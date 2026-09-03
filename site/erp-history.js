@@ -561,6 +561,19 @@
           "backoffice",
         ),
       );
+      /* Since PK12 a project cost names partida AND subpartida, so the two
+         years of history this module writes have to name one too — the demo
+         workspace is the first thing anybody opens, and a fixture that cannot
+         satisfy the product's own rule is not a fixture. First line of the
+         chapter, deliberately: inventing a spread would put figures on screen
+         that nothing decided. */
+      const lineIn = (projectId, chapterNum) => {
+        const hit = erp
+          .projectChapters(projectId)
+          .find((x) => String(x.chapter.num) === String(chapterNum));
+        const line = hit && hit.chapter.lines[0];
+        return line ? line.id : null;
+      };
       for (let d = 2; d < days; d += 7) {
         const day = workday(addDays(startDate, d));
         erp.setToday(day);
@@ -570,6 +583,7 @@
               workerId: w.id,
               projectId: prj.id,
               chapterNum: String(1 + (idx % 4)),
+              lineId: lineIn(prj.id, String(1 + (idx % 4))),
               date: day,
               hoursMilli: 8000,
             },
@@ -677,6 +691,7 @@
           {
             projectId: prj.id,
             chapterNum: "2",
+            lineId: lineIn(prj.id, "2"),
             kind: "material",
             amountCents: Math.round(totals.costBaseCents * 0.28),
           },

@@ -17,6 +17,19 @@ const SEED = process.argv[2] ? +process.argv[2] : 1;
 const SIM_MONTHS = +(process.env.SIM_MONTHS || 12);
 const SIM_PPM = +(process.env.SIM_PPM || 3);
 let _s = (SEED * 2654435761) % 2 ** 32;
+/**
+ * Where a project cost goes, since PK12: partida AND subpartida, by
+ * obligation. Spread into an allocation, it names the first subpartida of the
+ * chapter asked for — this simulation is about a year of trading balancing,
+ * not about which line inside a job a euro lands on, so any real destination
+ * serves; naming none is what the engine now refuses.
+ */
+const at = (engine, projectId, chapterNum) => {
+  const chapters = engine.projectChapters(projectId) || [];
+  const hit = chapters.find((x) => String(x.chapter.num) === String(chapterNum)) || chapters[0];
+  const line = hit && hit.chapter.lines[0];
+  return line ? { chapterNum: String(hit.chapter.num), lineId: line.id } : {};
+};
 const rnd = () => ((_s = (1103515245 * _s + 12345) % 2 ** 31), _s / 2 ** 31);
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -48,7 +61,7 @@ erp.state.clauseBlocks.push({
 
 // bank + till (BNK-06)
 const bank = erp.addBankAccount({ name: "Cuenta principal", kind: "bank", openingCents: 4200000 });
-const till = erp.addBankAccount({ name: "Caja efectivo", kind: "till", openingCents: 30000 });
+const till = erp.addBankAccount({ name: "Efectivo", kind: "bank", openingCents: 30000 });
 
 // suppliers (valid CIFs) — material supplier, subcontractor company, autónomo (IRPF)
 const supMat = erp.addParty({
@@ -428,7 +441,7 @@ function runQuickRepair() {
   erp.recordHours({
     workerId: pick([w1.id, w2.id]).valueOf(),
     projectId: prj.id,
-    chapterNum: "1",
+    ...at(erp, prj.id, "1"),
     hoursMilli: ri(2, 6) * 1000,
   });
   const inv = erp.issueInvoice({
@@ -482,7 +495,7 @@ function advanceProject(hnd) {
     const pu = erp.addPurchase({
       supplierId: supMat.id,
       projectId: prj.id,
-      chapterNum: "1",
+      ...at(erp, prj.id, "1"),
       desc: "Material obra",
       qtyMilli: 1000,
       unitCents: Math.round(t.costBaseCents * 0.25),
@@ -509,7 +522,12 @@ function advanceProject(hnd) {
         },
       ).id,
       allocations: [
-        { projectId: prj.id, chapterNum: "1", kind: "material", amountCents: pu.totalCents },
+        {
+          ...at(erp, prj.id, "1"),
+          projectId: prj.id,
+          kind: "material",
+          amountCents: pu.totalCents,
+        },
       ],
     });
     erp.payBills({
@@ -537,17 +555,17 @@ function advanceProject(hnd) {
         card: "V-1234",
       },
     ])[0];
-    erp.allocateMovementToProject(card.id, prj.code, "material");
+    erp.allocateMovementToProject(card.id, prj.code, "material", at(erp, prj.id, "1"));
     erp.recordHours({
       workerId: w1.id,
       projectId: prj.id,
-      chapterNum: "2",
+      ...at(erp, prj.id, "2"),
       hoursMilli: ri(30, 60) * 1000,
     });
     erp.recordHours({
       workerId: w2.id,
       projectId: prj.id,
-      chapterNum: "2",
+      ...at(erp, prj.id, "2"),
       hoursMilli: ri(30, 60) * 1000,
     });
     erp.markProgress(prj.id, "1", "done");
@@ -572,7 +590,7 @@ function advanceProject(hnd) {
       allocations: [
         {
           projectId: prj.id,
-          chapterNum: "3",
+          ...at(erp, prj.id, "3"),
           kind: "subcontract",
           amountCents: Math.round(t.costBaseCents * 0.2),
         },
@@ -588,7 +606,9 @@ function advanceProject(hnd) {
       number: "NC-" + prj.code,
       baseCents: 120000,
       vatBp: 2100,
-      allocations: [{ projectId: prj.id, chapterNum: "1", kind: "other", amountCents: 120000 }],
+      allocations: [
+        { ...at(erp, prj.id, "1"), projectId: prj.id, kind: "other", amountCents: 120000 },
+      ],
     });
     assert(
       b3.irpfCents === 18000,
@@ -660,7 +680,12 @@ function advanceProject(hnd) {
         baseCents: chg.costCents,
         vatBp: 2100,
         allocations: [
-          { projectId: prj.id, chapterNum: "3", kind: "subcontract", amountCents: chg.costCents },
+          {
+            ...at(erp, prj.id, "3"),
+            projectId: prj.id,
+            kind: "subcontract",
+            amountCents: chg.costCents,
+          },
         ],
       });
     }

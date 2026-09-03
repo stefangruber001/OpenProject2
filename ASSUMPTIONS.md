@@ -6768,6 +6768,565 @@ that direction; the mirror image is the one that ships, a check that passes
 because the property it reads is undefined. The assertion now names figures
 that appear in its own success message, so a missing field cannot be silent.
 
+### 206 · The schedule on a phone is a list, not a smaller chart (2026-08-30)
+
+The Gantt is a 190 px name column beside an SVG of `nDays × gZoom` pixels. On a
+390 px screen that is half the width spent on labels and a ~200 px window on the
+rest — about eight days of a job that runs twenty to sixty. The gestures were
+always touch-aware; `ganttWire` says so in its own comment. There was nothing
+legible to aim them at.
+
+**The first proposal was a «read-and-record» surface, and it was one control too
+many.** The same screen already renders `progressControl` below the chart, which
+is where progress is recorded, by partida, and it already works on a phone. What
+the phone lacked was a readable SCHEDULE: what happens, when, how far along, and
+what is late. So below 700 px `.gwrap` is replaced by a list of exactly that,
+and tapping a row opens the task drawer the desktop's name column opens — the
+phone loses the dragging, not the editing.
+
+**Both surfaces are rendered and CSS chooses**, rather than a width test at
+render time: a phone that rotates would otherwise keep whichever surface it
+booted with. Every figure comes from the same `sch` the SVG draws from, and the
+e2e now asserts that — each row's two dates are the schedule's own, checked
+against the schedule rather than against the chart's pixels. A list that
+recomputed its own would be a second answer to a question that has one.
+
+**Payment milestones are interleaved by date rather than listed apart.** A
+schedule is read forwards, and money falling due is one of the things that
+happens on a day.
+
+**The media query lost to the rule above it, twice in one package.** `.gwrap`
+is `display:flex`; a `@media` block written before it at equal specificity is
+overridden by document order, so both surfaces rendered. It now sits after
+`.glegend i`. Same failure as the CSS ordering bug earlier in this package —
+at equal specificity the later rule wins, and a media query buys no priority.
+
+### 207 · The source audit reads the literal, the miss ledger reads the DOM (2026-08-30)
+
+One screen's new rows moved both i18n gates, in opposite directions, for
+opposite reasons — and the lesson is the same one S2b learned one layer up.
+
+**The source audit reads what is written.** A row's sub-line was built by
+gluing the separator to the front of each word, so the audit saw four strings
+that no dictionary could ever hold, and the count went 207 → 211 against a
+ceiling of 207. It also caught a fragment out of the sort comparator, because
+`=> (a.date < b.date` looks exactly like markup to a regex that reads between
+`>` and `<`. Both fixed by restructuring the source — the words are joined by a
+separator held in one place, and the comparator uses `localeCompare` — never by
+moving the ceiling. **And the comment written to explain the fix quoted the
+offending fragment, which put it straight back in the count:** the audit reads
+comments too, which is stated in CLAUDE.md and was still worth learning twice.
+
+**The miss ledger reads what the browser rendered.** With the source clean, the
+crawl went 15 over: the translator walks TEXT NODES, so a row rendered as one
+string hands it the dates, the duration and the words as a single key. Splitting
+each word into its own element fixes it — the separators between elements are
+punctuation the ledger ignores, and `tr()`'s decoration pass already handles a
+word arriving with punctuation around it. The records — a contract number, a
+milestone's sequence — go in `translate="no"` spans, which is what the attribute
+is for.
+
+**So the bridge's payment-milestone projection now carries `number` and `seq`
+beside `label`.** The label is one string for the chart's tooltip; the two facts
+kept apart are what a caller needs to put the record in one span and the word in
+another. Splitting a formatted string back apart in the view would have been the
+alternative, and re-parsing your own formatting is how a display becomes a
+parser.
+
+Both gates finished exactly at their ceilings — 207 source, 43 EN / 103 CA
+rendered — measured with the process's own exit code, not a pipeline's.
+
+### 208 · The client report says which half of it is quoted and which is reconstructed (2026-08-30)
+
+Package 9 closes with the English report the operator has been owed since
+Package 8 — every observation from both sittings mapped to fixed, explained or
+deferred. Two decisions in it are worth keeping, because both were the choice
+between a tidier document and a true one.
+
+**The 28/08 column is written from the delivery record, and says so.** The
+eleven packages are described from `PROGRESS.md`'s ledger and the matching
+S31–S38 entries here. The operator's own wording was given in a session whose
+transcript no longer exists, so the report describes what each package CHANGED
+rather than restating what was asked, and a paragraph on the evidence page
+states plainly that this half is reconstructed and offers to map their notes
+line by line if they still have them. A report that paraphrases somebody's words
+while looking like it quotes them is worse than one that says which it is doing
+— and the packages are unaffected either way, so nothing was gained by blurring
+it.
+
+**The sweep is local, and says that too.** The plan called for a re-walk against
+the deployed build. This container cannot reach it: the proxy answers
+`CONNECT tunnel failed, 403` for the published address. So the seven items were
+re-checked against `site/` served from disk, which is byte-for-byte what
+`pages.yml` copies to the web — a strong check, and not the same as somebody
+opening the live URL. The report carries that distinction in a box rather than
+letting "verified" imply more than was done.
+
+**Every figure in the report is a gate's own output.** 652/652 browser checks,
+43/43 document PDF checks, 712 simulation invariants, 94 bank-import checks,
+132 unit tests, the four translation gates at their ceilings. Nothing is
+asserted that a run does not print, and no completion percentage appears at all
+— a percentage of "done" against a scope nobody has fixed is a number that
+cannot be wrong, which is exactly why it should not be published.
+
+**And the two repairs are in the report.** Two of this package's seven commits
+fixed breakages introduced during the work — one ours (the translation crawl
+skipped before a push because it is slow), one from a parallel session's change
+to the spreadsheet export. Both are named on the evidence page. A delivery
+report that shows only clean progress is an advertisement, and the operator has
+been reading these closely enough to notice the difference.
+
+### 209 · The reader needed one method the operator's phone did not have (2026-08-31)
+
+Every PDF the operator handed the workspace died on their iPhone with «undefined
+is not a function (near '…t of e…')». The file was fine — their own invoice
+reads in 190 ms here, 1,571 characters, extraction and all. `pdfjs-dist@6`
+calls `Promise.withResolvers()`, which arrived in Safari 17.4 (March 2024), and
+WebKit words a missing method exactly that way while quoting minified source
+near the call.
+
+**Found by experiment, not by reading release notes.** Each candidate API was
+deleted in turn and the operator's own PDF pushed through the real pipeline:
+
+```
+none (control)          ✓ read via text layer
+Promise.withResolvers   ✗ THE ONLY ONE that breaks it
+Object.hasOwn           ✓        structuredClone   ✓
+Array.findLast          ✓        Array.at          ✓
+withResolvers + shim    ✓ read via text layer
+```
+
+Four lines restore it. This is the «A3 Safari PDF crash» parked on 28/08 for
+want of a console line; the operator's screenshot was the console line.
+
+**The shim goes at the single door to pdf.js**, not beside a caller, because
+everything that reads a PDF goes through `ErpOcr.loadPdfjs()` — supplier-invoice
+capture, bank-statement import, the document preview, the thumbnailer. All four
+died together on that phone while photographs kept working, because tesseract
+does not use the method.
+
+**The worker is a second realm and needs its own copy.** `pdf.worker.min.mjs`
+calls it too, and a shim installed on the page cannot reach a worker. It is
+started through `site/pdfjs-worker-shim.mjs`, which installs the method and then
+`await import`s the real worker — dynamic, because a static import is hoisted
+and would run the worker before the shim. The vendored file stays untouched:
+its MANIFEST says it is generated, so a polyfill written into it would be erased
+by the next vendoring run, and erased silently. Verified in a browser: the
+worker spawns from the shim, requests `pdf.worker.min.mjs`, and parses.
+
+### 210 · «Escriba los datos a mano», on a panel with nothing to write in (2026-08-31)
+
+Chasing the Safari fault turned up a worse one underneath it. `captureStart`
+caught a failed reading, put the engine's own message in a toast — in English,
+on a Spanish screen — and **dropped the file**. The operator is left holding a
+document they now have to find again. Two lines above, the case where the reader
+RAN and found nothing keeps the file «never a dead end», written there on
+purpose; the case where the reader could not run got the opposite.
+
+**And that neighbour was not honest either.** With no reading, the panel printed
+one sentence telling the operator to type the data by hand and then rendered no
+inputs at all. The instruction was advice the screen made impossible to follow.
+The extraction capability refuses an empty document deliberately and its refusal
+says what should happen instead — offer manual entry with the image attached —
+so the host was simply not doing what it had been told. It now renders the same
+eleven rows, blank, every dot amber because nothing checked anything, and the
+save reads them.
+
+**The badge grew a third state**, because there are three: read from the PDF's
+text, read from a picture, and not read at all. A reader that never ran used to
+fall into the second and claim an image had been read — an empty panel under a
+badge saying otherwise, which is the kind of small lie that costs ten minutes.
+
+**Twice in two packages, the same trap:** the comment written to explain a fix
+quoted the Spanish phrase it was about, and the source audit reads comments, so
+the count went up by exactly that quotation. It is written in CLAUDE.md. The
+comment now says so out loud beside the rewording, since stating it once has
+demonstrably not been enough.
+
+### 211 · The obra follows the signature, not the filing order (2026-08-31)
+
+The operator drew up three contracts on one accepted quote, signed the third,
+and could not invoice. CON-11 was right about the record it was reading and
+useless about which record that was: the job had been pointing at the FIRST
+contract since the day it was created, and signing the third changed nothing.
+
+**Two writers, both answering "which contract?" with `find()`.**
+`createProjectFromAcceptance` took `contracts.find(c => c.budgetId === …)` —
+whatever was pushed first, draft or cancelled or superseded — and
+`signContract` never touched the link at all. The question is now asked in one
+place, `_bestContractForBudget`, and answered the way a person would: a
+signature settles it, and among signatures the most recent; failing that the
+newest live draft; and a cancelled contract is never the answer, which
+`cancelContract` already said in its own way by releasing the job.
+
+**Signing claims the job**, because that is what an operator means by signing
+it. Two refusals, both about not overwriting a fact with a default: a job held
+by another SIGNED contract is left alone — two signatures on one budget is a
+question for a person, and «Vincular obra» is where they answer it — and a job
+whose contract has an INVOICED milestone is left alone, because those invoices
+point at that contract's installments and re-pointing the job would leave the
+money describing a document it no longer belongs to.
+
+**The blocker names the record it read.** «Contrato sin firmar» was true and
+unusable while a signed contract for the same customer sat on the same screen.
+It now carries the number, and when a signed contract exists for the same
+budget it says so and where to go. The numbers ride in a `ref` field rendered
+in its own `translate="no"` element rather than inside `detail`, so the
+sentence still translates and the record still does not — A12's rule, applied
+to a new blocker rather than rediscovered later.
+
+**Migration 20 repairs what was written before.** Step 19 linked the jobs that
+had NO contract; this moves the jobs holding the wrong one. It never touches a
+job whose contract is signed, and never one whose contract has been invoiced —
+a pointer moves, nothing else. Proven by gutting the step: three checks go red,
+and the six refusal checks correctly stay green, because they assert that
+nothing moves.
+
+**One check earns its keep only after the fix.** «A second signature does not
+steal an obra from a signed contract» passed red-first too — of course it did,
+nothing moved before. It is not a regression test for the bug; it is the guard
+against the fix going too far, which is a different job and worth having.
+
+### 212 · An allocation distributes the cost, so it foots against the base (2026-08-31)
+
+The operator's supplier invoice — 2.483,80 base, 521,60 IVA, 3.005,40 total —
+was distributed across two partidas and one row with no partida, footing to the
+base, and the screen refused it. It was asking for the VAT-inclusive total and
+showing every percentage as a share of it, so a correct distribution read as
+four fifths of itself.
+
+**Two doors, two units, one cost figure.** `registerBill` and `allocateBill`
+have always said «Bill allocations must total the taxable base»;
+`allocateCapture` demanded `confirmed.totalCents`. `projectCostRows` adds both
+into `actualCostCents`. Input VAT is recoverable and is not a job cost, so the
+base is the right unit and the capture door was the wrong one.
+
+**A correction to what this session first claimed.** I described a catch-22 —
+that a split accepted by the capture screen could never be registered as a
+bill. It is not that: `billFromCapture` rescales what it is handed, so the
+promotion produced a correct bill. What it actually cost was the split being
+entered TWICE against two different numbers, because the bill drawer refuses
+the capture's rows and makes you retype them. The real silent error was
+elsewhere: a `ticket` capture never becomes a bill, so nothing ever restated
+it, and `projectCostRows` charged its job the tax along with the cost.
+
+**The basis is reconstructed rather than assumed** when the base is not stated:
+total − tax, which is exact — a document stating no tax has a base equal to its
+total. Zero means nothing is known, and the check asserts nothing rather than
+asserting against a figure it invented, which is the rule the unconfirmed case
+already followed.
+
+**The refusal moved to the screen.** The engine keeps the invariant as its
+backstop, but it throws in English and says nothing about how far off you are.
+The capture card now refuses first, in the operator's language — and the figure
+is NOT in that sentence: a toast is one text node, so a number inside it makes
+a key no dictionary can hold. The gap is already on the card as «Sin repartir»
+beside its own amount in its own element, which is where a person is looking.
+
+**Migration 21 restates what was filed under the old rule**, and only that: the
+document must be confirmed, state a base and a different total, and its rows
+must currently add up to that total. A split already footing to the base is
+left alone; one matching neither figure is left alone and not guessed at,
+because somebody edited it by hand. The proportions are the operator's and are
+preserved to the cent — their own three figures round-trip exactly, which is
+what the migration check asserts rather than a tolerance. Every restatement is
+written to the audit log.
+
+**Three existing tests encoded the old unit and were restated deliberately**,
+not nudged: the capture block's refusals now use the amount that would
+otherwise have been accepted, so each fires for the reason it names; the
+promotion block enters the base and asserts the figures survive unchanged; and
+the rescale that used to be exercised incidentally is now exercised on purpose,
+with a legacy gross split, because it is still the safety net for documents
+allocated before this change and an untested safety net is not one.
+
+**And a fragility surfaced rather than caused:** an older block reaches for
+`erp.state.bills[0]` by index, so registering a bill anywhere earlier in the
+file silently handed it somebody else's document. The new block moved to the
+end rather than re-key an assertion that is not what is under test.
+
+### 213 · The reader was not misreading — it was not looking (2026-08-31)
+
+The operator photographed a supplier invoice and four fields came back empty.
+The diagnosis that matters came from running the PDF's own TEXT LAYER through
+the same pipeline: perfect input, and issuerName, issuerTaxId and docNumber
+were still null while orderRef returned «/ REFERENCIA». Better photographs
+would have fixed none of it. The rules were the problem.
+
+**The tax-id pattern could not see a hyphen.** `\b[A-Z]?\d{7,8}…` requires the
+letter to touch the digits, so «C.I.F. B-62889417» matched at the digits,
+dropped the B, failed its own shape test and returned nothing. One character
+class. That notation is how a great many Spanish suppliers write a CIF.
+
+**The issuer is never labelled, and never will be.** The keywords were «razón
+social», «emisor», «proveedor» — words that appear on almost no real invoice.
+A supplier's name is the largest text at the top, announced by nothing. It is
+now found by what IS true of it: in the head, not a date or an amount or an
+address, and joined across the line it wrapped onto — «SUMINISTROS CERDA» /
+«MATERIALS, S.L.» — using legal suffixes the PROFILE supplies, because knowing
+where a company name ends here is jurisdiction knowledge. Confidence stays low
+and the dot stays amber: it is a guess about a name nothing can check.
+
+**Every document names two companies, and both look alike.** Position settles
+it: below «FACTURAR A» the name and the tax id belong to whoever is billed.
+The profile supplies those markers; the capability uses them as a boundary and
+knows nothing about the words. This mattered more than expected — on the
+operator's document the CUSTOMER's CIF validates and the issuer's does not (it
+is a simulated number), so the reader was confidently returning the wrong
+company and scoring it well. A tenant-level `exclude` hint carries our own name
+and tax id as a second line of defence.
+
+**The heading and its contents are different lines.** A text field could only
+ever take what followed its label ON that line, so «FACTURA» over «N.o
+F-2026/4471» yielded nothing, and «OBRA / REFERENCIA» yielded the rest of its
+own heading. Now: label residue is discarded, and when the line is nothing but
+label the line below is read instead. Gated on the line being a heading —
+without that gate the rule reached past a line that did carry its value and
+took the line-items table header, which the pack's own fixture caught.
+
+**And `contrato`, `presupuesto` and `albarán` were not in the vocabulary at
+all.** The operator's invoice states «Contrato: CTR-2026-0004» and
+«Presupuesto: PRE-2026-0009» — the two references that tie a supplier's
+document to our job, our contract and our accepted quote — and the reader was
+throwing them away. `orderRef` now returns the contract number.
+
+**A derived amount may not vouch for itself.** When the recogniser keeps a
+figure and loses the words naming it, two of {net, tax, total} give the third
+by subtraction. But the totals check would then pass by construction, and the
+field would go green on the strength of arithmetic it was built to satisfy. So
+`derived` is a field of its own on the model, and `applyVerdicts` refuses to
+validate a derived amount. It stays amber and stays on the review list.
+
+**Two mistakes of mine, both caught by existing tests.** The residue rule first
+demanded three consecutive letters and threw away «OB-2026-014» and
+«F-2026/0417» — real references, mostly digits; a reference is not prose and
+must not be tested as though it were. And the comment explaining the derivation
+quoted the jurisdiction's own words for the tax inside a CAPABILITY, which the
+boundary linter refused, exactly as CLAUDE.md says it will.
+
+**One existing check asserted the defect as the specification.** It said the
+issuer «is the one field the reader routinely cannot find» and asserted the
+card showed «sin confirmar». It now asserts the name. The fallback still exists
+for a document that genuinely states no issuer; what changed is that this one
+states it.
+
+**Measured, on the operator's own document, text layer, no OCR:**
+
+```
+                 before              after
+issuerName       —                   SUMINISTROS CERDA MATERIALS, S.L.
+issuerTaxId      —                   B62889417   (amber: invented number, fails its check)
+docNumber        —                   F-2026/4471
+orderRef         "/ REFERENCIA"      CTR-2026-0004
+```
+
+### 214 · Facturación on a phone, and the jobs nobody could find (2026-08-31)
+
+Four small things, three of them measured at 390 px before anything was
+changed.
+
+**A drawer 134 px wider than the phone, because of one `<select>`.** A grid
+item floors at its content, and a select's content is its longest option —
+«P-2026-0009 · Ignacio Fernández · Carrer Francesca…». So the obra picker set
+the width of the whole «Nueva factura» drawer and dragged its paragraph and its
+button off the right edge. `min-width:0` on `.field`, `max-width:100%` on the
+controls.
+
+**An invoice preview at x = −91, clipped on BOTH sides.** `.condoc` centres,
+and centring a child wider than its box puts the left overflow at a negative
+scroll position no scrollbar reaches. This is the failure PK9-S4 first
+hypothesised for the contract pane and measurement disproved there — it was
+real here, on a screen nobody had measured, and the reason the contract fits
+while the invoice does not is the line-items table's 573 px min-content.
+
+**And the trap in fixing it.** Releasing the container alone shrank the sheet
+to 370 px and left the table at 520 inside it — `.sheet` clips rather than
+scrolls, so the right-hand column went off the page, and on an invoice the
+right-hand column is the amounts. That would have traded an unreachable margin
+for an unreadable figure. It took three attempts to find the real floor:
+`table-layout:fixed` did nothing, `overflow-wrap` on cells did nothing, and the
+measurement that mattered was the ancestor chain — `.inner` is a FLEX container
+and the page table inside it floored at `min-width:520px`. Exactly the trap
+PK6-A recorded for the document class that this renderer replaced, one level
+deeper and never re-applied. The check now walks every cell and asserts none is
+cut, not merely that the sheet fits.
+
+**«Invoice · Sin numerar».** The unnumbered preview's note about itself was
+written in Spanish straight into the facts adapter, so it printed Spanish on an
+English document. No gate could see it and none was at fault: a document is
+`translate="no"` on purpose, so the rendered-text crawler skips it, and
+`erp-facts.js` is not one of the four files the source audit reads. The fix is
+architectural rather than a dictionary entry — the phrase is the SYSTEM
+speaking on the document, not anything the document says, so it belongs in the
+document label layer, and `docFor` now receives that layer. Everything else in
+that file is data and still must never be translated.
+
+**«Obras», not «Avance físico».** Both children of Proyectos were named after
+what you DO to a job, so a person looking for their jobs found two verbs and no
+noun — which is what the operator asked about. PRY-01 IS the register of obras
+until a row is opened; its own subtitle says so. The code is unchanged, because
+the code is what the specification names and the label is what a person reads.
+
+**And the documented trap, walked into anyway.** The comment explaining that
+rename went between `subs:` and its first entry, which breaks the navigation
+manifest's strict regex — a hazard written in that very file, three lines
+above, by whoever hit it last. It is now outside the object like its neighbour,
+and says so.
+
+### 215 · The archive could not remove anything, and its duplicate check did not fire (2026-08-31)
+
+The operator filed one supplier invoice twice — once as an image, once as a PDF
+— and the register showed the two side by side with no warning and no way to
+remove either.
+
+**CAP-05 existed and was too brittle to fire.** The rule was
+`issuerTaxId === issuerTaxId && docNumber === docNumber`. The READER had changed
+between the two captures (PK10-S4 landed in between), so the copies disagreed
+about the tax id and the rule failed on the first occasion it was needed.
+Identity that requires every field to have been read the same way stops working
+the day the reader improves — which, in a product whose reader is being
+improved, is a matter of time.
+
+**And it was wrong in the other direction too.** Two documents nobody had
+confirmed both carried an empty tax id and an empty number, and `"" === ""`
+made every blank document a duplicate of every other one.
+
+**The rule now says what identity actually is.** A number identifies a
+document; an issuer identifies who wrote it, and may be known by a tax id OR by
+a name — either will do. Failing a number on both, the same issuer billing the
+same amount on the same day is the same document; nobody sends two. Empty never
+matches empty, in any clause. Names are folded the way `findDuplicateParty`
+already folds them, because two people typing «Vallès» will not agree.
+
+**Derived on read, not stamped at confirm.** `confirmCapture` stamped the flag
+at the moment of confirming, so a pair that only becomes recognisable LATER —
+because the reader improved, or somebody corrected a tax id by hand — stayed
+unflagged for ever. That is exactly the pair on the operator's screen: no
+migration would have helped, because neither document was ever going to be
+confirmed again. One pass over the register costs nothing and cannot go stale.
+
+**`deleteCapture` is new, and has one refusal.** A capture is a photograph plus
+what somebody confirmed about it, and both are undoable until it becomes a
+BILL — at which point it is an accounting record with a supplier, a due date
+and a place in the payables ledger, and deleting the photograph would leave that
+record describing a document nobody can produce. So: refused, naming the bill
+number and saying to void it first. Everything else can go, including an
+allocated one, because deleting a duplicate is precisely when you need to.
+
+**Deliberately NOT added to `apps/web/lib/erp-commands.ts`.** The workspace
+saves through a whole-document PUT, so the screen does not need the command
+API — and that file's own header says adding a command should be a deliberate
+edit, not a side effect. An unused remote deletion door is surface for no
+current need.
+
+**The split-sentence trap, a third time.** The confirmation body was assembled
+from three pieces so it could mention the allocation only when there was one —
+and a modal body is one text node, so the audit reported the fragments. Two
+whole sentences, chosen. It is written down twice already; the pattern to
+watch for is any user-visible string built with `+`.
+
+### 216 · The supplier picker answered a question nobody asked it (2026-08-31)
+
+The operator photographed an invoice from SUMINISTROS CERDA MATERIALS, assigned
+it to an obra, and the cost rows named a different company entirely. The
+document was right, the screens were right, and the bill between them was wrong.
+
+**A `<select>` with no empty option is never unanswered.** The drawer proposed
+a supplier when the tax id on the page matched one in the party file, and when
+it matched nobody it proposed nothing — so the browser proposed the FIRST
+supplier in the list, which is not a proposal, it is an answer. The comment
+three lines above described the intent exactly: «a tax id can be read off a
+page, but binding a cost to the wrong company is not a choice a screen should
+make alone». The intent was right and unimplemented. There was a warning pill,
+and a warning that nothing refuses is decoration.
+
+**The engine's guard was unreachable, not absent.** `billFromCapture` has
+always refused a missing `supplierId`; a control that always has a value can
+never deliver one. The empty option now exists and is the default, the form
+refuses on it in the operator's language, and `registerBill` states the same
+rule at the bottom so the next screen to be written cannot get there either.
+
+**The way out is on the same screen as the problem.** The issuer was not in the
+party file because it had never been created — the honest state, and the
+operator was looking at a form that refused to accept the answer they were
+holding. There is now a name field, a tax-id field, both filled in from the
+document, and a button that creates the supplier and selects it.
+
+**Both fields are editable, and that is what found the second bug.** The reader
+returned `B62889417` from the operator's real invoice, and it is not a valid
+identifier: the check character does not match the seven digits before it, so a
+digit was mis-read (the arithmetic gives `5`). The party file is right to refuse
+it. A button that filed whatever it was handed would have been a dead end at the
+exact moment the operator has the paper with the correct number on it.
+
+**The tests were encoding the defect.** Three e2e blocks opened the drawer,
+filled in a number and a base, and pressed Registrar without ever touching the
+supplier — passing only because of the silent default. They now choose one, and
+a new block walks the whole unknown-issuer path: refused, corrected, created,
+filed.
+
+### 217 · A bill could be wrong about the one thing it could not change (2026-08-31)
+
+Three doors were shut around the same mistake. `correctBill` allows the numbers
+on the page — base, rate, number, dates — and not the issuer, which is right for
+transcription and wrong for identity. Nothing deleted a bill. And `deleteCapture`
+refused precisely BECAUSE a bill pointed at the document, so the photograph was
+held shut by the record that should never have existed. Entry 215 above ends by
+telling the operator to «void the bill first»; there was no such door.
+
+**`reassignBill` re-derives the withholding rather than carrying it across.**
+The rate is a property of who issued the document, so keeping the previous
+party's would leave the total describing neither company. The audit line names
+both, because a supplier that changes silently is a worse record than one that
+is wrong.
+
+**`deleteBill` releases rather than dangles.** The captured document goes back
+to being a validated capture — the state it was in a moment earlier — and the
+purchase order goes back to delivered-and-not-yet-invoiced, which is what it
+once more is. A record pointing at an id that no longer exists is the failure
+the method exists to avoid.
+
+**It refuses on a CODE, not a sentence.** `billDeleteBlock` returns `paid`,
+`quarter-sent`, `reconciled` or `credited` and the screen writes the sentence,
+the same shape `_discardableMovement` already had — because a screen that must
+disable a button needs the reason before anybody presses it, and «no» with no
+reason is a wall.
+
+**And one line that had quietly opted out of the rule.** `projectCostRows` read
+`party(b.supplierId).name` for its `party` field while using the stamped
+`billSupplier` for `desc` — in a method whose neighbours all quote the document.
+Renaming a supplier would have rewritten who issued a cost booked years earlier;
+deactivating one would have thrown inside a report. It quotes the invoice now.
+
+### 218 · Emptying an account is a different act from undoing an import (2026-08-31)
+
+The operator asked whether the bank and card movements could be cleared to run a
+test. Most of it existed: **Bancos → the account → Deshacer** undoes an import
+or discards what nobody has touched, and a credit card is a `bankAccount` with
+`kind: "card"`, so one door already served both.
+
+**What did not exist was the case they were actually asking about.**
+`_discardableMovement` keeps everything anyone has touched — matched, allocated,
+marked as needing no invoice — which is exactly right for a statement loaded
+onto the wrong account and exactly wrong for starting a trial over, because the
+movements you most want gone afterwards are the ones you spent the trial
+reconciling. Undoing those meant `unmatchMovement` one at a time, and nobody
+does that four hundred times.
+
+**So `resetAccountMovements` unwinds instead of skipping**, voiding the payments
+and collections the reconciliations created so nothing is left claiming a bill
+was paid by a movement that no longer exists. It is shown in its own card, with
+its own count of what would have to be undone, because agreeing to discard the
+untouched ones is not agreeing to this.
+
+**One refusal, and it is not about lost work.** A closed period is a boundary
+somebody deliberately drew, and a test reset is not a reason to cross it. It is
+reopened first, in the open, with a reason — or the movements stay.
+
+**Scoped to one account.** «Clear the movements» is a sentence about a database;
+every real version of it is about one statement, one card, one till. An account
+at a time is a mistake that can be re-imported rather than one that cannot.
+
 ## S43 · PK-N — a Word file is the same document, not a second one (2026-08-29)
 
 The operator asked for every generated PDF to exist as a Word file too, an

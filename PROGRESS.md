@@ -1829,16 +1829,247 @@ Seven observations from the operator walking the live build on a phone. Plan:
 `/root/.claude/plans/witty-hatching-alpaca.md`. Any resume reads THIS table and
 continues with the first session not marked done.
 
-| Session | Scope                                                                                    | Status                                                                                                     |
-| ------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61                                    |
-| S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts |
-| S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | **done** — atProgressPct + validation, linkContractToProject, Ley 3/2004 entry, terms guarded              |
-| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | **done** — fluid below 700px; 794→364px, desktop guarded at A4, print and PDF proven untouched             |
-| S5      | the Gantt on a phone — read-and-record below ~700 px, desktop untouched                  | pending                                                                                                    |
-| S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | pending                                                                                                    |
+| Session | Scope                                                                                    | Status                                                                                                                    |
+| ------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| S1      | quote PDF drops exclusiones/supuestos · S curve cannot move · ＋ on the conditions lists | **done** — 637/637 e2e, doc-pdf 43/43 (41/43 red first), tracking 61/61                                                   |
+| S2      | Adicionales becomes a register: no project bar, no counter cards, CHG-04 marking kept    | **done** — register + row drawer, engine-wide `extrasRegister()`, and site-syntax now reads inline scripts                |
+| S3      | milestones at 10–90 % de avance · the «Obra —» link · LEGAL_REVIEW · terms whitelist     | **done** — atProgressPct + validation, linkContractToProject, Ley 3/2004 entry, terms guarded                             |
+| S4      | the contract sheet on a phone (`.sheet` is a fixed 210 mm page)                          | **done** — fluid below 700px; 794→364px, desktop guarded at A4, print and PDF proven untouched                            |
+| S5      | the Gantt on a phone — a timeline list below 700 px, desktop untouched                   | **done** — `ganttList` beside the chart, CSS chooses; 652/652 e2e, both i18n ceilings met exactly                         |
+| S6      | sweep + the ENGLISH client report (28/08 and 29/08 observations)                         | **done** — seven items re-walked on the final tree; report at `docs/clients/canei-subirats/informe-revision-2026-08.html` |
 
 Decided with the operator and NOT to be re-opened: Adicionales keeps its menu
 row (the relocation was designed, then cancelled to de-risk); milestone
 triggers become concrete progress percentages; the 8 %/year late-payment
 interest stands as explained.
+
+**Package 9 is closed (2026-08-30).** Seven commits — `120724d` `2e9d26d`
+`03975a2` `70efb17` `9223f62` `879ce4b` `56e98d0` — each green on all four
+workflows. Final sweep on `56e98d0`: 652/652 site-e2e, 43/43 doc-pdf, 712
+simulation invariants, 94 bank-import checks, 132 unit tests, source-audit
+207/207, workspace-audit 0, miss-crawl 43 EN / 103 CA — every gate exactly at
+its ceiling. The client report covering BOTH review sittings is committed at
+`docs/clients/canei-subirats/informe-revision-2026-08.html` (English, five A4
+pages, prints from the browser). Carried forward, named in the report and not
+built here: re-basing a plan whose work started before its first task; extras
+attached directly to a contract; the contract's Anexos tab as anything more
+than a read-only mirror. Blocked on the operator: the Safari PDF crash (needs a
+console line) and IBAN + logo in Configuración › Empresa.
+
+## Package 10 — the 31/08 live-build review (started 2026-08-31)
+
+Seven observations from the operator working the LIVE server on an iPhone.
+Every cause below was measured against running code before this table was
+written — reproduced, not inferred. Any resume reads THIS ledger and continues
+with the first session not marked done.
+
+| Session | Scope                                                                                            | Status                                                                                                                                           |
+| ------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| S1      | the document reader on an older Safari — `Promise.withResolvers`; and a capture that never dies  | **done** — polyfill at the one door to pdf.js plus a worker shim; a failed read now keeps the document; 657/657 e2e, 4 of 5 new checks red first |
+| S2      | the obra follows the signature — the right contract, at creation and at signing; CON-11 names it | **done** — `_bestContractForBudget`, signing claims the job, CON-11 carries a `ref`, migration 20; 660/660 e2e, 6 sim checks red first           |
+| S3      | an allocation is a COST — the base imponible, both doors, tickets, migration 20                  | **done** — basis is the taxable base, percentages with it, migration 21 restates filed splits; 662/662 e2e, 438 sim                              |
+| S4      | the reader reads — tax-id shape, the issuer, the document's own vocabulary, derived amounts      | **done** — 4 blank fields filled and the label residue replaced by the contract number; 662/662 e2e                                              |
+| S5      | Facturación on a phone · the untranslated invoice placeholder · Obras by name                    | **done** — drawer 134px→0, preview −91px→whole with no cell cut, the note translates, Proyectos names Obras                                      |
+
+**PK10-S6 (2026-08-31, after the package was closed).** The operator filed one
+supplier invoice twice and found the archive had no delete and no duplicate
+warning. CAP-05 existed but compared the tax id AND the number, and PK10-S4 had
+changed how the tax id is read between the two captures — so the rule failed on
+the first occasion it was needed, and would have gone on failing because the
+flag was stamped at confirm time and neither document would be confirmed again.
+The rule now identifies a document by its number plus EITHER the issuer's tax id
+or its name, falls back to issuer + date + amount when there is no number, never
+matches empty against empty, and is derived on read. `deleteCapture` refuses
+only once the document has become a bill.
+
+**Package 10 is closed (2026-08-31).** Five commits — `0b3bcb4` `487e376`
+`1687f07` `df0aab8` and this one — each green on the full battery. Final state:
+668/668 site-e2e, 438/438 manageability, 104/104 migration checks, 43/43
+doc-pdf, 94 bank-import checks, source-audit 207/207, workspace-audit 0,
+miss-crawl 43 EN / 103 CA — every gate at its ceiling. Two schema steps landed:
+20 (the job points at the contract that was signed) and 21 (a document's split
+is restated against the taxable base), both of which repair live data and both
+of which refuse to touch a record that has already been invoiced.
+
+Carried forward, unbuilt and named: re-basing a plan whose work started before
+its first task; extras attached directly to a contract; the contract's Anexos
+tab as anything more than a read-only mirror; and a corpus of real supplier
+invoices with expected fields, which is what would turn extraction accuracy
+into a number CI can hold rather than four fixtures. Blocked on the operator:
+IBAN and logo in Configuración › Empresa. The Safari PDF crash is CLOSED — it
+was `Promise.withResolvers`, and S1 fixed it.
+
+### The seven, and what was measured
+
+1. **PDF upload dies on the phone.** `pdfjs-dist@6.2.108` calls
+   `Promise.withResolvers()` — iOS Safari 17.4+, Chrome 119+, Firefox 121+.
+   Older Safari words the miss as «undefined is not a function (near '…t of
+   e…')», which is what the operator photographed. **Proved by experiment:**
+   deleting each candidate API in turn, only `withResolvers` breaks the path,
+   and a four-line polyfill restores it. The same fault kills bank-statement
+   PDF import, the document preview and the thumbnailer. Tesseract does not use
+   it, which is why photographs still work. This is the parked «A3 Safari PDF
+   crash» from 28/08 — the console line it was waiting for.
+2. **A signed contract cannot invoice its obra.**
+   `createProjectFromAcceptance` takes `contracts.find(c => c.budgetId === …)`
+   — the FIRST contract on the budget, draft or cancelled or superseded — and
+   `signContract` never touches the link. So the obra points at a draft, CON-11
+   reads that draft, and signing the real contract changes nothing. CON-11's
+   message never names the record it read.
+3. **The allocation split is checked in the wrong units.** `allocateCapture`
+   demands the split total `confirmed.totalCents` (GROSS); `registerBill`
+   demands `baseCents` (NET) — and `billDrawer` seeds the bill from the
+   capture's own rows, so satisfying the first guarantees the second refuses.
+   A catch-22 with no way through. `projectCostRows` sums both into one figure,
+   and a `ticket` capture is counted directly — at gross, VAT included.
+4. **Extraction misses fields a perfect text layer contains.** Measured on the
+   PDF text layer, not OCR: issuerName, issuerTaxId and docNumber all null, and
+   orderRef returns the label residue `/ REFERENCIA`. The tax-id pattern cannot
+   match `B-62889417` (no separator allowed after the leading letter); the
+   issuer is never labelled on a real invoice; `FACTURA` and `N.o F-2026/4471`
+   sit on different lines; `Contrato:` and `Presupuesto:` — the references that
+   would link the invoice to a job — are not in the vocabulary at all.
+5. **Two Facturación surfaces do not fit a phone.** The «Nueva factura» drawer
+   overflows 134 px because `.field` floors at the longest `<option>`; the
+   invoice preview sits at x = −91 in a 390 px viewport because `.condoc`
+   centres a child that floors at the document's 573 px min-content. Fixing the
+   container alone silently CUTS the 520 px line-items table, so the sheet's own
+   table needs its phone treatment in the same commit.
+6. **A Spanish string on an English invoice.** `erp-facts.js:674` hardcodes
+   «Sin numerar — el numero se asigna al emitir» (accent missing too). No gate
+   sees it: documents are `translate="no"` by design and `erp-facts.js` is not
+   in the source audit's file list.
+7. **Obras has no name.** `SECTIONS` gives Proyectos two children, both named
+   after verbs. The register of jobs is the landing state of «Avance físico»
+   and again of «Avance económico», and nothing on a phone says the jobs are
+   there.
+
+## Package 11 — the invoice filed against the wrong company (started 2026-08-31)
+
+Two questions from the operator, working the live server: an invoice assigned to
+an obra showed a different supplier than the document it came from, and could the
+bank and card movements be cleared to run a test. Both causes below were read out
+of running code before this table was written.
+
+| Session | Scope                                                                                             | Status                                                                                                                             |
+| ------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| S1      | the supplier picker must not choose — an empty default, a refusal, and a way to create the issuer | **done** — 3 e2e blocks were encoding the defect and now choose; 19/19 in the suite, 4 checks red first                            |
+| S2      | a way back — `reassignBill`, `deleteBill`, and the capture it releases                            | **done** — a mis-filed bill can be re-filed or removed, and `deleteBill` releases the document `deleteCapture` was holding shut    |
+| S3      | a cost row quotes the invoice, never the party file                                               | **done** — `projectCostRows` reads the stamped issuer for `party` too, the one field still reaching for the live party file        |
+| S4      | emptying an account for a trial run, distinct from undoing an import                              | **done** — `resetAccountMovements` unwinds reconciliations instead of skipping them; one account, refusing only on a closed period |
+
+**What was measured.**
+
+1. **The supplier picker answered for the operator.** `billDrawer`'s `#bd_sup`
+   had no empty option, so when the tax id read off the page matched no party
+   the browser selected the FIRST supplier in the list. `billFromCapture`'s
+   `if (!o.supplierId) throw` has always existed and can never fire, because a
+   `<select>` with options always has a value. The warning pill was there and
+   refused nothing.
+2. **The reader mis-read a digit of the tax id.** `B62889417` is not a valid
+   identifier — the check character does not match the seven digits before it;
+   the arithmetic gives `5`. So the issuer could not have been matched even if
+   it HAD been on file, and a create-supplier button that filed what it was
+   handed would have been refused by the party file.
+3. **Nothing downstream was wrong.** `registerBill` stamps `supplierName` onto
+   the record and `billSupplier` reads the stamp, so the cost rows were quoting
+   what was filed. The report was honest about a bill that was not.
+4. **And the mistake had no exit.** `correctBill`'s allow-list has no
+   `supplierId`; there is no `deleteBill`; and `deleteCapture` refuses while
+   `c.billId` is set — so the document was held shut by the record that should
+   never have existed.
+5. **`projectCostRows` read the party file for one field.** `party:` took
+   `this.party(b.supplierId).name` while `desc:` used the stamped
+   `billSupplier` — in a method whose other three sources all quote the
+   document. Latent here, and a silent rewrite of history the day a supplier is
+   renamed.
+6. **The movement cleanup mostly existed.** Bancos → the account → «Deshacer»
+   offers per-import undo and discards the untouched, and a credit card is a
+   `bankAccount` with `kind: "card"`, so one door already served both. What did
+   not exist is the case actually asked for: `_discardableMovement` KEEPS
+   everything anyone has touched, and the movements a trial most wants gone are
+   the ones it spent the trial reconciling.
+
+**Package 11 is closed (2026-08-31).** One commit, `6c23be5`, green on the full
+battery: 678/678 site-e2e unfiltered, 471/471 manageability with the
+`reassignBill`, `deleteBill` and `resetAccountMovements` checks red first,
+104/104 migrations, 43/43 doc-pdf, 94 bank-import, source-audit 207/207 in both
+languages, workspace-audit 0. The rendered-text crawl came DOWN — 41 EN and 101
+CA against ceilings of 43 and 103 — because the dictionary entries this package
+added covered two strings each language was already rendering untranslated, so
+the CI ceilings were ratcheted to 41 and 101 rather than left with slack in them.
+
+No schema step. Nothing here restates stored data: the mis-filed bills on the
+operator's workspace are repaired by hand, through the screen the package adds,
+because only a person can say whether a given invoice is real-and-mis-attributed
+(reassign) or should never have been filed at all (delete). A migration that
+guessed between those two would be inventing accounting records.
+
+## Package 12 — the 02/09 working session (started 2026-09-02)
+
+A continuous stream of operator reports against the live server, each one worked
+from running code before it was written down. Twelve commits, every one green on
+the unfiltered battery before it landed.
+
+| Session | Scope                                                                         | Status                                                                                                            |
+| ------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| S1      | a refused deletion names the place, not just the step                         | **done** `d066601` — the refusal was right; it said what blocked and never where to go and undo it                |
+| S1b     | one register, not a tray beside it                                            | **done** `893f0c8` — Bandeja and the register were the same documents counted twice on one screen                 |
+| S2a     | «Pagar» goes; whether money moved is the question                             | **done** `889835a` — pressing it wrote a payment for an invoice nobody had paid, then refused to release the bill |
+| S6      | accounts belong to the company, and can finally be removed                    | **done** `20a4550` — created on a screen for reading balances, deleted nowhere at all                             |
+| S6b     | three buttons that went where the tab beside them goes                        | **done** `088ba2f` — each selected a tab already in the strip a centimetre above it                               |
+| S4      | the deviation column is the subtraction it looks like                         | **done** `fd893f5` — correct arithmetic on a projection that appeared in no column of the table                   |
+| S4b     | the same six columns one level down, at subpartida                            | **done** `9d122f1` — the table named the problem and could not locate it inside the chapter                       |
+| S5      | the panel after a match says so, and Cerrar is not the act                    | **done** `97f486b` — the match had already run a step earlier; Cerrar looked like the thing that did it           |
+| S2      | every euro on a job names its partida and its subpartida                      | **done** `03c7184` — `_lineAlloc` normalised the gap away; the seed held 479 violations and now holds none        |
+| S4c     | the budget is fixed — an adicional changes it, not a screen                   | **done** `ace7f15` — «Ajustar» was a second way to change a number the contract owns                              |
+| S10     | a document shows all its columns on a phone                                   | **done** `1e7d662` — the host's `table{min-width:520px}` inside a caged sheet that clips rather than scrolls      |
+| S6c+S9  | deactivating retires an account; one with history can be deleted; iOS imports | **done** `ae52d75` — `activeBankAccounts()` had zero callers; the delete refusal was computed and shown nowhere   |
+
+**What was measured.**
+
+1. **The assignment rule inverted a default.** `_lineAlloc` opened with
+   `if (!alloc.lineId) return { ...alloc, lineId: null }` — a missing
+   destination normalised away and nothing further asked. Turning that into a
+   refusal took the seed from **479 violations to 0** and surfaced five
+   pre-existing defects the targeted suites had all been passing over, among
+   them three data-entry screens with no subpartida control at all and
+   `repeatDay` silently dropping the field when it copied a day.
+2. **A method with no callers.** `activeBankAccounts()` was written to keep a
+   deactivated account out of the pickers, was correct, and was called by
+   nothing anywhere in `site/`. The operator switched accounts off and watched
+   them stay. The test that covered it asked the ENGINE whether the method
+   omitted them, which it always did — a test that questions the engine about a
+   screen's behaviour passes while the screen is broken.
+3. **A refusal computed and never spoken.** `bankAccountDeleteBlock` returned a
+   reason and the screen rendered a disabled button with no title, so a rule
+   became a dead control. The same shape as S1: the engine was right and the
+   screen was silent.
+4. **A screen floor inside a document.** `table{min-width:520px}` keeps a
+   register readable and is unscoped, so it also pinned a quote's line items at
+   520px inside a 278px column while `.sheet{overflow:hidden}` swallowed the
+   difference — the amounts, with nothing to scroll. The floor had been found
+   and answered twice before, for carded tables and for the document class this
+   renderer replaced; neither fix reached here.
+5. **Two iOS file inputs opened by script.** A hidden `<input>` driven by
+   `.click()` never produces a file dialog on iOS Safari. «Importar extracto»
+   did nothing on the operator's phone, and the visit screen's camera fallback
+   did the same from inside a `catch` block — the fallback for a failed camera,
+   silent on the device most likely to need it.
+6. **The mobile document check measured the paper.** It asserted the sheet's
+   left edge was reachable and its right edge on screen, and passed throughout
+   while the columns inside were being clipped. It now asks whether the sheet
+   hides its own content and whether any cell prints wider than its cell.
+
+**Still open at the end of the package.** S7 (cash as a bank withdrawal, and
+retiring the `till` kind the operator said is not needed), S8 (period lock with
+"everything in the period assigned" as its precondition), and the iOS parity and
+TestFlight request, which is the oldest open item and has never been answered in
+full.
+
+**Governance.** This section was written eleven commits late. `PROGRESS.md` had
+not been touched since Package 11 closed on 31 August while twelve commits
+shipped, which is the rule in `CLAUDE.md` §3 broken quietly for a whole package
+— the code was green every time and the record was not kept. Noted here rather
+than tidied away, because the Definition of Done asks for governance files that
+are honest and current, and for a while these were neither.

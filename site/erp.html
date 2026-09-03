@@ -836,6 +836,60 @@
       }
 
       /* ---------- Gantt (spec §3.3 · §4.3) ---------- */
+      /* One schedule, two surfaces. 700px is where S4 put the document
+         boundary and the reasoning is the same: below it the screen is a phone
+         and a fixed-width instrument stops being readable. The chart keeps
+         everything it has above the line — this rule is the entire extent of
+         the change. */
+      .gmob {
+        display: none;
+      }
+      .gmob .gmrow {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .gmob .gmrow.late {
+        border-left: 3px solid var(--danger);
+      }
+      .gmob .gmrow.now {
+        border-left: 3px solid var(--green);
+      }
+      .gmob .gmtop {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+      }
+      .gmob .gmt {
+        flex: 1;
+        font: 600 13px var(--sans);
+        color: var(--ink);
+      }
+      .gmob .gmt .dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--danger);
+        margin-right: 6px;
+      }
+      .gmob .gmpct {
+        font: 600 12px var(--sans);
+        color: var(--muted);
+      }
+      .gmob .gmsub {
+        margin-top: 4px;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+      .gmob .gmsub b.late {
+        color: var(--danger);
+      }
+      .gmob .bar {
+        margin-top: 6px;
+      }
+      .gmob .gmrow.pay .gmt {
+        color: var(--blue);
+      }
       .gwrap {
         display: flex;
         align-items: flex-start;
@@ -1025,6 +1079,20 @@
         border-radius: 2px;
         margin-right: 4px;
         vertical-align: -1px;
+      }
+      /* AFTER .gwrap/.gtools/.glegend, deliberately: they are declared above
+         at the same specificity, and the later rule wins. Placed before them
+         this query rendered the chart AND the list at once — the same failure
+         the builder's phone tab bar had the first time it shipped. */
+      @media (max-width: 700px) {
+        .gwrap,
+        .gtools,
+        .glegend {
+          display: none;
+        }
+        .gmob {
+          display: block;
+        }
       }
 
       /* ---------- Project context: selector + fixed header (spec §4) ----------
@@ -3146,6 +3214,22 @@
          minimum and the pair is allowed to wrap, so the sheet fits the phone
          instead of scrolling sideways inside its own box. */
       @media (max-width: 700px) {
+        /* THE SHEET-RENDERED DOCUMENTS, which arrived after this block was
+           written for `.cdoc` and were never given the same treatment.
+           `.condoc` is a centring flex container, so `#invDoc` floored at the
+           document's own min-content — 573 px — and centring an over-wide
+           child puts its left edge at a negative offset no scrollbar can
+           reach: the invoice preview sat at x = −91 in a 390 px viewport,
+           clipped on BOTH sides. Left-aligned and allowed to shrink, so
+           whatever remains is at least reachable. */
+        .condoc {
+          justify-content: flex-start;
+          padding: 10px 10px 32px;
+        }
+        .condoc > * {
+          min-width: 0;
+          width: 100%;
+        }
         .cdoc {
           min-width: 0;
           padding: 22px 18px;
@@ -3616,59 +3700,6 @@
         font: 600 13px var(--sans);
         margin: 0;
       }
-      .inboxl {
-        max-height: 640px;
-        overflow: auto;
-      }
-      .icard {
-        display: grid;
-        grid-template-columns: 72px minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        height: 96px;
-        padding: 0 12px;
-        border-bottom: 1px solid var(--hair);
-        cursor: pointer;
-      }
-      .icard:hover {
-        background: var(--hair);
-      }
-      .icard .thumb {
-        width: 72px;
-        height: 72px;
-        border-radius: 8px;
-        border: 1px solid var(--line);
-        background: var(--hair);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-        font-size: 22px;
-        color: var(--faint);
-      }
-      .icard .thumb img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-      .icard .who {
-        font: 600 12.5px var(--sans);
-        color: var(--ink);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .icard .amt {
-        font: 700 15px var(--sans);
-        color: var(--ink);
-      }
-      .icard .meta {
-        font-size: 11.5px;
-        color: var(--muted);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
       @media (max-width: 1180px) {
         .inbox2 {
           grid-template-columns: minmax(0, 1fr);
@@ -4061,6 +4092,18 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
+        /* A GRID ITEM FLOORS AT ITS CONTENT unless told otherwise, and a
+           `<select>`'s content is its longest option — «P-2026-0009 · Ignacio
+           Fernández · Carrer Francesca…». So one obra picker made the whole
+           «Nueva factura» drawer 134 px wider than the phone, dragging its
+           paragraph and its button off the right edge. `min-width:0` lets the
+           column shrink; the control then needs telling it may not exceed it. */
+        min-width: 0;
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        max-width: 100%;
       }
       .field.full {
         grid-column: 1/-1;
@@ -5516,13 +5559,23 @@
         // before anyone builds it, so it belongs beside the contract it
         // amends. Its route key and code are unchanged, and PROJECT_SUBS
         // still lists it so the project-context bar survives the move.
+        // PK10-S5 · «Obras», not «Avance físico». Both children of this section
+        // were named after what you DO to a job, so a person looking for their
+        // jobs found two verbs and no noun — the operator asked where the obras
+        // were, on a phone, with the register of them one tap away. PRY-01 IS
+        // that register until a row is opened; its own subtitle says so. The
+        // code is unchanged, because the code is what the specification names
+        // and the label is what a person reads. (Comment sits OUTSIDE the
+        // object for the same reason the Administración one does: the manifest
+        // generator parses this block by a strict regex and a comment inside
+        // the run breaks it — which is exactly what happened writing this.)
         {
           k: "projects",
           ic: "🏗️",
           lab: "Proyectos",
           short: "Proyectos",
           subs: [
-            { k: "progress", lab: "Avance físico", code: "PRY-01" },
+            { k: "progress", lab: "Obras", code: "PRY-01" },
             { k: "economics", lab: "Avance económico", code: "PRY-02" },
           ],
         },
@@ -5542,7 +5595,6 @@
             { k: "invoicing", lab: "Ingresos", code: "ADM-01" },
             { k: "supplier-invoices", lab: "Gastos", code: "ADM-03" },
             { k: "banking", lab: "Consolidación bancaria", code: "ADM-05" },
-            { k: "petty-cash", lab: "Caja chica", code: "ADM-06" },
             { k: "labour", lab: "Horas", code: "ADM-04" },
             { k: "accountant", lab: "Reporte a gestoría", code: "ADM-07" },
             { k: "cash-flow", lab: "Flujo de caja", code: "ADM-08" },
@@ -5864,6 +5916,20 @@
       function autoCards(root) {
         root.querySelectorAll("table").forEach((t) => {
           if (t.hasAttribute("data-nocards")) return;
+          /* A GENERATED DOCUMENT IS NOT A REGISTER. Everything inside .cnsheet
+             is a rendered quote, contract, change order or invoice, and it
+             brings its own stylesheet, its own column widths and its own
+             mobile treatment. Carding it hid the `thead` outright — so the
+             contract's line items printed on a phone with no column headings
+             at all — and then re-labelled each cell from headings that were no
+             longer on screen.
+
+             Only the panes were affected, never the drawers: autoCards runs on
+             #view, so the same document read from a drawer kept its table and
+             the same document read from a pane did not. Two renderings of one
+             document, and the screenshot that starts a bug report only ever
+             shows one of them. */
+          if (t.closest(".cnsheet")) return;
           const heads = [...t.querySelectorAll("thead th")].map((th) => th.textContent.trim());
           // A headerless table still becomes cards, but only from three columns
           // up: a two-column key/value row already reads as one line, and
@@ -6609,6 +6675,101 @@
         }, msg);
       }
 
+      /* ---------- The same schedule, on a phone ----------
+
+     The chart is a 190px name column beside an SVG of `nDays × gZoom` pixels.
+     At 24px a day on a 390px screen that is half the width spent on labels and
+     a ~200px window on the rest — about eight days of a job that runs twenty to
+     sixty. The gestures were always touch-aware (ganttWire says so); there was
+     nothing legible to aim them at.
+
+     So below the breakpoint the same schedule is read as a list: what happens,
+     when, how far along it is, and what is late. Both are rendered and CSS
+     chooses, rather than a width test at render time — a phone that rotates
+     would otherwise keep whichever surface it booted with.
+
+     Every figure comes from the SAME `sch` the SVG draws from, so the two
+     cannot disagree about a date. Nothing is recomputed for the phone.
+
+     Payment milestones are interleaved by date rather than listed apart: a
+     schedule is read forwards, and money falling due is one of the things that
+     happens on a day. */
+      function ganttList(plan, sch, pays) {
+        const S = {};
+        if (sch) sch.tasks.forEach((t) => (S[t.taskId] = t));
+        const pos = (t) =>
+          S[t.id] || {
+            start: t.plannedStart,
+            finish: t.plannedEnd,
+            critical: false,
+            durationDays: 0,
+          };
+
+        const items = plan.tasks.map((t) => {
+          const p = pos(t);
+          const pct = Math.max(0, Math.min(100, t.progressPct || 0));
+          const done = pct >= 100;
+          return {
+            kind: "task",
+            id: t.id,
+            date: p.start,
+            title: t.title,
+            milestone: !!t.milestone,
+            critical: !!p.critical,
+            start: p.start,
+            finish: p.finish,
+            days: p.durationDays,
+            pct,
+            // Late is a fact about the plan and the clock, not a status
+            // somebody set: finished in the past and not reported done.
+            overdue: !done && p.finish < erp.today,
+            running: !done && p.start <= erp.today && erp.today <= p.finish,
+          };
+        });
+        pays.forEach((p) =>
+          items.push({
+            kind: "pay",
+            date: p.date,
+            number: p.number,
+            seq: p.seq,
+            amountCents: p.amountCents,
+            invoiced: p.invoiced,
+          }),
+        );
+        items.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+        /* EVERY WORD ITS OWN ELEMENT, and the record wrapped so nobody asks.
+           The translator walks TEXT NODES, so a row rendered as one string
+           hands it the dates, the duration and the words as a single key no
+           dictionary can hold — fifteen of them, straight into the miss
+           ledger. Split into elements, each word arrives on its own and the
+           separators between them are punctuation the ledger ignores; a
+           record — a contract number, a sequence — goes in a `translate="no"`
+           span, which is what that attribute is for. Same lesson as S2b, one
+           layer down: the audit reads the source, the ledger reads the DOM. */
+        const SEP = " · ";
+        const row = (i) => {
+          if (i.kind === "pay")
+            return `<div class="gmrow pay"><div class="gmtop">
+       <span class="gmt"><span translate="no">◆ ${esc(i.number)}</span> · <span>hito</span> <span translate="no">${i.seq}</span></span>
+       <span class="pill ${i.invoiced ? "g" : "b"}">${eur0(i.amountCents)}</span></div>
+      <div class="gmsub"><span translate="no">${fmtD(i.date)}</span>${SEP}<span>${i.invoiced ? "facturado" : "previsto"}</span></div></div>`;
+          const sub = [`<span translate="no">${fmtD(i.start)} → ${fmtD(i.finish)}</span>`];
+          if (!i.milestone) sub.push(`<span translate="no">${i.days} d</span>`);
+          if (i.overdue) sub.push('<b class="late">vencida</b>');
+          else if (i.running) sub.push("<span>en curso</span>");
+          if (i.critical) sub.push("<span>crítica</span>");
+          return `<div class="gmrow${i.overdue ? " late" : ""}${i.running ? " now" : ""}" data-mrow="${esc(i.id)}">
+      <div class="gmtop">
+       <span class="gmt">${i.critical ? '<span class="dot"></span>' : ""}${i.milestone ? "◆ " : ""}${esc(i.title)}</span>
+       <span class="gmpct">${i.pct}%</span></div>
+      <div class="bar"><i style="width:${i.pct}%"></i></div>
+      <div class="gmsub">${sub.join(SEP)}</div></div>`;
+        };
+
+        return `<div class="gmob">${items.map(row).join("")}</div>`;
+      }
+
       function ganttChart(plan, sch, cmp, pays) {
         const B = ganttApi(),
           cal = plan.calendar || B.defaultCalendar(),
@@ -6791,6 +6952,16 @@
           n.onclick = () => {
             gSel = n.dataset.task;
             ganttTaskDrawer(pid, n.dataset.task);
+          };
+        });
+        // The phone's schedule rows open the same drawer the chart's name
+        // column does — dates, duration, progress and the pinned start are all
+        // editable there, so nothing the chart could do is out of reach; it is
+        // one tap further in.
+        v.querySelectorAll(".gmob [data-mrow]").forEach((n) => {
+          n.onclick = () => {
+            gSel = n.dataset.mrow;
+            ganttTaskDrawer(pid, n.dataset.mrow);
           };
         });
 
@@ -8109,7 +8280,9 @@
         const reg = erp.extrasRegister();
         const codeOf = {};
         erp.state.projects.forEach((p) => (codeOf[p.id] = p.code));
-        const rows = (chgStage ? reg.items.filter((c) => erp.changeStage(c) === chgStage) : reg.items)
+        const rows = (
+          chgStage ? reg.items.filter((c) => erp.changeStage(c) === chgStage) : reg.items
+        )
           .slice()
           .reverse();
 
@@ -8544,8 +8717,7 @@
        it and «Adenda» stayed Spanish in English and Catalan. */
         const db = openDrawer("Adenda" + (doc.number ? " · " + doc.number : ""));
         db.innerHTML =
-          sheetDocHtml("ordenCambio", { changeId: id }, doc.language) +
-          changeLangFootHtml(id, doc);
+          sheetDocHtml("ordenCambio", { changeId: id }, doc.language) + changeLangFootHtml(id, doc);
         wireChangeLangFoot(id);
         paintImages(db);
       }
@@ -8640,11 +8812,28 @@
       }
       function hourWhereCell(r, jobs, chaptersOf) {
         if (!r.entry) {
+          /* PARTIDA AND SUBPARTIDA, both. Since PK12 hours on a job carry a
+             subpartida like every other project cost, and this sheet offered
+             only the chapter — so entering a line from the day sheet failed
+             with the engine's English refusal on a Spanish screen. The two
+             selects sit together because they are one answer; the second
+             fills from the first. */
+          const first = jobs[0] && jobs[0].id;
           const opts =
-            chaptersOf(jobs[0] && jobs[0].id)
+            chaptersOf(first)
               .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
               .join("") || '<option value="">—</option>';
-          return `<select class="inline" data-newchap="${r.workerId}">${opts}</select>`;
+          const firstChap = (chaptersOf(first)[0] || {}).num;
+          const lines = first ? lineOptionsFor(first, firstChap, "") : "";
+          /* Both halves built BEFORE the return, not joined with `+` in it. A
+             template literal spliced onto another with a conditional between
+             them reads to the translation audit as prose with no translation —
+             the trap CLAUDE.md records catching four earlier templates, and
+             this one made it five. */
+          const lineSel = lines
+            ? ` <select class="inline" data-newline="${r.workerId}">${lines}</select>`
+            : "";
+          return `<select class="inline" data-newchap="${r.workerId}">${opts}</select>${lineSel}`;
         }
         const line = hourLineLabel(r.entry);
         const chap = esc(r.entry.chapterNum || "—");
@@ -8816,6 +9005,35 @@
               (erp.state.projects.find((p) => !p.closed) || erp.state.projects[0] || {}).id,
           );
         $("#hAdd").onclick = () => newHoursDrawer(hDay);
+        /* The two selects are one answer, so they stay in step: choosing a
+           different partida refills the subpartidas under it, and choosing a
+           different job refills both. Without this the sheet would offer the
+           first job's subpartidas against whatever else was picked — a
+           destination that looks chosen and belongs to another obra. */
+        const refillWhere = (wid) => {
+          const proj = document.querySelector(`[data-newproj="${wid}"]`);
+          const chap = document.querySelector(`[data-newchap="${wid}"]`);
+          const line = document.querySelector(`[data-newline="${wid}"]`);
+          if (!proj || !chap) return;
+          const p = erp.state.projects.find((x) => x.id === proj.value);
+          const chapters = (p && p.baseline && p.baseline.chapters) || [];
+          chap.innerHTML =
+            chapters
+              .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+              .join("") || '<option value="">—</option>';
+          if (line) line.innerHTML = lineOptionsFor(proj.value, chap.value, "") || "";
+        };
+        document
+          .querySelectorAll("[data-newproj]")
+          .forEach((el) => (el.onchange = () => refillWhere(el.dataset.newproj)));
+        document.querySelectorAll("[data-newchap]").forEach(
+          (el) =>
+            (el.onchange = () => {
+              const line = document.querySelector(`[data-newline="${el.dataset.newchap}"]`);
+              const proj = document.querySelector(`[data-newproj="${el.dataset.newchap}"]`);
+              if (line && proj) line.innerHTML = lineOptionsFor(proj.value, el.value, "") || "";
+            }),
+        );
         document.querySelectorAll(".hsheet input.hin").forEach(
           (inp) =>
             (inp.onchange = () => {
@@ -8831,12 +9049,18 @@
                 const wid = inp.dataset.worker;
                 const proj = document.querySelector(`[data-newproj="${wid}"]`);
                 const chap = document.querySelector(`[data-newchap="${wid}"]`);
+                const line = document.querySelector(`[data-newline="${wid}"]`);
                 const knd = document.querySelector(`[data-newkind="${wid}"]`);
                 if (!proj || !proj.value) throw new Error("Selecciona el proyecto");
+                // Refused here, in the operator's language, before the engine
+                // says the same thing in English on a Spanish screen.
+                if (line && !line.value)
+                  throw new Error("Las horas de obra necesitan partida y subpartida");
                 erp.recordHours(
                   {
                     workerId: wid,
                     projectId: proj.value,
+                    lineId: (line && line.value) || null,
                     chapterNum: (chap && chap.value) || null,
                     // The kind chosen on the row prices the entry from its own
                     // rate band; without it every inline entry was a normal
@@ -8926,6 +9150,8 @@
           mutate(() => {
             const hrs = Number(String($("#nh_h").value).replace(",", "."));
             if (!(hrs > 0)) throw new Error("Indica las horas");
+            if ($("#nh_lwrap").style.display !== "none" && !$("#nh_l").value)
+              throw new Error("Las horas de obra necesitan partida y subpartida");
             erp.recordHours(
               {
                 workerId: $("#nh_w").value,
@@ -9896,8 +10122,7 @@
    <div class="card"><div class="queuebar">
      <span class="n">${open.length}</span><span>movimientos sin conciliar en el periodo</span>
      <span style="flex:1"></span>
-     <button class="btn sm" id="rcToDone">Conciliados →</button>
-     <button class="btn sm" id="rcClose" title="Bloquea el periodo; exige cero movimientos sin conciliar">🔒 Cerrar periodo</button>
+     <button class="btn sm" id="rcClose" title="Bloquea el trimestre; exige que todo en él esté asignado">🔒 Bloquear trimestre</button>
    </div></div>
    ${transferCard(transfers)}
    ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
@@ -9986,9 +10211,13 @@
            no chance of the two disagreeing. */
         renderRcSelBar([...v.querySelectorAll("#rcList tr.click")].map((tr) => tr.dataset.id));
 
-        $("#rcClose").onclick = () =>
-          mutate(() => erp.closeBankPeriod(r.from, r.to, "backoffice"), "Periodo cerrado");
-        $("#rcToDone").onclick = () => goTab("banking", "_reconciled");
+        /* The button OPENS the rules rather than trying the lock. It used to
+           call `closeBankPeriod(r.from, r.to)` — the dates of whatever the
+           global period selector happened to be showing — so the boundaries of
+           a lock were chosen by a control meant for filtering, and a period
+           could be drawn around the awkward week. The operator asked for both
+           halves of this: lock by a real unit, and say what the rules are. */
+        $("#rcClose").onclick = () => periodLockDrawer(lockQuarter());
         /* One pair at a time, through the method that writes the LINK. The old
            bulk button called `classifyMovement` on each leg separately, which
            left two movements that happened to be classified the same way and
@@ -10273,6 +10502,72 @@
        * amounts produces — is marked as a guess, kept out of the bulk action,
        * and left for a person to decide one at a time.
        */
+      /* WHY A QUARTER CANNOT BE LOCKED YET, in the operator's terms. Six
+         reasons, each with its own count, because a bare refusal with nothing
+         after it is the wall PK12-S1 was about — and this one has more to say
+         than any single sentence can carry. (No quoted phrase in this comment:
+         the source audit reads one as a user-visible string, which it did.) */
+      const LOCK_BLOCKER = {
+        unreconciled: "Movimientos sin conciliar",
+        costWithoutDestination: "Costes sin destino — ni obra ni gasto general",
+        costWithoutLine: "Costes de obra sin partida y subpartida",
+        hoursWithoutLine: "Horas de obra sin partida y subpartida",
+        cashOutstanding: "Efectivo retirado y todavía sin justificar",
+        documentsPending: "Documentos capturados y sin registrar",
+      };
+      /** The quarter the lock acts on — the one the period selector is showing. */
+      function lockQuarter() {
+        return ErpEngine.quarterOf(periodRange().from);
+      }
+      /**
+       * The lock, its rules, and what is standing in the way of them.
+       *
+       * The button behind this used to attempt the close and report a single
+       * refusal after the fact. Everything that blocks it is knowable BEFORE
+       * anybody presses anything, so it is shown first and the button is
+       * disabled until the list is empty — the same shape as the delete
+       * refusals: the reason before the press, never a wall after it.
+       */
+      function periodLockDrawer(quarter) {
+        const db = openDrawer(`Bloquear el trimestre ${quarter}`);
+        const blockers = erp.periodLockBlockers(quarter);
+        const r = erp.quarterRange(quarter);
+        const already = (erp.state.bankPeriods || []).some(
+          (p) => p.from === r.from && !p.reopenedAt,
+        );
+        /* Built BEFORE the template, not inside it. Written as a ternary
+           between two literals it put the source audit's quote-pairing on the
+           code between them and reported the JavaScript as a user-visible
+           string — the third variant of that trap this package has hit, after
+           guillemets in a comment and a `+`-joined ternary. Out here each
+           literal stands alone. */
+        let blockerRows = blockers
+          .map((b) => {
+            const label = esc(LOCK_BLOCKER[b.key] || b.key);
+            return `<div class="it"><span class="pill r" translate="no">${b.count}</span><span style="flex:1;margin-left:8px">${label}</span></div>`;
+          })
+          .join("");
+        if (!blockerRows)
+          blockerRows = `<div class="it"><span class="pill g">✓</span><span style="flex:1;margin-left:8px">Todo lo del trimestre está conciliado y asignado.</span></div>`;
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Qué se bloquea</h3>
+     <span class="tag" translate="no">${r.from} → ${r.to}</span></div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">Bloquear un trimestre impide cambiar lo que hay dentro: conciliaciones, costes y horas quedan como están. Se puede reabrir, y la reapertura queda registrada con su motivo.</div></div></div>
+   <div class="card"><div class="ch"><h3>Requisitos</h3>
+     <span class="pill ${blockers.length ? "y" : "g"}">${blockers.length ? "Pendiente" : "Todo asignado"}</span></div>
+    <div class="daylist">${blockerRows}</div></div>`;
+        drawerFoot(
+          already
+            ? `<span style="color:var(--muted)">Este trimestre ya está bloqueado.</span>`
+            : `<button class="btn primary" id="lkGo"${blockers.length ? " disabled" : ""}>Bloquear el trimestre</button>`,
+        );
+        const go = $("#lkGo");
+        if (go)
+          go.onclick = () =>
+            mutate(() => {
+              erp.closeQuarter(quarter, "backoffice");
+              closeDrawer();
+            }, "Trimestre bloqueado");
+      }
       function transferCard(transfers) {
         if (!transfers.length) return "";
         const line = (id) => {
@@ -10553,6 +10848,8 @@
      ${hidden > 0 ? moreNote : ""}
     </div></div>
 
+   ${cashWithdrawalCard(m)}
+
    ${
      closed
        ? ""
@@ -10568,6 +10865,7 @@
          .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
          .join("")}</optgroup>
        ${cardSettleGroup(m)}
+       ${cashGroup(m)}
      </select>
      <button class="btn sm" id="rcDestGo">Identificar</button>
      <span style="width:10px"></span>
@@ -10624,7 +10922,7 @@
             closeDrawer();
             // A2: anything still owed after the match is a question, not a
             // silence. Asked once, about all of them, after the money moved.
-            setTimeout(() => shortfallDrawer(splits), 0);
+            setTimeout(() => shortfallDrawer(splits, m.id), 0);
           }, "Movimiento conciliado");
 
         db.querySelectorAll("[data-accept]").forEach(
@@ -10657,6 +10955,14 @@
             mutate(() => {
               if (val.startsWith("c:")) {
                 erp.markCardSettlement(m.id, val.slice(2), "backoffice");
+              } else if (val === "w:") {
+                /* The withdrawal is declared, not explained. What it bought is
+                   answered afterwards, by matching it against the receipts the
+                   way any other line is matched — and whatever is left over is
+                   either still in a pocket or came back as a deposit. */
+                erp.markCashWithdrawal(m.id, "backoffice");
+              } else if (val.startsWith("r:")) {
+                erp.markCashReturn(m.id, val.slice(2), "backoffice");
               } else {
                 erp.splitMovement(
                   m.id,
@@ -10714,7 +11020,7 @@
    document driven to zero with no stated reason is indistinguishable from a
    mistake three months later — and the gestoría has to be able to tell a
    prompt-payment discount from a bank charge. */
-      function shortfallDrawer(splits) {
+      function shortfallDrawer(splits, movId) {
         const short = (splits || [])
           .map((s) => {
             const kind = s.billId ? "bill" : "invoice";
@@ -10731,10 +11037,19 @@
           .filter(Boolean);
         if (!short.length) return;
         const reasons = erp.listActive("settlementReasons");
-        const db = openDrawer("¿El resto sigue pendiente?");
+        /* THIS PANEL ARRIVES AFTER THE MATCH, NOT BEFORE IT.
+           `matchMovementSplit` has already run by the time this opens, and the
+           panel wore every affordance of a dialog you can back out of — a
+           question for a title, a Cerrar, two choices. The operator pressed
+           Cerrar expecting to cancel and the movement stayed reconciled, which
+           is the screen's fault: it asked a follow-up question in the costume
+           of a confirmation. So it now SAYS the match is done before it asks
+           anything, and offers the way back rather than leaving it to be found
+           on the next tab. */
+        const db = openDrawer("Movimiento conciliado");
         db.innerHTML = `<div class="it" style="margin-bottom:10px;color:var(--muted)">
-     El movimiento no cubre del todo ${short.length === 1 ? "este documento" : "estos documentos"}.
-     Si el resto sigue pendiente no hay nada que hacer; si se da por cerrado, di por qué.</div>
+     <span>El movimiento ya está conciliado.</span>
+     <span>No cubre del todo ${short.length === 1 ? "este documento" : "estos documentos"}, así que queda una diferencia.</span></div>
    ${short
      .map(
        (
@@ -10749,8 +11064,28 @@
      </div></div>`,
      )
      .join("")}
-   <div class="field full" style="margin-top:6px"><button class="btn primary" id="sfKeep">Sigue pendiente</button></div>`;
+   <div class="daylist" style="margin-top:6px"><div class="it" style="color:var(--muted)">Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.</div></div>
+   <div class="field full" style="margin-top:6px;display:flex;gap:8px">
+     <button class="btn primary" id="sfKeep">Ha sido un pago parcial</button>
+     <span style="flex:1"></span>
+     <button class="btn danger" id="sfUndo">Deshacer la conciliación</button></div>`;
         $("#sfKeep").onclick = () => closeDrawer();
+        /* The SAME door the Conciliados tab uses, not a second one:
+           `unexplainMovement` dispatches to `unmatchMovement` for a matched
+           movement and voids the payment the match created. Two ways to undo
+           the same thing is how they come to behave differently. */
+        $("#sfUndo").onclick = async () => {
+          const yes = await askConfirm("Deshacer la conciliación", {
+            body: "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.",
+            okLabel: "Deshacer",
+            danger: true,
+          });
+          if (!yes) return;
+          mutate(() => {
+            erp.unexplainMovement(movId, "backoffice");
+            closeDrawer();
+          }, "Conciliación deshecha");
+        };
         db.querySelectorAll("[data-sfclose]").forEach(
           (b) =>
             (b.onclick = () => {
@@ -10760,7 +11095,7 @@
               mutate(() => {
                 erp.settleShortfall(d.kind, d.id, reason, "backoffice");
                 closeDrawer();
-                setTimeout(() => shortfallDrawer(splits), 0);
+                setTimeout(() => shortfallDrawer(splits, movId), 0);
               }, "Cerrado con su motivo");
             }),
         );
@@ -11115,16 +11450,14 @@
                   "Cancelado",
                 )),
           );
-        document
-          .querySelectorAll("[data-sent-msg]")
-          .forEach(
-            (b) =>
-              (b.onclick = () =>
-                mutate(() => {
-                  const q = erp.recordCommunicationSent(b.dataset.sentMsg, "backoffice");
-                  fileDraftForComm(q); // N2 · the draft goes to the mailbox
-                }, "Registrado como enviado")),
-          );
+        document.querySelectorAll("[data-sent-msg]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(() => {
+                const q = erp.recordCommunicationSent(b.dataset.sentMsg, "backoffice");
+                fileDraftForComm(q); // N2 · the draft goes to the mailbox
+              }, "Registrado como enviado")),
+        );
         /* Filing again, without re-sending anything. A draft that did not
            reach the mailbox — the server was down, the mailbox was not
            connected yet, the append was refused — is a message the operator
@@ -11437,10 +11770,7 @@
          copy of the central-directory arithmetic is one place for it to be
          wrong. */
       const zipStore = (files) =>
-        CaneiZip.blob(
-          files,
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        );
+        CaneiZip.blob(files, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       const xmlEsc = (v) =>
         String(v ?? "").replace(
           /[&<>"']/g,
@@ -11469,7 +11799,7 @@
          arithmetic happened in cents, long before this file. */
       const XLSX_STYLES =
         '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-        "<fonts count=\"6\">" +
+        '<fonts count="6">' +
         '<font><sz val="10"/><name val="Arial"/><color rgb="FF3D3D3D"/></font>' +
         '<font><b/><sz val="16"/><name val="Georgia"/><color rgb="FF14160F"/></font>' +
         '<font><sz val="9"/><name val="Arial"/><color rgb="FF6B7063"/></font>' +
@@ -11524,9 +11854,7 @@
         if (head.length) head.push([{ v: "", s: 0 }]);
         const headerRowIndex = head.length; // 0-based row of the column titles
 
-        const body = rows.map((r, i) =>
-          r.map((c) => ({ v: c, s: i === 0 ? 3 : (i % 2 ? 5 : 4) })),
-        );
+        const body = rows.map((r, i) => r.map((c) => ({ v: c, s: i === 0 ? 3 : i % 2 ? 5 : 4 })));
         const all = head.concat(body);
         if (foot) all.push([{ v: "", s: 0 }], [{ v: foot, s: 6 }]);
 
@@ -11553,7 +11881,9 @@
           });
         const cols = widest.length
           ? "<cols>" +
-            widest.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("") +
+            widest
+              .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
+              .join("") +
             "</cols>"
           : "";
         // The header row stays on screen while the operator scrolls; on a
@@ -12042,6 +12372,14 @@
         const sing = cfg.nounSingular || "registro",
           plur = cfg.nounPlural || "registros";
         v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    ${
+      /* Controls that belong to the SCREEN rather than to the list — Gastos
+          puts its capture buttons here. A slot rather than a second toolbar
+          above: two rows of controls read as two unrelated groups, and the
+          question «where do I upload a document» should not be answered in a
+          different place from «where do I find one». Wiring is the caller's,
+          because these are the caller's buttons. */ cfg.leading || ""
+    }
     ${cfg.noNew ? "" : `<button class="btn primary sm" id="${ids.newBtn}">${cfg.newLabel || "＋ Nuevo"}</button>`}
     <input id="${ids.q}" placeholder="${esc(cfg.searchPlaceholder || "Buscar…")}" value="${esc(st.q)}"
       style="flex:0 1 280px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--paper);color:var(--ink)">
@@ -14522,6 +14860,13 @@
    data, and the moment it does belong there it stops being a reading and
    becomes a captured document. */
       let capWork = null; // {file, url, kind, recognised, result, blobKey, docType, focusKey}
+      /* Whether the register is showing only what still needs a person. This
+         replaces the Bandeja — a second panel that held the SAME documents the
+         register already listed, so an unassigned document appeared twice on
+         one screen and the counts «1» and «1 documento» were the same one.
+         A filter says what the panel was trying to say and cannot disagree
+         with the list it filters. */
+      let capPendingOnly = false;
 
       const CAP_FIELDS = [
         ["issuerName", "Emisor"],
@@ -14596,64 +14941,23 @@
         );
       }
 
-      /* Thumbnails for the inbox cards.
-   Cached per blob key for the life of the page: a card list re-renders on
-   every keystroke elsewhere on the screen, and minting a fresh object URL
-   each time would hold every picture ever shown in memory until the tab is
-   closed. A PDF has no thumbnail an <img> can draw, so the icon stays — found
-   by letting the load fail rather than by guessing from the file name, which
-   is the only test that works for both the local and the served path. */
-      const capThumbUrls = {};
-      function capThumbs(root) {
-        root.querySelectorAll(".thumb[data-blob]").forEach((box) => {
-          const key = box.dataset.blob;
-          if (!key) return;
-          const show = (url) => {
-            if (!url) return;
-            const img = new Image();
-            img.onload = () => {
-              box.innerHTML = "";
-              box.appendChild(img);
-            };
-            img.onerror = () => {}; // stays the 📄 icon: a PDF, or a blob that has gone
-            img.alt = "";
-            img.src = url;
-          };
-          if (capThumbUrls[key] !== undefined) {
-            show(capThumbUrls[key]);
-            return;
-          }
-          const direct = ErpStore.blobUrl(key);
-          if (direct) {
-            capThumbUrls[key] = direct;
-            show(direct);
-            return;
-          }
-          capThumbUrls[key] = null; // claim the key so a re-render does not fetch twice
-          ErpStore.getBlob(key)
-            .then((b) => {
-              if (!b) return;
-              capThumbUrls[key] = URL.createObjectURL(b);
-              show(capThumbUrls[key]);
-            })
-            .catch(() => {});
-        });
-      }
-
-      /* ---------- The document's own panel (ADM-03, S7) ----------
-   Everything a filed document needs a person for, in the 480 side panel the
-   specification makes the universal edit surface: where the cost lands, the
-   two archive fields the workbook has columns for, and the note.
-
-   Allocation is deliberately the last block rather than the first. The order
-   on screen is the order of the questions — what is this, where did it come
-   from, then who pays for it — and the amount you are splitting is stated
-   above the split rather than remembered from the row you clicked. */
       function captureDrawer(id) {
         const c = erp.state.captured.find((x) => x.id === id);
         if (!c) return;
         const cf = c.confirmed;
-        const total = cf ? cf.totalCents : 0;
+        /* Derived, not read off the record — see `duplicateCaptureMap`. The
+           pair the operator found had been filed before the flag could
+           recognise them, so a stamp made at confirm time would never light. */
+        const dupMap = erp.duplicateCaptureMap();
+        const dupId = dupMap[c.id] || c.duplicateSuspect || null;
+        const dupOther = dupId ? erp.state.captured.find((x) => x.id === dupId) : null;
+        /* THE BASE, NOT THE TOTAL. What is being split is the cost, and the
+           tax is not one — the bill drawer three hundred lines down has always
+           passed `readBase()` here, and this one passed the VAT-inclusive
+           total, which is what made a split accepted here impossible to
+           register as a bill. */
+        const total = erp.captureBasisCents(cf);
+        const vatAside = cf ? Math.max(0, (cf.totalCents || 0) - total) : 0;
         const db = openDrawer(c.stdName || CAP_TYPE_LABEL[c.docType] || "Documento");
         let billBlock = "";
         if (cf && !c.billId)
@@ -14690,7 +14994,13 @@
      <div class="it"><span>Nº documento</span><span style="flex:1"></span><b>${cf ? esc(cf.docNumber || "—") : "—"}</b></div>
      <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${cf && cf.date ? fmtD(cf.date) : "—"}</b></div>
      <div class="it"><span>Total</span><span style="flex:1"></span><b>${cf ? eur(cf.totalCents) : "—"}</b></div>
-     ${c.duplicateSuspect ? '<div class="it"><span class="pill r">Posible duplicado</span><span>ya hay un documento con el mismo NIF y número</span></div>' : ""}
+     ${
+       dupOther
+         ? `<div class="it"><span class="pill r">Posible duplicado</span>
+       <span style="flex:1;margin-left:8px"><span>Ya hay otro documento de este emisor con el mismo número</span> <b translate="no">${esc(dupOther.stdName || dupOther.id)}</b></span>
+       <button class="btn sm" id="cd_seeDup">Ver el otro</button></div>`
+         : ""
+     }
     </div></div>
    <div class="card"><div class="ch"><h3>Archivo</h3><span class="tag">de dónde viene y con qué se relaciona</span></div>
     <div class="fgrid" style="padding:10px 12px 12px">
@@ -14698,8 +15008,30 @@
      <div class="field full"><label>Ruta de origen</label><input id="cd_path" value="${esc(c.sourcePath || "")}" placeholder="Carpeta o archivo del que procede"></div>
      <div class="field full"><label>Notas</label><input id="cd_notes" value="${esc(c.notes || "")}" placeholder="Lo que la siguiente persona necesita saber"></div>
      <div class="field full"><button class="btn" id="cd_save">Guardar datos de archivo</button></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;padding:0 12px 12px;flex-wrap:wrap">
+     <span style="flex:1;font-size:12px;color:var(--muted)">${
+       c.billId
+         ? "<span>Registrado como factura: elimínala primero</span>"
+         : "<span>Se borra el documento y su imagen. No afecta a ninguna factura</span>"
+     }</span>
+     ${
+       /* The sentence named the step and not the PLACE. The operator hit the
+          disabled button, read «elimínala primero», and asked why the document
+          could not be deleted — which is the message failing, not the person.
+          «Primero» is another screen, and a instruction that does not say which
+          one is a dead end with a full stop on it. The way there is now one
+          press from where the refusal is read. */
+       c.billId ? `<button class="btn sm" id="cd_gobill">Ir a la factura</button>` : ""
+     }
+     <button class="btn sm danger" id="cd_del"${c.billId ? " disabled" : ""}>Eliminar documento</button>
     </div></div>
    <div class="card"><div class="ch"><h3>Asignación</h3><span class="tag" id="cd_rest"></span></div>
+    ${
+      vatAside
+        ? `<div class="it" style="padding:8px 12px 0;color:var(--muted);font-size:12px"><span>Se reparte la base imponible</span> <b translate="no">${eur(total)}</b>. <span>El IVA no se reparte: es IVA soportado, no coste de obra</span> <b translate="no">${eur(vatAside)}</b>.</div>`
+        : ""
+    }
     <div id="cd_rows" style="padding:6px 12px 12px"></div>
     <div style="display:flex;gap:8px;padding:0 12px 12px;flex-wrap:wrap">
      <button class="btn sm" id="cd_add">＋ Repartir</button>
@@ -14720,6 +15052,31 @@
               "backoffice",
             );
           }, "Datos de archivo guardados");
+        /* «Ver el otro» — the duplicate is only useful if you can look at it.
+           Reopening the drawer on the other document is the whole gesture:
+           compare the two, then delete whichever one is the copy. */
+        if ($("#cd_seeDup") && dupOther) $("#cd_seeDup").onclick = () => captureDrawer(dupOther.id);
+        if ($("#cd_gobill")) $("#cd_gobill").onclick = () => billUnregisterDrawer(c.billId);
+        if ($("#cd_del"))
+          $("#cd_del").onclick = async () => {
+            /* Two WHOLE sentences, chosen — not one sentence assembled from
+               three pieces. A modal body is a single text node, so a string
+               built by concatenation is a key no dictionary can hold; the same
+               lesson the toast learned one session ago. */
+            const yes = await askConfirm("Eliminar el documento", {
+              body:
+                c.allocations && c.allocations.length
+                  ? "Se borra el documento archivado, su imagen y su asignación a la obra. No se puede deshacer."
+                  : "Se borra el documento archivado y su imagen. No se puede deshacer.",
+              okLabel: "Eliminar",
+              danger: true,
+            });
+            if (!yes) return;
+            mutate(() => {
+              erp.deleteCapture(id, "backoffice");
+              closeDrawer();
+            }, "Documento eliminado");
+          };
         $("#cd_add").onclick = () => {
           capAlloc.push({
             projectId: "",
@@ -14731,7 +15088,26 @@
           capAllocRows(id, total);
         };
         if ($("#cd_bill")) $("#cd_bill").onclick = () => billDrawer(id);
-        $("#cd_alloc").onclick = () =>
+        $("#cd_alloc").onclick = () => {
+          /* Refused HERE, with the figure, rather than by the engine's own
+             invariant — which is right about the rule and says it in English
+             to a Spanish operator, and says nothing about how far off they
+             are. The engine keeps the rule as its backstop; this is the
+             sentence a person can act on. */
+          const assigned = capAlloc.reduce((s2, a) => s2 + (a.amountCents || 0), 0);
+          if (total > 0 && Math.abs(assigned - total) > 1) {
+            /* The FIGURE is not in this sentence, deliberately. A toast is one
+               text node, so a number inside it makes a string no dictionary
+               can hold — the lesson S5 learned the hard way. The gap is
+               already on the card above, as «Sin repartir» beside its own
+               amount in its own element, which is where a person is looking. */
+            toast("⚠ El reparto debe sumar la base imponible");
+            return;
+          }
+          if (capAlloc.some((a) => a.projectId && !a.lineId)) {
+            toast("⚠ Cada línea de obra necesita partida y subpartida");
+            return;
+          }
           mutate(() => {
             erp.allocateCapture(
               id,
@@ -14747,6 +15123,7 @@
             );
             closeDrawer();
           }, "Documento asignado");
+        };
         capAllocRows(id, total);
       }
 
@@ -14892,7 +15269,7 @@
    document being promoted — because they are the same form with different
    starting values. Two drawers would be two places to forget the tax id. */
       let billAlloc = [];
-      function billDrawer(capId) {
+      function billDrawer(capId, preselectSupplierId) {
         const cap = capId ? erp.state.captured.find((x) => x.id === capId) : null;
         const cf = (cap && cap.confirmed) || null;
         const suppliers = erp.state.parties.filter(
@@ -14902,12 +15279,26 @@
           say("No hay ningún proveedor dado de alta todavía.");
           return;
         }
-        // Proposed, never decided: a tax id can be read off a page, but binding a
-        // cost to the wrong company is not a choice a screen should make alone.
+        /* Proposed, never decided: a tax id can be read off a page, but binding a
+           cost to the wrong company is not a choice a screen should make alone.
+           That sentence was true of the INTENT and false of the code. A <select>
+           with no empty option is never unanswered — the browser answers it, by
+           choosing the first entry — so a document whose tax id matched nobody
+           was filed against whichever supplier happened to be first in the list.
+           It happened on the operator's own workspace: an invoice from a company
+           that had never been created as a party landed on an unrelated one, and
+           every screen downstream then correctly reported the wrong thing.
+           So the empty choice exists and is the default, and `#bd_go` refuses
+           on it. `preselectSupplierId` is how the choice survives creating the
+           supplier without making the operator find it again. */
         const guess =
-          cf && cf.issuerTaxId
+          suppliers.find((p) => p.id === preselectSupplierId) ||
+          (cf && cf.issuerTaxId
             ? suppliers.find((p) => (p.taxId || "").toUpperCase() === cf.issuerTaxId.toUpperCase())
-            : null;
+            : null);
+        // The issuer is on the page and not in the file: offer to put it there,
+        // here, rather than sending the operator to the party screen and back.
+        const stranger = !!(cf && !guess && (cf.issuerName || cf.issuerTaxId));
         const base = cf ? cf.baseCents || 0 : 0;
         billAlloc =
           cap && cap.allocations && cap.allocations.length
@@ -14926,9 +15317,17 @@
         );
         db.innerHTML = `<div class="fgrid">
    <div class="field full"><label>Proveedor *</label><select id="bd_sup">
+     <option value=""${guess ? "" : " selected"}>— Elija el proveedor —</option>
      ${suppliers.map((p) => `<option value="${p.id}"${guess && guess.id === p.id ? " selected" : ""}>${esc(p.name)}${p.taxId ? " · " + esc(p.taxId) : ""}</option>`).join("")}
     </select></div>
-   ${cf && !guess && cf.issuerTaxId ? `<div class="field full"><span class="pill y">El NIF leído no coincide con ningún proveedor</span></div>` : ""}
+   ${
+     stranger
+       ? `<div class="field full"><span class="pill y">El emisor del documento no está dado de alta como proveedor</span></div>
+   <div class="field"><label>Nombre del emisor</label><input id="bd_supName" value="${esc(cf.issuerName || "")}"></div>
+   <div class="field"><label>NIF/CIF del emisor</label><input id="bd_supTax" value="${esc(cf.issuerTaxId || "")}"></div>
+   <div class="field full"><button class="btn sm" id="bd_mkSup">Dar de alta este proveedor</button></div>`
+       : ""
+   }
    <div class="field"><label>Nº factura *</label><input id="bd_num" value="${esc(cf ? cf.docNumber || "" : "")}"></div>
    <div class="field"><label>Fecha</label><input id="bd_date" type="date" value="${esc(cf && cf.date ? cf.date : erp.state.today)}"></div>
    <div class="field"><label>Vencimiento</label><input id="bd_due" type="date" value="${esc(cf && cf.dueDate ? cf.dueDate : "")}"></div>
@@ -14956,17 +15355,45 @@
           billAlloc.push(blankAlloc(0));
           draw();
         };
+        /* Both fields are editable on purpose. The reader is good and not
+           perfect, and a mis-read digit in a tax id would otherwise be a dead
+           end: the party file refuses an invalid one, and the operator is
+           looking at the paper that has the right one on it. */
+        const mkSup = $("#bd_mkSup");
+        if (mkSup)
+          mkSup.onclick = () =>
+            mutate(() => {
+              const name = $("#bd_supName").value.trim();
+              if (!name) throw new Error("El proveedor necesita un nombre");
+              const made = erp.addParty(
+                {
+                  name,
+                  taxId: $("#bd_supTax").value.trim().toUpperCase(),
+                  roles: ["supplier"],
+                  partyType: "company",
+                },
+                "backoffice",
+              );
+              billDrawer(capId, made.id);
+            }, "Proveedor dado de alta");
         $("#bd_go").onclick = () =>
           mutate(() => {
+            // Refused HERE, in the operator's language. `billFromCapture` has
+            // always guarded this, but a select that is never empty can never
+            // reach it — the engine's rule was unreachable rather than absent.
+            if (!$("#bd_sup").value)
+              throw new Error("Elija el proveedor al que pertenece la factura");
             const number = $("#bd_num").value.trim();
             if (!number) throw new Error("La factura necesita un número");
             const baseCents = readBase();
             if (!(baseCents > 0)) throw new Error("La factura necesita una base imponible");
             const vatCents =
               Math.round(Number(String($("#bd_vat").value).replace(",", ".")) * 100) || 0;
-            // An unallocated bill is a legitimate state — the engine says so and
-            // the payables list flags it — so empty rows are dropped rather than
-            // refused, and a partial split is refused rather than filed wrong.
+            /* An unallocated bill USED to be a legitimate state, flagged by the
+               payables list and otherwise allowed. Since PK12 it is a cost that
+               belongs to nothing, which is the one thing the rule forbids — so
+               empty rows are still dropped, and a bill left with none is now
+               refused rather than filed homeless. */
             const rows = billAlloc
               .filter((a) => (a.projectId || a.overheadCategory) && a.amountCents > 0)
               .map((a) => ({
@@ -14977,8 +15404,14 @@
                 kind: a.kind || "material",
                 amountCents: a.amountCents,
               }));
+            if (!rows.length)
+              throw new Error("Reparta la factura: a una obra o a gastos generales");
+            // Refused HERE, in the operator's language, before the engine says
+            // the same thing in English on a Spanish screen.
+            if (rows.some((a) => a.projectId && !a.lineId))
+              throw new Error("Cada línea de obra necesita partida y subpartida");
             const total = rows.reduce((s, a) => s + a.amountCents, 0);
-            if (rows.length && Math.abs(total - baseCents) > 1)
+            if (Math.abs(total - baseCents) > 1)
               throw new Error("El reparto debe sumar la base imponible");
             const fields = {
               supplierId: $("#bd_sup").value,
@@ -14996,6 +15429,67 @@
         draw();
       }
 
+      /* Why a bill cannot be removed, in the reader's language. The engine
+         returns a CODE for the same reason `discardPreview` does — a screen
+         that must disable a button needs the reason before anybody presses
+         it, and the sentence explaining it belongs where the sentences live. */
+      const BILL_BLOCK = {
+        "shared-payment":
+          "Su pago liquida además otras facturas. Deshaga primero ese pago en Conciliación.",
+        "quarter-sent": "Su trimestre ya se ha enviado al asesor. Registre un abono en su lugar.",
+        reconciled: "Está casada con un movimiento bancario. Deshaga primero la conciliación.",
+        credited: "Tiene un abono que la referencia. Elimine primero el abono.",
+      };
+
+      /**
+       * Un-register an invoice that should not be in the ledger.
+       *
+       * This drawer used to offer two things — change the supplier, or delete
+       * — and the operator's answer was that only one of them belongs here:
+       * «The only option here is to Un-register.» They are right, and it is
+       * simpler than what it replaces. A bill filed against the wrong company
+       * is not repaired in place; it is taken out of the ledger, and the
+       * document it came from goes back to the archive to be filed again from
+       * what it actually says. One door, one meaning.
+       *
+       * What may NOT be un-registered is named rather than merely refused, so
+       * a disabled button is never a wall — see `billDeleteBlock`.
+       */
+      function billUnregisterDrawer(billId) {
+        const b = erp.state.bills.find((x) => x.id === billId);
+        if (!b) return;
+        const block = erp.billDeleteBlock(billId);
+        const db = openDrawer("Anular el registro");
+        db.innerHTML = `<div class="card"><div class="daylist">
+    <div class="it"><span>Proveedor</span><span style="flex:1"></span><b translate="no">${esc(erp.billSupplier(b).name)}</b></div>
+    <div class="it"><span>Nº factura</span><span style="flex:1"></span><b translate="no">${esc(b.number)}</b></div>
+    <div class="it"><span>Total</span><span style="flex:1"></span><b translate="no">${eur(b.totalCents)}</b></div>
+   </div></div>
+   <div class="card" style="margin-top:10px"><div class="ch"><h3>Anular el registro</h3></div>
+    <div style="padding:8px 12px 12px">
+     <div class="sub" style="margin-bottom:8px">${block ? esc(BILL_BLOCK[block] || block) : b.capId ? "La factura sale del registro y el documento archivado vuelve a quedar libre para volver a registrarlo." : "La factura sale del registro con su reparto. No se puede deshacer."}</div>
+     <button class="btn sm danger" id="bf_del"${block ? " disabled" : ""}>Anular el registro</button>
+    </div></div>`;
+        const del = $("#bf_del");
+        if (del && !block)
+          del.onclick = async () => {
+            // One whole sentence each, never assembled — a modal body is a
+            // single text node and a concatenated one is untranslatable.
+            const yes = await askConfirm("Anular el registro", {
+              body: b.capId
+                ? "La factura sale del registro y el documento archivado vuelve a quedar sin registrar. No se puede deshacer."
+                : "La factura sale del registro con su reparto a las obras. No se puede deshacer.",
+              okLabel: "Anular",
+              danger: true,
+            });
+            if (!yes) return;
+            mutate(() => {
+              erp.deleteBill(billId, "backoffice");
+              closeDrawer();
+            }, "Registro anulado");
+          };
+      }
+
       /** Read a chosen file and open the validation screen on the result. */
       function captureStart(file) {
         if (typeof ErpOcr === "undefined" || !ErpBridge.extraction) {
@@ -15011,7 +15505,19 @@
           .then((rec) => {
             let result;
             try {
-              result = ErpBridge.extraction.read(rec.text);
+              /* WHO WE ARE, so the reader cannot hand back our own record as
+                 the issuer's. Every supplier invoice names two companies —
+                 theirs at the head, ours under «FACTURAR A» — and nothing in
+                 the shape of a name or a tax id says which is which. The
+                 document's own layout settles it most of the time; this is the
+                 fact that settles the rest, and only the host has it. */
+              const me = erp.state.config || {};
+              result = ErpBridge.extraction.read(rec.text, {
+                exclude: {
+                  names: [me.legalName, me.tradeName].filter(Boolean),
+                  taxIds: [me.taxId].filter(Boolean),
+                },
+              });
             } catch (e) {
               // A photograph with nothing readable on it. The document is still
               // worth keeping — it just has to be typed. Never a dead end.
@@ -15029,7 +15535,31 @@
             };
             render();
           })
-          .catch((e) => toast("⚠ " + (e.message || "No se ha podido leer el documento")));
+          .catch((e) => {
+            /* THE READER FAILED, AND THE DOCUMENT SURVIVES IT.
+               Two lines above, a photograph with nothing readable on it keeps
+               the file so it can be typed — "never a dead end", written there
+               on purpose. A reader that could not RUN got the opposite: the
+               engine's own message in a toast, in English, and the file
+               dropped. That is the worse failure of the two, because the
+               operator is standing in front of a document they now have to
+               find again; it is how an older phone lost every PDF it was
+               handed. The panel opens with nothing read and every field
+               empty, which is exactly the state a blank photograph produces
+               and a state this screen already knows how to be in. */
+            console.warn("capture: the reader failed", e);
+            toast("⚠ No se ha podido leer el documento: rellénelo a mano");
+            capWork = {
+              file,
+              url: URL.createObjectURL(file),
+              kind: /pdf$/i.test(file.type) ? "pdf" : "image",
+              recognised: { text: [], pages: [], pageCount: 0, engine: "none", warnings: [] },
+              result: null,
+              docType: "supplierInvoice",
+              focusKey: null,
+            };
+            render();
+          });
       }
 
       function captureClose() {
@@ -15049,10 +15579,18 @@
           r = w.result;
         document.body.classList.add("fs");
         const rec = w.recognised;
+        /* Three states, because there are three. The badge used to have two —
+           read from the PDF's text, or read from a picture — and a reader that
+           never ran fell into the second and claimed an image had been read.
+           An empty panel under a badge saying something was read is the kind
+           of small lie that costs an operator ten minutes hunting for the
+           fields it supposedly found. */
         const engine =
           rec.engine === "pdf-text"
             ? '<span class="pill g">Leído del texto del PDF</span>'
-            : `<span class="pill y">Leído de una imagen${rec.confidence != null ? " · " + rec.confidence + "% de confianza" : ""}</span>`;
+            : rec.engine === "none"
+              ? '<span class="pill r">Sin lectura — escríbalo a mano</span>'
+              : `<span class="pill y">Leído de una imagen${rec.confidence != null ? " · " + rec.confidence + "% de confianza" : ""}</span>`;
         const amber = r ? r.fields.filter((f) => f.verdict === "amber").length : CAP_FIELDS.length;
 
         v.innerHTML = `<div class="pb">
@@ -15176,9 +15714,55 @@
         if (!capWork) return;
         const r = capWork.result;
         const host = $("#capForm");
+        /* NOTHING WAS READ, SO EVERY FIELD IS BLANK — and blank is not the same
+           as absent. This branch used to print one sentence telling the
+           operator to write the data by hand, and then offer nowhere to write
+           it: the panel had no inputs at all, so the instruction was advice
+           the screen itself made impossible to follow. (That sentence is not
+           quoted here on purpose — the source audit reads comments, and a
+           quoted example counts as a string nobody translated.) The extraction
+           capability refuses an empty document on purpose and says what should
+           happen instead — "offer manual entry with the image attached" — and
+           this is that offer. The same rows, the same order, every dot amber,
+           because nothing checked anything. Typed values live on `capWork.manual`
+           rather than going through `recheck`, which needs a reading to re-check. */
         if (!r) {
-          host.innerHTML = `<div class="pbh">Datos</div><div class="pbbody">
-      <div class="empty">No se ha leído nada del documento. Escriba los datos a mano; la imagen queda adjunta igualmente.</div></div>`;
+          capWork.manual = capWork.manual || {};
+          host.innerHTML = `<div class="pbh">Datos</div>
+   <div class="pbbody"><div class="it" style="color:var(--muted)">No se ha leído nada del documento. Escriba los datos a mano; la imagen queda adjunta igualmente.</div></div>
+   ${CAP_FIELDS.map(([key, label]) => {
+     const held = capWork.manual[key];
+     const shown =
+       held === null || held === undefined
+         ? ""
+         : CAP_AMOUNTS.has(key)
+           ? (held / 100).toFixed(2)
+           : String(held);
+     return `<div class="capf${capWork.focusKey === key ? " on" : ""}" data-f="${key}">
+       <span class="dot amber" title="Sin comprobar — revíselo"></span>
+       <label for="cap_${key}">${label}</label>
+       <input id="cap_${key}" data-key="${key}" value="${esc(shown)}"
+         ${CAP_AMOUNTS.has(key) ? 'inputmode="decimal"' : ""}>
+      </div>`;
+   }).join("")}`;
+          host.querySelectorAll("input[data-key]").forEach((inp) => {
+            inp.onchange = () => {
+              if (!capWork) return;
+              const key = inp.dataset.key;
+              const raw = inp.value.trim();
+              const value =
+                raw === ""
+                  ? null
+                  : CAP_AMOUNTS.has(key)
+                    ? Math.round(Number(raw.replace(",", ".")) * 100)
+                    : raw;
+              capWork.manual[key] = Number.isNaN(value) ? null : value;
+            };
+          });
+          if (capWork.focusKey) {
+            const i = document.getElementById("cap_" + capWork.focusKey);
+            if (i) i.focus();
+          }
           return;
         }
         const badChecks = r.checks.filter((c) => c.status === "mismatch");
@@ -15259,7 +15843,10 @@
           r = w.result;
         const val = (k) => {
           const f = r && r.fields.find((x) => x.key === k);
-          return f ? f.value : null;
+          if (f) return f.value;
+          // Typed by hand, because nothing was read. Same keys, same units.
+          const m = w.manual || {};
+          return m[k] === undefined ? null : m[k];
         };
         const key = "cap_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
         /* A REFERENCE IS ONLY WRITTEN IF THE BYTES LANDED.
@@ -15441,7 +16028,8 @@
            channel whose behaviour has to be guessed is a channel that gets
            picked wrongly. */
         const CH_HINT = {
-          email: "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.",
+          email:
+            "Se prepara un borrador en el buzón de la empresa. No se envía nada al cliente todavía.",
           whatsapp: "Se abre WhatsApp con el mensaje escrito. Usted decide cuándo enviarlo.",
           hand: "Queda registrado como entregado en mano en la fecha y hora que indique.",
         };
@@ -15496,7 +16084,10 @@
                 // nothing was said" is precisely how a working mailbox
                 // looked broken for a day.
                 const tpl = erp.commsTemplate("quote-send");
-                if (!tpl) toast("⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo");
+                if (!tpl)
+                  toast(
+                    "⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo",
+                  );
                 if (tpl) {
                   const vars = { number: b.number, cliente: party.name };
                   const C = commsApi();
@@ -16116,7 +16707,11 @@
         partyNoTaxId: ["suppliers", "proveedores"],
         movUnallocated: ["banking", "banco"],
         receiptUnmatched: ["invoicing", "facturación"],
-        cashNoDoc: ["petty-cash", "caja chica"],
+        /* The cash exception used to point at Caja chica. There is no such
+           screen: an undocumented cash spend is now an unexplained part of a
+           withdrawal, and the place to answer it is the bank line it came
+           out of. */
+        cashNoDoc: ["banking", "conciliación"],
       };
       /** DMC-01: the selected chapter ("" = all), the tree's own search, and the drag. */
       let catChapter = "",
@@ -16379,10 +16974,66 @@
       function cardSettleGroup(m) {
         const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
         if (!acc || acc.kind === "card" || m.amountCents >= 0) return "";
-        const cards = erp.state.bankAccounts.filter((a) => a.kind === "card");
+        /* activeBankAccounts(), not the raw array. A deactivated card must not
+           be offerable as the thing a bank line settles — that is the whole
+           point of deactivating it, and for a while it was the whole point of
+           a method nothing called. */
+        const cards = erp.activeBankAccounts().filter((a) => a.kind === "card");
         if (!cards.length) return "";
         const opts = cards.map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`).join("");
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
+      }
+      /* The cash options, in the same picker and for the same reason: this
+         panel says WHAT a line is, and «I took this out as cash» is exactly
+         that. Money out offers the withdrawal; money in offers to close a
+         withdrawal that is still owed an explanation, because a deposit is
+         only a return if there is something for it to return to. */
+      /* WHAT IS LEFT OF A WITHDRAWAL, said as three figures and a remainder.
+         Two hundred out, ninety of receipts against it, sixty back in, fifty
+         still in a pocket — the way the operator described cash working, and
+         the last figure is the one nothing could show before. (Written with
+         no apostrophes on purpose: the source audit pairs them as quotes and
+         reported the middle of this comment as a user-visible string.)
+         It is not an error state: cash in a pocket at the end of a week is
+         ordinary, and a screen that treats it as a fault teaches people to
+         make the number up. */
+      function cashWithdrawalCard(m) {
+        if (!m.cashWithdrawal) return "";
+        const c = erp.cashWithdrawalState(m.id);
+        const back = erp.state.movements.filter(
+          (x) => x.cashReturn && x.cashReturn.withdrawalId === m.id,
+        );
+        return `<div class="card" style="margin:0"><div class="ch"><h3>Reintegro de efectivo</h3>
+     <span class="tag">${c.outstandingCents > 0 ? "queda por justificar" : "todo justificado"}</span></div>
+    <div class="daylist" style="padding:10px 14px">
+     <div class="it"><span style="flex:1">Retirado</span><b>${eur(c.totalCents)}</b></div>
+     <div class="it"><span style="flex:1">Justificado con documentos</span><b>${eur(c.documentedCents)}</b></div>
+     <div class="it"><span style="flex:1">Devuelto al banco</span><b>${eur(c.returnedCents)}</b></div>
+     ${back
+       .map(
+         (x) =>
+           `<div class="it" style="color:var(--muted)"><span style="flex:1">${esc(fmtD(x.accountingDate))} · ${esc(movWho(x))}</span><span>${eur(x.amountCents)}</span></div>`,
+       )
+       .join("")}
+     <div class="it" style="border-top:1px solid var(--line)"><span style="flex:1">En efectivo todavía</span>
+      <b style="color:${c.outstandingCents > 0 ? "var(--amber)" : "var(--greenDeep)"}">${eur(c.outstandingCents)}</b></div>
+    </div></div>`;
+      }
+      function cashGroup(m) {
+        const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+        if (!acc || acc.kind === "card") return "";
+        if (m.amountCents < 0)
+          return m.cashWithdrawal
+            ? ""
+            : `<optgroup label="Efectivo"><option value="w:">Reintegro de efectivo</option></optgroup>`;
+        const open = erp.state.movements
+          .filter((x) => x.cashWithdrawal && erp.cashWithdrawalState(x.id).outstandingCents > 0)
+          .map(
+            (x) =>
+              `<option value="r:${x.id}">${esc(fmtD(x.accountingDate))} · ${eur(x.amountCents)}</option>`,
+          )
+          .join("");
+        return open ? `<optgroup label="Devolución de efectivo">${open}</optgroup>` : "";
       }
 
       /**
@@ -16475,6 +17126,14 @@
           .slice()
           .reverse();
         const pv = erp.discardPreview(accountId);
+        /* The neighbouring question, and deliberately a different one: `pv`
+           counts what may be discarded without undoing anything, `rv` counts
+           what emptying the account would have to undo first. A trial run
+           needs the second — the movements somebody most wants gone afterwards
+           are the ones they spent the trial reconciling — and the two numbers
+           are shown apart because agreeing to one is not agreeing to the
+           other. */
+        const rv = erp.resetAccountPreview(accountId);
         const here = { length: pv.total };
         const free = pv.deletable;
         const db = openDrawer("Deshacer importación · " + (acc ? acc.name : ""));
@@ -16502,7 +17161,21 @@
     <div style="padding:0 12px 10px"><span class="pill y">Sólo se borra lo que nadie ha tocado: un movimiento casado, asignado o marcado sin factura se conserva.</span></div>
     <div style="display:flex;gap:8px;padding:0 12px 12px"><span style="flex:1"></span>
      <button class="btn" id="uiAll"${free ? "" : " disabled"}>Borrar los ${free} sin conciliar</button>
-    </div></div>`;
+    </div></div>
+   ${
+     rv.closed
+       ? `<div class="card"><div class="ch"><h3>Vaciar la cuenta</h3></div>
+    <div style="padding:8px 12px 12px"><div class="sub">Hay movimientos dentro de un periodo cerrado. Reabra el periodo en Conciliación para poder vaciar la cuenta.</div></div></div>`
+       : `<div class="card"><div class="ch"><h3>Vaciar la cuenta</h3><span class="tag" translate="no">${rv.total}</span></div>
+    <div class="daylist">
+     <div class="it"><span>Se deshacen conciliaciones</span><span style="flex:1"></span><b translate="no">${rv.reconciled}</b></div>
+     <div class="it"><span>Pierden su reparto</span><span style="flex:1"></span><b translate="no">${rv.allocated}</b></div>
+    </div>
+    <div style="padding:8px 12px 10px"><span class="pill r">Para volver a empezar una prueba: borra TODOS los movimientos de esta cuenta, incluidos los ya conciliados.</span></div>
+    <div style="display:flex;gap:8px;padding:0 12px 12px"><span style="flex:1"></span>
+     <button class="btn danger" id="uiReset"${rv.total ? "" : " disabled"}>Vaciar la cuenta entera</button>
+    </div></div>`
+   }`;
         db.querySelectorAll("[data-undoimp]").forEach(
           (b) =>
             (b.onclick = () =>
@@ -16520,6 +17193,21 @@
               closeDrawer();
               say(`${r.deleted} movimientos borrados, ${r.kept} conservados`);
             }, "Movimientos borrados");
+        const reset = $("#uiReset");
+        if (reset)
+          reset.onclick = async () => {
+            const yes = await askConfirm("Vaciar la cuenta entera", {
+              body: "Se borran todos los movimientos de esta cuenta y se deshacen sus conciliaciones, con los pagos y cobros que crearon. No se puede deshacer.",
+              okLabel: "Vaciar",
+              danger: true,
+            });
+            if (!yes) return;
+            mutate(() => {
+              const r = erp.resetAccountMovements(accountId, "backoffice");
+              closeDrawer();
+              say(`${r.deleted} movimientos borrados, ${r.unwound} conciliaciones deshechas`);
+            }, "Cuenta vaciada");
+          };
       }
 
       /**
@@ -16554,6 +17242,16 @@
       }
 
       const ACCOUNT_KINDS = { bank: "Banco", card: "Tarjeta", till: "Caja" };
+      /* Why a Borrar is greyed, in the operator's words rather than the
+         engine's code. A disabled button with no explanation is the state the
+         operator hit and reported as simply not being able to delete anything:
+         the reason existed, it was returned, and no screen ever said it. */
+      const ACCOUNT_BLOCK = {
+        settled: "Hay movimientos de otra cuenta que dicen liquidar esta tarjeta",
+        "closed-period": "Tiene movimientos en un periodo cerrado — ábralo primero",
+        "has-movements": "Tiene movimientos detrás",
+        "has-imports": "Tiene extractos importados detrás",
+      };
       /**
        * One line per account, then the sum — not the sum alone.
        *
@@ -16578,10 +17276,25 @@
             const pill = open
               ? `<span class="pill y"><span>${open}</span> <span>sin casar</span></span>`
               : '<span class="pill g">Todo casado</span>';
+            /* The row IS the picker now — the select above the card is gone,
+               so choosing has to be legible from the row itself rather than
+               from a control that repeated it. «Elegida» says which one the
+               import will land on; the row was already clickable and already
+               tinted, and a tint alone is not a label. */
+            const chosen = a.id === bankAcc;
+            const off = a.active === false;
             return (
-              `<div class="it" data-acct="${a.id}" style="cursor:pointer${a.id === bankAcc ? ";background:var(--greenSoft)" : ""}">` +
+              `<div class="it" data-acct="${a.id}" style="cursor:pointer${chosen ? ";background:var(--greenSoft)" : ""}">` +
               `<span class="k">${esc(a.name)}</span>` +
-              `<span class="pill b">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>` +
+              /* Folded into the template rather than joined onto it with `+`.
+                 A single-quoted fragment sitting between two concatenations
+                 makes the source audit pair the wrong quotes and report the
+                 CODE between them as a user-visible string — it reported two,
+                 and both were JavaScript. The other trap this file records
+                 about `+` is a reader's: a string built that way becomes one
+                 text node and stops being translatable. Same operator, two
+                 different gates, one answer. */
+              `<span class="pill b">${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</span>${off ? `<span class="pill y">Desactivada</span>` : ""}${chosen ? `<span class="pill g">Elegida</span>` : ""}` +
               `<span style="flex:1"></span>${pill}` +
               `<b>${eur0(erp.accountBalanceCents(a.id))}</b></div>`
             );
@@ -16617,7 +17330,7 @@
    <div class="field"><label>Tipo</label><select id="na_kind">
      <option value="bank"${k === "bank" ? " selected" : ""}>Cuenta bancaria</option>
      <option value="card"${k === "card" ? " selected" : ""}>Tarjeta de crédito</option>
-     <option value="till"${k === "till" ? " selected" : ""}>Caja de efectivo</option></select></div>
+</select></div>
    <div class="field"><label>Saldo inicial (€)</label><input id="na_open" type="number" step="0.01" value="0"></div>
    <div class="field full"><label>IBAN</label><input id="na_iban" placeholder="ES00 0000 0000 0000 0000 0000"></div>
    <div class="field full" style="margin-top:6px"><button class="btn primary" id="na_go">Crear cuenta</button></div>
@@ -16668,12 +17381,18 @@
 
       /* What the payables row shows about the bill's document: the captured
          file it came from, the attached paper, or the offer to attach one. */
+      /* An invoice with nothing behind it SAYS so. A paperclip is an offer to
+         attach and reads as an option; the gap it stands for is not optional.
+         Almost every document arrives photographed or uploaded, so a bill with
+         no document is either one typed in by hand — the case «＋ Nueva
+         factura» exists for, and which the accountant will still ask about —
+         or a filing somebody started and left. Both are worth chasing, and
+         neither is visible while the only sign is an unpressed button. */
       function billDocCell(billId) {
         const b = erp.state.bills.find((x) => x.id === billId);
         if (!b) return "";
-        if (b.capId) return ' <span class="pill g">doc</span>';
-        if (b.supportingDoc) return ' <span class="pill g">doc</span>';
-        return ` <button class="btn sm" data-billdoc="${billId}">📎</button>`;
+        if (b.capId || b.supportingDoc) return ' <span class="pill g">doc</span>';
+        return ` <span class="pill y">sin documento</span> <button class="btn sm" data-billdoc="${billId}">📎</button>`;
       }
       function billDocDrawer(billId) {
         const b = erp.state.bills.find((x) => x.id === billId);
@@ -16829,7 +17548,9 @@
             ownDoc || matchedBillDoc,
           ]);
         }
-        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, { subtitle: "Conciliación " + quarter });
+        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, {
+          subtitle: "Conciliación " + quarter,
+        });
         files.unshift({
           path: "conciliacion.xlsx",
           bytes: new Uint8Array(await xlsx.arrayBuffer()),
@@ -16860,8 +17581,46 @@
           byLine.get(k).push(r);
         }
         const total = rows.reduce((s2, r) => s2 + r.amountCents, 0);
+        /* TWO CARDS, TWO QUESTIONS. The report was that this screen could not
+           say where inside a partida the problem was — a partida can be four
+           subpartidas with three of them exactly on budget, and a list of
+           documents does not name the one that moved. So the same six columns
+           the partida table carries appear here one level down, and the
+           documents stay underneath: once you know WHICH subpartida, you want
+           to know why.
+
+           Paraphrased, not quoted: the translation audit reads comments, and a
+           phrase in guillemets looks to it exactly like a string the screen
+           prints — which is how this very comment failed the gate once. */
+        const lines = erp.lineEconomics(projectId, chapterNum);
         const db = openDrawer("Costes · " + chapterNum + ". " + (chapterName || ""));
-        db.innerHTML = `<div class="card"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Por subpartida</h3><span class="tag">${eur(total)}</span></div>
+   <div class="scroll"><table><thead><tr>
+     <th>Subpartida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
+     <th class="num">Desviación</th><th class="num">%</th>
+     <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
+   ${
+     lines
+       .map((l) => {
+         const dev = l.actualCents - l.budgetCostCents;
+         const mg = l.saleCents - l.actualCents;
+         const spent = l.budgetCostCents
+           ? ((l.actualCents / l.budgetCostCents) * 100).toFixed(1) + "%"
+           : "—";
+         const mgPct = l.saleCents ? ((mg / l.saleCents) * 100).toFixed(1) + "%" : "—";
+         return `<tr><td class="k">${l.unassigned ? '<span class="pill y">sin subpartida</span>' : esc(l.num + " · " + l.name)}</td>
+      <td class="num">${eur0(l.budgetCostCents)}</td>
+      <td class="num">${eur0(l.actualCents)}</td>
+      <td class="num ${dev > 0 ? "warn" : ""}">${dev > 0 ? "+" : ""}${eur0(dev)}</td>
+      <td class="num">${spent}</td>
+      <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(mg)}</td>
+      <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${mgPct}</td></tr>`;
+       })
+       .join("") ||
+     '<tr><td colspan="7"><div class="empty">Esta partida no tiene subpartidas en su línea base.</div></td></tr>'
+   }
+   </tbody></table></div></div>
+   <div class="card" style="margin-top:10px"><div class="ch"><h3>Coste acumulado</h3><span class="tag">${eur(total)}</span></div>
    <div class="scroll"><table><thead><tr><th>Subpartida</th><th>Origen</th><th>Documento</th><th>Fecha</th><th class="num">Importe</th></tr></thead><tbody>
    ${
      [...byLine.entries()]
@@ -17833,7 +18592,7 @@
    </div>
    ${
      plan.tasks.length
-       ? ganttChart(plan, sch, cmp, pays)
+       ? ganttChart(plan, sch, cmp, pays) + ganttList(plan, sch, pays)
        : derivable
          ? `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de las partidas y subpartidas aceptadas: la duración de cada partida sale de sus cantidades y del rendimiento diario del oficio.</div>`
          : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance.
@@ -17977,12 +18736,22 @@
           ganttWire(v, pid, plan, sch);
         },
 
-        /* ---------- Captura (CAP) · ADM-03, two zones (S7) ----------
-    The specification's shape: a 372 column of 96 px cards on the left, the
-    register on the right. What decides which side a document is on is not
-    its status name but whether it still needs a person — an unallocated
-    document is work, an allocated one is history — because that is the only
-    question the person opening this screen is actually asking.
+        /* ---------- Captura (CAP) · ADM-03, one register ----------
+    This screen used to be two zones: a 372 column of 96 px cards on the left,
+    the register on the right. The comment above them said what decides which
+    SIDE a document is on — «an unallocated document is work, an allocated one
+    is history» — and the code never implemented it. The tray held everything
+    unallocated; the register held everything, full stop. So a document that
+    was validated and not yet assigned sat in both, and the screen showed the
+    operator «Bandeja 1» beside «1 documento», which was the same document
+    counted twice. Reported exactly that way, with an arrow drawn between the
+    two panels.
+
+    One list now, and the tray's question survives as a filter on it: «Sin
+    asignar» with its count, which cannot disagree with the register the way a
+    second panel could. The capture buttons moved into the register's own bar
+    through `leading`, because «where do I upload a document» and «where do I
+    find one» should not be two places.
 
     The register keeps the shared list primitive (S2) rather than a hand-built
     table, so it paginates 10/25/50 like the other twenty-eight screens. */
@@ -17990,39 +18759,11 @@
           if (capWork) return captureValidate(v);
           $("#sub").textContent =
             "Fotografía o sube una factura, albarán o ticket y asígnalo a un proyecto o a gastos generales. Nada se valida sin confirmación humana.";
-          // Newest first. The document somebody has just photographed is the one they
-          // are about to file, and a worklist that appends to the bottom asks them to
-          // scroll past everything they have already dealt with to reach it.
-          const pending = erp.state.captured.filter((c) => !c.allocations.length).reverse();
-          v.innerHTML = `<div class="inbox2">
-   <div class="inbox">
-    <div class="ih"><h3>Bandeja</h3><span style="flex:1"></span><span class="tag" id="capPend">${pending.length}</span></div>
-    <div class="inboxl" id="capCards">
-     ${
-       pending
-         .map((c) => {
-           const cf = c.confirmed;
-           return `<div class="icard" data-cap="${c.id}">
-      <div class="thumb" data-blob="${esc(c.imageRef || "")}">📄</div>
-      <div style="min-width:0">
-       <div class="who">${cf && cf.issuerName ? esc(cf.issuerName) : "Emisor por confirmar"}</div>
-       <div class="amt">${cf && cf.totalCents ? eur(cf.totalCents) : "—"}</div>
-       <div class="meta"><span>${esc(CAP_TYPE_LABEL[c.docType] || c.docType)}</span> · <span>${fmtD(c.capturedAt)}</span></div>
-      </div></div>`;
-         })
-         .join("") || '<div class="empty">Nada pendiente de asignar.</div>'
-     }
-    </div>
-    <div style="display:flex;gap:8px;padding:10px 12px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line)">
-     <label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>
-     <label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>
-     <button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>
-    </div>
-   </div>
-   <div id="capReg"></div>
-  </div>
+          const pendingCount = erp.state.captured.filter((c) => !c.allocations.length).length;
+          v.innerHTML = `<div id="capReg"></div>
   <div class="card"><div class="daylist"><div class="it">Un PDF con texto se lee al instante y sin descargar nada. Una foto o un escaneado necesitan el lector de imágenes: unos 7 MB que se descargan la primera vez que hagan falta. Prepárelo con wifi si va a trabajar en una obra sin cobertura.</div></div></div>`;
 
+          const capDup = erp.duplicateCaptureMap();
           renderMasterList($("#capReg"), {
             id: "captured",
             noNew: true,
@@ -18041,7 +18782,32 @@
             nounPlural: "documentos",
             searchPlaceholder: "Buscar por emisor, número o referencia…",
             emptyText: "Ningún documento coincide con la búsqueda.",
-            baseRows: erp.state.captured.slice().reverse(),
+            /* The count is its own element and never concatenated into the
+               label. A string built with `+` around a number is one text node
+               per number the register can hold — an unbounded set no
+               dictionary can carry, and the third time that trap has been
+               walked into on this codebase. */
+            leading:
+              `<label class="btn primary sm">＋ Capturar documento<input type="file" id="capFile" accept="image/*,application/pdf" hidden></label>` +
+              `<label class="btn sm">Cámara<input type="file" id="capCam" accept="image/*" capture="environment" hidden></label>` +
+              `<button class="btn sm" id="capPrep">Preparar para trabajar sin cobertura</button>` +
+              `<button class="btn sm${capPendingOnly ? " primary" : ""}" id="capPend" aria-pressed="${capPendingOnly}"><span>Sin asignar</span> <b translate="no">${pendingCount}</b></button>`,
+            /* The duplicate flag is DERIVED here, not read off the record.
+               `confirmCapture` stamps `duplicateSuspect` at the moment of
+               confirming, so a pair that only becomes recognisable later —
+               because the reader improved, or somebody corrected a tax id —
+               stayed unflagged for ever. That is precisely the pair the
+               operator was looking at: one supplier invoice, filed twice, side
+               by side in this register with no warning on either. */
+            /* Newest first. The document somebody has just photographed is the
+               one they are about to file, and a register that appends to the
+               bottom asks them to scroll past everything already dealt with
+               to reach it. */
+            baseRows: erp.state.captured
+              .slice()
+              .reverse()
+              .filter((c) => !capPendingOnly || !c.allocations.length)
+              .map((c) => ({ ...c, dupOf: capDup[c.id] || null })),
             matches: (c, q) =>
               [
                 c.stdName,
@@ -18074,16 +18840,17 @@
               {
                 label: "Estado",
                 html: (c) =>
-                  `<span class="pill ${CAP_STATUS[c.status] ? CAP_STATUS[c.status][1] : ""}">${esc(CAP_STATUS[c.status] ? CAP_STATUS[c.status][0] : c.status)}</span>${c.duplicateSuspect ? ' <span class="pill r">¿Duplicado?</span>' : ""}`,
+                  `<span class="pill ${CAP_STATUS[c.status] ? CAP_STATUS[c.status][1] : ""}">${esc(CAP_STATUS[c.status] ? CAP_STATUS[c.status][0] : c.status)}</span>${c.dupOf || c.duplicateSuspect ? ' <span class="pill r">¿Duplicado?</span>' : ""}`,
               },
             ],
             onRowClick: (id) => captureDrawer(id),
           });
 
-          v.querySelectorAll("[data-cap]").forEach(
-            (card) => (card.onclick = () => captureDrawer(card.dataset.cap)),
-          );
-          capThumbs(v);
+          $("#capPend").onclick = () => {
+            capPendingOnly = !capPendingOnly;
+            getListState("captured").page = 1;
+            render();
+          };
           const take = (el) => {
             if (el)
               el.onchange = () => {
@@ -18124,7 +18891,6 @@
     here would bury the rest of the map. */
         _reconcile: conciliacion,
         _reconciled: conciliados,
-        "petty-cash": cajaChica,
         "cash-flow": flujoCaja,
         messaging: comunicaciones,
 
@@ -18570,7 +19336,8 @@
             "Facturas de proveedor con base, IVA y retención IRPF según el perfil fiscal. Pagos parciales y un pago para varias facturas.";
           const rows = erp.payables();
           v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn primary sm" id="sb_new">＋ Nueva factura</button></div>
+    <span style="flex:1"></span>
+    <button class="btn sm" id="sb_new" title="Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos">＋ Nueva factura</button></div>
    <div class="card"><div class="ch"><h3>Facturas de proveedor</h3><span class="tag">pendiente ${eur0(rows.reduce((s, r) => s + Math.max(0, r.outstandingCents), 0))}</span></div>
    <div class="scroll"><table><thead><tr><th>Proveedor</th><th>Nº factura</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Asignación</th><th>Estado</th><th></th></tr></thead><tbody>
    ${rows
@@ -18586,33 +19353,17 @@
        return `<tr><td class="k">${esc(r.supplier)}</td><td>${esc(r.number)}</td><td class="num">${eur(r.totalCents)}</td>
      <td class="num k">${r.outstandingCents > 0 ? eur(r.outstandingCents) : "—"}</td><td>${fmtD(r.dueDate)}</td>
      <td>${r.unallocated ? '<span class="pill r">Sin asignar</span>' : '<span class="pill g">Asignada</span>'}</td><td>${st}</td>
-     <td>${r.outstandingCents > 0 ? `<button class="btn sm" data-pay="${r.id}">Pagar</button>` : ""}
+     <td><button class="btn sm" data-billfix="${r.id}">Anular registro</button>
       ${billDocCell(r.id)}</td></tr>`;
      })
      .join("")}
    </tbody></table></div></div>`;
           $("#sb_new").onclick = () => billDrawer(null);
+          v.querySelectorAll("[data-billfix]").forEach(
+            (b) => (b.onclick = () => billUnregisterDrawer(b.dataset.billfix)),
+          );
           v.querySelectorAll("[data-billdoc]").forEach(
             (b) => (b.onclick = () => billDocDrawer(b.dataset.billdoc)),
-          );
-          v.querySelectorAll("[data-pay]").forEach(
-            (b) =>
-              (b.onclick = () => {
-                const bill = erp.state.bills.find((x) => x.id === b.dataset.pay);
-                const out = erp.billOutstandingCents(bill.id);
-                mutate(
-                  () =>
-                    erp.payBills(
-                      {
-                        amountCents: out,
-                        method: "transfer",
-                        billAllocations: [{ billId: bill.id, amountCents: out }],
-                      },
-                      "backoffice",
-                    ),
-                  "Pago registrado: " + eur(out),
-                );
-              }),
           );
         },
 
@@ -18662,7 +19413,20 @@
         _bankAccounts(v) {
           $("#sub").textContent =
             "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.";
-          const accs = erp.state.bankAccounts;
+          /* THE POINT OF DEACTIVATING. `activeBankAccounts()` was written for
+             this screen and called by nothing, so an account switched off here
+             stayed exactly where it was — which is what the operator reported,
+             and it was not a subtle bug: the method had zero callers in the
+             whole of site/.
+
+             A switched-off account that still HOLDS something is a different
+             case and is still listed, marked, because the card below prints a
+             consolidated total: hiding a balance while still counting it is a
+             screen that does not add up, and that is worse than a row somebody
+             wanted gone. Empty and switched off, it goes. */
+          const accs = erp.state.bankAccounts.filter(
+            (a) => a.active !== false || erp.accountBalanceCents(a.id) !== 0,
+          );
           /* A register with no account yet is where a real tenant starts — the
              demo seed ships two, so this branch only ever runs on the one day
              it matters. The buttons that create an account and import a
@@ -18670,9 +19434,15 @@
              the bank work unreachable precisely on first use: a sentence, and
              nothing to press. The door belongs above the emptiness. */
           if (!accs.length) {
-            v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="bkNew">＋ Cuenta</button></div>
-   <div class="card"><div class="empty">No hay cuentas configuradas.<br>Crea la primera cuenta para empezar: banco, tarjeta o caja.</div></div>`;
-            $("#bkNew").onclick = () => newAccountDrawer();
+            /* The door belongs above the emptiness — that much was already
+               learnt here. What changed is WHERE the door leads: accounts
+               belong to the company and are configured with the rest of it,
+               so this screen points at that one rather than owning a second
+               way in. Two places to create an account is two places to look
+               for the one you cannot find. */
+            v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="bkToCfg">Ir a Configuración › Empresa</button></div>
+   <div class="card"><div class="empty">No hay cuentas configuradas.<br>Las cuentas y las tarjetas se crean en Configuración › Empresa.</div></div>`;
+            $("#bkToCfg").onclick = () => go("company");
             return;
           }
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
@@ -18690,16 +19460,11 @@
 
           v.innerHTML = `
    <div class="stepbar">
-     <select class="inline" id="bkSel">
-       <option value="">Todas las cuentas</option>
-       ${accs.map((a) => `<option value="${a.id}"${a.id === bankAcc ? " selected" : ""}>${esc(a.name)}${a.kind === "card" ? " · tarjeta" : a.kind === "till" ? " · caja" : ""}</option>`).join("")}
-     </select>
-     <button class="btn sm" id="bkNew">＋ Cuenta</button>
+     <span class="k">${bankAcc ? esc((accs.find((a) => a.id === bankAcc) || {}).name || "") : "Todas las cuentas"}</span>
+     <span style="color:var(--muted)">${bankAcc ? "el extracto se importa aquí" : "elija una cuenta abajo para importar"}</span>
      <span style="flex:1"></span>
-     <button class="btn sm" id="bkImport">⬆ Importar extracto (.xlsx / .pdf)</button>
+     <label class="btn sm">⬆ Importar extracto (.xlsx / .pdf)<input type="file" id="bkFile" accept=".xlsx,.pdf" hidden></label>
      <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
-     <input type="file" id="bkFile" accept=".xlsx,.pdf" style="display:none">
-     <button class="btn sm primary" id="bToRec">Ir a Conciliación →</button>
    </div>
    ${accountLines(accs)}
    <div class="card"><div class="ch"><h3>Últimos movimientos</h3><span class="tag">${recent.length}</span></div>
@@ -18715,13 +19480,9 @@
        )
        .join("") || '<div class="it">Sin movimientos todavía.</div>'
    }
-   ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span><button class="btn sm" id="bkToRec2">Conciliar →</button></div>` : ""}
+   ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span></div>` : ""}
    </div></div>`;
 
-          $("#bkSel").onchange = (e) => {
-            bankAcc = e.target.value;
-            render();
-          };
           // Clicking the account's own line is the same act as choosing it in
           // the picker — a second way in, not a second piece of state.
           v.querySelectorAll("[data-acct]").forEach(
@@ -18731,9 +19492,6 @@
                 render();
               }),
           );
-          $("#bToRec").onclick = () => goTab("banking", "_reconcile");
-          if ($("#bkToRec2")) $("#bkToRec2").onclick = () => goTab("banking", "_reconcile");
-          $("#bkNew").onclick = () => newAccountDrawer();
           /* The statement lands on ONE account — importing into "all accounts"
              would have to guess, and a guess about which bank a movement
              belongs to is a reconciliation that starts wrong. */
@@ -18744,17 +19502,22 @@
             }
             undoImportDrawer(bankAcc);
           };
-          $("#bkImport").onclick = () => {
-            if (!bankAcc) {
-              say("Elige primero la cuenta a la que pertenece el extracto.");
-              return;
-            }
-            $("#bkFile").click();
-          };
           $("#bkFile").onchange = async (ev) => {
             const file = ev.target.files && ev.target.files[0];
             ev.target.value = "";
             if (!file) return;
+            /* THE GUARD MOVED HERE, and it had to. It used to sit on a button
+               that called `bkFile.click()` — and a scripted click on a hidden
+               input is precisely what iOS Safari will not turn into a file
+               dialog, which is why the operator's phone did nothing at all.
+               The button is a <label> now, the way every other file control in
+               this file already was, so the picker is opened by the tap
+               itself. Nothing runs before it any more, so the question it
+               asked is asked after the file comes back instead. */
+            if (!bankAcc) {
+              say("Elige primero la cuenta a la que pertenece el extracto.");
+              return;
+            }
             let parsed;
             try {
               if (/\.pdf$/i.test(file.name)) {
@@ -19388,6 +20151,12 @@
         const MISS_LAB = COMPANY_MISSING_LABELS;
         const grid = (...keys) =>
           `<div class="fgrid" style="padding:12px 16px">${keys.map((k) => companyField(c, k)).join("")}</div>`;
+        /* Accounts belong to the COMPANY, so they are configured with the rest
+           of it. They used to be created from Consolidación bancaria — a
+           screen for reading balances and getting a statement in — and could
+           not be removed from anywhere at all, so a workspace that had been
+           demonstrated on carried its demo accounts for ever. */
+        const accounts = erp.state.bankAccounts.slice();
         v.innerHTML = `
    ${
      missing.length
@@ -19453,6 +20222,40 @@
     )}
     <div class="daylist"><div class="it" style="color:var(--muted)">Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.</div></div></div>
 
+   <div class="card"><div class="ch"><h3>Cuentas y tarjetas</h3>
+     <span class="tag" translate="no">${accounts.length}</span>
+     <span style="flex:1"></span>
+     <button class="btn sm" id="co_accNew">＋ Cuenta</button></div>
+    <div class="daylist"><div class="it" style="color:var(--muted)">Desactivar una cuenta la retira de las listas y conserva lo conciliado. Borrar la quita del todo: si tiene movimientos detrás, se avisa de cuántos y se van con ella.</div></div>
+    <div class="scroll"><table data-nocards><thead><tr>
+      <th>Cuenta</th><th>Tipo</th><th class="num">Saldo</th><th class="num">Movimientos</th>
+      <th>Estado</th><th></th></tr></thead><tbody>
+    ${
+      accounts
+        .map((a) => {
+          const off = a.active === false;
+          const movs = erp.state.movements.filter((m) => m.accountId === a.id).length;
+          /* Asked WITH the cascade, because that is the button being drawn.
+             Asked without it, every account carrying history came back
+             "has-movements" and the control was rendered permanently disabled
+             with nothing saying why — which is exactly what the operator ran
+             into and described as not being able to delete them at all. */
+          const block = erp.bankAccountDeleteBlock(a.id, { withMovements: true });
+          return `<tr><td class="k">${esc(a.name)}</td>
+      <td>${esc(ACCOUNT_KINDS[a.kind] || a.kind)}</td>
+      <td class="num">${eur0(erp.accountBalanceCents(a.id))}</td>
+      <td class="num" translate="no">${movs}</td>
+      <td>${off ? '<span class="pill y">Desactivada</span>' : '<span class="pill g">Activa</span>'}</td>
+      <td class="num" style="white-space:nowrap">
+       <button class="btn sm" data-accoff="${a.id}">${off ? "Reactivar" : "Desactivar"}</button>
+       <button class="btn sm danger" data-accdel="${a.id}"${block ? ` disabled title="${esc(ACCOUNT_BLOCK[block] || block)}"` : ""}>Borrar</button></td></tr>`;
+        })
+        .join("") ||
+      '<tr><td colspan="6"><div class="empty">No hay ninguna cuenta todavía.</div></td></tr>'
+    }
+    </tbody></table></div>
+   </div>
+
    <div class="card"><div class="ch"><h3>Pie legal</h3></div>
     <div class="fgrid" style="padding:12px 16px">
      <div class="field full"><label>Texto que se imprime al pie de cada documento</label>
@@ -19460,6 +20263,47 @@
     </div></div>
 
    <div style="margin:12px 0 24px"><button class="btn primary" id="co_save">Guardar</button></div>`;
+
+        $("#co_accNew").onclick = () => newAccountDrawer();
+        v.querySelectorAll("[data-accoff]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              const a = erp.state.bankAccounts.find((x) => x.id === b.dataset.accoff);
+              mutate(
+                () => erp.setBankAccountActive(a.id, a.active === false, "backoffice"),
+                a.active === false ? "Cuenta reactivada" : "Cuenta desactivada",
+              );
+            }),
+        );
+        v.querySelectorAll("[data-accdel]").forEach(
+          (b) =>
+            (b.onclick = async () => {
+              const a = erp.state.bankAccounts.find((x) => x.id === b.dataset.accdel);
+              const n = erp.state.movements.filter((m) => m.accountId === a.id).length;
+              /* Two bodies, and the number is in NEITHER. A sentence carrying
+                 a count is a different string for every value it can hold,
+                 which no dictionary can follow — the rule
+                 `resetAccountMovements` states about its own refusal. The
+                 count is on the row the operator just pressed, in its own
+                 Movimientos column, which is where it was read before the
+                 button was reached. */
+              const yes = await askConfirm(
+                n ? "Borrar la cuenta y sus movimientos" : "Borrar la cuenta",
+                {
+                  body: n
+                    ? "Se borra la cuenta y todos los movimientos que tiene detrás. Las conciliaciones se deshacen primero, así que ninguna factura queda diciendo que la pagó un movimiento que ya no existe. No se puede deshacer."
+                    : "Se borra la cuenta. No tiene ningún movimiento detrás, así que no se pierde nada conciliado.",
+                  okLabel: "Borrar",
+                  danger: true,
+                },
+              );
+              if (!yes) return;
+              mutate(
+                () => erp.deleteBankAccount(a.id, "backoffice", { withMovements: true }),
+                "Cuenta borrada",
+              );
+            }),
+        );
 
         /* The logo is a file, not a name. `logoRef` — the field this replaces —
            was never read by anything that draws. */
@@ -19547,7 +20391,8 @@
           // No server, no mailbox — and no pretending otherwise. The published
           // read-only copies and a browser-only workspace land here.
           state.textContent = "solo en el servidor";
-          msg.textContent = "Esta copia funciona sin servidor: el buzón se conecta en la instalación de la empresa.";
+          msg.textContent =
+            "Esta copia funciona sin servidor: el buzón se conecta en la instalación de la empresa.";
           save.disabled = true;
           addr.disabled = pass.disabled = true;
           return;
@@ -19598,7 +20443,10 @@
               // The endpoint answers with a redirect carrying the outcome, so
               // the answer is in the address we ended up on.
               const q = new URLSearchParams((r.url.split("?")[1] || "").replace(/#.*$/, ""));
-              return { status: q.get("status") || (r.ok ? "ok" : "failed"), detail: q.get("detail") || "" };
+              return {
+                status: q.get("status") || (r.ok ? "ok" : "failed"),
+                detail: q.get("detail") || "",
+              };
             })
             .then((res) => {
               save.disabled = false;
@@ -19615,13 +20463,15 @@
                 sweepMailboxDrafts();
               } else {
                 state.textContent = "sin conectar";
-                msg.textContent = res.detail || "El buzón no ha aceptado estos datos. No se ha guardado nada.";
+                msg.textContent =
+                  res.detail || "El buzón no ha aceptado estos datos. No se ha guardado nada.";
                 toast("⚠ El buzón no ha aceptado estos datos");
               }
             })
             .catch(() => {
               save.disabled = false;
-              msg.textContent = "No se ha podido contactar con el servidor. No se ha guardado nada.";
+              msg.textContent =
+                "No se ha podido contactar con el servidor. No se ha guardado nada.";
             });
         };
       }
@@ -20119,7 +20969,11 @@
         });
         $("#p_edit").onclick = () => editPartyDrawer(id);
         $("#p_propnew").onclick = () =>
-          propertyDrawer(null, { partyId: id, back: () => partyDrawer(id), onSaved: () => partyDrawer(id) });
+          propertyDrawer(null, {
+            partyId: id,
+            back: () => partyDrawer(id),
+            onSaved: () => partyDrawer(id),
+          });
         db.querySelectorAll("[data-prop]").forEach(
           (btn) =>
             (btn.onclick = () =>
@@ -20596,22 +21450,25 @@
    <div class="field full" style="margin-top:8px${back ? ";flex-direction:row;gap:8px" : ""}"><button class="btn primary" id="pr_save"${back ? ` style="flex:1"` : ""}>${pr ? "Guardar cambios" : "Crear inmueble"}</button>${back ? `<button class="btn" id="pr_back">Cancelar</button>` : ""}</div></div>`;
         if (back) $("#pr_back").onclick = closeDrawer;
         $("#pr_save").onclick = () =>
-          mutate(() => {
-            const street = $("#pr_street").value.trim();
-            if (!street) throw new Error("La dirección es obligatoria");
-            const patch = {
-              street,
-              postalCode: $("#pr_cp").value.trim(),
-              city: $("#pr_city").value.trim(),
-              part: $("#pr_part").value,
-              surfaceM2: Math.round(+$("#pr_m2").value || 0),
-            };
-            const rec = pr
-              ? erp.updateProperty(id, patch, "backoffice")
-              : erp.addProperty(Object.assign({ partyId }, patch), "backoffice");
-            closeDrawer();
-            if (onSaved) onSaved(rec);
-          }, pr ? "Inmueble actualizado" : "Inmueble creado");
+          mutate(
+            () => {
+              const street = $("#pr_street").value.trim();
+              if (!street) throw new Error("La dirección es obligatoria");
+              const patch = {
+                street,
+                postalCode: $("#pr_cp").value.trim(),
+                city: $("#pr_city").value.trim(),
+                part: $("#pr_part").value,
+                surfaceM2: Math.round(+$("#pr_m2").value || 0),
+              };
+              const rec = pr
+                ? erp.updateProperty(id, patch, "backoffice")
+                : erp.addProperty(Object.assign({ partyId }, patch), "backoffice");
+              closeDrawer();
+              if (onSaved) onSaved(rec);
+            },
+            pr ? "Inmueble actualizado" : "Inmueble creado",
+          );
       }
       /* ---------- COM-04 · creating a contract (Package 2, slide 4) ----------
    "No hay opción de crear/subir nuevo contrato" — and it was more literal
@@ -21259,7 +22116,7 @@
       <div class="daylist"><div class="it">
        <label class="btn sm">Desde el ordenador<input type="file" id="cv_file" accept="image/*" multiple hidden></label>
        <button class="btn sm" id="cv_cam">Cámara</button>
-       <input type="file" id="cv_camfb" accept="image/*" capture="environment" hidden>
+       <label class="btn sm" id="cv_camfbL" hidden>Elegir la foto<input type="file" id="cv_camfb" accept="image/*" capture="environment" hidden></label>
       </div></div></div>
      ${
        comp.ok
@@ -21324,9 +22181,15 @@
               const file = await capturePhoto();
               if (file) await addPhotos([file]);
             } catch (e) {
-              // Say what went wrong, then offer the only thing left that works.
+              /* Say what went wrong, then REVEAL the only thing left that
+                 works rather than pressing it. This used to call .click() on a
+                 hidden input from inside a catch block — off the end of the
+                 user gesture, on an input iOS Safari will not open that way,
+                 so the fallback for a failed camera was itself silent on the
+                 device most likely to need it. A control the operator can see
+                 and tap is one they can also tap twice. */
               toast("⚠ " + e.message);
-              $("#cv_camfb").click();
+              $("#cv_camfbL").hidden = false;
             }
           };
           const fix = $("#cv_fixparty");
@@ -21509,12 +22372,41 @@
           CaneiSheet.scopedCss(".cnsheet") +
           /* app-side frame: a 210mm sheet scrolls inside a narrow pane
              rather than widening it, and loses its screen chrome in print */
-          "\n.cnsheet{overflow-x:auto}.cnsheet .sheet{margin:0 auto}";
+          "\n.cnsheet{overflow-x:auto}" +
+          /* THE HOST'S OWN FLOOR, KEPT OUT OF THE CAGE — third sighting.
+             `table{min-width:520px}` up at the top of this stylesheet is a
+             screen rule: it stops a register collapsing into unreadable
+             columns. It is unscoped, so it also lands on every table inside a
+             document, where it means nothing — a sheet declares its columns in
+             per-cent of a page it already owns.
+
+             PK5-A found this floor behind carded tables and answered it with
+             `table.cards{min-width:0}`; the old document class found it again
+             and answered it with `.cdoc table{min-width:0}`. Neither reached
+             here, because this renderer replaced .cdoc afterwards and the cage
+             sets no min-width of its own, so the host's is the only
+             declaration and wins by default. Measured on the seeded quote at
+             390px: the line-item table pinned at 520px inside a 278px column,
+             with `.sheet{overflow:hidden}` swallowing the 242px difference —
+             the amounts, silently, and with nothing to scroll because the
+             paper had already eaten the overflow.
+
+             Answered at the cage rather than in erp-sheet.js on purpose: the
+             floor is this file's, and the sheet renders standalone elsewhere
+             where it does not exist. */
+          "\n.cnsheet table{min-width:0}" +
+          /* Centring only where there is room to centre. Auto margins on a box
+             wider than its scroller put the left of that box out of reach —
+             you can scroll right and never get back. Below the sheet's own
+             breakpoint its mobile rule sets margin:0; this used to override it
+             from here by arriving later in the same stylesheet. */
+          "\n@media (min-width:701px){.cnsheet .sheet{margin:0 auto}}";
         document.head.appendChild(st);
       }
       function sheetDocHtml(kind, refs, lang) {
-        const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
-        return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), CaneiDocI18n.tr(lang || "es"), { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
+        const T = CaneiDocI18n.tr(lang || "es");
+        const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes, T);
+        return `<div class="cnsheet">${CaneiSheet.render(doc, erp._issuerBlock(), T, { pict: typeof ErpPictograms !== "undefined" ? ErpPictograms : null })}</div>`;
       }
       /* ==================== N2 · every email becomes a draft ====================
          The engine's comms queue stays log-only (the mandate: no real sends).
@@ -21619,7 +22511,13 @@
             }
           }
           if (!kind) return null;
-          const doc = CaneiErpFacts.docFor(erp, kind, refs, CaneiDocTypes);
+          const doc = CaneiErpFacts.docFor(
+            erp,
+            kind,
+            refs,
+            CaneiDocTypes,
+            CaneiDocI18n.tr(lang || "es"),
+          );
           const iss = erp._issuerBlock();
           const brand = {
             wordmark: iss.tradeName,
@@ -21706,8 +22604,7 @@
         if (typeof ErpStore === "undefined" || !ErpStore.isRemote() || sweepingDrafts)
           return Promise.resolve(0);
         const rows = ((erp && erp.state.commsQueue) || []).filter(
-          (q) =>
-            ["draft", "approved", "sent"].includes(q.status) && q.to && q.filed !== "mailbox",
+          (q) => ["draft", "approved", "sent"].includes(q.status) && q.to && q.filed !== "mailbox",
         );
         if (!rows.length) return Promise.resolve(0);
         sweepingDrafts = true;
@@ -21957,6 +22854,7 @@
             marked: new Set(annex.markedItems),
           },
           CaneiDocTypes,
+          CaneiDocI18n.tr(lang),
         );
         if (annex.enabled && annex.pages && annex.pages.length) {
           const pages = [];
@@ -22030,7 +22928,13 @@
        * than inside them so a screen that gains a document gains both.
        */
       function downloadDocx(kind, refs, lang, filename) {
-        const descriptor = CaneiErpFacts.docFor(erp, kind, refs || {}, CaneiDocTypes);
+        const descriptor = CaneiErpFacts.docFor(
+          erp,
+          kind,
+          refs || {},
+          CaneiDocTypes,
+          CaneiDocI18n.tr(lang || "es"),
+        );
         saveDocx(descriptor, lang, filename);
       }
       async function downloadBudgetPdf(id, versionId) {
@@ -22062,9 +22966,7 @@
         const b = erp.budget(id);
         const doc = erp.renderBudgetDoc(id, versionId);
         const money = (c) => eur(c).replace(/ ?€/, "").trim();
-        const rows = [
-          ["Nº", "Código", "Descripción", "Ud.", "Cantidad", "Precio ud.", "Importe"],
-        ];
+        const rows = [["Nº", "Código", "Descripción", "Ud.", "Cantidad", "Precio ud.", "Importe"]];
         for (const c of doc.chapters) {
           // The chapter as its own banner row, so the file reads in the same
           // order and the same groups as the paper does.
@@ -22203,43 +23105,6 @@
         const bdAns = $("#bdAnswer");
         if (bdAns) bdAns.onclick = () => budgetResponseDrawer(id, vsel);
       }
-      /** Adjust one chapter's projection. The reason is required, by the engine. */
-      function forecastDrawer(pid, chapterNum, name, row) {
-        const db = openDrawer(`Proyección · ${chapterNum}. ${name}`);
-        const stored = (erp.project(pid).forecastOverrides || {})[chapterNum];
-        db.innerHTML = `<div class="card"><div class="ch"><h3>Coste a fin de obra</h3><span class="tag">§4.4</span></div>
-   <div class="daylist">
-    <div class="it">Presupuestado <b>${eur(row.budgetCents)}</b> · real <b>${eur(row.actualCents)}</b> · avance <b>${row.progressPct}%</b></div>
-    <div class="it">Proyección calculada <b>${eur(row.calculatedCents)}</b>${row.provisional ? ' <span class="pill y">provisional — muy poco avance para extrapolar</span>' : ""}</div>
-    ${stored ? `<div class="it">Ajuste vigente <b>${eur(stored.costCents)}</b> · ${esc(stored.reason)} <span style="color:var(--muted)">(${esc(stored.by)}, ${fmtD(stored.at)})</span></div>` : ""}
-   </div></div>
-   <div class="card"><div class="ch"><h3>Ajustar</h3></div><div class="fgrid" style="padding:12px 16px">
-    <div class="field"><label>Coste a fin de obra (€)</label><input id="fc_amt" type="number" step="0.01" value="${((stored ? stored.costCents : row.calculatedCents) / 100).toFixed(2)}"></div>
-    <div class="field full"><label>Motivo * — se guarda con el ajuste y es lo único revisable después</label>
-      <input id="fc_why" placeholder="La parte cara ya está ejecutada" value="${esc(stored ? stored.reason : "")}"></div>
-    <div class="field full" style="margin-top:6px;display:flex;gap:8px">
-      <button class="btn primary" id="fc_save">Guardar ajuste</button>
-      ${stored ? '<button class="btn danger" id="fc_clear">Volver a la calculada</button>' : ""}</div>
-   </div></div>`;
-        $("#fc_save").onclick = () =>
-          mutate(() => {
-            erp.setForecastOverride(
-              pid,
-              chapterNum,
-              { costCents: Math.round(+$("#fc_amt").value * 100), reason: $("#fc_why").value },
-              "backoffice",
-            );
-            closeDrawer();
-          }, "Proyección ajustada");
-        const cl = $("#fc_clear");
-        if (cl)
-          cl.onclick = () =>
-            mutate(() => {
-              erp.clearForecastOverride(pid, chapterNum, "backoffice");
-              closeDrawer();
-            }, "Ajuste retirado");
-      }
-
       /* ================= PRY-01/PRY-02 · the two jobs' full-screen surfaces =====
    Both used to share `projectPanelHead` — one header, because a job that
    read differently depending on which of two adjacent screens you opened it
@@ -22256,10 +23121,6 @@
       function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
-        const f =
-          typeof ErpBridge !== "undefined" && ErpBridge.projects
-            ? ErpBridge.projects.forecast(erp, id)
-            : null;
         const names = {};
         const variationNums = new Set();
         try {
@@ -22277,35 +23138,44 @@
           ? Math.round((marginCents / e.currentRevenueCents) * 1000) / 10
           : 0;
         const SRC = { bill: "Factura", labour: "Horas", capture: "Documento" };
-        /* The rows the table will render, built HERE so their sum can be
-           checked against the project's own total before the screen claims
-           they agree. */
-        const tableRows = (() => {
-          const rows = f
-            ? f.byChapter.slice()
-            : erp.chapterEconomics(id).map((c) => ({
-                chapter: c.num,
-                budgetCents: c.budgetCostCents,
-                actualCents: c.actualCents,
-                varianceCents: c.actualCents - c.budgetCostCents,
-                varianceBp: 0,
-              }));
-          /* The factory forecast reads baseline + change orders and knows
-             nothing of variation budgets — so their chapters are merged in
-             from chapterEconomics, which does. Without this the forecast
-             bridge being loaded HID every variation from the table. */
-          if (f)
-            for (const c of erp.chapterEconomics(id))
-              if (c.variation && !rows.some((r) => String(r.chapter) === String(c.num)))
-                rows.push({
-                  chapter: c.num,
-                  budgetCents: c.budgetCostCents,
-                  actualCents: c.actualCents,
-                  varianceCents: c.actualCents - c.budgetCostCents,
-                  varianceBp: 0,
-                });
-          return rows;
-        })();
+        /* THE ROWS, AND WHAT THEIR NUMBERS MEAN.
+           Built HERE so their sum can be checked against the project's own
+           total before the screen claims they agree — and, since PK12, built
+           from `chapterEconomics` ALONE rather than from the forecast bridge.
+
+           The deviation column used to be `proyectado − presupuestado`, where
+           the projection is `coste real ÷ avance registrado` and appeared in
+           no column of the table. So the operator read «531 presupuestado,
+           507 acumulado, desviación +483» and could not make it add up,
+           because it does not: the number was correct arithmetic on a figure
+           that was not on screen. Worse, the fallback below computed the
+           LITERAL difference, so the same column meant one thing with the
+           capability bundle loaded and another without it.
+
+           It is now the subtraction it looks like, in the operator's own
+           words: «Budget, Acumulated Real, Deviation, % (Acumulated
+           Real/Budget), Margin (Price-Acumulated Real) and Margin %». The
+           projection keeps its home behind «Ajustar», where presupuestado,
+           real, avance and the calculated figure are shown together and it can
+           be read. */
+        const tableRows = erp.chapterEconomics(id).map((c) => {
+          const budgetCents = c.budgetCostCents;
+          const actualCents = c.actualCents;
+          const saleCents = c.saleCents || 0;
+          const marginCents2 = saleCents - actualCents;
+          return {
+            chapter: c.num,
+            budgetCents,
+            actualCents,
+            saleCents,
+            varianceCents: actualCents - budgetCents,
+            // A share of nothing is not zero per cent, it is not a share —
+            // so an unbudgeted chapter shows a dash rather than a division.
+            spentBp: budgetCents ? Math.round((actualCents / budgetCents) * 10000) : null,
+            marginCents: marginCents2,
+            marginBp: saleCents ? Math.round((marginCents2 / saleCents) * 10000) : null,
+          };
+        });
         /* «Cuadra» is a claim, not a pleasantry — measured before it is
            printed. The operator's UAT caught this screen saying «la tabla de
            arriba cuadra con el proyecto» while the table sat 45 € short of
@@ -22326,34 +23196,35 @@
       <div class="kpi click" id="ecoInvoices" title="Ver las facturas de esta obra"><div class="lab">Venta</div><div class="val">${eur0(e.currentRevenueCents)}</div>
         <div class="sub"><span>contratada más extras aprobados</span> <span>· ver facturas →</span></div></div>
       <div class="kpi"><div class="lab">Coste</div><div class="val">${eur0(e.actualCents)}</div>
-        <div class="sub"><span>comprometido</span> <span>${eur0(e.committedCents)}</span></div></div>
+        <div class="sub"><span>acumulado real</span></div></div>
       <div class="kpi ${marginCents < 0 ? "warn" : "hi"}"><div class="lab">Margen</div><div class="val">${eur0(marginCents)}</div>
         <div class="sub"><span>${marginPct}%</span> <span>sobre la venta</span></div></div>
     </div>
 
     <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3></div>
      <div class="scroll"><table><thead><tr>
-       <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado</th>
-       <th class="num">Desviación</th><th class="num">%</th><th class="num">Margen</th><th></th></tr></thead><tbody>
+       <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
+       <th class="num">Desviación</th><th class="num">%</th>
+       <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
      ${
        tableRows
-         .map((c) => {
-           const base =
-             (p.baseline.chapters || []).find((x) => String(x.num) === String(c.chapter)) || {};
-           const mg = (base.saleCents || 0) - (c.actualCents || 0);
-           return `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
+         .map(
+           (
+             c,
+           ) => `<tr class="click" data-chcosts="${c.chapter}"><td class="k">${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>
         <td class="num">${eur0(c.budgetCents)}</td>
         <td class="num">${eur0(c.actualCents)}</td>
         <td class="num ${c.varianceCents > 0 ? "warn" : ""}">${c.varianceCents > 0 ? "+" : ""}${eur0(c.varianceCents)}</td>
-        <td class="num">${((c.varianceBp || 0) / 100).toFixed(1)}%</td>
-        <td class="num" style="color:${mg < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(mg)}</td>
-        <td>${f ? `<button class="btn sm" data-adj="${c.chapter}">Ajustar</button>` : ""}</td></tr>`;
-         })
+        <td class="num">${c.spentBp === null ? "—" : (c.spentBp / 100).toFixed(1) + "%"}</td>
+        <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(c.marginCents)}</td>
+        <td class="num" style="color:${c.marginCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${c.marginBp === null ? "—" : (c.marginBp / 100).toFixed(1) + "%"}</td>
+        </tr>`,
+         )
          .join("") ||
        '<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>'
      }
      </tbody></table></div>
-     ${f ? `<div class="daylist"><div class="it" style="color:var(--muted)">La proyección de cada partida parte del coste real y del avance registrado. «Ajustar» la sustituye a mano, y la cifra calculada se sigue mostrando junto a la ajustada.</div></div>` : ""}
+     <div class="daylist"><div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>
     </div>
 
     <div class="card" style="margin-top:12px"><div class="ch"><h3>Pendiente de repartir</h3>
@@ -22402,23 +23273,19 @@
               chapterCostsDrawer(id, row.dataset.chcosts, names[row.dataset.chcosts] || "");
             }),
         );
-        // The manual forecast override kept its button. The doc's table does not
-        // mention one, but `setForecastOverride` is a real engine rule with a real
-        // reason ("the tiler quoted a fixed price, stop extrapolating") and this is
-        // its only interface — dropping it would un-cover it, which is the mistake
-        // S1b named when the subcontract screens went.
-        body
-          .querySelectorAll("[data-adj]")
-          .forEach(
-            (b) =>
-              (b.onclick = () =>
-                forecastDrawer(
-                  id,
-                  b.dataset.adj,
-                  names[b.dataset.adj] || "",
-                  f && f.byChapter.find((c) => String(c.chapter) === String(b.dataset.adj)),
-                )),
-          );
+        /* THE ADJUST BUTTON IS GONE, and with it the manual forecast
+           override's only interface. The comment here argued the opposite: that
+           `setForecastOverride` was a real engine rule whose sole door this
+           was, so removing the button would un-cover it. The operator settled
+           the question above that argument — the budget is FIXED, and the only
+           thing that changes it is an adicional to the contract. A screen that
+           let a chapter's figure be edited in place was a second way to change
+           a number the contract owns.
+
+           `setForecastOverride` and `clearForecastOverride` stay in the engine
+           and the bridge still reads what they wrote, so a workspace holding
+           overrides from before this change keeps resolving them. Nothing can
+           create a new one. */
       }
 
       /** The full-screen shell for a job's Avance económico — PK4-B's mirror of
@@ -22539,201 +23406,19 @@
         );
       }
 
-      /* ================= ADM-06 · Caja chica (S11) ==============================
-   "The simplest screen" (§3.2), and the one that most rewards not being
-   clever: a till is a bank account whose statement nobody imports, so entries
-   are typed and the arqueo at the foot is what proves them.
+      /* ADM-06 · Caja chica IS GONE, and the till kind with it.
+         The operator described how cash really moves — taken out of the bank,
+         spent, receipted, and the remainder paid back in — and then said of
+         cash-box accounts: no need for them. A till modelled that same money
+         as a second balance to keep and reconcile, so the cash sat in two
+         places at once and neither of them was the bank line it came from.
+         What replaces the screen is not another screen: it is
+         `markCashWithdrawal` on the bank line itself, the document matching
+         that already existed, and `markCashReturn` for what comes back.
 
-   The closing figure is COMPUTED from the opening balance and the period's
-   movements. A stored closing balance is a number nobody counted. */
-      let cashAcc = "",
-        bankAcc = "";
-      function cajaChica(v) {
-        $("#sub").textContent =
-          "Entradas y salidas de la caja en efectivo, y el arqueo que las prueba. Una salida sin justificante se cuenta aparte: es el agujero clásico en las cuentas de una empresa pequeña.";
-        const tills = erp.state.bankAccounts.filter((a) => a.kind === "till");
-        /* Same first-day trap as the bank screen: the till is created in the
-           account drawer, and this screen — the one named after it — used to
-           state the absence and offer no way out of it. */
-        if (!tills.length) {
-          v.innerHTML = `<div class="stepbar"><button class="btn primary sm" id="cashNew">＋ Crear caja</button></div>
-   <div class="card"><div class="empty">No hay ninguna caja en efectivo configurada.</div></div>`;
-          $("#cashNew").onclick = () => newAccountDrawer("till");
-          return;
-        }
-        if (!cashAcc || !tills.some((t) => t.id === cashAcc)) cashAcc = tills[0].id;
-        const r = periodRange();
-        const cc = erp.cashCount(cashAcc, r.from, r.to);
-        const movs = erp.state.movements
-          .filter((m) => m.accountId === cashAcc && inPeriod(m.accountingDate))
-          .slice()
-          .reverse();
-
-        v.innerHTML = `
-   <div class="stepbar">
-     ${tills.length > 1 ? `<select class="inline" id="cashSel">${tills.map((t) => `<option value="${t.id}"${t.id === cashAcc ? " selected" : ""}>${esc(t.name)}</option>`).join("")}</select>` : ""}
-     <button class="btn primary sm" id="cashIn">＋ Entrada</button>
-     <button class="btn sm" id="cashOut">− Salida</button>
-   </div>
-   <div class="card"><div class="queuebar">
-     <span class="n">${eur(cc.closingCents)}</span><span>en caja</span>
-     <span style="flex:1"></span>
-     ${cc.awaitingDoc ? `<span class="pill r"><span>${cc.awaitingDoc}</span> <span>sin justificante</span></span>` : '<span class="pill g">Todo justificado</span>'}
-   </div></div>
-   <div class="card"><div class="ch"><h3>Movimientos</h3><span class="tag">${cc.count}</span></div>
-    <div class="scroll"><table><thead><tr><th>Fecha</th><th>Concepto</th><th class="num">Importe</th><th>Justificante</th><th></th></tr></thead><tbody>
-    ${
-      movs
-        .map(
-          (m) => `<tr><td>${fmtD(m.accountingDate)}</td>
-      <td class="k">${esc(m.concept || m.merchantText || "—")}</td>
-      <td class="num" style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</td>
-      <td>${m.needsDoc ? '<span class="pill r">Falta</span>' : '<span class="pill g">Sí</span>'}</td>
-      <td>${m.needsDoc ? `<button class="btn sm" data-cashdoc="${m.id}">Marcar justificado</button>` : ""}</td></tr>`,
-        )
-        .join("") ||
-      '<tr><td colspan="5"><div class="empty">Sin movimientos de caja en el periodo.</div></td></tr>'
-    }
-    </tbody></table></div>
-    <div class="daylist" style="border-top:1px solid var(--line)">
-      <div class="it"><span>Saldo inicial</span><span style="flex:1"></span><b>${eur(cc.openingCents)}</b></div>
-      <div class="it"><span>Entradas</span><span style="flex:1"></span><b>${eur(cc.inCents)}</b></div>
-      <div class="it"><span>Salidas</span><span style="flex:1"></span><b>${eur(-cc.outCents)}</b></div>
-      <div class="it"><span>Saldo final</span><span style="flex:1"></span><b id="cashClose">${eur(cc.closingCents)}</b></div>
-    </div>
-   </div>`;
-        const sel = $("#cashSel");
-        if (sel)
-          sel.onchange = () => {
-            cashAcc = sel.value;
-            render();
-          };
-        $("#cashIn").onclick = () => cashDrawer(cashAcc, 1);
-        $("#cashOut").onclick = () => cashDrawer(cashAcc, -1);
-        v.querySelectorAll("[data-cashdoc]").forEach(
-          (b) => (b.onclick = () => receiptDrawer(b.dataset.cashdoc)),
-        );
-      }
-      function cashDrawer(accountId, sign) {
-        const db = openDrawer(sign > 0 ? "Entrada de caja" : "Salida de caja");
-        /* Block 2 of the client review: a cash payment lands somewhere — a
-           project (down to its chapter and subpartida, on the same accepted-budget
-           validation every other cost uses) or an overhead — and until now this
-           drawer had nowhere to say so, even though the engine takes it. A cash
-           ENTRY (money in) is a float top-up, not a cost, so it gets no
-           destination. Optional on purpose: filing first and assigning later
-           in Conciliación stays legal, exactly as it is for a bank line. */
-        const destBlock =
-          sign < 0
-            ? `<div class="field full"><label>Destino</label><select id="ca_dest">
-      <option value="">— sin asignar todavía —</option>
-      <optgroup label="Obras">${erp.state.projects
-        .filter((p) => !p.closed)
-        .map((p) => `<option value="p:${p.id}">${esc(projectPickLabel(p))}</option>`)
-        .join("")}</optgroup>
-      <optgroup label="Gastos generales">${Object.entries(OVERHEAD_LABEL)
-        .map(([k, l]) => `<option value="o:${k}">${esc(l)}</option>`)
-        .join("")}</optgroup>
-     </select></div>
-    <div class="field" id="ca_chapwrap" style="display:none"><label>Partida</label><select id="ca_chap"></select></div>
-    <div class="field" id="ca_linewrap" style="display:none"><label>Subpartida</label><select id="ca_line"></select></div>`
-            : "";
-        const wireCashDest = () => {
-          const dest = $("#ca_dest");
-          if (!dest) return;
-          const paint = () => {
-            const val = dest.value;
-            const pid = val.startsWith("p:") ? val.slice(2) : "";
-            $("#ca_chapwrap").style.display = pid ? "" : "none";
-            if (pid)
-              $("#ca_chap").innerHTML = '<option value="">—</option>' + chapterOptions(pid, "");
-            paintLine();
-          };
-          const paintLine = () => {
-            const val = dest.value;
-            const pid = val.startsWith("p:") ? val.slice(2) : "";
-            const ch = pid ? $("#ca_chap").value : "";
-            const opts = pid && ch ? lineOptionsFor(pid, ch, "") : "";
-            $("#ca_linewrap").style.display = opts ? "" : "none";
-            if (opts) $("#ca_line").innerHTML = '<option value="">—</option>' + opts;
-          };
-          dest.onchange = paint;
-          $("#ca_chap").onchange = paintLine;
-        };
-        db.innerHTML = `<div class="fgrid">
-   <div class="field full"><label>Concepto *</label><input id="ca_c" placeholder="${sign > 0 ? "Reposición de caja" : "Ferretería del barrio"}"></div>
-   <div class="field"><label>Importe (€)</label><input id="ca_a" type="number" step="0.01" min="0"></div>
-   <div class="field"><label>Fecha</label><input id="ca_d" type="date" value="${erp.today}"></div>
-   ${
-     sign < 0
-       ? `<div class="field full"><label style="display:flex;gap:6px;align-items:center">
-     <input type="checkbox" id="ca_doc" checked> <span>Falta el justificante</span></label></div>`
-       : ""
-   }
-   ${destBlock}
-   ${
-     sign < 0
-       ? `<div class="field full"><label>Trabajador (si es un pago a su nombre)</label><select id="ca_w">
-      <option value="">—</option>
-      ${erp.state.workers
-        .filter((w) => w.active !== false)
-        .map((w) => `<option value="${w.id}">${esc(w.name)}</option>`)
-        .join("")}
-     </select></div>`
-       : ""
-   }
-   <div class="field full" style="margin-top:6px"><button class="btn primary" id="ca_go">Registrar</button></div>
-  </div>`;
-        wireCashDest();
-        $("#ca_go").onclick = () =>
-          mutate(
-            () => {
-              const amt = Math.round(Number(String($("#ca_a").value).replace(",", ".")) * 100);
-              if (!(amt > 0)) throw new Error("Indica el importe");
-              const concept = $("#ca_c").value.trim();
-              if (!concept) throw new Error("El concepto es obligatorio");
-              const doc = $("#ca_doc");
-              // BNK-07's own signature: the movement goes in through importMovements,
-              // and NOT naming a supporting document is what flags it. There is no
-              // second cash method — see the note in erp-engine.js.
-              const rec = erp.recordCashMovement(
-                accountId,
-                {
-                  accountingDate: $("#ca_d").value || erp.today,
-                  concept,
-                  amountCents: sign * amt,
-                  supportingDocRef:
-                    sign < 0 && doc && doc.checked ? null : "registrado-en-pantalla",
-                  workerId: $("#ca_w") && $("#ca_w").value ? $("#ca_w").value : null,
-                },
-                "operations",
-              );
-              const dest = $("#ca_dest") ? $("#ca_dest").value : "";
-              if (dest) {
-                erp.splitMovement(
-                  rec.id,
-                  [
-                    dest.startsWith("p:")
-                      ? {
-                          projectId: dest.slice(2),
-                          chapterNum: $("#ca_chap").value || null,
-                          lineId:
-                            $("#ca_line") && $("#ca_linewrap").style.display !== "none"
-                              ? $("#ca_line").value || null
-                              : null,
-                          kind: "material",
-                          amountCents: amt,
-                        }
-                      : { overheadCategory: dest.slice(2), amountCents: amt },
-                  ],
-                  "operations",
-                );
-              }
-              closeDrawer();
-            },
-            sign > 0 ? "Entrada registrada" : "Salida registrada",
-          );
-      }
+         `bankAcc` was declared here beside a `cashAcc` that no longer has a
+         screen. It belongs to Consolidación bancaria and stays. */
+      let bankAcc = "";
 
       /* ================= ADM-08 · Flujo de caja (S12) ============================
    The last unbuilt subsección in the menu, and the only screen in the
@@ -23144,7 +23829,10 @@
         ["ca", "Català"],
         ["en", "English"],
       ]
-        .map(([v, l]) => `<option value="${v}"${(w.language || "") === v ? " selected" : ""}>${l}</option>`)
+        .map(
+          ([v, l]) =>
+            `<option value="${v}"${(w.language || "") === v ? " selected" : ""}>${l}</option>`,
+        )
         .join("")}
      </select></div>
     </div>
@@ -23294,7 +23982,7 @@
           const rows = pv.blocks
             .map(
               (b) => `<div class="it"><span class="pill r" translate="no">${esc(b.code)}</span>
-       <span style="flex:1;margin-left:8px"><span>${esc(b.label)}</span>${b.detail ? ` — <span${b.data ? ' translate="no"' : ""}>${esc(b.detail)}</span>` : ""}</span></div>`,
+       <span style="flex:1;margin-left:8px"><span>${esc(b.label)}</span>${b.detail ? ` — <span${b.data ? ' translate="no"' : ""}>${esc(b.detail)}</span>` : ""}${b.ref ? ` <b translate="no">${esc(b.ref)}</b>` : ""}</span></div>`,
             )
             .join("");
           const empty = pv.empty
@@ -23512,10 +24200,7 @@
       const TRIGGER_OPTIONS = [
         ["onSignature", CON_TRIGGER.onSignature],
         ["atWorksStart", CON_TRIGGER.atWorksStart],
-        ...Object.entries(CON_PROGRESS_LABEL).map(([pct, lab]) => [
-          "atProgressPct:" + pct,
-          lab,
-        ]),
+        ...Object.entries(CON_PROGRESS_LABEL).map(([pct, lab]) => ["atProgressPct:" + pct, lab]),
         ["onCompletion", CON_TRIGGER.onCompletion],
         ["fixedDate", CON_TRIGGER.fixedDate],
         // Kept so a contract already carrying it can be edited without the
@@ -23703,12 +24388,7 @@
             { contractId: rec && rec.id, lineText: (l) => lineDesc(l, d.language) },
             d.language,
           ) +
-          docLangFootHtml(
-            "conLang",
-            d.language,
-            signed,
-            "El contrato firmado conserva su idioma",
-          );
+          docLangFootHtml("conLang", d.language, signed, "El contrato firmado conserva su idioma");
         const langSel = $("#conLang");
         if (langSel && !langSel.disabled)
           langSel.onchange = () =>
@@ -23831,15 +24511,15 @@
           if (linkPrj) linkPrj.onclick = () => linkProjectDrawer(conWork.id);
           return;
         }
-      /** Which obra this contract governs.
+        /** Which obra this contract governs.
      Offers the jobs that have none, and says so when there are none to offer
      rather than showing an empty select. The engine moves the link rather than
      copying it — one obra has one contract — and refuses a job that is not
      there; this only asks the question. */
-      function linkProjectDrawer(contractId) {
-        const free = erp.state.projects.filter((p) => !p.closed && !p.contractId);
-        const db = openDrawer("Vincular obra");
-        db.innerHTML = `<div class="fgrid">
+        function linkProjectDrawer(contractId) {
+          const free = erp.state.projects.filter((p) => !p.closed && !p.contractId);
+          const db = openDrawer("Vincular obra");
+          db.innerHTML = `<div class="fgrid">
    ${
      free.length
        ? `<div class="field full"><label>Obra *</label><select id="lp_prj">${free
@@ -23853,14 +24533,14 @@
        : '<div class="field full"><div class="empty">No hay obras abiertas sin contrato. Una obra ya vinculada conserva su contrato.</div></div>'
    }
   </div>`;
-        const b = $("#lp_save");
-        if (b)
-          b.onclick = () =>
-            mutate(() => {
-              erp.linkContractToProject(contractId, $("#lp_prj").value, "backoffice");
-              closeDrawer();
-            }, "Obra vinculada");
-      }
+          const b = $("#lp_save");
+          if (b)
+            b.onclick = () =>
+              mutate(() => {
+                erp.linkContractToProject(contractId, $("#lp_prj").value, "backoffice");
+                closeDrawer();
+              }, "Obra vinculada");
+        }
 
         /* Part 2 · item 11 — what was actually contracted, not just how much.
        The contract already stored `budgetId` + `acceptedVersionId` from the

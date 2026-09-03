@@ -16,6 +16,7 @@
 
 import { ExtractionService } from "@repo/capability-extraction";
 import type {
+  ExtractInput,
   ExtractedField,
   ExtractionConfig,
   ExtractionResult,
@@ -329,9 +330,20 @@ export function createExtraction(config?: Partial<ExtractionConfig> | null) {
   });
 
   return {
-    /** Recognised text in, candidate fields with dots and provenance out. */
-    read(text: string | string[], assumeIssueDate?: string): ExtractionResult {
-      return svc.extract({ text, assumeIssueDate });
+    /**
+     * Recognised text in, candidate fields with dots and provenance out.
+     *
+     * The second argument used to be the assumed issue date and still may be,
+     * because callers pass one; an object carries that plus `exclude`, which
+     * is how the host says who WE are so the reader cannot return our own name
+     * and tax id as the issuer's. Every document names two companies.
+     */
+    read(
+      text: string | string[],
+      opts?: string | { assumeIssueDate?: string; exclude?: ExtractInput["exclude"] },
+    ): ExtractionResult {
+      const o = typeof opts === "string" ? { assumeIssueDate: opts } : (opts ?? {});
+      return svc.extract({ text, ...o });
     },
     /**
      * Re-run the checks over values a person has edited. The screen calls this

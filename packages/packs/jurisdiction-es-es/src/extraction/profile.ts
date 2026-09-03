@@ -123,6 +123,11 @@ export const ES_EXTRACTION_PROFILE: ExtractionProfile = {
   keywords: {
     issuerName: ["razon social", "emisor", "proveedor", "expedido por", "datos del emisor"],
     issuerTaxId: ["nif", "cif", "n.i.f", "c.i.f", "nie", "identificacion fiscal"],
+    /* The number is almost never announced by the word «factura» on its own
+       line. Real invoices head the block «FACTURA» and put «N.o F-2026/4471»
+       underneath, or write «Nº», «N.º», «Núm.» beside the value — so the
+       markers belong here as labels in their own right, not only the phrases
+       that spell the word out. */
     docNumber: [
       "factura n",
       "n factura",
@@ -131,6 +136,13 @@ export const ES_EXTRACTION_PROFILE: ExtractionProfile = {
       "factura numero",
       "n de documento",
       "albaran n",
+      "n.o",
+      "n.º",
+      "nº",
+      "num.",
+      "núm.",
+      "numero",
+      "factura",
     ],
     issueDate: ["fecha de factura", "fecha factura", "fecha de emision", "fecha emision", "fecha"],
     dueDate: ["vencimiento", "fecha de vencimiento", "vence el", "forma de pago vencimiento"],
@@ -139,7 +151,23 @@ export const ES_EXTRACTION_PROFILE: ExtractionProfile = {
     withholdingAmount: ["retencion", "irpf", "ret. irpf", "retencion irpf"],
     totalAmount: ["total factura", "total a pagar", "importe total", "total"],
     iban: ["iban", "cuenta", "cta", "domiciliacion"],
-    orderRef: ["pedido", "n pedido", "su pedido", "obra", "referencia obra", "presupuesto n"],
+    /* What ties a supplier's document to work of ours. «Contrato:» and
+       «Presupuesto:» are the two that matter most and were missing entirely —
+       a supplier who writes them is handing us the link to the job, the
+       contract and the accepted quote, and the reader was throwing it away. */
+    orderRef: [
+      "pedido",
+      "n pedido",
+      "su pedido",
+      "obra",
+      "referencia obra",
+      "referencia",
+      "presupuesto n",
+      "presupuesto",
+      "contrato",
+      "albaran",
+      "albarán",
+    ],
   },
 
   patterns: {
@@ -149,11 +177,34 @@ export const ES_EXTRACTION_PROFILE: ExtractionProfile = {
       `\\b\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{2,4}\\b|\\b\\d{1,2}\\s+de\\s+(?:${MONTH_ALTERNATION})\\s+de[l]?\\s+\\d{4}\\b`,
       "gi",
     ),
-    taxId: /\b[A-Z]?\d{7,8}[-\s]?[A-Z0-9]\b/g,
+    /* The leading letter may be separated from the digits, because «C.I.F.
+       B-62889417» is how a great many Spanish suppliers write it. Without the
+       optional separator the match started at the digits, dropped the B, and
+       the result failed its own shape test — so the field came back empty on a
+       document that states it perfectly clearly. */
+    taxId: /\b[A-Z][-.\s]?\d{7,8}[-.\s]?[A-Z0-9]?\b|\b\d{8}[-.\s]?[A-Z]\b/g,
     percent: /\b\d{1,2}(?:[.,]\d{1,2})?\s?%/g,
     accountNumber: /\bES\d{2}[\s]?(?:\d{4}[\s]?){5}\b/g,
     docNumber: /\b[A-Z]{0,4}[-/]?\d{2,}[-/]?\d*\b/g,
   },
+
+  /* How a company's legal name ends here. The extractor uses these to tell a
+     name that wrapped onto a second line from two unrelated lines — «SUMINISTROS
+     CERDA» / «MATERIALS, S.L.» is one issuer, not two — and knows nothing about
+     what the words mean. */
+  issuerSuffixes: ["s.l.", "sl", "s.a.", "sa", "s.l.u.", "slu", "s.c.p.", "scp", "c.b.", "cb"],
+
+  /* How the second party is announced here. Below one of these headings, the
+     name and the tax id belong to whoever is being billed — us, usually — and
+     not to the company that issued the document. */
+  recipientMarkers: [
+    "facturar a",
+    "facturado a",
+    "cliente",
+    "destinatario",
+    "datos del cliente",
+    "razon social del cliente",
+  ],
 
   parseAmountCents,
   parseDate,

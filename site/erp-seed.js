@@ -16,6 +16,26 @@
 
   function build(today) {
     const erp = new ERP("2026-03-02");
+    /* THE FIRST SUBPARTIDA OF A CHAPTER, for the seed's own cost entries.
+     *
+     * Since PK12 a project cost must name partida AND subpartida — the
+     * operator's rule, covering hours as well as invoices — and this file
+     * wrote 479 costs that named a chapter and no line. They were not
+     * literals: they come out of loops, so the fix is a lookup at the handful
+     * of places that book them rather than four hundred edits.
+     *
+     * Deliberately the FIRST line rather than a spread across several. A demo
+     * seed's job is to be a workspace somebody can read, and inventing a
+     * distribution across subpartidas would put figures on the screen that
+     * nothing decided. One line, named, is honest about being a fixture. */
+    const lineIn = (projectId, chapterNum) => {
+      const hit = erp
+        .projectChapters(projectId)
+        .find((x) => String(x.chapter.num) === String(chapterNum));
+      const line = hit && hit.chapter.lines[0];
+      if (!line) throw new Error("seed: no subpartida in chapter " + chapterNum);
+      return line.id;
+    };
     erp.configureEntity({
       legalName: "Canei Subirats, S.L.",
       taxId: "B66666660",
@@ -40,7 +60,19 @@
       iban: "ES9121000418450200051332",
       openingCents: 6400000,
     });
-    const till = erp.addBankAccount({ name: "Caja efectivo", kind: "till", openingCents: 42000 });
+    /* A SECOND account, and it earns its place: §5.3's third fixture is an
+       equal-and-opposite pair across two accounts, which is what the internal
+       transfer matcher exists to spot. That pair used to cross the bank and
+       the till, and PK12-S7 retired the till — leaving the outgoing leg with
+       nowhere to land and the matcher with nothing to propose. Two accounts is
+       also the ordinary shape of a small company, so the fixture is more like
+       the thing it stands for than the till ever was. */
+    const bank2 = erp.addBankAccount({
+      name: "Cuenta de ahorro",
+      kind: "bank",
+      iban: "ES7100302053091234567895",
+      openingCents: 1200000,
+    });
 
     /* suppliers & subcontractors */
     const supMat = erp.addParty({
@@ -451,7 +483,6 @@
         suppliers: { material: supMat, electrical: supElec, plumbing: supFont, adviser: supArch },
         workers: [w1, w2],
         bank,
-        till,
         budgetWith,
       });
     }
@@ -646,6 +677,7 @@
       supplierId: supMat.id,
       projectId: prjR.id,
       chapterNum: "5",
+      lineId: lineIn(prjR.id, "5"),
       desc: "Gres porcelánico + material obra",
       qtyMilli: 1000,
       unitCents: 310000,
@@ -672,7 +704,15 @@
       vatBp: 2100,
       orderRef: "OR-ROCA-1",
       capId: capR.id,
-      allocations: [{ projectId: prjR.id, chapterNum: "5", kind: "material", amountCents: 310000 }],
+      allocations: [
+        {
+          projectId: prjR.id,
+          chapterNum: "5",
+          lineId: lineIn(prjR.id, "5"),
+          kind: "material",
+          amountCents: 310000,
+        },
+      ],
     });
     erp.payBills({
       amountCents: b1R.totalCents,
@@ -698,10 +738,25 @@
         card: "V-1234",
       },
     ])[0];
-    erp.allocateMovementToProject(cardR.id, prjR.code, "material");
+    erp.allocateMovementToProject(cardR.id, prjR.code, "material", {
+      chapterNum: "5",
+      lineId: lineIn(prjR.id, "5"),
+    });
     erp.learnMerchantRule("BRICODEPOT", { supplierId: supMat.id, category: "material" });
-    erp.recordHours({ workerId: w1.id, projectId: prjR.id, chapterNum: "1", hoursMilli: 42000 });
-    erp.recordHours({ workerId: w2.id, projectId: prjR.id, chapterNum: "1", hoursMilli: 38000 });
+    erp.recordHours({
+      workerId: w1.id,
+      projectId: prjR.id,
+      chapterNum: "1",
+      lineId: lineIn(prjR.id, "1"),
+      hoursMilli: 42000,
+    });
+    erp.recordHours({
+      workerId: w2.id,
+      projectId: prjR.id,
+      chapterNum: "1",
+      lineId: lineIn(prjR.id, "1"),
+      hoursMilli: 38000,
+    });
     erp.markProgress(prjR.id, "1", "done");
     erp.markProgress(prjR.id, "2", "done");
     erp.markProgress(prjR.id, "3", "inProgress", 60);
@@ -1008,14 +1063,28 @@
       number: "MV-1990",
       baseCents: 92000,
       vatBp: 2100,
-      allocations: [{ projectId: prjF.id, chapterNum: "1", kind: "material", amountCents: 92000 }],
+      allocations: [
+        {
+          projectId: prjF.id,
+          chapterNum: "1",
+          lineId: lineIn(prjF.id, "1"),
+          kind: "material",
+          amountCents: 92000,
+        },
+      ],
     });
     erp.payBills({
       amountCents: bF1.totalCents,
       method: "transfer",
       billAllocations: [{ billId: bF1.id, amountCents: bF1.totalCents }],
     });
-    erp.recordHours({ workerId: w1.id, projectId: prjF.id, chapterNum: "1", hoursMilli: 26000 });
+    erp.recordHours({
+      workerId: w1.id,
+      projectId: prjF.id,
+      chapterNum: "1",
+      lineId: lineIn(prjF.id, "1"),
+      hoursMilli: 26000,
+    });
     erp.setToday("2026-03-27");
     erp.markProgress(prjF.id, "1", "done");
     const billing = erp.projectBilling(prjF.id);
@@ -1042,6 +1111,7 @@
       desc: "Reparación persiana y grifería",
       valueCents: 32000,
     });
+    // A quick repair has no budget and so no subpartidas — see `_lineAlloc`.
     erp.recordHours({ workerId: w2.id, projectId: prjQ.id, chapterNum: "1", hoursMilli: 4000 });
     erp.issueInvoice({
       projectId: prjQ.id,
@@ -1176,13 +1246,23 @@
       machineReadable: false,
       keyFields: { concepto: "Combustible furgoneta" },
     }); // captured, unvalidated
+    /* This was the seed's «unallocated bill → exception» fixture, and that
+       state is no longer reachable: since PK12 `registerBill` refuses a bill
+       that belongs to nothing. The three reports that flag an unallocated bill
+       — the payables row, `packageBlocks`, the dashboard count — are kept, and
+       now serve data written BEFORE the rule rather than anything the product
+       can still produce. So the fixture becomes what it always should have
+       been: a real overhead cost, filed where overheads go. */
     erp.registerBill({
       supplierId: supElec.id,
       number: "EB-3301",
       baseCents: 148000,
       vatBp: 2100,
-      allocations: [],
-    }); // unallocated bill → exception
+      allocations: [{ overheadCategory: "fixedAsset", kind: "material", amountCents: 148000 }],
+    });
+    /* Held because the fixtures that explain it are staged further down: the
+       receipts it paid for, and the deposit that returns what was not spent. */
+    let cashOut;
     erp
       .importMovements(bank.id, [
         {
@@ -1193,17 +1273,22 @@
           card: "V-1234",
         }, // unallocated → exception
         { accountingDate: "2026-04-28", concept: "NOMINAS", amountCents: -1240000 },
-        { accountingDate: "2026-04-30", concept: "TRASPASO A CAJA", amountCents: -20000 },
+        {
+          accountingDate: "2026-04-30",
+          concept: "REINTEGRO EFECTIVO OFICINA",
+          amountCents: -20000,
+        },
       ])
       .forEach((m, i) => {
         if (i === 1) erp.classifyMovement(m.id, "salary");
-        if (i === 2) erp.classifyMovement(m.id, "internalTransfer");
+        /* THE CASH FIXTURE, and it is a withdrawal now rather than a till.
+           Two hundred euros come out of the bank; the screen has to be able to
+           show that some of it is documented, some came back, and some is
+           still in somebody's pocket — which is the ordinary state and the one
+           worth demonstrating. The receipts and the return are staged further
+           down, once the captures they refer to exist. */
+        if (i === 2) cashOut = erp.markCashWithdrawal(m.id, "seed");
       });
-    erp.recordCashMovement(till.id, {
-      accountingDate: "2026-05-02",
-      concept: "Compra pequeño material",
-      amountCents: -4200,
-    }); // cash without doc → flagged
 
     /* ---- §5.3: statement lines the reconciliation screen has to explain ----
        Three deliberate shapes, because a screen with nothing to match on is a
@@ -1228,15 +1313,33 @@
       },
       { accountingDate: "2026-05-04", concept: "TRASPASO ENTRE CUENTAS", amountCents: -60000 },
     ]);
-    erp.importMovements(till.id, [
+    // …and its other leg, on the second account: the pair the matcher proposes.
+    erp.importMovements(bank2.id, [
       { accountingDate: "2026-05-04", concept: "TRASPASO RECIBIDO", amountCents: 60000 },
     ]);
+    /* The return of the unspent cash — the last step the operator described,
+       and the one no screen could record before. 60 of the 200 never got
+       spent and goes back in; what is left is what the withdrawal still owes
+       an explanation for. */
+    erp
+      .importMovements(bank.id, [
+        { accountingDate: "2026-05-06", concept: "INGRESO EFECTIVO NO GASTADO", amountCents: 6000 },
+      ])
+      .forEach((m) => erp.markCashReturn(m.id, cashOut.id, "seed"));
     erp.registerBill({
       supplierId: supArch.id,
       number: "NC-88",
       baseCents: 84000,
       vatBp: 2100,
-      allocations: [{ projectId: prjB.id, chapterNum: "1", kind: "other", amountCents: 84000 }],
+      allocations: [
+        {
+          projectId: prjB.id,
+          chapterNum: "1",
+          lineId: lineIn(prjB.id, "1"),
+          kind: "other",
+          amountCents: 84000,
+        },
+      ],
     }); // 15% IRPF retained
     erp.addTask({
       owner: "operations",
@@ -1303,6 +1406,7 @@
       supplierId: supMat.id,
       projectId: prjB.id,
       chapterNum: "2",
+      lineId: lineIn(prjB.id, "2"),
       desc: "Mortero monocapa y malla para fachada",
       qtyMilli: 1000,
       unitCents: 486000,
@@ -1383,6 +1487,7 @@
               workerId: w.id,
               projectId: prjB.id,
               chapterNum: i === 0 ? "1" : "2",
+              lineId: lineIn(prjB.id, i === 0 ? "1" : "2"),
               date: d,
               hoursMilli: 8000,
             },
@@ -1551,6 +1656,7 @@
             workerId: w.id,
             projectId: prjB.id,
             chapterNum: "1",
+            lineId: lineIn(prjB.id, "1"),
             hoursMilli: 8000,
             date,
           });

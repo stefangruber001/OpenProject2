@@ -3086,6 +3086,44 @@
      * governs the job, and two answers to that question is the state this
      * method exists to leave behind.
      */
+    /**
+     * WHICH CONTRACT A BUDGET'S JOB BELONGS TO — asked in one place, because
+     * three places used to answer it and two of them answered "the first one".
+     *
+     * `contracts.find(c => c.budgetId === id)` returns whatever was pushed
+     * first, which on a live workspace is the oldest draft. The operator drew
+     * up three contracts on one accepted quote, signed the third, and the job
+     * had been pointing at the first since the day it was created — so CON-11
+     * refused the first invoice on the strength of a draft nobody had signed,
+     * while a signed contract for the same work sat two rows above it on the
+     * same screen.
+     *
+     * The order below is the order a person would read it in: a signature
+     * settles the question, and among signatures the most recent one does; if
+     * nothing is signed, the newest live draft; and a cancelled contract is
+     * never the answer, which `cancelContract` already says in its own way by
+     * releasing the job.
+     */
+    _bestContractForBudget(budgetId, { exclude } = {}) {
+      if (!budgetId) return null;
+      const live = this.state.contracts.filter(
+        (c) => c.budgetId === budgetId && c.status !== "cancelled" && c.id !== exclude,
+      );
+      if (!live.length) return null;
+      // Date first, then the number, which breaks a same-day tie the way the
+      // series itself orders them.
+      const key = (c) => String(c.date || "") + "\u0000" + String(c.number || "");
+      const newest = (list) =>
+        list.reduce((best, c) => (best === null || key(c) > key(best) ? c : best), null);
+      const signed = live.filter((c) => c.signature && c.signature.customerSignedAt);
+      return signed.length ? newest(signed) : newest(live);
+    }
+
+    /** Has this contract already been invoiced through one of its milestones? */
+    _contractHasInvoicedInstallment(contract) {
+      return (contract.installments || []).some((i) => !!i.invoicedInvoiceId);
+    }
+
     linkContractToProject(contractId, projectId, user) {
       const c = this.state.contracts.find((x) => x.id === contractId);
       if (!c) throw new Error("Contract not found");
@@ -3299,6 +3337,32 @@
       c.guarantees.forEach((g) => {
         g.startDate = null;
       }); // set at completion
+      /* THE SIGNATURE CLAIMS THE JOB, because that is what the operator means
+         by signing it. `createContract` writes the reverse link only for a job
+         that has none — right as a default, and it leaves the second contract
+         on a budget unable to claim its job for good. So the moment that
+         should obviously settle the question did nothing at all: they signed
+         the real contract and CON-11 went on refusing the first invoice on the
+         strength of the draft still holding the link.
+         Two refusals, both about not overwriting a fact with a default:
+         a job held by another SIGNED contract is left alone — two signatures
+         on one budget is a question for a person, and «Vincular obra» is where
+         they answer it; and a job whose contract has already been INVOICED
+         through one of its milestones is left alone too, because those
+         invoices point at that contract's installments and re-pointing the job
+         would leave the money describing a document it no longer belongs to. */
+      const holder = this.state.projects.find((p) => p.budgetId === c.budgetId && c.budgetId);
+      if (holder && holder.contractId !== c.id) {
+        const current = holder.contractId
+          ? this.state.contracts.find((x) => x.id === holder.contractId)
+          : null;
+        const heldBySigned = !!(current && current.signature && current.signature.customerSignedAt);
+        const heldByInvoiced = !!(current && this._contractHasInvoicedInstallment(current));
+        if (!heldBySigned && !heldByInvoiced) {
+          holder.contractId = c.id;
+          this._log(user, "signContract:claimObra", c.number + " → " + holder.code);
+        }
+      }
       this._log(user, "signContract", c.number);
       return c;
     }
@@ -3539,7 +3603,7 @@
       const b = this.budget(budgetId);
       if (!b.acceptedVersionId) throw new Error("Acceptance required before project creation");
       const t = this.budgetTotals(budgetId, b.acceptedVersionId);
-      const contract = this.state.contracts.find((c) => c.budgetId === budgetId);
+      const contract = this._bestContractForBudget(budgetId);
       const rec = {
         id: this._id("prj"),
         code: "P-" + b.number.replace("PRE-", ""),
@@ -4553,15 +4617,123 @@
       this._log(user, "captureDocument", rec.id);
       return rec;
     }
+    /**
+     * CAP-05 · IS THIS THE SAME DOCUMENT, FILED TWICE?
+     *
+     * The rule used to be `issuerTaxId === issuerTaxId && docNumber ===
+     * docNumber`, which failed the operator the first time it was needed: they
+     * filed one supplier invoice twice, and the two copies sat in the register
+     * side by side with no warning, because the READER had changed in between
+     * and given the two copies different tax ids. Identity that depends on
+     * every field being read the same way is identity that stops working the
+     * day the reader improves.
+     *
+     * Worse in the other direction: two documents nobody had confirmed yet
+     * both carried an empty tax id and an empty number, and `"" === ""` made
+     * every blank document a duplicate of every other one.
+     *
+     * So: a number identifies a document, and an issuer identifies who wrote
+     * it — but the issuer may be known by a tax id OR by a name, and either
+     * will do. Failing a number entirely, the same issuer billing the same
+     * amount on the same day is the same document; nobody sends two.
+     * Empty never matches empty, in any clause.
+     */
+    _dupKeys(confirmed) {
+      if (!confirmed) return null;
+      const squash = (v) =>
+        String(v || "")
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "");
+      // Same folding `findDuplicateParty` uses for a name — accents off, case
+      // off, runs of space collapsed. Two people typing one supplier will not
+      // agree about «Vallès», and the archive should not care.
+      const name = String(confirmed.issuerName || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      return {
+        number: squash(confirmed.docNumber),
+        taxId: squash(confirmed.issuerTaxId),
+        name,
+        date: String(confirmed.date || ""),
+        total: Math.round(confirmed.totalCents || 0),
+      };
+    }
+
+    _sameDocument(a, b) {
+      if (!a || !b) return false;
+      const sameIssuer = (!!a.taxId && a.taxId === b.taxId) || (!!a.name && a.name === b.name);
+      if (!sameIssuer) return false;
+      if (a.number && b.number) return a.number === b.number;
+      // No number to go on: the same issuer, the same day, the same money.
+      return (
+        !a.number &&
+        !b.number &&
+        !!a.date &&
+        a.date === b.date &&
+        a.total > 0 &&
+        a.total === b.total
+      );
+    }
+
+    /**
+     * Every filed document that looks like another one — computed, not stamped.
+     *
+     * `confirmCapture` stamps `duplicateSuspect` at the moment of confirming,
+     * which means a pair that only becomes recognisable LATER — because the
+     * reader improved, or because somebody corrected a tax id by hand — stays
+     * unflagged for ever, and the two documents the operator was looking at
+     * were exactly that pair. Deriving it on read costs one pass and cannot go
+     * stale.
+     */
+    duplicateCaptureMap() {
+      const out = {};
+      const seen = [];
+      for (const c of this.state.captured) {
+        const keys = this._dupKeys(c.confirmed);
+        if (!keys) continue;
+        const hit = seen.find((s) => this._sameDocument(s.keys, keys));
+        if (hit) out[c.id] = hit.id;
+        seen.push({ id: c.id, keys });
+      }
+      return out;
+    }
+
+    /**
+     * Remove a filed document. The one thing the archive could not do.
+     *
+     * A capture is a photograph plus what a person confirmed about it, and
+     * both are undoable facts until the moment it becomes a BILL — at which
+     * point it is an accounting record with a supplier, a due date and a place
+     * in the payables ledger, and deleting the photograph behind it would
+     * leave that record describing a document nobody can produce. So the one
+     * refusal is exactly that, and it says what to do instead.
+     */
+    deleteCapture(capId, user) {
+      const i = this.state.captured.findIndex((x) => x.id === capId);
+      if (i < 0) throw new Error("Captured document not found: " + capId);
+      const c = this.state.captured[i];
+      if (c.billId) {
+        const bill = this.state.bills.find((b) => b.id === c.billId);
+        throw new Error(
+          "No se puede eliminar: ya está registrado como factura " +
+            ((bill && bill.number) || c.billId) +
+            ". Anula primero la factura.",
+        );
+      }
+      this.state.captured.splice(i, 1);
+      this._log(user, "deleteCapture", c.stdName || c.id);
+      return c;
+    }
+
     confirmCapture(capId, confirmed, user) {
       // CAP-04 human confirmation; CAP-05 duplicates
       const c = this.state.captured.find((x) => x.id === capId);
+      const keys = this._dupKeys(confirmed);
       const dup = this.state.captured.find(
-        (x) =>
-          x.id !== capId &&
-          x.confirmed &&
-          x.confirmed.issuerTaxId === confirmed.issuerTaxId &&
-          x.confirmed.docNumber === confirmed.docNumber,
+        (x) => x.id !== capId && this._sameDocument(this._dupKeys(x.confirmed), keys),
       );
       c.duplicateSuspect = dup ? dup.id : null;
       c.confirmed = clone(confirmed);
@@ -4593,6 +4765,43 @@
       this._log(user, "updateCapture", capId);
       return c;
     }
+    /**
+     * WHAT A SPLIT MUST ADD UP TO — the taxable base, never the total.
+     *
+     * An allocation distributes a COST across the jobs and overheads that bear
+     * it, and input VAT is not a cost: it is recoverable, handled on the tax
+     * side, and charging it to a partida overstates that job by the rate.
+     * `registerBill` and `allocateBill` have always said so — «Bill
+     * allocations must total the taxable base» — while this door demanded the
+     * VAT-inclusive total, and `projectCostRows` adds both into one figure.
+     * Two doors, two units, one number.
+     *
+     * And it made the operator do the work twice, in two units. `billDrawer`
+     * seeds a bill from the capture's own rows and then refuses them, because
+     * it has always footed against the base — so a split entered here had to
+     * be entered again there, against a different number, for the same
+     * document. (`billFromCapture` rescales what it is handed, which is why
+     * the promotion still produced a correct bill; the second entry was the
+     * cost, not a wrong figure.) The screen's own refusal there — «El reparto
+     * debe sumar la base imponible» — was the system saying which unit it
+     * meant, in the one place that already knew.
+     *
+     * The base is taken from the record when it is there, and reconstructed
+     * from total − tax when it is not, which is exact rather than a guess: a
+     * document that states no tax has a base equal to its total, and one that
+     * states tax has a base equal to the difference. Zero means nothing is
+     * known yet, and the caller asserts nothing rather than asserting against
+     * a figure it invented.
+     */
+    captureBasisCents(confirmed) {
+      if (!confirmed) return 0;
+      const base = cents(confirmed.baseCents || 0);
+      if (base > 0) return base;
+      const total = cents(confirmed.totalCents || 0);
+      const vat = cents(confirmed.vatCents || 0);
+      return Math.max(0, total - vat);
+    }
+
     allocateCapture(capId, allocations, user) {
       // CAP-03/07: one project, split, or overhead
       const c = this.state.captured.find((x) => x.id === capId);
@@ -4613,14 +4822,16 @@
           throw new Error("Unknown cost kind: " + a.kind);
         if (!(Math.round(a.amountCents) > 0)) throw new Error("Every line needs a positive amount");
       });
-      // A confirmed document has a total to check the split against. An
+      // A confirmed document has a base to check the split against. An
       // unconfirmed one does not, and inventing one from the split itself
       // would make the check agree with whatever it was handed — so the
       // arithmetic is only asserted where there is something to assert it
-      // against, and filing an unread photograph stays possible.
-      const total = c.confirmed ? c.confirmed.totalCents : sum(rows, (a) => a.amountCents);
-      if (Math.abs(sum(rows, (a) => a.amountCents) - total) > 1)
-        throw new Error("Split must total the document amount"); // 7.4
+      // against, and filing an unread photograph stays possible. A confirmed
+      // document with no usable figure is the same case: nothing to assert.
+      const basis = this.captureBasisCents(c.confirmed);
+      const target = basis > 0 ? basis : sum(rows, (a) => a.amountCents);
+      if (Math.abs(sum(rows, (a) => a.amountCents) - target) > 1)
+        throw new Error("Split must total the taxable base"); // 7.4
       c.allocations = rows.map((a) =>
         // Gap 13: the account is resolved at the moment the cost is filed, so
         // a later report never has to guess what somebody meant.
@@ -4744,12 +4955,31 @@
         contractParty === billTo &&
         firstForPayer &&
         !contract.signature.customerSignedAt
-      )
+      ) {
+        /* NAME THE CONTRACT IT READ. The blocker used to say only that the
+           contract was unsigned — while the operator was looking at a signed
+           contract for the same customer, on the same screen, and had no way
+           to learn that the job was pointing at a different record. Naming it
+           turns "this is wrong" into "this is which", and when a signed
+           contract exists on the same budget the sentence says so and where to
+           go. The number rides in `ref` rather than inside `detail` so the
+           sentence still translates and the record still does not. */
+        const signedElsewhere = this._bestContractForBudget(contract.budgetId, {
+          exclude: contract.id,
+        });
+        const other =
+          signedElsewhere && signedElsewhere.signature && signedElsewhere.signature.customerSignedAt
+            ? signedElsewhere
+            : null;
         out.push({
           code: "CON-11",
           label: "Contrato sin firmar",
-          detail: "La primera factura de la obra necesita el contrato firmado.",
+          detail: other
+            ? "La obra está vinculada a un contrato sin firmar, y hay otro ya firmado para este presupuesto: vincúlelo a la obra desde el contrato."
+            : "La primera factura de la obra necesita el contrato firmado.",
+          ref: other ? contract.number + " → " + other.number : contract.number,
         });
+      }
       if (draft.kind === "creditNote" && !draft.rectifies)
         out.push({
           code: "AR-10",
@@ -5464,6 +5694,10 @@
     /* =========================== AP — supplier bills & payments =========================== */
     registerBill(b, user) {
       // AP-01/02/03/07
+      // Stated here, at the bottom, and not only in the screen above it: a bill
+      // with no supplier is not a bill, and "Party not found" is what `party()`
+      // would have said instead — true, and unhelpful about which party.
+      if (!b.supplierId) throw new Error("A bill must name the supplier it belongs to");
       const supplier = this.party(b.supplierId);
       const dup = this.state.bills.find(
         (x) => x.supplierId === b.supplierId && x.number === b.number,
@@ -5510,11 +5744,15 @@
         },
         {},
       );
-      if (rec.allocations.length) {
-        const s = sum(rec.allocations, (a) => a.amountCents);
-        if (Math.abs(s - rec.baseCents) > 1)
-          throw new Error("Bill allocations must total the taxable base");
-      }
+      /* A bill with no allocation used to be a legitimate state — filed, and
+         belonging to nothing. Under the rule it is a cost with no home, which
+         is the one thing that may not happen; the payables register flagged it,
+         and flagging is not refusing. */
+      if (!rec.allocations.length)
+        throw new Error("A bill must be allocated: to a project's subpartidas, or to overheads");
+      const allocSum = sum(rec.allocations, (a) => a.amountCents);
+      if (Math.abs(allocSum - rec.baseCents) > 1)
+        throw new Error("Bill allocations must total the taxable base");
       this.state.bills.push(rec);
       if (rec.capId) {
         const c = this.state.captured.find((x) => x.id === rec.capId);
@@ -5795,11 +6033,123 @@
         { id: this._id("bank"), name: "", kind: "bank", iban: "", openingCents: 0 },
         a,
       );
-      if (!["bank", "till", "card"].includes(rec.kind))
+      /* `till` is on its way out — schema v22 converts the stored ones, and
+         the screens stop offering it in the same session that replaces what it
+         was for (a cash box is a bank withdrawal awaiting its receipts, not a
+         ledger of its own). The door stays open here until that replacement
+         exists, because narrowing it first is what turns a rename into a
+         half-migrated tree: the engine refusing what the seed still builds. */
+      /* «till» IS NO LONGER CREATABLE, and is deliberately still READABLE.
+         The operator's verdict on cash-box accounts was short — no need for
+         them — and cash is now a withdrawal from a bank account (PK12-S7). A
+         workspace saved before this, and the v1 migration fixture, still hold
+         accounts of kind till and must still load: this guard runs on
+         creation, never on read, so nothing stored is invalidated and no
+         migration retypes a record. That is the reversible half of the change;
+         an account somebody no longer wants is deleted through Configuración,
+         which since PK12-S6c can actually do it. */
+      if (!["bank", "card"].includes(rec.kind))
         throw new Error("Unknown account kind: " + rec.kind);
       this.state.bankAccounts.push(rec);
       this._log(user, "addBankAccount", rec.name);
       return rec;
+    }
+    /**
+     * Why an account cannot simply be removed, or null when it can.
+     *
+     * A code rather than a sentence, and returned rather than thrown, for the
+     * reason `_discardableMovement` and `billDeleteBlock` return codes: a
+     * screen that must disable a button needs the reason before anybody
+     * presses it, and «no» with nothing after it is a wall.
+     */
+    bankAccountDeleteBlock(id, opts) {
+      const a = this.state.bankAccounts.find((x) => x.id === id);
+      if (!a) throw new Error("Account not found");
+      /* Checked FIRST because it is the one refusal that no confirmation can
+         buy off. A line on another account is classified an internal transfer
+         BECAUSE it names this card as what it settles; remove the card and
+         that line silently becomes a cost again, double-counting every
+         purchase already on it. That is a change to the accounts, not a
+         cleanup, so it stays a wall whatever the operator asks for. */
+      if (this.state.movements.some((m) => m.cardSettlement && m.cardSettlement.accountId === id))
+        return "settled";
+      /* Taking the movements too is a DIFFERENT act, and it is offered rather
+         than assumed. "This account has history behind it" is the right answer
+         to a stray click and the wrong answer to a demonstration workspace
+         somebody now wants rid of — which is the case the operator actually
+         hit: accounts deactivated because they could not be deleted, and then
+         still on the screen, because deactivating was never what was wanted. */
+      if (opts && opts.withMovements) {
+        if (
+          this.state.movements.some(
+            (m) => m.accountId === id && this.bankPeriodClosed(m.accountingDate),
+          )
+        )
+          return "closed-period";
+        return null;
+      }
+      if (this.state.movements.some((m) => m.accountId === id)) return "has-movements";
+      if ((this.state.importBatches || []).some((b) => b.accountId === id)) return "has-imports";
+      return null;
+    }
+    /**
+     * Remove an account that never held anything.
+     *
+     * The same rule the party file already applies to a company: deletion is
+     * for a record that was created by mistake, not for one with history
+     * behind it. An account carrying movements is not deleted — it is
+     * DEACTIVATED, because its movements are reconciled against real
+     * documents and removing the account they name would orphan every one of
+     * them silently. So the two verbs are separate and the screen offers
+     * whichever is honest.
+     *
+     * Until now there was neither: `addBankAccount` existed and nothing
+     * removed, so a workspace that had been demonstrated on carried its demo
+     * accounts for ever with no way to be rid of them.
+     */
+    deleteBankAccount(id, user, opts) {
+      if (!this.state.bankAccounts.some((x) => x.id === id)) throw new Error("Account not found");
+      const block = this.bankAccountDeleteBlock(id, opts);
+      if (block) throw new Error("This account cannot be removed: " + block);
+      /* The movements go through `resetAccountMovements`, not through a filter
+         written here. That method already unwinds each reconciliation before
+         dropping the row — so nothing is left claiming a bill was paid by a
+         movement that no longer exists — and already clears the import
+         batches that described them. Deleting the rows directly would leave
+         both of those behind, which is the same orphaning this refused to do
+         in the first place. The index is re-read afterwards: the reset does
+         not touch this array today, and a delete that depends on that staying
+         true is a delete that removes the wrong account the day it changes. */
+      let movementsRemoved = 0;
+      if (opts && opts.withMovements)
+        movementsRemoved = this.resetAccountMovements(id, user).deleted;
+      const i = this.state.bankAccounts.findIndex((x) => x.id === id);
+      const [gone] = this.state.bankAccounts.splice(i, 1);
+      this._log(user, "deleteBankAccount", gone.name);
+      /* The account itself is returned, as before — callers pass it straight
+         to a toast. What it also carries now is how much went with it, so a
+         screen can say so without counting the rows again after they are
+         gone. */
+      gone.movementsRemoved = movementsRemoved;
+      return gone;
+    }
+    /**
+     * Keep the history, lose the account from the pickers.
+     *
+     * `active !== false` is the test everywhere, so an account that predates
+     * this field is active — the same convention the party file uses, and the
+     * reason neither needed a migration to introduce it.
+     */
+    setBankAccountActive(id, active, user) {
+      const a = this.state.bankAccounts.find((x) => x.id === id);
+      if (!a) throw new Error("Account not found");
+      a.active = !!active;
+      this._log(user, active ? "activateBankAccount" : "deactivateBankAccount", a.name);
+      return a;
+    }
+    /** The accounts a picker should offer: everything still in use. */
+    activeBankAccounts() {
+      return this.state.bankAccounts.filter((a) => a.active !== false);
     }
     /**
      * The bank line that pays a card off, tied to the card it settles.
@@ -5826,6 +6176,126 @@
       this._log(user, "markCardSettlement", movId + " → " + card.name);
       return m;
     }
+    /* =============== PK12-S7 — cash is a withdrawal, not an account ==========
+       The operator described how cash actually works, and it is not a till:
+       money is taken OUT of the bank, spent, and comes back as receipts; what
+       is not spent is paid back IN. So the thing to be explained is the
+       WITHDRAWAL, and it is explained by the documents it bought plus the
+       deposit that returned the rest.
+
+       A till account modelled the same money as a second balance to keep, and
+       the operator's verdict on that was short: no need for them. Nothing here
+       replaces the till with another container — the withdrawal is a bank line
+       like every other, and the only new fact is what closes it. */
+    /**
+     * Declare a bank line to be cash taken out of the bank.
+     *
+     * Classified an internal transfer for `markCardSettlement`'s reason: at
+     * the moment of the withdrawal nothing has been BOUGHT. The money is still
+     * the company's, in a pocket instead of an account, and counting the
+     * withdrawal as a cost would count it again when the receipts arrive.
+     */
+    markCashWithdrawal(movId, user) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      if (m.amountCents >= 0)
+        throw new Error("A cash withdrawal takes money out — pick the line that leaves the bank");
+      const acc = this.state.bankAccounts.find((a) => a.id === m.accountId);
+      if (acc && acc.kind === "card")
+        throw new Error("Cash comes out of an account, not off a card");
+      this.classifyMovement(m.id, "internalTransfer", user);
+      m.cashWithdrawal = { at: this.state.today, by: user || "backoffice" };
+      this._log(user, "markCashWithdrawal", movId);
+      return m;
+    }
+    /**
+     * What is still unexplained about a withdrawal.
+     *
+     * Three ways money leaves a withdrawal and they are added, not chosen
+     * between: the receipts it paid for, the cash handed back to the bank, and
+     * whatever is still in somebody's pocket. The last is the number the
+     * screen has to show, because "the rest is still out there" is a real and
+     * ordinary state, not an error.
+     */
+    cashWithdrawalState(movId) {
+      const m = this.state.movements.find((x) => x.id === movId);
+      if (!m) throw new Error("Movement not found");
+      const totalCents = Math.abs(cents(m.amountCents));
+      const documentedCents = sum((m.matched && m.matched.documents) || [], (d) =>
+        cents(d.amountCents),
+      );
+      const returnedCents = sum(
+        this.state.movements.filter((x) => x.cashReturn && x.cashReturn.withdrawalId === movId),
+        (x) => Math.abs(cents(x.amountCents)),
+      );
+      return {
+        totalCents,
+        documentedCents,
+        returnedCents,
+        outstandingCents: totalCents - documentedCents - returnedCents,
+      };
+    }
+    /**
+     * The unspent cash going back in, tied to the withdrawal it closes.
+     *
+     * Classified an internal transfer, and that is the whole point: the
+     * company's own money returning to its own account is not revenue, and a
+     * deposit left unclassified reads as income in every report that sums
+     * incoming lines. The same trap `markCardSettlement` exists to avoid, at
+     * the other end of the same journey.
+     *
+     * Refuses to return more than is left. A withdrawal of 1.000 that already
+     * has 700 of receipts against it has 300 outstanding; a 400 deposit
+     * pointed at it is either the wrong deposit or the wrong withdrawal, and
+     * both are worth stopping before the arithmetic stops adding up.
+     */
+    markCashReturn(depositMovId, withdrawalMovId, user) {
+      const d = this.state.movements.find((x) => x.id === depositMovId);
+      const w = this.state.movements.find((x) => x.id === withdrawalMovId);
+      if (!d || !w) throw new Error("Movement not found");
+      if (d.id === w.id) throw new Error("A withdrawal cannot return to itself");
+      if (d.amountCents <= 0)
+        throw new Error("The return puts money back — pick the line that enters the bank");
+      if (!w.cashWithdrawal) throw new Error("That movement is not a cash withdrawal");
+      if (d.cashReturn && d.cashReturn.withdrawalId !== withdrawalMovId)
+        throw new Error("That deposit is already the return of another withdrawal");
+      const st = this.cashWithdrawalState(withdrawalMovId);
+      if (cents(d.amountCents) > st.outstandingCents + 1)
+        throw new Error("The return is larger than what is left of the withdrawal");
+      this.classifyMovement(d.id, "internalTransfer", user);
+      d.cashReturn = {
+        withdrawalId: withdrawalMovId,
+        at: this.state.today,
+        by: user || "backoffice",
+      };
+      this._log(user, "markCashReturn", depositMovId + " → " + withdrawalMovId);
+      return d;
+    }
+    /** Untie a return. The deposit goes back to being an unexplained line. */
+    clearCashReturn(depositMovId, user) {
+      const d = this.state.movements.find((x) => x.id === depositMovId);
+      if (!d) throw new Error("Movement not found");
+      if (!d.cashReturn) throw new Error("That movement is not the return of a withdrawal");
+      delete d.cashReturn;
+      d.class = null;
+      d.excludedFromPL = false;
+      d.status = "unallocated";
+      this._log(user, "clearCashReturn", depositMovId);
+      return d;
+    }
+    /**
+     * Every cash withdrawal in a quarter, with what explains it.
+     *
+     * This is what `cashRecords` in the quarterly package is derived from now.
+     * It used to be "every movement on an account of kind till", which asked
+     * the accounts what cash was instead of asking the money.
+     */
+    cashWithdrawals(quarter) {
+      return this.state.movements
+        .filter((m) => m.cashWithdrawal && quarterOf(m.accountingDate) === quarter)
+        .map((m) => ({ ...m, cash: this.cashWithdrawalState(m.id) }));
+    }
+
     /* ============ PK7-D — a transfer is a PAIR, and the product must hold it ==
        `findInternalTransfers` has always proposed pairs and the bulk button
        has always marked both legs. Everything else treated a transfer as two
@@ -6345,16 +6815,104 @@
       this._log(user, "discardMovements", doomed.size + " movs");
       return { deleted: doomed.size, kept: kept.length, keptDetail: kept.slice(0, 20) };
     }
-    allocateMovementToProject(movId, ref, kind, user) {
-      // BNK-02: enter a budget/project number → cost lands on the project
+    /**
+     * What emptying an account would cost, before anybody empties it.
+     *
+     * `discardPreview` answers the neighbouring question — how much of this is
+     * still untouched — and its answer is deliberately conservative. This one
+     * counts what would have to be UNDONE, because that is the number a person
+     * needs in front of them before agreeing to it.
+     */
+    resetAccountPreview(accountId) {
+      const here = this.state.movements.filter((m) => m.accountId === accountId);
+      return {
+        total: here.length,
+        closed: here.filter((m) => this.bankPeriodClosed(m.accountingDate)).length,
+        reconciled: here.filter((m) => m.matched).length,
+        allocated: here.filter((m) => !m.matched && (m.allocations || []).length).length,
+      };
+    }
+    /**
+     * Empty ONE account of its movements — the reset a trial run needs.
+     *
+     * Deliberately not `discardMovements`. That method keeps everything anyone
+     * has touched, which is exactly right for a statement loaded onto the
+     * wrong account and exactly wrong for starting a test over: the movements
+     * a person most wants gone afterwards are the ones they spent the trial
+     * reconciling. Undoing them one at a time was the only way, and nobody
+     * does that four hundred times.
+     *
+     * So this one unwinds rather than skips — `unmatchMovement` first, which
+     * voids the payment or collection the reconciliation created, so nothing
+     * is left claiming a bill was paid by a movement that no longer exists.
+     *
+     * ONE refusal, and it is not negotiable: a closed period. That is not a
+     * precaution about lost work, it is an accounting boundary somebody
+     * deliberately drew, and a reset is not a reason to cross it. The period
+     * is reopened first, in the open, or the movements stay.
+     *
+     * Scoped to a single account on purpose. "Clear the movements" is a
+     * sentence about a database; every real version of it is about one
+     * statement, one card, one till, and an account at a time is a mistake
+     * that can be re-imported rather than one that cannot.
+     */
+    resetAccountMovements(accountId, user) {
+      const acc = this.state.bankAccounts.find((a) => a.id === accountId);
+      if (!acc) throw new Error("Account not found");
+      const here = this.state.movements.filter((m) => m.accountId === accountId);
+      const closed = here.filter((m) => this.bankPeriodClosed(m.accountingDate));
+      /* The count is NOT in the message, by `closeBankPeriod`'s own rule three
+         methods up: one distinct string per number the queue can hold is a set
+         no dictionary can translate. The screen shows the number, next to the
+         button, before anybody presses it. */
+      if (closed.length)
+        throw new Error(
+          "The account has movements in a closed period — reopen it before emptying the account",
+        );
+      let unwound = 0;
+      for (const m of here)
+        if (m.matched) {
+          this.unmatchMovement(m.id, user);
+          unwound++;
+        }
+      const ids = new Set(here.map((m) => m.id));
+      this.state.movements = this.state.movements.filter((m) => !ids.has(m.id));
+      // The batches described movements that are gone; a list of imports whose
+      // rows no longer exist is a menu of dead undo buttons.
+      this.state.importBatches = (this.state.importBatches || []).filter(
+        (b) => b.accountId !== accountId,
+      );
+      this._log(user, "resetAccountMovements", acc.name + " · " + here.length + " movs");
+      return { deleted: here.length, unwound };
+    }
+    /**
+     * BNK-02: enter a budget/project number → the cost lands on the project.
+     *
+     * `where` carries the partida and subpartida. It is a fourth argument
+     * rather than a rewrite because the shape of this door is right — one
+     * movement, one project — and only the destination was underspecified.
+     *
+     * The allocation now goes through `withAccountCode` like every other. It
+     * used to be written straight onto the movement, which is exactly why it
+     * was the one door in seven that the assignment rule did not reach: a
+     * choke point only chokes what passes through it, and this did not.
+     */
+    allocateMovementToProject(movId, ref, kind, where, user) {
       const m = this.state.movements.find((x) => x.id === movId);
       const p =
         this.state.projects.find((x) => x.code === ref || x.budgetNumber === ref) ||
         this.project(ref);
       if (!LISTS.costKinds.includes(kind || "material")) throw new Error("Unknown cost kind");
+      const w = where || {};
       m.class = m.amountCents < 0 ? "projectCost" : "customerReceipt";
       m.allocations = [
-        { projectId: p.id, kind: kind || "material", amountCents: Math.abs(m.amountCents) },
+        this.withAccountCode({
+          projectId: p.id,
+          chapterNum: w.chapterNum || null,
+          lineId: w.lineId || null,
+          kind: kind || "material",
+          amountCents: Math.abs(m.amountCents),
+        }),
       ];
       m.status = "allocated";
       this._log(user, "allocateMovement", (m.merchantText || m.concept) + " → " + p.code);
@@ -6418,6 +6976,45 @@
      */
     _lineAlloc(alloc) {
       if (!alloc.lineId) {
+        /* EVERY EURO HAS A HOME, and for a project cost that home is a
+           subpartida. The operator's rule, in their words: a cost goes to a
+           project or to a general expense, and if it is a project it carries
+           partida AND subpartida by obligation.
+           
+           This line used to normalise the gap away — `lineId: null`, stored,
+           and nothing further asked. The consequence was money that reached a
+           job and stopped: `unassignedChapterCosts` exists to itemise exactly
+           that, and the per-subpartida table shows the whole cost of the demo
+           seed's Demoliciones sitting under «sin subpartida» with no budget to
+           compare it against. A total nobody can place is not a total.
+           
+           There is deliberately NO exception for a line with no natural
+           subpartida — a delivery charge, a whole-invoice discount. The answer
+           settled with the operator is that such a cost either belongs to a
+           partida the budget should carry (administrative expenses, with
+           logistics under it) or it is not a project cost at all and goes to
+           the general-expense list. Attributing it proportionally across the
+           lines it accompanies was the alternative, and it invents a
+           distribution nobody chose in order to satisfy a rule.
+           
+           An OVERHEAD cost still passes: it names no project, so there is no
+           subpartida for it to be missing. */
+        if (alloc.projectId) {
+          /* ONE EXEMPTION, AND IT IS NOT A LOOPHOLE. A quick repair job
+             (`createQuickProject`, PRJ-08) is created without a budget: its
+             baseline is a single chapter that IS the whole job, with no lines
+             at all. There is no subpartida to name and no finer place for the
+             money to hide — chapter level is already the finest grain that
+             exists on it, so demanding one would be ceremony that makes a
+             small repair unbookable.
+
+             Scoped to `budgetId`, not to the accepted version: every project
+             built through `createProjectFromAcceptance` has both, so this
+             admits quick jobs and nothing else. */
+          const proj = this.project(alloc.projectId);
+          if (proj.budgetId) throw new Error("A project cost must name its partida and subpartida");
+          return { ...alloc, lineId: null };
+        }
         // Normalised to null (not undefined, not "") so every stored
         // allocation has the same shape whichever door it came through.
         return { ...alloc, lineId: null };
@@ -6863,6 +7460,115 @@
      * and the exception panel exists precisely so that this refusal is never a
      * surprise.
      */
+    /**
+     * Everything standing between a quarter and being locked, itemised.
+     *
+     * The operator asked for the lock and then asked for its rules: "I like
+     * the idea of locking but we have to improve on how we decide what to lock
+     * and the rules to lock — everything in the period to be locked should be
+     * assigned." Two changes follow from that sentence.
+     *
+     * The unit is a QUARTER, not a pair of dates somebody types. A period
+     * whose boundaries are chosen by hand can be drawn around the awkward
+     * week, and the quarter is the boundary the filings already use.
+     *
+     * And ASSIGNED is broader than reconciled. A movement nobody explained
+     * blocks the quarter, as before; so does a cost that names no destination,
+     * a project cost missing its partida and subpartida, an hour on a
+     * budgeted job with no subpartida, cash still out of the bank with
+     * nothing accounting for it, and a document captured and never filed.
+     * Those are the same rule PK12-S2 made mandatory going forward, applied
+     * to what is already stored — a workspace that predates the rule can hold
+     * every one of them.
+     *
+     * Returned as a LIST rather than thrown as a sentence, for
+     * `billDeleteBlock`'s reason: a screen has to show what is in the way
+     * before anybody presses the button, and one string cannot itemise six
+     * different things. Each entry carries its own count and its own
+     * references, so the refusal can be read AND acted on.
+     */
+    periodLockBlockers(quarter) {
+      const inQ = (d) => quarterOf(d) === quarter;
+      const budgeted = (projectId) => {
+        const p = this.state.projects.find((x) => x.id === projectId);
+        return !!(p && p.budgetId);
+      };
+      const billAllocs = [];
+      for (const b of this.state.bills.filter((x) => inQ(x.date)))
+        for (const a of b.allocations || []) billAllocs.push({ bill: b, alloc: a });
+
+      const out = [];
+      const add = (key, refs) => {
+        if (refs.length) out.push({ key, count: refs.length, refs: refs.slice(0, 20) });
+      };
+      add(
+        "unreconciled",
+        this.state.movements
+          .filter((m) => m.status === "unallocated" && !m.unbacked && inQ(m.accountingDate))
+          .map((m) => m.id),
+      );
+      add(
+        "costWithoutDestination",
+        billAllocs
+          .filter((x) => !x.alloc.projectId && !x.alloc.overheadCategory)
+          .map((x) => x.bill.number),
+      );
+      add(
+        "costWithoutLine",
+        billAllocs
+          .filter((x) => x.alloc.projectId && budgeted(x.alloc.projectId) && !x.alloc.lineId)
+          .map((x) => x.bill.number),
+      );
+      add(
+        "hoursWithoutLine",
+        this.state.labour
+          .filter((h) => inQ(h.date) && h.projectId && budgeted(h.projectId) && !h.lineId)
+          .map((h) => h.id),
+      );
+      add(
+        "cashOutstanding",
+        this.cashWithdrawals(quarter)
+          .filter((m) => m.cash.outstandingCents > 0)
+          .map((m) => m.id),
+      );
+      add(
+        "documentsPending",
+        this.state.captured
+          .filter((c) => c.confirmed && inQ(c.confirmed.date) && !c.billId)
+          .map((c) => c.id),
+      );
+      return out;
+    }
+    /** The quarter's first and last day — the only boundaries a lock may use. */
+    quarterRange(quarter) {
+      const [y, q] = String(quarter).split("-Q");
+      const first = (Number(q) - 1) * 3 + 1;
+      const last = first + 2;
+      const pad = (n) => String(n).padStart(2, "0");
+      /* No leap-year branch, and none is needed: a quarter ends in March,
+         June, September or December, so February is never the last month and
+         the 28th/29th question cannot arise. An earlier draft carried that
+         check and it was unreachable code pretending to be careful. */
+      const endDay = { 3: 31, 6: 30, 9: 30, 12: 31 }[last];
+      return { from: `${y}-${pad(first)}-01`, to: `${y}-${pad(last)}-${endDay}` };
+    }
+    /**
+     * Lock a whole quarter, or refuse and say everything that is in the way.
+     *
+     * `closeBankPeriod` stays underneath and keeps its own narrower guard —
+     * this is the door with the rules on it, that one is the mechanism.
+     */
+    closeQuarter(quarter, user) {
+      const blockers = this.periodLockBlockers(quarter);
+      if (blockers.length) {
+        const e = new Error("The quarter still has items that are not assigned");
+        e.blockers = blockers;
+        throw e;
+      }
+      const r = this.quarterRange(quarter);
+      return this.closeBankPeriod(r.from, r.to, user);
+    }
+
     closeBankPeriod(from, to, user) {
       const open = this.unreconciledMovements(from, to);
       /* The count is NOT in the message. It is already on screen, in the bar
@@ -7284,6 +7990,21 @@
           lineId: rec.lineId,
         });
         rec.chapterNum = a.chapterNum;
+      } else if (
+        rec.projectId &&
+        (this.state.projects.find((x) => x.id === rec.projectId) || {}).budgetId
+      ) {
+        /* Hours are a project cost like any other, and the rule covers them:
+           the operator was asked whether it applied to invoices only or to
+           every project cost, and answered both. This branch read
+           `rec.lineId = null` — the same silent normalisation `_lineAlloc`
+           performed one level up, and the reason 464 of the demo seed's labour
+           entries named a chapter and no line.
+
+           BOTH hours doors carry it. `correctHours` has the identical branch,
+           and guarding only the first would have left editing an entry as the
+           way around the rule — file it with a subpartida, then take it off. */
+        throw new Error("Hours on a project must name their partida and subpartida");
       } else rec.lineId = null;
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
@@ -7617,6 +8338,13 @@
               workerId: l.workerId,
               projectId: l.projectId,
               chapterNum: l.chapterNum,
+              /* The WHOLE destination, not half of it. This copied the chapter
+                 and dropped the line, which was survivable while a subpartida
+                 was optional and is not now: repeating a day would refuse
+                 every entry it was asked to reproduce. The same shape as the
+                 capture→bill catch-22 — a destination carried partially
+                 between two doors that each demand all of it. */
+              lineId: l.lineId,
               hoursMilli: l.hoursMilli,
               kind: l.kind,
               date: toDate,
@@ -7657,8 +8385,15 @@
             source: "bill",
             id: "bill:" + b.id + ":" + i,
             ref: b.number,
-            party: b.supplierId ? this.party(b.supplierId).name : "",
-            desc: b.supplierId ? this.billSupplier(b).name : "",
+            /* Both from the BILL, not from the party file. `billSupplier`'s own
+               comment says every reader goes through it rather than reaching
+               for `party(id).name`, and this line was the exception that
+               proved nothing: renaming a supplier would have quietly rewritten
+               who issued a cost booked years earlier, and deactivating one
+               would have thrown inside a report. What the invoice said on the
+               day it was filed is the answer a cost row wants. */
+            party: this.billSupplier(b).name,
+            desc: this.billSupplier(b).name,
             date: b.date,
             chapterNum: chap(a.chapterNum),
             lineId: a.lineId || null,
@@ -7780,6 +8515,68 @@
      * allocated tickets), so the drawer's sum can never disagree with the
      * chapter total above it. Each row carries its subpartida when it names one.
      */
+    /**
+     * One partida's economics, broken down by subpartida.
+     *
+     * `chapterEconomics` one level further in, and for the same reason: a
+     * chapter showing 596 spent against 280 budgeted does not say WHERE, and
+     * the operator reported exactly that — the table stopped at chapter level,
+     * so the line that moved stayed hidden. A chapter can be four lines with
+     * three of them exactly on budget.
+     *
+     * The reported words are paraphrased rather than quoted, deliberately: the
+     * translation audit reads comments, and a phrase inside guillemets is
+     * indistinguishable to it from a string the screen prints. That trap is
+     * recorded twice already in this repository.
+     *
+     * The figures come from the same place the chapter's do — the accepted
+     * version's own lines, priced the way `chapterEconomics` prices a
+     * variation chapter, so the two levels cannot disagree about what was
+     * budgeted. Actuals are `projectCostRows` grouped by `lineId`, which every
+     * allocation already carries.
+     *
+     * A cost naming no subpartida gets a row of its own with no budget behind
+     * it. That is not a rounding of the truth: money landed on the partida and
+     * this table cannot say where, which is exactly the state the assignment
+     * rule exists to make impossible. Until then it is a visible count rather
+     * than a silence, and the rows sum to the partida either way.
+     */
+    lineEconomics(projectId, chapterNum) {
+      const num = String(chapterNum);
+      const actualByLine = {};
+      for (const r of this.projectCostRows(projectId)) {
+        if (String(r.chapterNum) !== num) continue;
+        const k = r.lineId || "";
+        actualByLine[k] = (actualByLine[k] || 0) + r.amountCents;
+      }
+      const found = this.projectChapters(projectId).find((x) => String(x.chapter.num) === num);
+      const rows = ((found && found.chapter.lines) || []).map((l) => {
+        const qty = l.subLines && l.subLines.length ? this._aggSubLines(l.subLines) : l.qtyMilli;
+        const saleCents = l.lumpSum ? l.priceCents : mul(qty, l.priceCents);
+        const budgetCostCents = l.lumpSum ? l.costCents : mul(qty, l.costCents);
+        return {
+          lineId: l.id,
+          num: l.num,
+          name: l.desc || "",
+          saleCents,
+          budgetCostCents,
+          actualCents: actualByLine[l.id] || 0,
+          unassigned: false,
+        };
+      });
+      const orphan = actualByLine[""] || 0;
+      if (orphan)
+        rows.push({
+          lineId: null,
+          num: null,
+          name: null,
+          saleCents: 0,
+          budgetCostCents: 0,
+          actualCents: orphan,
+          unassigned: true,
+        });
+      return rows;
+    }
     chapterCosts(projectId, chapterNum) {
       const num = String(chapterNum);
       return this.projectCostRows(projectId)
@@ -8127,10 +8924,12 @@
       const invoices = this.state.invoices.filter((i) => inQ(i.date));
       const bills = this.state.bills.filter((b) => inQ(b.date));
       const movements = this.state.movements.filter((m) => inQ(m.accountingDate));
-      const tillIds = new Set(
-        this.state.bankAccounts.filter((a) => a.kind === "till").map((a) => a.id),
-      );
-      const cash = movements.filter((m) => tillIds.has(m.accountId));
+      /* Cash is the WITHDRAWALS now, not the movements that happened to sit
+         on an account of kind till. Asking the accounts what counted as cash
+         meant a company that took money out of its ordinary account — which is
+         what actually happens — had no cash records at all, while one that
+         kept a till had every internal movement of it counted twice. */
+      const cash = this.cashWithdrawals(quarter);
       const late = this.lateDocuments(quarter);
       const assets = this.fixedAssetRegister(quarter);
       const sev = (n) => (n > 0 ? "r" : "g");
@@ -8156,17 +8955,21 @@
         {
           key: "bank",
           label: "Movimientos bancarios",
-          count: movements.length - cash.length,
-          amountCents: sum(
-            movements.filter((m) => !tillIds.has(m.accountId)),
-            (m) => m.amountCents,
-          ),
+          /* EVERY movement, cash withdrawals included. It used to be every
+             movement that was not on a till, because a till's lines were a
+             separate register that the bank never saw. A withdrawal is a bank
+             line — it is on the statement — so subtracting it here would make
+             the bank block disagree with the statement it reports on. The two
+             blocks stopped being a partition when the till went: Efectivo is
+             now a LENS over these same lines, not a second set of them. */
+          count: movements.length,
+          amountCents: sum(movements, (m) => m.amountCents),
           issues: ex.unallocatedMovements.length,
           sev: sev(ex.unallocatedMovements.length),
         },
         {
           key: "cash",
-          label: "Caja",
+          label: "Efectivo retirado",
           count: cash.length,
           amountCents: sum(cash, (m) => m.amountCents),
           issues: ex.undocumentedCash.length,
@@ -8427,11 +9230,7 @@
         issuedInvoices: this.state.invoices.filter((i) => inQ(i.date)).map(txFromInvoice),
         receivedBills: this.state.bills.filter((b) => inQ(b.date)).map(txFromBill),
         bankMovements: this.state.movements.filter((m) => inQ(m.accountingDate)),
-        cashRecords: this.state.movements.filter(
-          (m) =>
-            inQ(m.accountingDate) &&
-            this.state.bankAccounts.find((a) => a.id === m.accountId && a.kind === "till"),
-        ),
+        cashRecords: this.cashWithdrawals(quarter),
         vat: this.vatSummary(quarter),
         irpf: this.irpfSummary(quarter),
         exceptions: this.exceptionList(quarter),
@@ -10348,6 +11147,95 @@
       this._log(user, "attachBillDoc", b.number);
       return b;
     }
+    /**
+     * What still points at a bill, and therefore what must be undone first.
+     *
+     * A CODE, not a sentence, and returned rather than thrown — so a screen
+     * can disable the button and say why in the reader's own language before
+     * anybody presses it. `_discardableMovement` answers the same shape for
+     * the same reason.
+     */
+    billDeleteBlock(id) {
+      const b = this.state.bills.find((x) => x.id === id);
+      if (!b) throw new Error("Bill not found");
+      const q = quarterOf(b.date);
+      if ((this.state.packagesSent || []).some((p) => p.quarter === q)) return "quarter-sent";
+      /* PAID IS NOT THE QUESTION. WHETHER MONEY MOVED IS.
+         This used to refuse any bill with a payment against it, and that
+         conflated two records that look alike and are not. A payment that
+         names a `movementId` was created by reconciling a real bank line —
+         money left an account, and un-registering the invoice it settled has
+         to start in Conciliación. A payment with NO movement never touched a
+         bank: it is a bookkeeping entry somebody made by pressing a button,
+         and refusing to undo it left the operator holding an invoice marked
+         «Pagada» against money that never moved, undeletable, with
+         `voidPayment` reachable from no screen. That was a dead end this
+         method built. So it blocks on the first and voids the second. */
+      const pays = this._billPayments(id);
+      if (pays.some((p) => p.movementId)) return "reconciled";
+      /* One payment can settle SEVERAL invoices — `payBills` takes a list —
+         and voiding it whole to release one of them would quietly un-pay the
+         others. Nothing on any screen would say so. Refused by name instead,
+         so the operator undoes the payment deliberately rather than losing
+         three settlements to fix a fourth. */
+      if (
+        pays.some((p) =>
+          (p.billAllocations || []).some((a) => a.billId !== id && a.amountCents > 0),
+        )
+      )
+        return "shared-payment";
+      if (
+        this.state.movements.some(
+          (m) =>
+            m.matched &&
+            (m.matched.billId === b.id ||
+              (m.matched.documents || []).some((d) => d.billId === b.id)),
+        )
+      )
+        return "reconciled";
+      if (this.state.bills.some((x) => x.creditNoteFor === b.id)) return "credited";
+      return null;
+    }
+    /** Every payment that allocates anything to this bill. */
+    _billPayments(billId) {
+      return this.state.payments.filter((p) =>
+        (p.billAllocations || []).some((a) => a.billId === billId),
+      );
+    }
+    /**
+     * Remove a bill that should never have been filed at all.
+     *
+     * Not a correction and not a credit note — those are for a document that
+     * is real and wrong. This is for one that is not a document: an invoice
+     * registered against the wrong company, or twice, or from a reading nobody
+     * meant to keep. So it is refused the moment anything downstream has
+     * treated it as real, and `billDeleteBlock` names which thing.
+     *
+     * The two forward pointers are RELEASED rather than left dangling. The
+     * captured document goes back to being a validated capture that can be
+     * registered again — or now deleted — which is the state it was in a
+     * moment earlier; the purchase order goes back to delivered-and-not-yet-
+     * invoiced, which is what it once more is. A record pointing at an id that
+     * no longer exists is the failure this method exists to avoid.
+     */
+    deleteBill(id, user) {
+      const i = this.state.bills.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Bill not found");
+      const b = this.state.bills[i];
+      const block = this.billDeleteBlock(id);
+      if (block) throw new Error("This invoice cannot be removed: " + block);
+      /* Voided BEFORE the bill goes, so `voidPayment` can still find what it
+         is undoing. Only unreconciled ones reach here — `billDeleteBlock`
+         refuses the rest — so this is never quietly reversing a bank line. */
+      for (const pay of this._billPayments(id)) this.voidPayment(pay.id, user);
+      this.state.bills.splice(i, 1);
+      const cap = b.capId ? this.state.captured.find((c) => c.id === b.capId) : null;
+      if (cap) cap.billId = null;
+      for (const pu of this.state.purchases.filter((x) => x.status.invoicedBillId === id))
+        pu.status.invoicedBillId = null;
+      this._log(user, "deleteBill", b.number + " · " + this.billSupplier(b).name);
+      return { bill: b, releasedCapture: cap ? cap.id : null };
+    }
     allocateBill(id, allocations, user) {
       const b = this.state.bills.find((x) => x.id === id);
       if (!b) throw new Error("Bill not found");
@@ -10510,6 +11398,21 @@
           lineId: rec.lineId,
         });
         rec.chapterNum = a.chapterNum;
+      } else if (
+        rec.projectId &&
+        (this.state.projects.find((x) => x.id === rec.projectId) || {}).budgetId
+      ) {
+        /* Hours are a project cost like any other, and the rule covers them:
+           the operator was asked whether it applied to invoices only or to
+           every project cost, and answered both. This branch read
+           `rec.lineId = null` — the same silent normalisation `_lineAlloc`
+           performed one level up, and the reason 464 of the demo seed's labour
+           entries named a chapter and no line.
+
+           BOTH hours doors carry it. `correctHours` has the identical branch,
+           and guarding only the first would have left editing an entry as the
+           way around the rule — file it with a subpartida, then take it off. */
+        throw new Error("Hours on a project must name their partida and subpartida");
       } else rec.lineId = null;
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);

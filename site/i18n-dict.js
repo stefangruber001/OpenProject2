@@ -688,6 +688,233 @@ window.CANEI_DICT = {
     ["La factura necesita una base imponible", "The invoice needs a taxable base"],
     ["El reparto debe sumar la base imponible", "The split must total the taxable base"],
     ["Factura registrada", "Invoice registered"],
+    [
+      "Las horas de obra necesitan partida y subpartida",
+      "Hours on a job need a line item and a sub-line item",
+    ],
+    [
+      "⚠ Las horas de obra necesitan partida y subpartida",
+      "⚠ Hours on a job need a line item and a sub-line item",
+    ],
+    [
+      "El coste de obra necesita partida y subpartida",
+      "A job cost needs a line item and a sub-line item",
+    ],
+    [
+      "⚠ El coste de obra necesita partida y subpartida",
+      "⚠ A job cost needs a line item and a sub-line item",
+    ],
+    [
+      "Reparta la factura: a una obra o a gastos generales",
+      "Allocate the invoice: to a job, or to general expenses",
+    ],
+    [
+      "Cada línea de obra necesita partida y subpartida",
+      "Every job line needs a line item and a sub-line item",
+    ],
+    [
+      "⚠ Cada línea de obra necesita partida y subpartida",
+      "⚠ Every job line needs a line item and a sub-line item",
+    ],
+    [
+      "⚠ Reparta la factura: a una obra o a gastos generales",
+      "⚠ Allocate the invoice: to a job, or to general expenses",
+    ],
+    ["El movimiento ya está conciliado.", "The movement is already reconciled."],
+    ["Ha sido un pago parcial", "It was a partial payment"],
+    ["Deshacer la conciliación", "Undo the reconciliation"],
+    ["Conciliación deshecha", "Reconciliation undone"],
+    [
+      "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.",
+      "The movement goes back to the unexplained queue and the payment the reconciliation created is voided.",
+    ],
+    [
+      "Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.",
+      "If it was a partial payment there is nothing more to do: the rest stays owed and shows as outstanding.",
+    ],
+    ["Por subpartida", "By sub-line item"],
+    [
+      "Esta partida no tiene subpartidas en su línea base.",
+      "This line item has no sub-line items in its baseline.",
+    ],
+    ["Acumulado real", "Actual to date"],
+    ["acumulado real", "actual to date"],
+    [
+      "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.",
+      "These figures are the real ones: budgeted, spent, and the difference between them. The budget is not adjusted here — it changes through a contract variation, which is what modifies it.",
+    ],
+    [
+      "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos",
+      "For an invoice that does not arrive as a document — most are uploaded or photographed in Documents",
+    ],
+    ["Cuentas y tarjetas", "Accounts and cards"],
+    ["Ir a Configuración › Empresa", "Go to Settings › Company"],
+    [
+      "Las cuentas y las tarjetas se crean en Configuración › Empresa.",
+      "Accounts and cards are created in Settings › Company.",
+    ],
+    ["Desactivada", "Deactivated"],
+    ["Borrar la cuenta", "Delete the account"],
+    ["Bloquear el trimestre", "Lock the quarter"],
+    ["🔒 Bloquear trimestre", "🔒 Lock quarter"],
+    ["Trimestre bloqueado", "Quarter locked"],
+    ["Qué se bloquea", "What gets locked"],
+    ["Este trimestre ya está bloqueado.", "This quarter is already locked."],
+    [
+      "Todo lo del trimestre está conciliado y asignado.",
+      "Everything in the quarter is reconciled and assigned.",
+    ],
+    ["Movimientos sin conciliar", "Unreconciled movements"],
+    [
+      "Costes sin destino — ni obra ni gasto general",
+      "Costs with no destination — neither a site nor an overhead",
+    ],
+    ["Costes de obra sin partida y subpartida", "Site costs with no line item and sub-line item"],
+    ["Horas de obra sin partida y subpartida", "Site hours with no line item and sub-line item"],
+    ["Efectivo retirado y todavía sin justificar", "Cash withdrawn and still unaccounted for"],
+    ["Documentos capturados y sin registrar", "Documents captured and not filed"],
+    [
+      "Bloquear un trimestre impide cambiar lo que hay dentro: conciliaciones, costes y horas quedan como están. Se puede reabrir, y la reapertura queda registrada con su motivo.",
+      "Locking a quarter prevents changing what is inside it: reconciliations, costs and hours stay as they are. It can be reopened, and the reopening is recorded with its reason.",
+    ],
+    ["Reintegro de efectivo", "Cash withdrawal"],
+    ["Devolución de efectivo", "Cash return"],
+    ["Devuelto al banco", "Returned to the bank"],
+    ["En efectivo todavía", "Still in cash"],
+    ["Justificado con documentos", "Backed by documents"],
+    ["queda por justificar", "still to account for"],
+    ["todo justificado", "all accounted for"],
+    ["conciliación", "reconciliation"],
+    [
+      "Desactivar una cuenta la retira de las listas y conserva lo conciliado. Borrar la quita del todo: si tiene movimientos detrás, se avisa de cuántos y se van con ella.",
+      "Deactivating an account takes it out of the lists and keeps what has been reconciled. Deleting removes it altogether: if it has movements behind it, you are told how many and they go with it.",
+    ],
+    ["Borrar", "Delete"],
+    [
+      "Hay movimientos de otra cuenta que dicen liquidar esta tarjeta",
+      "Movements on another account say they settle this card",
+    ],
+    [
+      "Tiene movimientos en un periodo cerrado — ábralo primero",
+      "It has movements in a closed period — reopen it first",
+    ],
+    ["Tiene movimientos detrás", "It has movements behind it"],
+    ["Tiene extractos importados detrás", "It has imported statements behind it"],
+    ["Borrar la cuenta y sus movimientos", "Delete the account and its movements"],
+    [
+      "Se borra la cuenta y todos los movimientos que tiene detrás. Las conciliaciones se deshacen primero, así que ninguna factura queda diciendo que la pagó un movimiento que ya no existe. No se puede deshacer.",
+      "The account and every movement behind it are deleted. The reconciliations are undone first, so no invoice is left saying it was paid by a movement that no longer exists. This cannot be undone.",
+    ],
+    [
+      "Se borra la cuenta. No tiene ningún movimiento detrás, así que no se pierde nada conciliado.",
+      "The account is deleted. It has no movements behind it, so nothing reconciled is lost.",
+    ],
+    ["Elegida", "Chosen"],
+    ["el extracto se importa aquí", "the statement is imported here"],
+    ["elija una cuenta abajo para importar", "choose an account below to import"],
+    ["Elegir la foto", "Choose the photo"],
+    ["Cuenta borrada", "Account deleted"],
+    ["Cuenta desactivada", "Account deactivated"],
+    ["Cuenta reactivada", "Account reactivated"],
+    ["No hay ninguna cuenta todavía.", "No accounts yet."],
+    ["Anular registro", "Unregister"],
+    ["Anular el registro", "Unregister the invoice"],
+    ["Registro anulado", "Invoice unregistered"],
+    [
+      "Su pago liquida además otras facturas. Deshaga primero ese pago en Conciliación.",
+      "Its payment settles other invoices too. Undo that payment in Reconciliation first.",
+    ],
+    [
+      "La factura sale del registro y el documento archivado vuelve a quedar libre para volver a registrarlo.",
+      "The invoice leaves the register and the filed document is free to be registered again.",
+    ],
+    [
+      "La factura sale del registro con su reparto. No se puede deshacer.",
+      "The invoice leaves the register with its split. This cannot be undone.",
+    ],
+    [
+      "La factura sale del registro y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.",
+      "The invoice leaves the register and the filed document goes back to unregistered. This cannot be undone.",
+    ],
+    [
+      "La factura sale del registro con su reparto a las obras. No se puede deshacer.",
+      "The invoice leaves the register with its allocation to the jobs. This cannot be undone.",
+    ],
+    ["Ir a la factura", "Go to the invoice"],
+    ["Corregir", "Fix"],
+    ["Corregir la factura", "Fix the invoice"],
+    [
+      "Al cambiar de proveedor se recalcula la retención según su perfil fiscal.",
+      "Changing the supplier recalculates the withholding from their tax profile.",
+    ],
+    ["Cambiar el proveedor", "Change the supplier"],
+    ["Proveedor cambiado", "Supplier changed"],
+    ["Eliminar la factura", "Delete the invoice"],
+    ["Factura eliminada", "Invoice deleted"],
+    [
+      "Nadie ha tocado todavía esta factura. Al eliminarla, el documento archivado vuelve a quedar libre.",
+      "Nobody has touched this invoice yet. Deleting it frees the filed document again.",
+    ],
+    [
+      "Se borra la factura registrada y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.",
+      "The registered invoice is deleted and the filed document goes back to unregistered. This cannot be undone.",
+    ],
+    [
+      "Se borra la factura registrada y su asignación a las obras. No se puede deshacer.",
+      "The registered invoice and its allocation to the jobs are deleted. This cannot be undone.",
+    ],
+    [
+      "Ya tiene un pago registrado. Anule primero el pago.",
+      "It already has a payment against it. Void the payment first.",
+    ],
+    [
+      "Su trimestre ya se ha enviado al asesor. Registre un abono en su lugar.",
+      "Its quarter has already gone to the accountant. Register a credit note instead.",
+    ],
+    [
+      "Está casada con un movimiento bancario. Deshaga primero la conciliación.",
+      "It is matched to a bank movement. Undo the reconciliation first.",
+    ],
+    [
+      "Tiene un abono que la referencia. Elimine primero el abono.",
+      "A credit note refers to it. Delete the credit note first.",
+    ],
+    ["Vaciar la cuenta", "Empty the account"],
+    ["Vaciar la cuenta entera", "Empty the whole account"],
+    ["Cuenta vaciada", "Account emptied"],
+    ["Se deshacen conciliaciones", "Reconciliations undone"],
+    ["Pierden su reparto", "Lose their split"],
+    [
+      "Hay movimientos dentro de un periodo cerrado. Reabra el periodo en Conciliación para poder vaciar la cuenta.",
+      "Some movements fall in a closed period. Reopen it in Reconciliation before emptying the account.",
+    ],
+    [
+      "Para volver a empezar una prueba: borra TODOS los movimientos de esta cuenta, incluidos los ya conciliados.",
+      "To start a trial over: this deletes EVERY movement on the account, reconciled ones included.",
+    ],
+    [
+      "Se borran todos los movimientos de esta cuenta y se deshacen sus conciliaciones, con los pagos y cobros que crearon. No se puede deshacer.",
+      "Every movement on this account is deleted and its reconciliations undone, along with the payments and receipts they created. This cannot be undone.",
+    ],
+    ["— Elija el proveedor —", "— Choose the supplier —"],
+    [
+      "El emisor del documento no está dado de alta como proveedor",
+      "The document's issuer is not on file as a supplier",
+    ],
+    ["Nombre del emisor", "Issuer name"],
+    ["NIF/CIF del emisor", "Issuer tax id"],
+    ["Dar de alta este proveedor", "Add this supplier"],
+    [
+      "Elija el proveedor al que pertenece la factura",
+      "Choose the supplier this invoice belongs to",
+    ],
+    [
+      "⚠ Elija el proveedor al que pertenece la factura",
+      "⚠ Choose the supplier this invoice belongs to",
+    ],
+    ["El proveedor necesita un nombre", "The supplier needs a name"],
+    ["⚠ El proveedor necesita un nombre", "⚠ The supplier needs a name"],
+    ["Proveedor dado de alta", "Supplier added"],
     ["Opcionales (aparte)", "Optional items (separate)"],
     ["Total por m²", "Total per m²"],
     ["⚠ Líneas pendientes de precio (no incluidas)", "⚠ Lines awaiting price (not included)"],
@@ -3020,6 +3247,51 @@ window.CANEI_DICT = {
       "⚠ No se ha podido leer nada: rellénelo a mano",
       "⚠ Nothing could be read: fill it in by hand",
     ],
+    /* PK10-S1 · the reader itself failed to run — an older phone without
+       `Promise.withResolvers`, a corrupt file, no memory. Distinct from the
+       line above, which means the reader ran and found nothing. */
+    [
+      "⚠ No se ha podido leer el documento: rellénelo a mano",
+      "⚠ The document could not be read: fill it in by hand",
+    ],
+    ["Sin lectura — escríbalo a mano", "Not read — type it in"],
+    /* PK10-S6 · the archive can remove a document, and says when one looks
+       like another. */
+    ["Ver el otro", "See the other one"],
+    ["Eliminar documento", "Delete document"],
+    ["Eliminar el documento", "Delete the document"],
+    ["Documento eliminado", "Document deleted"],
+    [
+      "Ya hay otro documento de este emisor con el mismo número",
+      "There is already another document from this issuer with the same number",
+    ],
+    ["Registrado como factura: elimínala primero", "Registered as a bill: delete that first"],
+    [
+      "Se borra el documento y su imagen. No afecta a ninguna factura",
+      "The document and its image are deleted. No bill is affected",
+    ],
+    [
+      "Se borra el documento archivado y su imagen. No se puede deshacer.",
+      "The filed document and its image are deleted. This cannot be undone.",
+    ],
+    [
+      "Se borra el documento archivado, su imagen y su asignación a la obra. No se puede deshacer.",
+      "The filed document, its image and its allocation to the job are deleted. This cannot be undone.",
+    ],
+    /* PK10-S3 · an allocation distributes the COST, so it foots against the
+       taxable base. The figures live in their own elements beside these. */
+    ["⚠ El reparto debe sumar la base imponible", "⚠ The split must total the taxable base"],
+    ["Se reparte la base imponible", "The taxable base is what is split"],
+    [
+      "El IVA no se reparte: es IVA soportado, no coste de obra",
+      "VAT is not split: it is recoverable input VAT, not a job cost",
+    ],
+    /* PK10-S2 · CON-11 when the job is pointing at the wrong contract. The
+       numbers ride beside this sentence in their own span, not inside it. */
+    [
+      "La obra está vinculada a un contrato sin firmar, y hay otro ya firmado para este presupuesto: vincúlelo a la obra desde el contrato.",
+      "The job is linked to an unsigned contract, and another one for this quote is already signed: link it to the job from the contract.",
+    ],
     ["Nº documento", "Document no."],
     ["Retención", "Withholding"],
     ["Factura de proveedor", "Supplier invoice"],
@@ -3323,6 +3595,12 @@ window.CANEI_DICT = {
     ["Al 70 % de avance", "At 70 % progress"],
     ["Al 80 % de avance", "At 80 % progress"],
     ["Al 90 % de avance", "At 90 % progress"],
+    /* PK9-S5 · the phone's schedule rows. Lower-case because they are read
+       inside a sentence — «12/05/2026 → 18/05/2026 · 5 d · vencida» — and the
+       dictionary matches the string as rendered. */
+    ["vencida", "overdue"],
+    ["en curso", "in progress"],
+    ["previsto", "expected"],
     ["Vincular obra", "Link a job"],
     ["Vincular", "Link"],
     ["Obra vinculada", "Job linked"],

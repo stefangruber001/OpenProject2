@@ -217,13 +217,30 @@ var ExtractionService = class {
       );
     }
     const folded = lines.map(fold);
+    const exclude = {
+      names: new Set((input.exclude?.names ?? []).map(fold).filter(Boolean)),
+      taxIds: new Set(
+        (input.exclude?.taxIds ?? []).map((t) => t.toUpperCase().replace(/[^A-Z0-9]/g, "")).filter(Boolean)
+      )
+    };
+    const recipientAt = this.recipientBoundary(folded, profile);
     const perField = /* @__PURE__ */ new Map();
     for (const key of FIELD_KEYS) {
-      perField.set(key, this.candidatesFor(key, lines, folded, pageOf, profile));
+      perField.set(key, this.candidatesFor(key, lines, folded, pageOf, profile, exclude));
+    }
+    for (const key of ["issuerName", "issuerTaxId"]) {
+      const all = perField.get(key) ?? [];
+      const above = all.filter((c) => c.source.line < recipientAt);
+      if (above.length && above.length < all.length) perField.set(key, above);
+    }
+    if (!perField.get("issuerName")?.length) {
+      const guessed = this.unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt);
+      if (guessed) perField.set("issuerName", [guessed]);
     }
     const issueDate = best(perField.get("issueDate"))?.value ?? input.assumeIssueDate;
     const taxBreakdown = this.taxBreakdown(lines, pageOf, profile);
     const fields = FIELD_KEYS.map((key) => this.toField(key, perField.get(key) ?? []));
+    this.deriveMissingAmount(fields);
     const checks = this.check(fields, taxBreakdown, issueDate, profile);
     for (const check of checks) {
       if (check.status !== "mismatch") continue;
@@ -308,13 +325,20 @@ var ExtractionService = class {
     return { validated: false, reasons: [] };
   }
   /* ------------------------------------------------------------------ */
-  candidatesFor(key, lines, folded, pageOf, profile) {
+  candidatesFor(key, lines, folded, pageOf, profile, exclude) {
     const kind = FIELD_TOKEN[key];
     const keywords = (profile.keywords[key] ?? []).map(fold);
     const out = [];
     lines.forEach((line, i) => {
-      const spans = this.tokens(kind, line, i, pageOf[i], profile, key);
+      const spans = this.tokens(kind, line, i, pageOf[i], profile, key, lines);
       for (const { span, value } of spans) {
+        if (typeof value === "string") {
+          if (kind === "taxId" && exclude.taxIds.has(value.toUpperCase().replace(/[^A-Z0-9]/g, "")))
+            continue;
+          if (kind === "text" && exclude.names.has(fold(value))) continue;
+        }
+        if (kind === "text" && typeof value === "string" && this.isLabelResidue(value, profile))
+          continue;
         const reasons = [];
         let score2 = 0;
         let failedCheckDigit = false;
@@ -374,7 +398,7 @@ var ExtractionService = class {
     });
     return out.sort((a, b) => b.confidence - a.confidence || a.source.line - b.source.line);
   }
-  tokens(kind, line, lineIndex, page, profile, key) {
+  tokens(kind, line, lineIndex, page, profile, key, allLines) {
     const mk = (m2, value) => ({
       span: {
         line: lineIndex,
@@ -391,15 +415,25 @@ var ExtractionService = class {
       for (const k of keywords) {
         const at = f.indexOf(k);
         if (at === -1) continue;
-        const after = line.slice(at + k.length).replace(/^[\s:.#-]+/, "");
-        if (!after) continue;
-        const start = line.length - after.length;
-        return [
-          {
-            span: { line: lineIndex, text: after, start, end: line.length, page },
-            value: after
-          }
-        ];
+        const after = line.slice(at + k.length).replace(/^[\s:.#/–—-]+/, "");
+        if (after && !this.isLabelResidue(after, profile)) {
+          const start = line.length - after.length;
+          return [
+            {
+              span: { line: lineIndex, text: after, start, end: line.length, page },
+              value: after
+            }
+          ];
+        }
+        const below = allLines?.[lineIndex + 1]?.trim();
+        if (below && this.isLabelResidue(line, profile) && !this.isLabelResidue(below, profile)) {
+          return [
+            {
+              span: { line: lineIndex + 1, text: below, start: 0, end: below.length, page },
+              value: below
+            }
+          ];
+        }
       }
       return [];
     }
@@ -421,6 +455,147 @@ var ExtractionService = class {
       found.push(mk(m, value));
     }
     return found;
+  }
+  /**
+   * Is this "value" just the rest of its own label?
+   *
+   * «OBRA / REFERENCIA» is a heading. Cutting at «obra» left «/ REFERENCIA»,
+   * and the reader offered it as the job reference — a field filled with the
+   * remainder of the words that announced it. So: strip every keyword this
+   * profile knows, and if what survives has no word left in it, there was
+   * never a value there.
+   *
+   * Every keyword, not just the field's own: a heading pairs words from
+   * different fields («OBRA / REFERENCIA», «Fecha / Vencimiento»), and a rule
+   * that only knew its own would keep the other half.
+   *
+   * What survives has to be alphanumeric, not a WORD. The first version asked
+   * for three consecutive letters and threw away «OB-2026-014» and
+   * «F-2026/0417» — real references, mostly digits, exactly the shape these
+   * fields carry. A reference is not prose and must not be tested as though it
+   * were.
+   */
+  isLabelResidue(text, profile) {
+    let rest = fold(text);
+    for (const list of Object.values(profile.keywords)) {
+      for (const k of list ?? []) {
+        const folded = fold(k);
+        if (folded.length >= 3) rest = rest.split(folded).join(" ");
+      }
+    }
+    return !/[\p{L}\p{N}]/u.test(rest);
+  }
+  /**
+   * THE ISSUER, WHICH NO DOCUMENT LABELS.
+   *
+   * `keywords.issuerName` lists «razón social», «emisor», «proveedor» — words
+   * that appear on almost no real invoice. A supplier's name is simply the
+   * largest text at the top, announced by nothing, so a label-driven reader
+   * could never find it and returned "not found" on documents that shout it in
+   * 24-point bold.
+   *
+   * What IS true of it: it sits in the head of the document, it is not us, and
+   * it is not a date, an amount, a tax id or an address. That is enough to
+   * offer one — never to be sure of one, so the confidence stays low and the
+   * dot stays amber, which is the honest posture for a guess about a name
+   * nothing can check.
+   *
+   * A name that wrapped onto a second line is one name: «SUMINISTROS CERDA» /
+   * «MATERIALS, S.L.» — joined when the line below ends in one of the legal
+   * suffixes the profile names, because knowing what the end of a company name
+   * looks like here is jurisdiction knowledge and does not belong in this file.
+   */
+  unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt) {
+    const suffixes = (profile.issuerSuffixes ?? []).map(fold);
+    const head = Math.min(lines.length, 8, recipientAt);
+    for (let i = 0; i < head; i++) {
+      const line = lines[i].trim();
+      if (line.length < 3 || line.length > 80) continue;
+      if (!new RegExp("\\p{Lu}", "u").test(line)) continue;
+      if (this.isLabelResidue(line, profile)) continue;
+      if (exclude.names.has(fold(line))) continue;
+      if (profile.parseDate(line) || profile.parseAmountCents(line)) continue;
+      const letters = (line.match(new RegExp("\\p{L}", "gu")) ?? []).length;
+      const digits = (line.match(/\d/gu) ?? []).length;
+      if (digits >= letters) continue;
+      let text = line;
+      let end = i;
+      const next = lines[i + 1]?.trim();
+      if (next && next.length <= 40 && suffixes.some((sfx) => fold(next).includes(sfx))) {
+        text = `${line} ${next}`;
+        end = i + 1;
+      }
+      if (exclude.names.has(fold(text))) continue;
+      return {
+        value: text,
+        raw: text,
+        confidence: 0.35,
+        source: { line: i, text, start: 0, end: lines[end].length, page: pageOf[i] },
+        reasons: ["at the head of the document, and not this company"],
+        labelled: false,
+        validated: false
+      };
+    }
+    return null;
+  }
+  /**
+   * The line at which the document stops talking about the issuer.
+   *
+   * A heading, so the marker has to START the line — «FACTURAR A» does;
+   * «Indíquese el número de factura al cliente» does not, and treating the
+   * word wherever it fell would cut the document at a sentence in the payment
+   * terms. Returns the line count when there is no such heading, which means
+   * "no boundary" and leaves every candidate in play.
+   */
+  recipientBoundary(folded, profile) {
+    const markers = (profile.recipientMarkers ?? []).map(fold).filter(Boolean);
+    if (!markers.length) return folded.length;
+    for (let i = 0; i < folded.length; i++) {
+      const line = folded[i].trim();
+      if (markers.some((m) => line.startsWith(m))) return i;
+    }
+    return folded.length;
+  }
+  /**
+   * THE THIRD AMOUNT IS ARITHMETIC, NOT A GUESS.
+   *
+   * A photograph loses a table row: a real document came back with the net and
+   * the total read cleanly and the tax missing, because the recogniser kept the
+   * figure and lost the words that named it. But net + tax = total — with two
+   * of the three present the third is not a guess, it is subtraction.
+   *
+   * Filled only when exactly one is missing and the others were actually read,
+   * marked as derived rather than read, and left amber: nothing checked it,
+   * and the totals check that runs immediately afterwards will contradict it
+   * if the two it came from disagree with the rest of the document. A value
+   * that arrives by arithmetic must never wear a green dot for it.
+   */
+  deriveMissingAmount(fields) {
+    const get = (key) => fields.find((f) => f.key === key);
+    const net = get("netAmount");
+    const tax = get("taxAmount");
+    const total = get("totalAmount");
+    if (!net || !tax || !total) return;
+    const wh = get("withholdingAmount");
+    const whValue = typeof wh?.value === "number" ? wh.value : 0;
+    const num = (f) => typeof f.value === "number" ? f.value : null;
+    const n = num(net);
+    const t = num(tax);
+    const g = num(total);
+    const fill = (f, value, from) => {
+      f.value = round(value);
+      f.confidence = 0.4;
+      f.validated = false;
+      f.verdict = "amber";
+      f.derived = true;
+      f.reasons = [`derived from ${from}, not read`];
+    };
+    if (n !== null && t !== null && g === null)
+      fill(total, n + t - whValue, "the base and the tax");
+    else if (n !== null && g !== null && t === null)
+      fill(tax, g - n + whValue, "the base and the total");
+    else if (t !== null && g !== null && n === null)
+      fill(net, g - t + whValue, "the tax and the total");
   }
   /** Rows of a document that states several rates (spec §5.2). */
   taxBreakdown(lines, pageOf, profile) {
@@ -567,7 +742,7 @@ var ExtractionService = class {
         continue;
       }
       if (isAmountField(f.key)) {
-        const ok = totals?.status === "ok";
+        const ok = totals?.status === "ok" && !f.derived;
         f.validated = ok;
         f.verdict = ok ? "green" : "amber";
         continue;
@@ -739,6 +914,11 @@ var ES_EXTRACTION_PROFILE = {
   keywords: {
     issuerName: ["razon social", "emisor", "proveedor", "expedido por", "datos del emisor"],
     issuerTaxId: ["nif", "cif", "n.i.f", "c.i.f", "nie", "identificacion fiscal"],
+    /* The number is almost never announced by the word «factura» on its own
+       line. Real invoices head the block «FACTURA» and put «N.o F-2026/4471»
+       underneath, or write «Nº», «N.º», «Núm.» beside the value — so the
+       markers belong here as labels in their own right, not only the phrases
+       that spell the word out. */
     docNumber: [
       "factura n",
       "n factura",
@@ -746,7 +926,14 @@ var ES_EXTRACTION_PROFILE = {
       "num factura",
       "factura numero",
       "n de documento",
-      "albaran n"
+      "albaran n",
+      "n.o",
+      "n.\xBA",
+      "n\xBA",
+      "num.",
+      "n\xFAm.",
+      "numero",
+      "factura"
     ],
     issueDate: ["fecha de factura", "fecha factura", "fecha de emision", "fecha emision", "fecha"],
     dueDate: ["vencimiento", "fecha de vencimiento", "vence el", "forma de pago vencimiento"],
@@ -755,7 +942,23 @@ var ES_EXTRACTION_PROFILE = {
     withholdingAmount: ["retencion", "irpf", "ret. irpf", "retencion irpf"],
     totalAmount: ["total factura", "total a pagar", "importe total", "total"],
     iban: ["iban", "cuenta", "cta", "domiciliacion"],
-    orderRef: ["pedido", "n pedido", "su pedido", "obra", "referencia obra", "presupuesto n"]
+    /* What ties a supplier's document to work of ours. «Contrato:» and
+       «Presupuesto:» are the two that matter most and were missing entirely —
+       a supplier who writes them is handing us the link to the job, the
+       contract and the accepted quote, and the reader was throwing it away. */
+    orderRef: [
+      "pedido",
+      "n pedido",
+      "su pedido",
+      "obra",
+      "referencia obra",
+      "referencia",
+      "presupuesto n",
+      "presupuesto",
+      "contrato",
+      "albaran",
+      "albar\xE1n"
+    ]
   },
   patterns: {
     // Money: optional euro sign, thousands points, decimal comma.
@@ -764,11 +967,32 @@ var ES_EXTRACTION_PROFILE = {
       `\\b\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{2,4}\\b|\\b\\d{1,2}\\s+de\\s+(?:${MONTH_ALTERNATION})\\s+de[l]?\\s+\\d{4}\\b`,
       "gi"
     ),
-    taxId: /\b[A-Z]?\d{7,8}[-\s]?[A-Z0-9]\b/g,
+    /* The leading letter may be separated from the digits, because «C.I.F.
+       B-62889417» is how a great many Spanish suppliers write it. Without the
+       optional separator the match started at the digits, dropped the B, and
+       the result failed its own shape test — so the field came back empty on a
+       document that states it perfectly clearly. */
+    taxId: /\b[A-Z][-.\s]?\d{7,8}[-.\s]?[A-Z0-9]?\b|\b\d{8}[-.\s]?[A-Z]\b/g,
     percent: /\b\d{1,2}(?:[.,]\d{1,2})?\s?%/g,
     accountNumber: /\bES\d{2}[\s]?(?:\d{4}[\s]?){5}\b/g,
     docNumber: /\b[A-Z]{0,4}[-/]?\d{2,}[-/]?\d*\b/g
   },
+  /* How a company's legal name ends here. The extractor uses these to tell a
+     name that wrapped onto a second line from two unrelated lines — «SUMINISTROS
+     CERDA» / «MATERIALS, S.L.» is one issuer, not two — and knows nothing about
+     what the words mean. */
+  issuerSuffixes: ["s.l.", "sl", "s.a.", "sa", "s.l.u.", "slu", "s.c.p.", "scp", "c.b.", "cb"],
+  /* How the second party is announced here. Below one of these headings, the
+     name and the tax id belong to whoever is being billed — us, usually — and
+     not to the company that issued the document. */
+  recipientMarkers: [
+    "facturar a",
+    "facturado a",
+    "cliente",
+    "destinatario",
+    "datos del cliente",
+    "razon social del cliente"
+  ],
   parseAmountCents,
   parseDate,
   parsePercentBp,
@@ -2450,9 +2674,17 @@ function createExtraction(config) {
     }
   });
   return {
-    /** Recognised text in, candidate fields with dots and provenance out. */
-    read(text, assumeIssueDate) {
-      return svc.extract({ text, assumeIssueDate });
+    /**
+     * Recognised text in, candidate fields with dots and provenance out.
+     *
+     * The second argument used to be the assumed issue date and still may be,
+     * because callers pass one; an object carries that plus `exclude`, which
+     * is how the host says who WE are so the reader cannot return our own name
+     * and tax id as the issuer's. Every document names two companies.
+     */
+    read(text, opts) {
+      const o = typeof opts === "string" ? { assumeIssueDate: opts } : opts ?? {};
+      return svc.extract({ text, ...o });
     },
     /**
      * Re-run the checks over values a person has edited. The screen calls this

@@ -64,10 +64,14 @@ await pg.waitForTimeout(2800);
 
 // 1 · the BBVA statement, through the real file input, onto the bank account
 await pg.evaluate(() => {
-  const sel = document.getElementById("bkSel");
+  /* The account is chosen by clicking its row. The select this used to drive
+     went in PK12-S6c, at the operator's request — the rows were always the
+     same choice. Clicking TOGGLES, so only click when it is not already the
+     chosen one. */
   const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
-  sel.value = bank.id;
-  sel.dispatchEvent(new Event("change", { bubbles: true }));
+  if (bankAcc === bank.id) return;
+  const row = document.querySelector(`#view [data-acct="${bank.id}"]`);
+  if (row) row.click();
 });
 await pg.waitForTimeout(500);
 const movBefore = await pg.evaluate(() => erp.state.movements.length);
@@ -107,6 +111,16 @@ await pg.evaluate((id) => captureDrawer(id), capInfo.capId);
 await pg.waitForTimeout(400);
 await pg.click("#cd_bill");
 await pg.waitForTimeout(400);
+/* Since PK12 a bill must be allocated — a cost that belongs to nothing is the
+   one thing the rule forbids. An electricity bill is a general expense, so it
+   goes where general expenses go, and the drawer refuses before the engine if
+   it does not. */
+await pg.evaluate(() => {
+  const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+  dest.value = "o:office";
+  dest.dispatchEvent(new Event("change", { bubbles: true }));
+});
+await pg.waitForTimeout(300);
 await pg.click("#bd_go");
 await pg.waitForTimeout(600);
 const bill = await pg.evaluate(() => {
@@ -143,7 +157,15 @@ const card = await pg.evaluate(() => {
   );
   const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
   const b = erp.registerBill(
-    { supplierId: sup.id, number: "RL-FERR-9", baseCents: 5000, vatBp: 2100 },
+    {
+      supplierId: sup.id,
+      number: "RL-FERR-9",
+      baseCents: 5000,
+      vatBp: 2100,
+      // This block is about the CARD path — purchase, match, settlement — not
+      // about where the cost lands, so it lands where a tool purchase does.
+      allocations: [{ overheadCategory: "fixedAsset", kind: "material", amountCents: 5000 }],
+    },
     "bo",
   );
   const mv = erp.state.movements.find((x) => x.accountId === c.id);
@@ -169,8 +191,8 @@ else bad("card", JSON.stringify(card));
 // 5 · a cash payment onto a partida, and an unexplained fee explained
 const cash = await pg.evaluate(() => {
   const till =
-    erp.state.bankAccounts.find((a) => a.kind === "till") ||
-    erp.addBankAccount({ name: "Caja RL", kind: "till" }, "bo");
+    erp.state.bankAccounts.find((a) => a.name === "Efectivo RL") ||
+    erp.addBankAccount({ name: "Efectivo RL", kind: "bank" }, "bo");
   const p = erp.state.projects.find(
     (x) =>
       x.budgetId &&
@@ -273,8 +295,20 @@ const zip = await pg.evaluate(async () => {
   const dir = ErpImport.zip.centralDirectory(bytes);
   const sheet = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
   const rows = await ErpImport.parseXlsxRows(sheet);
-  const body = rows.slice(1);
-  const head = rows[0];
+  /* The workbook opens with the company's identity now (PK-O), so the column
+     titles are not row 1 any more, and below the table sits the legal foot.
+     Found by what the header CONTAINS and counted to the first blank line —
+     the same reading tests/site-e2e uses on this file, deliberately copied
+     rather than invented a second time. Reading it the old way counted five
+     rows of branding as movements and looked up every column in the wrong
+     row, which is how this went red on a workbook that was perfectly correct. */
+  const headerRow = rows.findIndex((r) => (r || []).includes("Nº documento"));
+  const head = rows[headerRow] || [];
+  const body = [];
+  for (const r of rows.slice(headerRow + 1)) {
+    if (!(r || []).some((c) => String(c || "").trim())) break;
+    body.push(r);
+  }
   const col = (n) => head.indexOf(n);
   const docEntries = Object.keys(dir).filter((n) => n.startsWith("docs/"));
   return {

@@ -84,6 +84,7 @@ async function main() {
     testBudgetBuilder,
     testPresupuestador,
     testCapture,
+    testOlderPhone,
     testSupplierBillEntry,
     testVariationBudget,
     testProjectTracking,
@@ -97,6 +98,8 @@ async function main() {
     testSmallFixes,
     testChangeApprovalEvidence,
     testContractCreation,
+    testContractObraLink,
+    testFacturacionPhone,
     testBudgetCreation,
     testProcurement,
     testAdmin,
@@ -1372,6 +1375,30 @@ async function testMobile(browser, base) {
           viewport: window.innerWidth,
           // The property a reader feels: is the whole document on screen?
           rightOfViewport: Math.round(s.right - window.innerWidth),
+          /* WHAT IS ON THE PAPER, not just where the paper is. Everything
+             above measures the sheet's own box, and the sheet passed all of
+             it while the operator was looking at a quote whose Precio and
+             Importe columns were not on the screen: `.sheet` clipped its own
+             overflow, so the amounts were gone and every number here still
+             said the document fitted. Measured at the time: a 520px
+             line-items table inside a 278px column, 242px of it swallowed.
+
+             So the two questions a reader actually asks. Does the sheet hide
+             any of its own content — and does any cell print wider than the
+             cell it is in, which is how a column comes to sit on top of the
+             one beside it. */
+          sheetHides: sheet.scrollWidth - sheet.clientWidth,
+          spill: [...sheet.querySelectorAll("th,td")]
+            .filter((n) => n.scrollWidth > n.clientWidth + 1)
+            .map(
+              (n) =>
+                (n.textContent || "").trim().slice(0, 24) +
+                " " +
+                n.clientWidth +
+                "<" +
+                n.scrollWidth,
+            )
+            .slice(0, 6),
         };
       });
       if (!opened || !fit) {
@@ -1380,14 +1407,123 @@ async function testMobile(browser, base) {
           `mobile: the ${what} sheet renders at 390px`,
           opened ? "no .cnsheet .sheet" : "no record",
         );
-      } else if (fit.clippedLeftBy <= 1 && fit.rightOfViewport <= 1) {
+      } else if (
+        fit.clippedLeftBy <= 1 &&
+        fit.rightOfViewport <= 1 &&
+        fit.sheetHides <= 1 &&
+        !fit.spill.length
+      ) {
         ok(
-          `mobile: the whole ${what} is on screen — ${fit.sheetW}px in a ${fit.viewport}px viewport`,
+          `mobile: the whole ${what} is on screen — ${fit.sheetW}px in a ${fit.viewport}px viewport, nothing clipped`,
         );
       } else {
         bad(`mobile: the ${what} on a phone`, JSON.stringify(fit));
       }
     }
+
+    /* THE SCHEDULE IS READABLE ON A PHONE.
+       The operator sent a video of the Gantt on mobile. Measured: the chart is
+       a fixed 190px name column beside a `nDays × gZoom` SVG at 24px/day, so a
+       390px screen spends half itself on labels and shows the rest of the job
+       through a ~200px slit — about eight days of a twenty-to-sixty-day plan.
+       The gestures were always touch-aware (see ganttWire); there was simply
+       nothing legible to aim them at.
+
+       Asserted on what a reader gets, not on which element exists: the
+       schedule surface fits the viewport, no 190px column eats half of it, and
+       every task in the plan is present as a row. */
+    await pg.evaluate(() => {
+      const p = erp.state.projects.find((x) => !x.closed);
+      location.hash = "progress";
+      ganttFull = true;
+      gProject = p.id;
+      render();
+    });
+    await pg.waitForTimeout(1200);
+    const sched = await pg.evaluate(() => {
+      const B = typeof ganttApi === "function" ? ganttApi() : null;
+      const plan = B && B.get(erp.state, gProject);
+      const names = document.querySelector(".gnames");
+      const list = document.querySelector(".gmob");
+      const seen = (el) => el && el.getBoundingClientRect().width > 0;
+      const host = list || document.querySelector(".gwrap");
+      return {
+        tasks: plan ? plan.tasks.length : 0,
+        rows: document.querySelectorAll(".gmob [data-mrow]").length,
+        nameColumnVisible: seen(names),
+        listVisible: seen(list),
+        surfaceW: host ? Math.round(host.getBoundingClientRect().width) : null,
+        viewport: window.innerWidth,
+        pageW: document.documentElement.scrollWidth,
+      };
+    });
+    if (
+      sched.tasks > 0 &&
+      sched.listVisible &&
+      !sched.nameColumnVisible &&
+      sched.rows >= sched.tasks &&
+      sched.surfaceW <= sched.viewport + 1 &&
+      sched.pageW <= sched.viewport + 1
+    )
+      ok(
+        `mobile: the schedule reads as a list — ${sched.rows} rows for ${sched.tasks} tasks, ${sched.surfaceW}px in ${sched.viewport}px`,
+      );
+    else bad("mobile: the Gantt on a phone", JSON.stringify(sched));
+
+    /* THE LIST AND THE CHART READ ONE SCHEDULE. Both surfaces are drawn from
+       the same `sch`, and the point of that is that they cannot disagree about
+       a date — so the check is against the schedule itself, not against the
+       chart's pixels. Every task row's two dates must be the ones the schedule
+       holds for that task, formatted the way the rest of the workspace formats
+       a date. A list that quietly recomputed its own would be a second answer
+       to a question that has one. */
+    const dates = await pg.evaluate(() => {
+      const B = typeof ganttApi === "function" ? ganttApi() : null;
+      const sch = B && B.schedule(B.get(erp.state, gProject));
+      if (!sch) return { err: "no schedule" };
+      const by = {};
+      sch.tasks.forEach((t) => (by[t.taskId] = t));
+      let checked = 0;
+      const wrong = [];
+      document.querySelectorAll(".gmob [data-mrow]").forEach((n) => {
+        const t = by[n.dataset.mrow];
+        const sub = n.querySelector(".gmsub");
+        if (!t || !sub) return;
+        checked++;
+        const txt = sub.textContent || "";
+        [t.start, t.finish].forEach((d) => {
+          const p = String(d).split("-");
+          const want = p[2] + "/" + p[1] + "/" + p[0];
+          if (txt.indexOf(want) < 0) wrong.push(n.dataset.mrow + " wants " + want + " got " + txt);
+        });
+      });
+      return { checked, wrong: wrong.slice(0, 3) };
+    });
+    if (dates.checked > 0 && dates.wrong && dates.wrong.length === 0)
+      ok(
+        `mobile: every schedule row carries the schedule's own dates — ${dates.checked} rows checked`,
+      );
+    else bad("mobile: the list agrees with the schedule", JSON.stringify(dates));
+
+    /* …and a row still reaches everything the chart could do. The drawer it
+       opens is the one the desktop's name column opens, where the dates, the
+       duration, the percentage and the pinned start all live — so the phone
+       loses the dragging, not the editing. */
+    const tapped = await pg.evaluate(async () => {
+      const row = document.querySelector(".gmob [data-mrow]");
+      if (!row) return { err: "no row" };
+      row.click();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        open: !!document.querySelector("#drawer.on"),
+        fields: ["t_title", "t_pct", "t_pin"].filter((id) => !!document.getElementById(id)),
+      };
+    });
+    if (tapped.open && tapped.fields.length === 3)
+      ok("mobile: tapping a schedule row opens the task, dates and progress included");
+    else bad("mobile: schedule row opens the task", JSON.stringify(tapped));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(200);
 
     if (errs.length === 0) ok("mobile: no console errors at 390px");
     else bad("mobile: no console errors", errs.slice(0, 3).join(" | "));
@@ -1675,11 +1811,12 @@ async function testShell(browser, base) {
     }));
     if (
       shape.sections === 6 &&
-      shape.subs === 31 &&
+      // 30 since PK12-S7 took Caja chica out: cash is a bank withdrawal now.
+      shape.subs === 30 &&
       shape.hidden === "alerts,financials,price-list,purchasing"
     )
-      ok("shell: 6 secciones × 31 declared subs, 4 hidden by name");
-    else bad("shell: 6×31 (4 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 30 declared subs, 4 hidden by name");
+    else bad("shell: 6×30 (4 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -1715,7 +1852,7 @@ async function testShell(browser, base) {
     });
     if (
       adminOrder ===
-      "Ingresos · Gastos · Consolidación bancaria · Caja chica · Horas · Reporte a gestoría · Flujo de caja"
+      "Ingresos · Gastos · Consolidación bancaria · Horas · Reporte a gestoría · Flujo de caja"
     )
       ok("shell: Administración runs in money-flow order with the new names");
     else bad("shell: admin order", adminOrder);
@@ -1748,8 +1885,13 @@ async function testShell(browser, base) {
       buildSubs("sales");
       return rows;
     });
-    if (projSubs.join(" · ") === "Avance físico · Avance económico")
-      ok("shell: Proyectos keeps physical and financial progress");
+    /* PK10-S5 · «Obras», not «Avance físico». Renamed deliberately: both
+       children were named after what you DO to a job, so a person looking for
+       their jobs found two verbs and no noun. PRY-01 IS the register of them
+       until a row is opened. The code is unchanged; only the word a person
+       reads has moved. */
+    if (projSubs.join(" · ") === "Obras · Avance económico")
+      ok("shell: Proyectos names the jobs, then their financial progress");
     else bad("shell: projects subs", projSubs.join(" · "));
 
     // Choosing a subsection routes and collapses the panel again.
@@ -1871,6 +2013,31 @@ async function testGantt(browser, base) {
   const finishChip = () => pg.locator(".gtools .chip").first().innerText();
   try {
     await openGantt(pg, base);
+
+    /* PK9-S5 put a schedule LIST behind a 700px breakpoint. Above it nothing
+       may move: the chart, its tools and its legend are what a planner uses,
+       and a media query that leaked upward would replace a working instrument
+       with a phone's summary. Asserted on visibility rather than on the rule,
+       because the failure mode is a rule losing to a later one at equal
+       specificity — which is exactly how the first attempt rendered both. */
+    const desk = await pg.evaluate(() => {
+      const vis = (s) => {
+        const el = document.querySelector(s);
+        return !!el && el.getBoundingClientRect().width > 0;
+      };
+      return {
+        chart: vis(".gwrap"),
+        names: vis(".gnames"),
+        svg: vis("#gSvg"),
+        tools: vis(".gtools"),
+        list: vis(".gmob"),
+      };
+    });
+    if (desk.chart && desk.names && desk.svg && desk.tools && !desk.list)
+      ok(
+        "gantt: the desktop keeps the chart, its name column and its tools — the list stays on the phone",
+      );
+    else bad("gantt: desktop unchanged by the phone breakpoint", JSON.stringify(desk));
 
     // Empty plan → derive it from the project's accepted budget. Over a plan
     // that already exists the derivation asks first (PK3-C); say yes.
@@ -2555,6 +2722,20 @@ async function testSupplierBillEntry(browser, base) {
       ok(`AP-01: the payables screen offers a way to record an invoice (${btn.w}×${btn.h})`);
     else bad("AP-01: new-invoice button reachable", JSON.stringify(btn));
 
+    /* PK12-S6b · A BILL WITH NO DOCUMENT SAYS SO. The operator asked why
+       «＋ Nueva factura» exists at all when every invoice arrives scanned or
+       uploaded. It exists for the ones that do not — a supplier who bills in
+       the body of an email, a cost accrued before the paper turns up — so it
+       stays, demoted, and what it produces is marked: a paperclip is an offer
+       to attach and reads as optional, and the gap it stands for is not. */
+    const manualDoor = await pg.evaluate(() => {
+      const b = document.getElementById("sb_new");
+      return { present: !!b, primary: b ? b.className.includes("primary") : null };
+    });
+    if (manualDoor.present && manualDoor.primary === false)
+      ok("AP-01: manual entry is still offered, and no longer the primary action");
+    else bad("AP-01: manual entry demoted", JSON.stringify(manualDoor));
+
     const before = await pg.evaluate(() => erp.state.bills.length);
     await pg.click("#sb_new");
     await pg.waitForTimeout(400);
@@ -2564,12 +2745,57 @@ async function testSupplierBillEntry(browser, base) {
     if (formed) ok("AP-01: it opens a form with a supplier and a taxable base");
     else bad("AP-01: bill drawer opens", "no #bd_sup/#bd_base");
 
+    /* PK11 · THE PICKER MUST NOT CHOOSE. This block used to fill in the number
+       and the base and press Registrar without ever touching #bd_sup — which
+       passed only because a <select> with no placeholder silently selects its
+       FIRST option. That is the defect that filed a SUMINISTROS CERDA invoice
+       against Leroy Merlin on the operator's workspace, and the test was
+       encoding it. Now the empty choice is the default and the form refuses. */
+    const unchosen = await pg.evaluate(() => ({
+      value: document.getElementById("bd_sup").value,
+      placeholder: !!document.querySelector('#bd_sup option[value=""]'),
+    }));
+    if (unchosen.placeholder && unchosen.value === "")
+      ok("AP-01: a new invoice starts with no supplier chosen, rather than the first in the list");
+    else bad("AP-01: supplier starts unchosen", JSON.stringify(unchosen));
+
     await pg.evaluate(() => {
       document.getElementById("bd_num").value = "E2E-001";
       document.getElementById("bd_base").value = "1000";
       document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
     });
     await pg.waitForTimeout(200);
+    const refusedCount = await pg.evaluate(() => erp.state.bills.length);
+    await pg.click("#bd_go");
+    await pg.waitForTimeout(500);
+    const refused = await pg.evaluate(
+      (n) => ({ grew: erp.state.bills.length !== n, open: !!document.getElementById("bd_sup") }),
+      refusedCount,
+    );
+    if (!refused.grew && refused.open)
+      ok("AP-01: registering with no supplier chosen is refused, and the form stays open");
+    else bad("AP-01: refuses an unchosen supplier", JSON.stringify(refused));
+
+    await pg.evaluate(() => {
+      const sel = document.getElementById("bd_sup");
+      sel.value = [...sel.options].find((o) => o.value)?.value || "";
+      /* Since PK12 a bill must be allocated: a cost that belongs to nothing is
+         the one thing the rule forbids. This block is about the SUPPLIER, so
+         the cost goes to a general expense and stays out of the way. */
+      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      dest.value = "o:office";
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      /* The AMOUNT as well as the destination: a row seeded before the base
+         was typed carries zero, and a zero row is dropped rather than filed —
+         so setting only the destination leaves the bill with no allocation and
+         the drawer correctly refuses it. */
+      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = String(
+        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
+      );
+      amt.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(300);
     await pg.click("#bd_go");
     await pg.waitForTimeout(700);
 
@@ -2588,6 +2814,20 @@ async function testSupplierBillEntry(browser, base) {
     if (made.name && made.taxId)
       ok(`AP-01: the bill carries its issuer's name and tax id (${made.name} · ${made.taxId})`);
     else bad("AP-01: issuer stamped on the bill", JSON.stringify(made));
+
+    const noDoc = await pg.evaluate(() => {
+      const b = erp.state.bills.find((x) => x.number === "E2E-001");
+      const tr = [...document.querySelectorAll("#view table tr")].find((t) =>
+        /E2E-001/.test(t.textContent),
+      );
+      return {
+        hasCap: !!(b && (b.capId || b.supportingDoc)),
+        says: tr ? /sin documento/i.test(tr.textContent) : null,
+      };
+    });
+    if (noDoc.hasCap === false && noDoc.says)
+      ok("AP-01: …and a bill typed in by hand is marked «sin documento» in the register");
+    else bad("AP-01: documentless bill flagged", JSON.stringify(noDoc));
 
     // ── a photographed document becomes that invoice ──
     const capId = await pg.evaluate(() => {
@@ -2635,6 +2875,21 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: the reading is carried into the form instead of being retyped");
     else bad("AP-01: capture prefills the bill", JSON.stringify(prefilled));
 
+    await pg.evaluate(() => {
+      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      dest.value = "o:office";
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      /* The AMOUNT as well as the destination: a row seeded before the base
+         was typed carries zero, and a zero row is dropped rather than filed —
+         so setting only the destination leaves the bill with no allocation and
+         the drawer correctly refuses it. */
+      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = String(
+        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
+      );
+      amt.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(300);
     await pg.click("#bd_go");
     await pg.waitForTimeout(700);
     const linked = await pg.evaluate((id) => {
@@ -2650,12 +2905,131 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: the document and the invoice end up pointing at each other");
     else bad("AP-01: capture → bill link", JSON.stringify(linked));
 
+    /* ── PK11 · a document from a company nobody has on file ──────────────
+       The operator photographed an invoice from SUMINISTROS CERDA MATERIALS,
+       a supplier that had never been created as a party. The reader got the
+       NIF right; the picker matched nothing; the form defaulted to the first
+       supplier in the list and the cost landed on Leroy Merlin. So: when the
+       NIF matches nobody the picker must stay EMPTY, and the way out — create
+       the supplier from what the document already says — must be on the same
+       screen, because the operator is looking at the answer while the form
+       refuses to accept it. */
+    const strangerCap = await pg.evaluate(() => {
+      const c = erp.captureDocument({ docType: "supplierInvoice", imageRef: "e2e_blob2" }, "bo");
+      erp.confirmCapture(
+        c.id,
+        {
+          issuerName: "SUMINISTROS E2E MATERIALS, S.L.",
+          issuerTaxId: "B62889417",
+          docNumber: "E2E-STRANGER-1",
+          date: erp.state.today,
+          baseCents: 30000,
+          vatCents: 6300,
+          totalCents: 36300,
+        },
+        "bo",
+      );
+      return c.id;
+    });
+    await pg.evaluate((id) => billDrawer(id), strangerCap);
+    await pg.waitForTimeout(400);
+    const stranger = await pg.evaluate(() => ({
+      sup: document.getElementById("bd_sup").value,
+      warn: /no está dado de alta/i.test(document.body.innerText),
+      create: !!document.getElementById("bd_mkSup"),
+      name: document.getElementById("bd_supName")
+        ? document.getElementById("bd_supName").value
+        : null,
+      taxId: document.getElementById("bd_supTax")
+        ? document.getElementById("bd_supTax").value
+        : null,
+    }));
+    if (stranger.sup === "")
+      ok("AP-01: an unknown issuer leaves the supplier unchosen instead of picking one");
+    else bad("AP-01: unknown issuer leaves supplier empty", JSON.stringify(stranger));
+    if (stranger.warn && stranger.create && stranger.name && stranger.taxId)
+      ok("AP-01: and the form offers to create that supplier from what the document says");
+    else bad("AP-01: create-supplier offered", JSON.stringify(stranger));
+
+    /* B62889417 is what the reader returned from the operator's real invoice
+       and it is NOT a valid tax identifier — the check character does not
+       match the seven digits before it, so a digit was mis-read. That is why
+       both fields are editable rather than a button that files what it was
+       handed: the party file is right to refuse, and the operator is holding
+       the paper with the correct one on it. First the refusal, then the fix. */
+    const beforeParties = await pg.evaluate(() => erp.state.parties.length);
+    await pg.click("#bd_mkSup");
+    await pg.waitForTimeout(500);
+    const refusedParty = await pg.evaluate(
+      (n) => ({
+        grew: erp.state.parties.length !== n,
+        stillOffered: !!document.getElementById("bd_mkSup"),
+      }),
+      beforeParties,
+    );
+    if (!refusedParty.grew && refusedParty.stillOffered)
+      ok("AP-01: a mis-read tax id is refused, and the form stays put so it can be corrected");
+    else bad("AP-01: invalid tax id refused", JSON.stringify(refusedParty));
+
+    await pg.evaluate(() => {
+      document.getElementById("bd_supTax").value = "B62889415";
+    });
+    await pg.click("#bd_mkSup");
+    await pg.waitForTimeout(600);
+    const created = await pg.evaluate((n) => {
+      const p = erp.state.parties.find((x) => (x.taxId || "").toUpperCase() === "B62889415");
+      return {
+        grew: erp.state.parties.length === n + 1,
+        name: p ? p.name : null,
+        roles: p ? p.roles : null,
+        chosen: document.getElementById("bd_sup") ? document.getElementById("bd_sup").value : null,
+        picked:
+          p && document.getElementById("bd_sup")
+            ? document.getElementById("bd_sup").value === p.id
+            : false,
+      };
+    }, beforeParties);
+    if (created.grew && created.name === "SUMINISTROS E2E MATERIALS, S.L." && created.picked)
+      ok(`AP-01: it creates the supplier and selects it (${created.name})`);
+    else bad("AP-01: supplier created from the document", JSON.stringify(created));
+    if (created.roles && created.roles.includes("supplier"))
+      ok("AP-01: created as a supplier, so it is there the next time");
+    else bad("AP-01: created with the supplier role", JSON.stringify(created));
+
+    await pg.evaluate(() => {
+      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      dest.value = "o:office";
+      dest.dispatchEvent(new Event("change", { bubbles: true }));
+      /* The AMOUNT as well as the destination: a row seeded before the base
+         was typed carries zero, and a zero row is dropped rather than filed —
+         so setting only the destination leaves the bill with no allocation and
+         the drawer correctly refuses it. */
+      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = String(
+        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
+      );
+      amt.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(300);
+    await pg.click("#bd_go");
+    await pg.waitForTimeout(700);
+    const strangerBill = await pg.evaluate(() => {
+      const b = erp.state.bills.find((x) => x.number === "E2E-STRANGER-1");
+      return b ? { name: b.supplierName, taxId: b.supplierTaxId } : null;
+    });
+    if (strangerBill && strangerBill.taxId === "B62889415")
+      ok(`AP-01: the invoice is filed against the company that issued it (${strangerBill.name})`);
+    else bad("AP-01: stranger bill filed correctly", JSON.stringify(strangerBill));
+
     // ── Block 4: a split typed as PERCENTAGES lands as exact cents ─────────
     const pctSplit = await pg.evaluate(async () => {
       const projects = erp.state.projects.filter((p) => !p.closed).slice(0, 2);
       if (projects.length < 2) return { skip: "needs two open projects" };
       document.getElementById("sb_new").click();
       await new Promise((r) => setTimeout(r, 300));
+      // Chosen, not defaulted — the picker no longer answers for the operator.
+      const sel4 = document.getElementById("bd_sup");
+      sel4.value = [...sel4.options].find((o) => o.value).value;
       document.getElementById("bd_num").value = "E2E-PCT";
       document.getElementById("bd_base").value = "1000";
       document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
@@ -2670,6 +3044,18 @@ async function testSupplierBillEntry(browser, base) {
       };
       await set(0, "dest", "p:" + projects[0].id);
       await set(1, "dest", "p:" + projects[1].id);
+      /* Since PK12 a job cost names its partida AND subpartida, so choosing
+         the project is no longer the whole destination. The selects appear as
+         the level above is chosen, which is why they are set in order. */
+      const firstOption = (i, k) => {
+        const el = document.querySelector(`#bd_rows [data-ai="${i}"][data-k="${k}"]`);
+        const opt = el && [...el.options].find((o) => o.value);
+        return opt ? opt.value : null;
+      };
+      for (const i of [0, 1]) {
+        await set(i, "chapterNum", firstOption(i, "chapterNum"));
+        await set(i, "lineId", firstOption(i, "lineId"));
+      }
       // 33,3 / 66,7 — the case where naive rounding loses a cent.
       await set(0, "pct", "33.3");
       await set(1, "pct", "66.7");
@@ -2705,6 +3091,8 @@ async function testSupplierBillEntry(browser, base) {
       await pg.click("#sb_new");
       await pg.waitForTimeout(300);
       await pg.evaluate((id) => {
+        const sel5 = document.getElementById("bd_sup");
+        sel5.value = [...sel5.options].find((o) => o.value).value;
         document.getElementById("bd_num").value = "E2E-1F";
         document.getElementById("bd_base").value = "250";
         document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
@@ -2898,6 +3286,65 @@ async function testVariationBudget(browser, base) {
       ok("5-6: the chapter table carries the variation row, marked with its pill");
     else bad("5-6: economics row", JSON.stringify(ecoRow));
 
+    /* PK12-S4 · EVERY NUMBER IN THE ROW IS THE SUBTRACTION IT LOOKS LIKE.
+       The operator circled «+483 €» against 531 presupuestado and 507
+       acumulado and said it does not add up. It did not: the column was
+       `proyectado − presupuestado`, where the projection is `coste real ÷
+       avance` and appeared in no column of the table — correct arithmetic on a
+       figure that was not on screen. Worse, with the capability bundle absent
+       the same column computed the literal difference instead, so it meant two
+       different things depending on what had loaded.
+
+       Asserted against the cells as RENDERED, not against the model, because
+       what was wrong was what a person read. */
+    const cells = await pg.evaluate((num) => {
+      const row = document.querySelector(`[data-chcosts="${num}"]`);
+      if (!row) return null;
+      const n = (t) =>
+        Math.round(
+          Number(
+            String(t)
+              .replace(/[^0-9,-]/g, "")
+              .replace(",", "."),
+          ),
+        );
+      const td = [...row.querySelectorAll("td")].map((x) => x.textContent.trim());
+      const model = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
+      return {
+        budget: n(td[1]),
+        actual: n(td[2]),
+        deviation: n(td[3]),
+        pct: td[4],
+        margin: n(td[5]),
+        marginPct: td[6],
+        wantBudget: Math.round(model.budgetCostCents / 100),
+        wantActual: Math.round(model.actualCents / 100),
+        wantDeviation: Math.round((model.actualCents - model.budgetCostCents) / 100),
+        wantMargin: Math.round((model.saleCents - model.actualCents) / 100),
+      };
+    }, joined.num);
+    if (
+      cells &&
+      cells.budget === cells.wantBudget &&
+      cells.actual === cells.wantActual &&
+      cells.deviation === cells.wantDeviation
+    )
+      ok(
+        `5-6: desviación is acumulado − presupuestado, on the screen (${cells.actual} − ${cells.budget} = ${cells.deviation})`,
+      );
+    else bad("5-6: deviation reads as the subtraction", JSON.stringify(cells));
+    if (cells && cells.margin === cells.wantMargin)
+      ok("5-6: …margen is venta − acumulado, on the same basis as the column beside it");
+    else bad("5-6: margin basis", JSON.stringify(cells));
+    // Both percentages are shares of something, so a zero denominator is a
+    // dash rather than a division.
+    const pctOk =
+      cells &&
+      /^(—|-?\d+([.,]\d+)?%)$/.test(cells.pct) &&
+      /^(—|-?\d+([.,]\d+)?%)$/.test(cells.marginPct);
+    if (pctOk) ok(`5-6: …and both percentages render (${cells.pct} · ${cells.marginPct})`);
+    else bad("5-6: percentage columns", JSON.stringify(cells));
+
     /* The FORECAST must see the same money the table does. `projectValue`
        used to iterate the baseline chapters alone, so a variation chapter's
        cost — the 120,00 € bill filed above — was silently absent from the
@@ -2922,8 +3369,54 @@ async function testVariationBudget(browser, base) {
 
     await pg.click(`[data-chcosts="${joined.num}"]`);
     await pg.waitForTimeout(500);
+
+    /* PK12-S4b · «the view only allow you to see Partida level, so you don't
+       know where is the issue». A partida can be four subpartidas with three
+       of them exactly on budget, and a list of documents does not say which
+       one moved. The same six columns appear one level down, and they sum to
+       the partida — two levels that disagree about what was spent would be
+       worse than one level that cannot answer. */
+    const subLevel = await pg.evaluate((num) => {
+      const cards = [...document.querySelectorAll(".drawer .card")];
+      const head = cards.map((c) => (c.querySelector("h3") || {}).textContent || "");
+      const t = cards[0] && cards[0].querySelector("table");
+      const ths = t ? [...t.querySelectorAll("thead th")].map((x) => x.textContent.trim()) : [];
+      const model = erp.lineEconomics(gProject, num);
+      const chapter = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
+      return {
+        firstCard: head[0],
+        keepsDocuments: head.some((h) => /Coste acumulado/i.test(h)),
+        cols: ths.length,
+        heads: ths.join("|"),
+        rows: t ? t.querySelectorAll("tbody tr").length : 0,
+        modelRows: model.length,
+        linesSum: model.reduce((a, r) => a + r.actualCents, 0),
+        chapterActual: chapter ? chapter.actualCents : null,
+      };
+    }, joined.num);
+    if (
+      /Por subpartida/i.test(subLevel.firstCard) &&
+      subLevel.cols === 7 &&
+      subLevel.keepsDocuments
+    )
+      ok(
+        `5-6: the drill-down leads with the subpartida table and keeps the documents (${subLevel.heads})`,
+      );
+    else bad("5-6: subpartida table present", JSON.stringify(subLevel));
+    if (subLevel.rows === subLevel.modelRows && subLevel.linesSum === subLevel.chapterActual)
+      ok(
+        `5-6: …and the subpartidas sum to the partida exactly (${subLevel.linesSum}c across ${subLevel.rows})`,
+      );
+    else bad("5-6: subpartidas sum to the partida", JSON.stringify(subLevel));
+    /* The DOCUMENTS table, which is the second one now — «Por subpartida»
+       leads. `querySelector` took the first table in the drawer and would
+       silently have started asserting about the wrong one, so the card is
+       named rather than counted on to stay first. */
     const drill = await pg.evaluate(() => {
-      const t = document.querySelector(".drawer table tbody");
+      const card = [...document.querySelectorAll(".drawer .card")].find((c) =>
+        /Coste acumulado/i.test((c.querySelector("h3") || {}).textContent || ""),
+      );
+      const t = card && card.querySelector("table tbody");
       if (!t) return null;
       const rows = [...t.querySelectorAll("tr")];
       return {
@@ -2997,38 +3490,17 @@ async function testVariationBudget(browser, base) {
 //    every field carries a dot that a validator earned rather than a
 //    confidence score; a typed correction is re-checked; and the record is
 //    written only when a person presses the button.
-async function testCapture(browser, base) {
-  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
-  const errs = [];
-  attachConsole(pg, errs);
-  try {
-    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
-    await bootedShell(pg);
-    await pg.waitForTimeout(900);
-
-    const wired = await pg.evaluate(() => ({
-      ocr: typeof window.ErpOcr,
-      extraction: typeof (window.ErpBridge && window.ErpBridge.extraction),
-      surface: window.ErpBridge && window.ErpBridge.surfaceVersion,
-      capture: !!document.getElementById("capFile"),
-    }));
-    if (wired.ocr === "object" && wired.extraction === "object" && wired.capture)
-      ok(`ADM-03: the capture pipeline is wired (bundle surface v${wired.surface})`);
-    else bad("ADM-03: pipeline wired", JSON.stringify(wired));
-
-    // Nothing of the OCR runtime may load merely because the screen is open.
-    const idle = await pg.evaluate(() => ({
-      tesseract: typeof window.Tesseract,
-      vendorRequests: performance
-        .getEntriesByType("resource")
-        .filter((r) => /vendor\//.test(r.name)).length,
-    }));
-    if (idle.tesseract === "undefined" && idle.vendorRequests === 0)
-      ok("ADM-03: opening the inbox loads none of the 7 MB reader");
-    else bad("ADM-03: nothing loads at rest", JSON.stringify(idle));
-
-    // Hand it a genuine PDF with a text layer, built in the page.
-    await pg.evaluate(() => {
+/**
+ * A genuine one-page PDF with a real text layer, built inside the page.
+ *
+ * Installed as `window.__makeTextPdf()` rather than returned, because a `File`
+ * cannot cross the evaluate boundary — so both the capture suite and the
+ * older-phone suite reach for the same builder in their own page context
+ * instead of each carrying a copy of forty lines of PDF syntax.
+ */
+async function installPdfBuilder(pg) {
+  await pg.evaluate(() => {
+    window.__makeTextPdf = (name) => {
       const lines = [
         "DISTRIBUCIONES CERYGRES, S.A.",
         "NIF: A08932907",
@@ -3064,8 +3536,46 @@ async function testCapture(browser, base) {
       const blob = new Blob([new Uint8Array([...pdf].map((c) => c.charCodeAt(0)))], {
         type: "application/pdf",
       });
+      return new File([blob], name || "factura.pdf", { type: "application/pdf" });
+    };
+  });
+}
+
+async function testCapture(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    const wired = await pg.evaluate(() => ({
+      ocr: typeof window.ErpOcr,
+      extraction: typeof (window.ErpBridge && window.ErpBridge.extraction),
+      surface: window.ErpBridge && window.ErpBridge.surfaceVersion,
+      capture: !!document.getElementById("capFile"),
+    }));
+    if (wired.ocr === "object" && wired.extraction === "object" && wired.capture)
+      ok(`ADM-03: the capture pipeline is wired (bundle surface v${wired.surface})`);
+    else bad("ADM-03: pipeline wired", JSON.stringify(wired));
+
+    // Nothing of the OCR runtime may load merely because the screen is open.
+    const idle = await pg.evaluate(() => ({
+      tesseract: typeof window.Tesseract,
+      vendorRequests: performance
+        .getEntriesByType("resource")
+        .filter((r) => /vendor\//.test(r.name)).length,
+    }));
+    if (idle.tesseract === "undefined" && idle.vendorRequests === 0)
+      ok("ADM-03: opening the inbox loads none of the 7 MB reader");
+    else bad("ADM-03: nothing loads at rest", JSON.stringify(idle));
+
+    // Hand it a genuine PDF with a text layer, built in the page.
+    await installPdfBuilder(pg);
+    await pg.evaluate(() => {
       const dt = new DataTransfer();
-      dt.items.add(new File([blob], "factura.pdf", { type: "application/pdf" }));
+      dt.items.add(window.__makeTextPdf());
       const inp = document.getElementById("capFile");
       inp.files = dt.files;
       inp.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3181,47 +3691,91 @@ async function testCapture(browser, base) {
       ok("ADM-03: the machine's reading is kept beside it, and never marked confirmed by itself");
     else bad("ADM-03: reading kept unconfirmed", JSON.stringify(saved));
 
-    // ---- S7: the two zones, and the half of ADM-03 that was not built -----
+    /* ---- ONE register, not a tray beside it -----------------------------
+       This screen used to be two zones, and the left one held the same
+       documents the register already listed — so an unassigned document
+       appeared twice and the screen read «Bandeja 1» beside «1 documento»
+       about a single document. The operator sent it back with an arrow drawn
+       between the two panels. The tray's question survives as a filter that
+       cannot disagree with the list it filters, and the capture buttons moved
+       into the register's own bar. */
     await pg.waitForTimeout(400);
     const zones = await pg.evaluate(() => {
-      const wrap = document.querySelector("#view .inbox2");
-      const card = document.querySelector("#view .icard");
+      const reg = document.querySelector("#view table.mlist");
+      const view = document.querySelector("#view");
       return {
-        two: !!wrap,
-        cols: wrap ? getComputedStyle(wrap).gridTemplateColumns : "",
-        cards: document.querySelectorAll("#view .icard").length,
-        cardHeight: card ? Math.round(card.getBoundingClientRect().height) : 0,
+        trayGone:
+          !document.querySelector("#view .inbox2") && !document.querySelector("#view .icard"),
         register: document.querySelectorAll("#view table.mlist").length,
+        capture: !!document.getElementById("capFile"),
+        camera: !!document.getElementById("capCam"),
+        offline: !!document.getElementById("capPrep"),
+        filter: !!document.getElementById("capPend"),
+        // Full width: the register spans the view rather than a 1fr column
+        // beside a 372px one.
+        fills:
+          reg && view
+            ? reg.closest(".card").getBoundingClientRect().width /
+              view.getBoundingClientRect().width
+            : 0,
       };
     });
-    if (zones.two && zones.cards >= 1 && zones.cardHeight === 96 && zones.register === 1)
-      ok(`ADM-03: the inbox is 96 px cards beside the register (${zones.cols})`);
-    else bad("ADM-03: two zones", JSON.stringify(zones));
+    if (zones.trayGone && zones.register === 1 && zones.fills > 0.9)
+      ok(
+        `ADM-03: one register, spanning the screen (${Math.round(zones.fills * 100)}% of the view)`,
+      );
+    else bad("ADM-03: one full-width register", JSON.stringify(zones));
+    if (zones.capture && zones.camera && zones.offline && zones.filter)
+      ok("ADM-03: the capture buttons and the pending filter sit on the register's own bar");
+    else bad("ADM-03: buttons moved onto the register", JSON.stringify(zones));
 
-    // The document just saved is on the LEFT, because nobody has said who
-    // pays for it yet. That is the whole reason the column exists.
-    const cardText = await pg.locator("#view .icard").first().innerText();
-    // The issuer NAME is the one field the reader routinely cannot find — no
-    // keyword introduces it and no validator can vouch for it, so it comes
-    // back null on this fixture exactly as it did in the S0b spike. The card
-    // says so rather than showing a blank line: same discipline as the amber
-    // dot, one screen later.
-    if (/2\.037,59/.test(cardText) && /confirmar/i.test(cardText))
-      ok("ADM-03: a card carries the detected amount, and says when the issuer was not detected");
-    else bad("ADM-03: card content", cardText.replace(/\n/g, " · ").slice(0, 90));
+    /* The register row carries what the card used to. PK10-S4 · the issuer
+       assertion here is deliberately positive: no keyword introduces a
+       supplier's own name, so a label-driven reader could never find it, and
+       the rule that reads it — the head of the document, joined across the
+       line it wrapped onto — is what makes this pass. */
+    const rowText = await pg.evaluate(() => {
+      const tr = [...document.querySelectorAll("#view table.mlist tr.click")].find((t) =>
+        /CERYGRES/i.test(t.textContent),
+      );
+      return tr ? tr.innerText.replace(/\s+/g, " ") : "";
+    });
+    if (/2\.037,59/.test(rowText) && /CERYGRES/i.test(rowText))
+      ok("ADM-03: a register row carries the detected amount and the issuer the reader finds");
+    else bad("ADM-03: row content", rowText.slice(0, 90));
 
-    // …and a document whose issuer WAS confirmed shows it, so the line above
-    // is about this document rather than about the card never rendering a name.
-    const named = await pg.evaluate(() =>
-      [...document.querySelectorAll("#view .icard")].some((c) =>
-        /Vall/.test(c.querySelector(".who").textContent),
-      ),
-    );
-    if (named) ok("ADM-03: a card whose issuer is known shows the issuer");
-    else bad("ADM-03: named card", "no card carried a confirmed issuer name");
+    // The filter answers what the tray's count answered, and agrees with the
+    // register because it IS the register.
+    const filtered = await pg.evaluate(async () => {
+      const chip = document.getElementById("capPend");
+      const claimed = Number(chip.querySelector("b").textContent);
+      chip.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const shown = document.querySelectorAll("#view table.mlist tr.click").length;
+      const truth = erp.state.captured.filter((c) => !c.allocations.length).length;
+      document.getElementById("capPend").click();
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        claimed,
+        shown,
+        truth,
+        restored: document.querySelectorAll("#view table.mlist tr.click").length,
+      };
+    });
+    if (filtered.claimed === filtered.truth && filtered.shown === filtered.truth)
+      ok(`ADM-03: «Sin asignar» counts and filters the same ${filtered.truth} documents`);
+    else bad("ADM-03: pending filter agrees with the register", JSON.stringify(filtered));
+    if (filtered.restored > filtered.shown || filtered.truth === filtered.restored)
+      ok("ADM-03: …and pressing it again gives the whole register back");
+    else bad("ADM-03: filter toggles off", JSON.stringify(filtered));
 
     // ---- allocation: the half S6 left for this session --------------------
-    await pg.locator("#view .icard").first().click();
+    await pg.evaluate(() => {
+      const tr = [...document.querySelectorAll("#view table.mlist tr.click")].find((t) =>
+        /CERYGRES/i.test(t.textContent),
+      );
+      (tr || document.querySelector("#view table.mlist tr.click")).click();
+    });
     await pg.waitForTimeout(400);
     await pg.fill("#cd_ref", "PED-E2E-77");
     await pg.fill("#cd_notes", "reforma baño");
@@ -3259,17 +3813,55 @@ async function testCapture(browser, base) {
       ok("ADM-03: a split that does not total the document is refused, panel still open");
     else bad("ADM-03: short split refused", JSON.stringify(refused));
 
-    // Now split it properly: part to a project, the rest to an overhead.
+    /* Now split it properly: part to a project, the rest to an overhead.
+       PK10-S3 · the figures foot to the TAXABLE BASE (1.683,96), not to the
+       VAT-inclusive total the document also states. An allocation distributes
+       the cost, and input VAT is not one — the same rule `registerBill` has
+       always applied, so the split entered here is the split the bill takes. */
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().fill("1000.00");
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().dispatchEvent("change");
     await pg.waitForTimeout(300);
+    /* And its partida and subpartida, which since PK12 are not optional on a
+       job cost. The selects appear as the level above is chosen, so they are
+       filled in order; the overhead row below needs none, because a general
+       expense has no partida to name. */
+    for (const k of ["chapterNum", "lineId"]) {
+      const v = await pg.evaluate((key) => {
+        const el = document.querySelector(`#cd_rows [data-ai="0"][data-k="${key}"]`);
+        const opt = el && [...el.options].find((o) => o.value);
+        return opt ? opt.value : null;
+      }, k);
+      if (v) {
+        await pg.locator(`#cd_rows [data-ai="0"][data-k="${k}"]`).selectOption(v);
+        await pg.waitForTimeout(250);
+      }
+    }
     await pg.click("#cd_add");
     await pg.waitForTimeout(300);
     await pg.locator('#cd_rows select[data-k="dest"]').nth(1).selectOption("o:office");
     await pg.waitForTimeout(300);
-    await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).fill("1037.59");
+    await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).fill("683.96");
     await pg.locator('#cd_rows input[data-k="amountCents"]').nth(1).dispatchEvent("change");
     await pg.waitForTimeout(300);
+
+    /* The operator's own complaint, measured: the percentages were shares of
+       the VAT-inclusive total, so a distribution that footed correctly read as
+       four-fifths of itself and would not go in. 1.000,00 of a 1.683,96 base
+       is 59,4 %; of the 2.037,59 total it was 49,1 %. */
+    const basis = await pg.evaluate(() => ({
+      pct: [...document.querySelectorAll('#cd_rows input[data-k="pct"]')].map((i) => i.value),
+      rest: (document.querySelector("#cd_rest") || {}).textContent || "",
+      saysBase: /base imponible|taxable base|base imposable/i.test(
+        document.querySelector("#cd_alloc")?.closest(".card")?.textContent || "",
+      ),
+    }));
+    if (basis.pct[0] === "59.4" && basis.pct[1] === "40.6")
+      ok(`ADM-03: the split reads as a share of the taxable base (${basis.pct.join(" · ")} %)`);
+    else bad("ADM-03: percentages against the base", JSON.stringify(basis));
+    if (basis.saysBase && /cuadra|balances|quadra/i.test(basis.rest))
+      ok("ADM-03: …the card says the base is what is being split, and that it foots");
+    else bad("ADM-03: the card names its basis", JSON.stringify(basis));
+
     await pg.click("#cd_alloc");
     await pg.waitForTimeout(700);
     const allocated = await pg.evaluate(() => {
@@ -3279,34 +3871,557 @@ async function testCapture(browser, base) {
         status: c.status,
         onlyOneDest: c.allocations.every((a) => !!a.projectId !== !!a.overheadCategory),
         sum: c.allocations.reduce((s, a) => s + a.amountCents, 0),
-        stillPending: document.querySelectorAll("#view .icard").length,
       };
     });
     if (
       allocated.n === 2 &&
       allocated.status === "allocated" &&
       allocated.onlyOneDest &&
-      allocated.sum === 203759
+      allocated.sum === 168396
     )
       ok("ADM-03: a document splits between a project and an overhead, and adds up");
     else bad("ADM-03: split allocation", JSON.stringify(allocated));
-    const gone = await pg.evaluate(() => {
+    /* Allocated is HISTORY, and the filter is what says so now. The old
+       assertion was that the document left the tray for the register; there is
+       no tray, so the same fact is that it stays in the register and drops out
+       of «Sin asignar». One list, two answers, no way for them to disagree. */
+    const gone = await pg.evaluate(async () => {
       const id = erp.state.captured[erp.state.captured.length - 1].id;
-      return {
-        inInbox: !!document.querySelector(`#view .icard[data-cap="${id}"]`),
-        inRegister: [...document.querySelectorAll("#view table.mlist tr.click")].some(
+      const inList = () =>
+        [...document.querySelectorAll("#view table.mlist tr.click")].some(
           (tr) => tr.dataset.id === id,
-        ),
+        );
+      const inRegister = inList();
+      document.getElementById("capPend").click();
+      await new Promise((r) => setTimeout(r, 500));
+      const inPending = inList();
+      document.getElementById("capPend").click();
+      await new Promise((r) => setTimeout(r, 500));
+      return { inRegister, inPending };
+    });
+    if (gone.inRegister && !gone.inPending)
+      ok("ADM-03: an allocated document stays in the register and leaves «Sin asignar»");
+    else bad("ADM-03: allocated document leaves the pending filter", JSON.stringify(gone));
+
+    /* PK10-S6 · THE SAME DOCUMENT, FILED TWICE. The operator did it and the
+       register showed the pair side by side with no warning: CAP-05 compared
+       the tax id AND the number, and the reader had changed between the two
+       captures, so the copies disagreed about the tax id. The flag is derived
+       on read now, so a pair that only becomes recognisable later still
+       lights — and the archive finally has a way to remove one. */
+    const dup = await pg.evaluate(() => {
+      const src = erp.state.captured.find((c) => c.confirmed);
+      if (!src) return { skip: "no confirmed document to copy" };
+      const copy = erp.captureDocument(
+        { docType: src.docType, imageRef: "copy-e2e" },
+        "backoffice",
+      );
+      // The same document as the reader would have had it on a worse day: the
+      // number and the issuer agree, the tax id does not.
+      erp.confirmCapture(copy.id, { ...src.confirmed, issuerTaxId: "B00000000" }, "backoffice");
+      render();
+      return { id: copy.id, of: src.id };
+    });
+    await pg.waitForTimeout(600);
+    if (dup.skip) {
+      bad("ADM-03: a document to copy", dup.skip);
+    } else {
+      const flagged = await pg.evaluate((id) => {
+        const row = [...document.querySelectorAll("#capReg table.mlist tr.click")].find(
+          (tr) => tr.dataset.id === id,
+        );
+        return { found: !!row, text: row ? row.textContent.replace(/\s+/g, " ") : "" };
+      }, dup.id);
+      if (flagged.found && /duplicado/i.test(flagged.text))
+        ok("ADM-03: a second copy of a filed document is flagged as a possible duplicate");
+      else bad("ADM-03: duplicate flagged in the register", JSON.stringify(flagged));
+
+      const removed = await pg.evaluate(async (id) => {
+        captureDrawer(id);
+        await new Promise((r) => setTimeout(r, 400));
+        const btn = document.querySelector("#cd_del");
+        const seeOther = !!document.querySelector("#cd_seeDup");
+        if (!btn) return { err: "no delete button" };
+        btn.click();
+        await new Promise((r) => setTimeout(r, 300));
+        // The confirmation is the app's own modal, not the browser's.
+        const ok2 = [...document.querySelectorAll("button")].find((b) =>
+          /^eliminar$/i.test(b.textContent.trim()),
+        );
+        if (!ok2) return { err: "no confirmation offered", seeOther };
+        ok2.click();
+        await new Promise((r) => setTimeout(r, 500));
+        return {
+          seeOther,
+          gone: !erp.state.captured.some((c) => c.id === id),
+          logged: erp.state.audit.some((a) => a.action === "deleteCapture"),
+        };
+      }, dup.id);
+      if (removed.gone && removed.logged && removed.seeOther)
+        ok("ADM-03: …the drawer offers the other copy, and deletes this one behind a confirmation");
+      else bad("ADM-03: delete a filed document", JSON.stringify(removed));
+    }
+
+    /* ── the refused delete has to name the place, not just the step ──────
+       The operator opened a filed document, found «Eliminar documento»
+       disabled with «Registrado como factura: elimínala primero», and asked
+       why it could not be deleted. The refusal is correct — the bill is an
+       accounting record and the photograph may not vanish from under it — and
+       the sentence was a dead end: «primero» is another screen and it did not
+       say which. So the drawer offers the way there, and the way there is the
+       drawer that can actually remove the bill. */
+    const routed = await pg.evaluate(async () => {
+      const sup = erp.state.parties.find((p) =>
+        (p.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
+      );
+      const c = erp.captureDocument({ docType: "supplierInvoice", imageRef: "e2e_route" }, "bo");
+      erp.confirmCapture(
+        c.id,
+        {
+          issuerName: sup.name,
+          issuerTaxId: sup.taxId,
+          docNumber: "E2E-ROUTE-1",
+          date: erp.state.today,
+          baseCents: 20000,
+          vatCents: 4200,
+          totalCents: 24200,
+        },
+        "bo",
+      );
+      /* Split before promoting: a bill must be allocated, so a document with
+         none cannot become one. This block is about the ROUTE out of a
+         document held shut by its bill, not about where the cost lands. */
+      erp.allocateCapture(
+        c.id,
+        [{ overheadCategory: "office", kind: "material", amountCents: 20000 }],
+        "bo",
+      );
+      erp.billFromCapture(c.id, { supplierId: sup.id }, "bo");
+      captureDrawer(c.id);
+      await new Promise((r) => setTimeout(r, 400));
+      const del = document.querySelector("#cd_del");
+      const go = document.querySelector("#cd_gobill");
+      if (!go) return { err: "no route to the bill offered", disabled: del && del.disabled };
+      const r1 = go.getBoundingClientRect();
+      go.click();
+      await new Promise((r) => setTimeout(r, 400));
+      const onBill = !!document.querySelector("#bf_del");
+      const canDelete = onBill && !document.querySelector("#bf_del").disabled;
+      return {
+        disabled: !!(del && del.disabled),
+        reachable: r1.width > 40 && r1.height >= 20,
+        onBill,
+        canDelete,
+        capId: c.id,
       };
     });
-    if (!gone.inInbox && gone.inRegister)
-      ok("ADM-03: an allocated document leaves the inbox for the register");
-    else bad("ADM-03: allocated document moves side", JSON.stringify(gone));
+    if (routed.disabled && routed.reachable)
+      ok("ADM-03: a document behind a bill refuses deletion and offers the way to the bill");
+    else bad("ADM-03: route to the bill offered", JSON.stringify(routed));
+    if (routed.onBill && routed.canDelete)
+      ok("ADM-03: …and that way lands on the drawer that can actually remove it");
+    else bad("ADM-03: the route lands somewhere useful", JSON.stringify(routed));
+
+    /* And the whole way out, end to end: un-register the bill, then delete the
+       document. The confirmation reads «Anular» rather than «Eliminar» since
+       the operator settled what this action is called — the invoice leaves the
+       register, it is not erased from history. */
+    const freed = await pg.evaluate(async (capId) => {
+      document.querySelector("#bf_del").click();
+      await new Promise((r) => setTimeout(r, 300));
+      const yes = [...document.querySelectorAll("button")].find((b) =>
+        /^anular$/i.test(b.textContent.trim()),
+      );
+      if (!yes) return { err: "no confirmation offered" };
+      yes.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const cap = erp.state.captured.find((c) => c.id === capId);
+      const released = !!cap && cap.billId === null;
+      if (!released)
+        return { released, billGone: !erp.state.bills.some((b) => b.number === "E2E-ROUTE-1") };
+      captureDrawer(capId);
+      await new Promise((r) => setTimeout(r, 400));
+      const del = document.querySelector("#cd_del");
+      return {
+        released,
+        billGone: !erp.state.bills.some((b) => b.number === "E2E-ROUTE-1"),
+        nowEnabled: !!del && !del.disabled,
+      };
+    }, routed.capId);
+    if (freed.billGone && freed.released && freed.nowEnabled)
+      ok("ADM-03: un-registering the bill releases the document, which can then be deleted");
+    else bad("ADM-03: the way out works end to end", JSON.stringify(freed));
 
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
     bad("document capture", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * THE OPERATOR'S OWN PHONE, which is older than the reader assumes.
+ *
+ * `pdfjs-dist@6` calls `Promise.withResolvers()`. It arrived in Safari 17.4,
+ * Chrome 119 and Firefox 121 — so on an iPhone a little behind, the method is
+ * undefined and every PDF the workspace is handed dies, with WebKit's wording
+ * for a missing method: "undefined is not a function". Supplier-invoice
+ * capture, bank-statement import, the document preview and the thumbnailer all
+ * go through the same door and all died together, while photographs kept
+ * working because tesseract does not use it.
+ *
+ * Deleting the method is a fair simulation and a precise one: it was found by
+ * deleting each candidate API in turn and running a real invoice through the
+ * pipeline, and this is the only one that breaks it.
+ *
+ * The second check is the one that matters even when the first is fixed: a
+ * reader that fails for ANY reason — a corrupt file, no memory, a browser
+ * older still — must not take the document with it. The panel opens, empty,
+ * ready to be typed.
+ */
+async function testOlderPhone(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.addInitScript(() => {
+      delete Promise.withResolvers;
+    });
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    const gone = await pg.evaluate(() => typeof Promise.withResolvers);
+    if (gone === "undefined")
+      ok("older phone: the browser under test has no Promise.withResolvers");
+    else bad("older phone: the simulation applied", `withResolvers is ${gone}`);
+
+    await installPdfBuilder(pg);
+    const read = await pg.evaluate(async () => {
+      try {
+        const rec = await ErpOcr.recognise(window.__makeTextPdf(), {});
+        const text = (
+          Array.isArray(rec.text) ? rec.text.join("\n") : String(rec.text || "")
+        ).trim();
+        return { ok: true, engine: rec.engine, chars: text.length, hasNif: /A08932907/.test(text) };
+      } catch (e) {
+        return { ok: false, message: String((e && e.message) || e).slice(0, 120) };
+      }
+    });
+    if (read.ok && read.engine === "pdf-text" && read.hasNif)
+      ok(`older phone: a PDF still reads through its text layer (${read.chars} characters)`);
+    else bad("older phone: the reader survives a missing withResolvers", JSON.stringify(read));
+
+    // …and the whole capture path, not just the reader in isolation.
+    await pg.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(window.__makeTextPdf());
+      const inp = document.getElementById("capFile");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(2500);
+    const panel = await pg.evaluate(() => ({
+      open: document.body.classList.contains("fs"),
+      badge: (document.querySelector(".pbbar .pill") || {}).textContent || "",
+      nif: (document.querySelector('[data-f="issuerTaxId"] input') || {}).value || "",
+    }));
+    if (panel.open && /PDF/i.test(panel.badge) && panel.nif.includes("A08932907"))
+      ok("older phone: capture opens the validation screen with the document read");
+    else bad("older phone: capture on an old browser", JSON.stringify(panel));
+
+    /* A READER THAT CANNOT RUN AT ALL still may not lose the document. Broken
+       here at the last possible moment — the recogniser itself — so the check
+       is about what the SCREEN does with a failure, not about any one cause. */
+    await pg.evaluate(() => {
+      captureClose();
+      ErpOcr.recognise = () => Promise.reject(new Error("simulated reader failure"));
+    });
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.items.add(window.__makeTextPdf("rota.pdf"));
+      const inp = document.getElementById("capFile");
+      inp.files = dt.files;
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await pg.waitForTimeout(900);
+    const kept = await pg.evaluate(() => ({
+      open: document.body.classList.contains("fs"),
+      name: (document.querySelector(".pbbar .who span") || {}).textContent || "",
+      badge: (document.querySelector(".pbbar .pill") || {}).textContent || "",
+      fields: document.querySelectorAll(".capf").length,
+      typeable: !!document.querySelector('[data-f="issuerName"] input'),
+    }));
+    if (kept.open && kept.name === "rota.pdf" && kept.fields > 0 && kept.typeable)
+      ok(`older phone: a reader that fails keeps the document — ${kept.fields} fields to type`);
+    else bad("older phone: a failed read is not a dead end", JSON.stringify(kept));
+    if (/sin lectura|not read|sense lectura/i.test(kept.badge))
+      ok("older phone: …and the badge says nothing was read, rather than claiming an image");
+    else bad("older phone: honest badge after a failed read", JSON.stringify(kept.badge));
+  } catch (e) {
+    bad("older phone (PK10-S1)", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * PK10-S2 · CON-11 SAYS WHICH CONTRACT, because "unsigned" was not enough.
+ *
+ * The operator had three contracts on one accepted quote and signed the third.
+ * The job had pointed at the first since the day it was created, so the blocker
+ * refused the first invoice on the strength of a draft — while a signed
+ * contract for the same customer sat two rows above it on the same screen, and
+ * nothing anywhere said the two were different records.
+ *
+ * State is BUILT and then put back, rather than hunted for: a check that skips
+ * because the seed happens not to hold the case proves nothing. The second
+ * contract is fabricated in place rather than created through the engine, so
+ * the contract series is not advanced by a test.
+ */
+async function testContractObraLink(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    const shown = await pg.evaluate(async () => {
+      /* Cloned, not created: driving the engine here would advance the contract
+         series, and a test that consumes a document number leaves a gap ORG-04
+         requires not to exist. A clone carries every field the preview reads
+         and a fresh id no invoice points at, which is exactly the state the
+         operator was in — a job whose first invoice has not been issued. */
+      const src = erp.state.projects.find((p) => p.contractId);
+      if (!src) return { skip: "no job with a contract in the seed" };
+      const heldSrc = erp.state.contracts.find((c) => c.id === src.contractId);
+      if (!heldSrc) return { skip: "the job's contract is missing" };
+
+      const prj = JSON.parse(JSON.stringify(src));
+      prj.id = "prj_ghost_e2e";
+      prj.code = "P-GHOST";
+      const draft = JSON.parse(JSON.stringify(heldSrc));
+      draft.id = "con_ghost_draft";
+      draft.number = "CTR-GHOST-0";
+      draft.status = "draft";
+      draft.signature = {
+        customerSignedAt: null,
+        companySignedAt: null,
+        method: null,
+        document: null,
+      };
+      draft.document = null;
+      (draft.installments || []).forEach((i) => {
+        i.invoicedInvoiceId = null;
+        i.status = "planned";
+      });
+      const signed = JSON.parse(JSON.stringify(draft));
+      signed.id = "con_ghost_signed";
+      signed.number = "CTR-GHOST-1";
+      signed.date = erp.today;
+      signed.status = "signed";
+      signed.signature = {
+        customerSignedAt: erp.today,
+        companySignedAt: erp.today,
+        method: "physical",
+        document: { storageKey: "ghost", name: "firmado.pdf" },
+      };
+      prj.contractId = draft.id;
+      erp.state.projects.push(prj);
+      erp.state.contracts.push(draft, signed);
+
+      invOpen(prj.id);
+      invSync();
+      await new Promise((r) => setTimeout(r, 600));
+      const row = [...document.querySelectorAll("#invGates .daylist .it")].find((r) =>
+        /CON-11/.test(r.textContent),
+      );
+      const out = {
+        found: !!row,
+        text: row ? row.textContent.replace(/\s+/g, " ").trim() : "",
+        refInNoTranslate: row
+          ? [...row.querySelectorAll('[translate="no"]')].map((e) => e.textContent.trim())
+          : [],
+        held: draft.number,
+      };
+      document.querySelector("#invBack")?.click();
+      // Put the workspace back exactly as it was found.
+      erp.state.projects = erp.state.projects.filter((p) => p.id !== "prj_ghost_e2e");
+      erp.state.contracts = erp.state.contracts.filter(
+        (c) => c.id !== "con_ghost_draft" && c.id !== "con_ghost_signed",
+      );
+      return out;
+    });
+
+    if (shown.skip) {
+      bad("CON-11: a job to block", shown.skip);
+    } else {
+      const ref = shown.held + " → CTR-GHOST-1";
+      if (shown.found && shown.refInNoTranslate.includes(ref))
+        ok(
+          `CON-11: the blocker names the contract the job reads and the one that is signed (${ref})`,
+        );
+      else bad("CON-11: names both contracts", JSON.stringify(shown));
+      if (/firmado|signed|signat/i.test(shown.text) && !shown.text.includes("undefined"))
+        ok(
+          "CON-11: …in a sentence that translates, with the numbers beside it rather than inside it",
+        );
+      else bad("CON-11: sentence and numbers kept apart", JSON.stringify(shown.text));
+    }
+
+    if (errs.length === 0) ok("CON-11: no console errors");
+    else bad("CON-11: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("contract↔obra link (PK10-S2)", String(e).slice(0, 200));
+  } finally {
+    await pg.close();
+  }
+}
+
+/**
+ * PK10-S5 · THE FACTURACIÓN SCREENS ON THE PHONE THE OPERATOR CARRIES.
+ *
+ * Three separate failures, all measured at 390 px before they were fixed:
+ * a drawer 134 px wider than the viewport because a `<select>` floored at its
+ * longest option; an invoice preview sitting at x = −91, clipped on BOTH sides,
+ * because a centring flex container will not shrink a child below its
+ * min-content; and — once that was released — a line-items table still cut off
+ * inside the sheet, taking the amounts column with it.
+ *
+ * The last one is the reason the first two are checked together: fixing the
+ * container alone trades an unreachable left margin for an unreadable right
+ * column, which is not an improvement.
+ */
+async function testFacturacionPhone(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+  const errs = [];
+  attachConsole(pg, errs);
+  try {
+    await pg.goto(`${base}/erp.html#invoicing`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(1200);
+
+    // ── the «Nueva factura» drawer
+    await pg.evaluate(() => newInvoiceDrawer());
+    await pg.waitForTimeout(500);
+    const drawer = await pg.evaluate(() => {
+      const body = document.querySelector("#dbody");
+      const sel = document.querySelector("#nf_p");
+      const go = document.querySelector("#nf_go");
+      const r = (e) => (e ? Math.round(e.getBoundingClientRect().right) : null);
+      return {
+        overflow: body ? body.scrollWidth - body.clientWidth : null,
+        selectRight: r(sel),
+        buttonRight: r(go),
+        vw: window.innerWidth,
+        page: document.documentElement.scrollWidth,
+      };
+    });
+    if (
+      drawer.overflow <= 1 &&
+      drawer.selectRight <= drawer.vw &&
+      drawer.buttonRight <= drawer.vw &&
+      drawer.page <= drawer.vw
+    )
+      ok(
+        `ADM-01: the «Nueva factura» drawer fits the phone (${drawer.selectRight}px in ${drawer.vw})`,
+      );
+    else bad("ADM-01: drawer fits", JSON.stringify(drawer));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    // ── the invoice preview, and what is inside it
+    const sheet = await pg.evaluate(async () => {
+      const p = erp.state.projects.find((x) => x.contractId);
+      if (!p) return { skip: "no job with a contract" };
+      invOpen(p.id);
+      await new Promise((r) => setTimeout(r, 1200));
+      const cage = document.querySelector(".condoc");
+      const sh = document.querySelector("#invDoc .sheet");
+      if (!cage || !sh) return { skip: "no preview rendered" };
+      const cb = cage.getBoundingClientRect();
+      const sb = sh.getBoundingClientRect();
+      // Every table cell that carries an amount must be inside the page.
+      const cells = [...sh.querySelectorAll("td, th")];
+      const cut = cells.filter((c) => c.getBoundingClientRect().right > sb.right + 1).length;
+      return {
+        clippedLeftBy: Math.round(cb.x - sb.x),
+        rightOfViewport: Math.round(sb.right - window.innerWidth),
+        sheetW: Math.round(sb.width),
+        cells: cells.length,
+        cut,
+        page: document.documentElement.scrollWidth,
+        vw: window.innerWidth,
+      };
+    });
+    if (sheet.skip) {
+      bad("ADM-01: an invoice preview to measure", sheet.skip);
+    } else {
+      if (sheet.clippedLeftBy <= 0 && sheet.rightOfViewport <= 1 && sheet.page <= sheet.vw)
+        ok(
+          `ADM-01: the invoice preview is whole on the phone — ${sheet.sheetW}px in ${sheet.vw}px`,
+        );
+      else bad("ADM-01: preview fits the viewport", JSON.stringify(sheet));
+      if (sheet.cells > 0 && sheet.cut === 0)
+        ok(`ADM-01: …and no cell is cut off inside it — ${sheet.cells} checked, amounts included`);
+      else bad("ADM-01: no cell cut inside the sheet", JSON.stringify(sheet));
+    }
+
+    /* PK10-S5 · a Spanish sentence on an English invoice. The unnumbered
+       preview says so on the document itself, and that sentence was written
+       into the facts adapter in Spanish — so an English invoice read «Invoice ·
+       Sin numerar». No gate could see it: a document is `translate="no"` by
+       design, so the crawler skips it, and the facts file is not one the source
+       audit reads. It goes through the document's own label layer now. */
+    const placeholder = await pg.evaluate(async () => {
+      const p = erp.state.projects.find((x) => x.contractId);
+      if (!p) return { skip: "no job" };
+      invOpen(p.id);
+      invWork.language = "en";
+      invSync();
+      await new Promise((r) => setTimeout(r, 700));
+      const es = (document.querySelector("#invDoc") || {}).textContent || "";
+      invWork.language = "es";
+      invSync();
+      await new Promise((r) => setTimeout(r, 500));
+      const back = (document.querySelector("#invDoc") || {}).textContent || "";
+      document.querySelector("#invBack")?.click();
+      return { en: es, esAgain: back };
+    });
+    if (placeholder.skip) bad("N1: an invoice to preview", placeholder.skip);
+    else if (
+      /not yet numbered/i.test(placeholder.en) &&
+      !/sin numerar/i.test(placeholder.en) &&
+      /sin numerar/i.test(placeholder.esAgain)
+    )
+      ok("N1: the unnumbered note speaks the document's language, not the code's");
+    else
+      bad(
+        "N1: unnumbered placeholder translates",
+        JSON.stringify({
+          en: placeholder.en.replace(/\s+/g, " ").slice(0, 90),
+          es: placeholder.esAgain.replace(/\s+/g, " ").slice(0, 60),
+        }),
+      );
+
+    // PK10-S5 · the jobs are findable by name, not only by what you do to them.
+    const nav = await pg.evaluate(() => {
+      const proj = SECTIONS.find((x) => x.k === "projects");
+      return { subs: proj ? proj.subs.map((sub) => sub.lab) : [] };
+    });
+    if (nav.subs.includes("Obras"))
+      ok(`Proyectos names the register of jobs (${nav.subs.join(" · ")})`);
+    else bad("Proyectos names Obras", JSON.stringify(nav));
+
+    if (errs.length === 0) ok("ADM-01: no console errors at 390px");
+    else bad("ADM-01: no console errors", errs.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("Facturación on a phone (PK10-S5)", String(e).slice(0, 200));
   } finally {
     await pg.close();
   }
@@ -3915,16 +5030,34 @@ async function testProjectTracking(browser, base) {
     const seeded = await pg.evaluate(() => {
       const pid = gProject;
       const sup = erp.state.parties.find((p) => p.active && p.roles.includes("supplier"));
-      erp.registerBill(
+      /* Since PK12 a project cost names its partida and subpartida on the way
+         in, so a cost that reaches the job and stops there can no longer be
+         WRITTEN. It is filed properly and then stripped back, which is honest
+         about what such a row now is: data from before the rule. The block
+         below is about the screen that makes it visible and the way to clear
+         it, and that machinery is not obsolete — a running workspace holds
+         exactly these rows. */
+      const hit = (erp.projectChapters(pid) || [])[0];
+      const ln = hit && hit.chapter.lines[0];
+      const seededBill = erp.registerBill(
         {
           supplierId: sup.id,
           number: "E2E-SINCAP",
           baseCents: 50000,
           vatBp: 2100,
-          allocations: [{ projectId: pid, amountCents: 50000 }],
+          allocations: [
+            {
+              projectId: pid,
+              chapterNum: hit ? String(hit.chapter.num) : null,
+              lineId: ln ? ln.id : null,
+              amountCents: 50000,
+            },
+          ],
         },
         "bo",
       );
+      seededBill.allocations[0].chapterNum = null;
+      seededBill.allocations[0].lineId = null;
       const chapters = erp.chapterEconomics(pid).reduce((s, c) => s + c.actualCents, 0);
       return { chapters, project: erp.actualCostCents(pid), pid };
     });
@@ -4016,31 +5149,39 @@ async function testProjectTracking(browser, base) {
       ok("PRY-02: the screen's «cuadra» claim is measured, and the card prints the engine's total");
     else bad("PRY-02: measured cuadra claim", JSON.stringify(honest));
 
-    // A projection is adjustable, and the reason is required by the engine.
-    await pg.locator("#view [data-adj]").first().click();
-    await pg.waitForTimeout(400);
-    await pg.locator("#fc_amt").fill("1234.00");
-    await pg.locator("#fc_why").fill("");
-    await pg.locator("#fc_save").click();
-    await pg.waitForTimeout(350);
-    // Assert the OUTCOME, not the wording: the engine's messages are English
-    // while the UI is Spanish, so matching the text would test the translation
-    // rather than the rule. What matters is that nothing was stored.
-    const refusal = await pg.locator("#toast").innerText();
-    const storedAnyway = await pg.evaluate(
-      () => Object.keys(erp.project(gProject).forecastOverrides || {}).length,
-    );
-    if (/^⚠/.test(refusal.trim()) && storedAnyway === 0)
-      ok("economics: an adjusted projection without a reason is refused and not stored");
-    else bad("economics: reason required", `toast="${refusal}" stored=${storedAnyway}`);
+    /* THE BUDGET IS FIXED. Two checks used to live here, both driving an
+       "Ajustar" button on each chapter row: one that a projection without a
+       reason was refused, one that an accepted adjustment showed on the row.
+       The operator removed the control itself — "we should not allow
+       adjustments to the budget. This is fixed. Adjustments can only be done
+       by contract modification (adicionales)" — so what is asserted now is
+       its absence, on the screen and in the data.
 
-    await pg.locator("#fc_why").fill("La parte cara ya está ejecutada");
-    await pg.locator("#fc_save").click();
-    await pg.waitForTimeout(500);
-    const adjusted = await pg.locator("#view").innerText();
-    if (/ajustada/i.test(adjusted) || /calculada/i.test(adjusted))
-      ok("economics: an adjustment is recorded against the chapter");
-    else bad("economics: adjustment recorded", adjusted.replace(/\n/g, " ").slice(0, 160));
+       Absence is asserted on the RENDERED table, not on a selector alone: a
+       button renamed rather than removed would still pass a check that only
+       looked for [data-adj]. And the engine's setForecastOverride is
+       deliberately still there for workspaces holding older overrides, so the
+       test is that no screen can create one, not that the rule is gone. */
+    const noAdjust = await pg.evaluate(() => {
+      const view = document.querySelector("#view");
+      const text = view ? view.innerText : "";
+      return {
+        control: view.querySelectorAll("[data-adj]").length,
+        word: /ajustar/i.test(text),
+        rows: view.querySelectorAll("[data-chcosts]").length,
+        saysAdicional: /adicional al contrato/i.test(text),
+        stored: Object.keys(erp.project(gProject).forecastOverrides || {}).length,
+      };
+    });
+    if (
+      noAdjust.control === 0 &&
+      !noAdjust.word &&
+      noAdjust.rows > 0 &&
+      noAdjust.saysAdicional &&
+      noAdjust.stored === 0
+    )
+      ok("economics: the budget cannot be adjusted from the screen — only by an adicional");
+    else bad("economics: budget is fixed", JSON.stringify(noAdjust));
 
     // ← Obras returns to the register, same as PRY-01's own back button.
     await pg.locator("#ecoBack").click();
@@ -4358,57 +5499,82 @@ async function testFirstRun(browser, base) {
     await emptyRegister();
     await pg.waitForTimeout(400);
 
-    if (await pg.locator("#bkNew").isVisible())
-      ok("first run: with no accounts, the bank screen still offers ＋ Cuenta");
-    else bad("first run: bank screen", "no #bkNew — the empty state is a dead end");
+    /* The door still belongs above the emptiness — that was learnt here and
+       has not changed. What changed is where it LEADS: accounts belong to the
+       company and are configured with the rest of it, so this screen points at
+       that one instead of owning a second way to create the same thing. An
+       empty state with nothing to press is still the failure being guarded
+       against; a signpost is not nothing. */
+    if (await pg.locator("#bkToCfg").isVisible())
+      ok("first run: with no accounts, the bank screen still offers a way forward");
+    else bad("first run: bank screen", "no #bkToCfg — the empty state is a dead end");
 
-    await pg.locator("#bkNew").click();
+    await pg.locator("#bkToCfg").click();
+    await pg.waitForTimeout(500);
+    const landed = await pg.evaluate(() => ({
+      onCompany: /Cuentas y tarjetas/i.test(document.querySelector("#view").innerText),
+      canAdd: !!document.getElementById("co_accNew"),
+    }));
+    if (landed.onCompany && landed.canAdd)
+      ok("first run: …and it lands on the screen that does create them");
+    else bad("first run: the signpost leads somewhere", JSON.stringify(landed));
+
+    await pg.locator("#co_accNew").click();
     await pg.waitForTimeout(400);
     await pg.fill("#na_name", "BBVA primera cuenta");
     await pg.selectOption("#na_kind", "bank");
     await pg.locator("#na_go").click();
     await pg.waitForTimeout(600);
     const madeBank = await pg.evaluate(() => erp.state.bankAccounts.length);
-    if (madeBank === 1) ok("first run: the first bank account is created from that button");
+    if (madeBank === 1) ok("first run: the first bank account is created there");
     else bad("first run: create account", `accounts=${madeBank}`);
 
-    // …and once one exists, the statement importer is on the same screen.
-    const importable = await pg.evaluate(() => !!document.querySelector("#bkImport"));
-    if (importable) ok("first run: the statement importer appears with the first account");
-    else bad("first run: importer", "no #bkImport after creating an account");
-
-    // ---- petty cash: the till is created from the screen named after it ----
-    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
     await bootedShell(pg);
-    await emptyRegister();
-    await pg.waitForTimeout(400);
+    await pg.waitForTimeout(500);
 
-    if (await pg.locator("#cashNew").isVisible())
-      ok("first run: with no till, Caja chica offers to create one");
-    else bad("first run: petty cash", "no #cashNew — the empty state is a dead end");
+    /* …and once one exists, the statement importer is on the same screen.
+       Looked for as the INPUT, not as the button that used to script a click
+       on it: on iOS a hidden input opened by `.click()` never produces a file
+       dialog, so «Importar extracto» did nothing at all on the operator's
+       phone. It is a <label> wrapping the input now, the way every other file
+       control in this file already was, and what has to exist is that pair. */
+    const importable = await pg.evaluate(() => {
+      const input = document.querySelector("#bkFile");
+      return { input: !!input, insideLabel: !!(input && input.closest("label")) };
+    });
+    if (importable.input && importable.insideLabel)
+      ok(
+        "first run: the statement importer appears with the first account, as a label iOS can open",
+      );
+    else bad("first run: importer", JSON.stringify(importable));
 
-    await pg.locator("#cashNew").click();
-    await pg.waitForTimeout(400);
-    // The kind is PRESELECTED: this button says "create a till", so landing on
-    // "bank account" would be a different promise than the one it made.
-    const preset = await pg.inputValue("#na_kind");
-    if (preset === "till") ok("first run: that button preselects «Caja de efectivo»");
-    else bad("first run: till preset", `kind=${preset}`);
-
-    await pg.fill("#na_name", "Caja obra");
-    await pg.locator("#na_go").click();
-    await pg.waitForTimeout(700);
-    // Geometry, not a count: the screen must now BE the petty-cash screen —
-    // entrada, salida and the arqueo — not merely hold one more record.
-    const usable = await pg.evaluate(() => ({
-      tills: erp.state.bankAccounts.filter((a) => a.kind === "till").length,
-      inBtn: !!document.querySelector("#cashIn"),
-      outBtn: !!document.querySelector("#cashOut"),
-      close: !!document.querySelector("#cashClose"),
-    }));
-    if (usable.tills === 1 && usable.inBtn && usable.outBtn && usable.close)
-      ok("first run: creating the till turns Caja chica into a working screen");
-    else bad("first run: petty cash after creation", JSON.stringify(usable));
+    /* PETTY CASH IS GONE, and the till kind with it — PK12-S7. The block
+       that stood here created a till from the screen named after it and then
+       checked that screen worked. The operator's account of how cash really
+       moves has no till in it: money is withdrawn from the bank, spent,
+       receipted, and what is left goes back in. So the assertion is that the
+       screen and the kind are both unreachable, and the flow that replaces
+       them is checked in testBankAndCash where the bank lines live. */
+    const cashGone = await pg.evaluate(() => {
+      location.hash = "petty-cash";
+      render();
+      return {
+        route: !document.documentElement.innerHTML.includes('id="cashNew"'),
+        nav: !/Caja chica/.test(document.querySelector("#p2list")?.textContent || ""),
+        kindRefused: (() => {
+          try {
+            erp.addBankAccount({ name: "E2E caja", kind: "till" }, "bo");
+            return false;
+          } catch (e) {
+            return true;
+          }
+        })(),
+      };
+    });
+    if (cashGone.route && cashGone.nav && cashGone.kindRefused)
+      ok("first run: Caja chica and the till kind are both gone — cash is a withdrawal now");
+    else bad("first run: petty cash removed", JSON.stringify(cashGone));
 
     /* ---- ORG-01 · the company's own record --------------------------------
        The operator asked where the company data is entered and the answer was
@@ -4486,6 +5652,142 @@ async function testFirstRun(browser, base) {
       ok("first run: the company record saves, and both addresses reach the documents");
     else bad("first run: company saved", JSON.stringify(saved));
 
+    /* PK12-S6 · ACCOUNTS BELONG TO THE COMPANY, and until now nothing could
+       remove one. `addBankAccount` existed and no method undid it, so a
+       workspace that had been demonstrated on carried its demo accounts for
+       ever — the operator's, with six of them, asked where they go. They are
+       created and retired here now, and Consolidación bancaria stops owning a
+       second door into the same decision. */
+    const accCard = await pg.evaluate(() => ({
+      card: /Cuentas y tarjetas/i.test(document.querySelector("#view").innerText),
+      add: !!document.getElementById("co_accNew"),
+      rows: document.querySelectorAll("#view [data-accdel]").length,
+      accounts: erp.state.bankAccounts.length,
+    }));
+    if (accCard.card && accCard.add && accCard.rows === accCard.accounts)
+      ok(`first run: the company screen lists and creates accounts (${accCard.rows})`);
+    else bad("first run: accounts on the company screen", JSON.stringify(accCard));
+
+    // Delete is offered only where it is honest: an account with movements
+    // behind it is deactivated instead, because removing it would orphan
+    // every reconciliation that names it.
+    const accRules = await pg.evaluate(async () => {
+      const made = erp.addBankAccount({ name: "E2E cuenta vacía", kind: "bank" }, "bo");
+      /* The condition is BUILT, not looked for: this suite deliberately starts
+         from an empty register, so an account with movements does not exist
+         unless the check makes one. Finding none and passing would have been
+         the check quietly testing nothing. */
+      const used = erp.addBankAccount({ name: "E2E cuenta usada", kind: "bank" }, "bo");
+      erp.importMovements(
+        used.id,
+        [{ accountingDate: erp.state.today, concept: "E2E MOV", amountCents: -1234 }],
+        "bo",
+      );
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const btn = (id) => document.querySelector(`[data-accdel="${id}"]`);
+      const out = {
+        emptyDeletable: !!btn(made.id) && !btn(made.id).disabled,
+        /* An account with history is now DELETABLE — with its movements, and
+           only after a confirmation that says so. The old shape of this check
+           asserted the opposite (the button disabled, the reason
+           "has-movements") and it was right about the engine and wrong about
+           the operator, who had a permanently greyed control and no way to be
+           rid of a demonstration account. What must still be true is that the
+           refusal it replaces is REPORTED rather than mute: a blocked button
+           now carries the reason in its title. */
+        usedDeletable: used ? !!btn(used.id) && !btn(used.id).disabled : null,
+        usedPlainReason: used ? erp.bankAccountDeleteBlock(used.id) : null,
+        usedCascadeReason: used
+          ? erp.bankAccountDeleteBlock(used.id, { withMovements: true })
+          : null,
+      };
+      // Deactivating keeps the history and takes it out of the pickers.
+      if (used) {
+        document.querySelector(`[data-accoff="${used.id}"]`).click();
+        await new Promise((r) => setTimeout(r, 400));
+        out.deactivated = erp.state.bankAccounts.find((a) => a.id === used.id).active === false;
+        out.hidden = !erp.activeBankAccounts().some((a) => a.id === used.id);
+        out.movementsKept = erp.state.movements.some((m) => m.accountId === used.id);
+        document.querySelector(`[data-accoff="${used.id}"]`).click();
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      erp.deleteBankAccount(made.id, "bo");
+      out.emptyGone = !erp.state.bankAccounts.some((a) => a.id === made.id);
+      // …and the one with history goes too, movements and all.
+      const before = erp.state.movements.filter((m) => m.accountId === used.id).length;
+      erp.deleteBankAccount(used.id, "bo", { withMovements: true });
+      out.usedGone = !erp.state.bankAccounts.some((a) => a.id === used.id);
+      out.movementsWentToo =
+        before > 0 && !erp.state.movements.some((m) => m.accountId === used.id);
+      return out;
+    });
+    if (
+      accRules.emptyDeletable &&
+      accRules.usedDeletable &&
+      accRules.usedPlainReason === "has-movements" &&
+      accRules.usedCascadeReason === null
+    )
+      ok("first run: an account with movements can be borrada — with them, and only on purpose");
+    else bad("first run: delete offered only when honest", JSON.stringify(accRules));
+    if (
+      accRules.deactivated &&
+      accRules.hidden &&
+      accRules.movementsKept &&
+      accRules.emptyGone &&
+      accRules.usedGone &&
+      accRules.movementsWentToo
+    )
+      ok("first run: …deactivating hides it from the pickers and keeps every movement");
+    else bad("first run: deactivate keeps history", JSON.stringify(accRules));
+
+    /* THE CHECK THAT WAS MISSING, and its absence is the whole defect.
+       `out.hidden` above asks `activeBankAccounts()` whether it omits a
+       deactivated account, and it always did — the method was correct from the
+       day it was written. What nothing asked is whether any SCREEN called it,
+       and none did: it had zero callers in the whole of site/, so the operator
+       switched accounts off and watched them stay exactly where they were.
+
+       So this asks the screen. A test that questions the engine about a
+       screen's behaviour is a test that passes while the screen is broken. */
+    const offScreen = await pg.evaluate(async () => {
+      const a = erp.addBankAccount({ name: "E2E cuenta apagada", kind: "bank" }, "bo");
+      const listed = () => {
+        location.hash = "banking";
+        render();
+        const v = document.querySelector("#view");
+        return (v ? v.innerText : "").includes("E2E cuenta apagada");
+      };
+      const whileOn = listed();
+      erp.setBankAccountActive(a.id, false, "bo");
+      await new Promise((r) => setTimeout(r, 250));
+      const whileOff = listed();
+      // The picker it replaced is gone too — the account rows are the picker.
+      const selGone = !document.querySelector("#bkSel");
+      erp.deleteBankAccount(a.id, "bo");
+      /* Put the screen back. This check has to LEAVE the company screen to do
+         its job, and the checks after it read the company screen's own fields
+         — PK-J went looking for the mailbox inputs and found the bank. A test
+         that changes the view owes the next one the view it borrowed. */
+      location.hash = "company";
+      render();
+      await new Promise((r) => setTimeout(r, 250));
+      return { whileOn, whileOff, selGone };
+    });
+    if (offScreen.whileOn && !offScreen.whileOff && offScreen.selGone)
+      ok(
+        "first run: switching an account off takes it off the banking screen, not just out of a method",
+      );
+    else bad("first run: deactivate reaches a screen", JSON.stringify(offScreen));
+
+    // And the screen that used to create them sends you here instead.
+    const bankDoor = await pg.evaluate(() => {
+      const html = document.documentElement.innerHTML;
+      return { gone: !html.includes('id="bkNew"') };
+    });
+    if (bankDoor.gone) ok("first run: Consolidación bancaria no longer owns a second way in");
+    else bad("first run: + Cuenta removed from banking", JSON.stringify(bankDoor));
+
     /* PK-J · the mailbox is entered on this screen too, and the password is
        NOT part of the company record. Both halves are asserted: the fields
        exist and are usable, and «Guardar» does not carry the password into
@@ -4548,140 +5850,153 @@ async function testFirstRun(browser, base) {
 
 // ── ADM-05 Consolidación bancaria and ADM-06 Caja chica (§3.2), plus gap 13 —
 //    the last structural break in the money chain, closed in S11.
+/**
+ * Create an account through the product, from the screen that owns them.
+ *
+ * Accounts moved to Configuración › Empresa, so a suite that merely NEEDS one
+ * to exist goes there and returns rather than reaching into the engine — the
+ * point of driving the product is that a door nobody can open is a failure,
+ * and a setup step that bypasses the door would not notice.
+ */
+async function makeAccount(pg, name, kind) {
+  await pg.evaluate(() => go("company"));
+  await pg.waitForTimeout(500);
+  await pg.click("#co_accNew");
+  await pg.waitForTimeout(300);
+  await pg.evaluate(
+    ([n, k]) => {
+      document.getElementById("na_name").value = n;
+      document.getElementById("na_kind").value = k;
+    },
+    [name, kind],
+  );
+  await pg.click("#na_go");
+  await pg.waitForTimeout(500);
+  await pg.evaluate(() => go("banking"));
+  await pg.waitForTimeout(600);
+}
+
 async function testBankAndCash(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];
   attachConsole(pg, errs);
   try {
-    // ---- ADM-06: the simplest screen, and the count that proves it ----
-    await pg.goto(`${base}/erp.html#petty-cash`, { waitUntil: "networkidle" });
+    /* ---- PK12-S7: cash is a withdrawal from the bank, not a till ----------
+       The operator's own account of how cash works, in order: money comes OUT
+       of the bank, gets spent, the receipts come back, and whatever was not
+       spent is paid back IN. What has to be true is that a bank line can be
+       declared a withdrawal, that what is still unaccounted for is a figure
+       the screen shows rather than a fault it hides, and that the deposit
+       returning the remainder is not counted as income.
+
+       Checked on the ENGINE and then on the SCREEN, because the defect this
+       package opened with was a method that was correct and called by nothing. */
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(500);
 
-    const shape = await pg.evaluate(() => ({
-      strip: !!document.querySelector("#view .queuebar"),
-      inBtn: !!document.querySelector("#cashIn"),
-      outBtn: !!document.querySelector("#cashOut"),
-      close: document.querySelector("#cashClose")
-        ? document.querySelector("#cashClose").textContent
-        : null,
-    }));
-    if (shape.strip && shape.inBtn && shape.outBtn && shape.close)
-      ok("ADM-06: entrada/salida, the balance strip and the arqueo at the foot");
-    else bad("ADM-06: screen shape", JSON.stringify(shape));
-
-    // The arqueo has to agree with the account balance, or one is decoration.
-    const agrees = await pg.evaluate(() => {
-      const cc = erp.cashCount(cashAcc);
-      return cc.closingCents === erp.accountBalanceCents(cashAcc);
-    });
-    if (agrees) ok("ADM-06: the count agrees with the account balance");
-    else bad("ADM-06: count vs balance", "they disagree");
-
-    // A payment out with no receipt is counted, never hidden.
-    const before = await pg.evaluate(() => erp.cashCount(cashAcc).awaitingDoc);
-    await pg.locator("#cashOut").click();
-    await pg.waitForTimeout(400);
-    await pg.fill("#ca_c", "Ferretería E2E");
-    await pg.fill("#ca_a", "12.50");
-    await pg.locator("#ca_go").click();
-    await pg.waitForTimeout(600);
-    const after = await pg.evaluate(() => {
-      const cc = erp.cashCount(cashAcc);
-      return {
-        awaiting: cc.awaitingDoc,
-        closing: cc.closingCents,
-        bal: erp.accountBalanceCents(cashAcc),
-      };
-    });
-    if (after.awaiting === before + 1 && after.closing === after.bal)
-      ok(`ADM-06: a cash payment with no receipt is counted (${before} → ${after.awaiting})`);
-    else bad("ADM-06: undocumented cash", JSON.stringify({ before, ...after }));
-
-    // ── Block 2: a cash payment says WHERE it landed — project, chapter,
-    //    partida — through the same validation every other cost uses.
-    const cashDest = await pg.evaluate(() => {
-      document.getElementById("cashOut").click();
-      return new Promise((res) =>
-        setTimeout(() => {
-          const dest = document.getElementById("ca_dest");
-          if (!dest) return res(null);
-          const p = erp.state.projects.find(
-            (x) =>
-              x.budgetId &&
-              x.acceptedVersionId &&
-              !x.closed &&
-              erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
-          );
-          if (!p) return res({ noProject: true });
-          document.getElementById("ca_c").value = "Tornillería obra";
-          document.getElementById("ca_a").value = "23.50";
-          dest.value = "p:" + p.id;
-          dest.dispatchEvent(new Event("change", { bubbles: true }));
-          setTimeout(() => {
-            const chap = document.getElementById("ca_chap");
-            const first = [...chap.options].find((o) => o.value);
-            chap.value = first.value;
-            chap.dispatchEvent(new Event("change", { bubbles: true }));
-            setTimeout(() => {
-              const line = document.getElementById("ca_line");
-              const lopt = [...line.options].find((o) => o.value);
-              if (lopt) line.value = lopt.value;
-              document.getElementById("ca_go").click();
-              setTimeout(() => {
-                const m = erp.state.movements.find((x) => x.concept === "Tornillería obra");
-                res(
-                  m && {
-                    alloc: m.allocations[0] || null,
-                    amount: m.amountCents,
-                  },
-                );
-              }, 500);
-            }, 250);
-          }, 250);
-        }, 400),
+    const cash = await pg.evaluate(() => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      if (!w) return { missing: true };
+      const st = erp.cashWithdrawalState(w.id);
+      const ret = erp.state.movements.find(
+        (m) => m.cashReturn && m.cashReturn.withdrawalId === w.id,
       );
+      return {
+        missing: false,
+        total: st.totalCents,
+        returned: st.returnedCents,
+        outstanding: st.outstandingCents,
+        adds: st.totalCents === st.documentedCents + st.returnedCents + st.outstandingCents,
+        // The returned cash is the company's own money coming home, not sales.
+        returnExcluded: !!ret && ret.excludedFromPL === true,
+        withdrawalExcluded: w.excludedFromPL === true,
+      };
     });
     if (
-      cashDest &&
-      cashDest.alloc &&
-      cashDest.alloc.projectId &&
-      cashDest.alloc.chapterNum &&
-      cashDest.alloc.lineId &&
-      cashDest.amount === -2350
+      !cash.missing &&
+      cash.adds &&
+      cash.returned > 0 &&
+      cash.outstanding > 0 &&
+      cash.returnExcluded &&
+      cash.withdrawalExcluded
     )
-      ok("block 2: a cash payment lands on project · chapter · partida from the drawer");
-    else bad("block 2: cash destination", JSON.stringify(cashDest));
-
-    // ── 1E: «Marcar justificado» now takes the FILE. The button used to flip
-    //    the flag with nothing behind it — the word without the receipt.
-    const docBtn = await pg.evaluate(() => {
-      const b = document.querySelector("[data-cashdoc]");
-      if (!b) return null;
-      const r = b.getBoundingClientRect();
-      return { w: Math.round(r.width), h: Math.round(r.height), id: b.dataset.cashdoc };
-    });
-    if (docBtn && docBtn.w > 60) ok("1E: the undocumented cash row offers its receipt");
-    else bad("1E: receipt button", JSON.stringify(docBtn));
-    await pg.click("[data-cashdoc]");
-    await pg.waitForTimeout(400);
-    await pg.setInputFiles('[data-ev="file"]', "tests/fixtures/receipt.png");
-    await pg.waitForTimeout(1200);
-    const attached = await pg.evaluate(async (id) => {
-      const m = erp.state.movements.find((x) => x.id === id);
-      if (!m || !m.supportingDoc) return { ok: false };
-      const blob = await ErpStore.getBlob(m.supportingDoc.storageKey);
-      return {
-        ok: m.needsDoc === false,
-        key: m.supportingDoc.storageKey,
-        bytes: blob ? blob.size : 0,
-      };
-    }, docBtn && docBtn.id);
-    if (attached.ok && attached.bytes > 0)
       ok(
-        `1E: the receipt is a real stored file (${attached.bytes} bytes behind ${attached.key.slice(0, 8)}…)`,
+        `PK12-S7: a withdrawal adds up — ${cash.total}c out, ${cash.returned}c back, ${cash.outstanding}c still in cash`,
       );
-    else bad("1E: file stored and flag cleared", JSON.stringify(attached));
+    else bad("PK12-S7: withdrawal arithmetic", JSON.stringify(cash));
+
+    // The refusals, both of them, and neither is negotiable.
+    const cashRefusals = await pg.evaluate(() => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      const inLine = erp.state.movements.find((m) => m.amountCents > 0 && !m.cashReturn);
+      const outLine = erp.state.movements.find((m) => m.amountCents < 0 && !m.cashWithdrawal);
+      const tries = (f) => {
+        try {
+          f();
+          return false;
+        } catch (e) {
+          return true;
+        }
+      };
+      return {
+        // More cannot come back than went out.
+        tooMuch: tries(() => {
+          const st = erp.cashWithdrawalState(w.id);
+          const big = erp.importMovements(
+            w.accountId,
+            [
+              {
+                accountingDate: erp.state.today,
+                concept: "E2E DEVOLUCION EXCESIVA",
+                amountCents: st.outstandingCents + 50000,
+              },
+            ],
+            "bo",
+          )[0];
+          erp.markCashReturn(big.id, w.id, "bo");
+        }),
+        // A withdrawal takes money out; an incoming line is not one.
+        wrongSign: tries(() => erp.markCashWithdrawal(inLine.id, "bo")),
+        // A deposit can only return to something that is a withdrawal.
+        notAWithdrawal: tries(() => erp.markCashReturn(inLine.id, outLine.id, "bo")),
+      };
+    });
+    if (cashRefusals.tooMuch && cashRefusals.wrongSign && cashRefusals.notAWithdrawal)
+      ok("PK12-S7: over-returning, the wrong sign and a non-withdrawal are all refused");
+    else bad("PK12-S7: cash refusals", JSON.stringify(cashRefusals));
+
+    /* And the SCREEN says it. The picker offers the withdrawal on money going
+       out, the state card prints the remainder, and neither exists because a
+       method exists — they are read off the rendered drawer. */
+    const cashScreen = await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(w.id);
+      await new Promise((r) => setTimeout(r, 500));
+      const body = document.querySelector("#dbody");
+      const txt = body ? body.innerText : "";
+      const st = erp.cashWithdrawalState(w.id);
+      return {
+        card: /Reintegro de efectivo/.test(txt),
+        showsOutstanding: txt.includes(eur(st.outstandingCents)),
+        // Already a withdrawal, so the option to declare it again is not offered.
+        noRedeclare: !/>Reintegro de efectivo</.test(
+          (document.querySelector("#rcDest") || {}).innerHTML || "",
+        ),
+      };
+    });
+    if (cashScreen.card && cashScreen.showsOutstanding && cashScreen.noRedeclare)
+      ok("PK12-S7: the drawer prints what is still in cash, and will not redeclare a withdrawal");
+    else bad("PK12-S7: withdrawal on screen", JSON.stringify(cashScreen));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+    /* Back to the accounts tab EXPLICITLY — the same rule written a few
+       hundred lines below. The tab choice is remembered, so a check that ends
+       on Conciliación hands the next one a screen with no account rows on it,
+       and ADM-05 then reports the balances screen as empty. */
+    await openTab(pg, "banking", "_bankAccounts");
 
     // ---- ADM-05: the screen answers "how much is where", and nothing else ----
     /* PK7-B. This screen used to carry the whole movement register with a
@@ -4698,9 +6013,14 @@ async function testBankAndCash(browser, base) {
       destSelects: document.querySelectorAll("[data-bkdest]").length,
       recent: document.querySelectorAll("#view .daylist .it").length,
       accounts: document.querySelectorAll("#view [data-acct]").length,
-      hasImport: !!document.getElementById("bkImport"),
+      hasImport: !!document.getElementById("bkFile"),
       hasUndo: !!document.getElementById("bkUndo"),
+      /* «Ir a Conciliación →» is gone, and its absence is now the assertion.
+         Conciliación is a TAB of this screen, sitting in the strip a
+         centimetre above — a button that selects the tab beside it is the same
+         two-doors-into-one-decision the operator called out on «＋ Cuenta». */
       toReconcile: !!document.getElementById("bToRec"),
+      recTab: document.querySelectorAll('.tabstrip [data-tab="_reconcile"]').length,
     }));
     if (readonly.classSelects === 0 && readonly.destSelects === 0)
       ok("ADM-05: no movement is classified or assigned from Cuentas y saldos");
@@ -4710,7 +6030,8 @@ async function testBankAndCash(browser, base) {
       readonly.recent > 0 &&
       readonly.hasImport &&
       readonly.hasUndo &&
-      readonly.toReconcile
+      !readonly.toReconcile &&
+      readonly.recTab === 1
     )
       ok(
         `ADM-05: it keeps balances, import, undo and the last movements read-only (${readonly.accounts} accounts)`,
@@ -4778,13 +6099,19 @@ async function testBankAndCash(browser, base) {
         engineTotal: Math.round(erp.cashPosition().totalCents / 100) * 100,
       };
     });
+    /* «all the kinds there are», not a hard three. The three were bank, till
+       and card, and PK12-S7 retired the till: cash is a withdrawal from a bank
+       account now, so a workspace has two kinds and a check demanding three
+       was asserting the existence of the thing that went. What still matters
+       is unchanged — every account the register holds has one readable line
+       with a figure on it, whatever kind it is. */
     const linesOk =
       perAccount.shown.length === perAccount.accounts &&
       perAccount.shown.every((s) => s.wide && s.cents !== null) &&
-      perAccount.kinds >= 3;
+      perAccount.kinds >= 1;
     if (linesOk)
       ok(
-        `ADM-05: one visible line per account, all ${perAccount.kinds} kinds (${perAccount.shown.length} accounts)`,
+        `ADM-05: one visible line per account, every kind (${perAccount.shown.length} accounts, ${perAccount.kinds} kinds)`,
       );
     else bad("ADM-05: per-account lines", JSON.stringify(perAccount));
     // The rounding is the screen's own (eur0), so compare at that resolution.
@@ -4866,7 +6193,8 @@ async function testBankAndCash(browser, base) {
     else bad("ADM-05: project assignment removed from the queue", JSON.stringify(noAssign));
     /* Back to the accounts tab EXPLICITLY. The tab choice is remembered, so
        navigating to #banking after visiting Conciliación reopens Conciliación
-       — and everything downstream that reaches for #bkSel finds nothing. */
+       — and everything downstream that reaches for an account row finds
+       nothing. */
     await openTab(pg, "banking", "_bankAccounts");
 
     // ---- Gap 13: a cost that lands on an account, not a project ----
@@ -4900,15 +6228,22 @@ async function testBankAndCash(browser, base) {
     //    fixture is the same file the Node gate reads.
     await pg.evaluate(() => (location.hash = "banking"));
     await pg.waitForTimeout(600);
+    /* The account is chosen by CLICKING ITS ROW. The select above the card is
+       gone — it repeated a choice the rows already offered, and the operator
+       asked for it to go. The rows were always clickable; they say «Elegida»
+       now so that the choice is legible without it. */
     await pg.evaluate(() => {
-      const sel = document.getElementById("bkSel");
-      const first = [...sel.options].find((o) => o.value);
-      sel.value = first.value;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      /* Clicking a row TOGGLES it, so a blind click on an account that was
+         already chosen deselects it and the import then refuses for want of an
+         account. Choose only when it is not already chosen. */
+      const row = document.querySelector("#view [data-acct]");
+      if (row && bankAcc !== row.dataset.acct) row.click();
     });
     await pg.waitForTimeout(500);
     const impBtn = await pg.evaluate(() => {
-      const b = document.getElementById("bkImport");
+      // The label wrapping the input, which is what a finger lands on.
+      const input = document.getElementById("bkFile");
+      const b = input && input.closest("label");
       if (!b) return null;
       const r = b.getBoundingClientRect();
       return { w: Math.round(r.width), h: Math.round(r.height) };
@@ -5005,14 +6340,11 @@ async function testBankAndCash(browser, base) {
     //    same door OCR uses), not the Node-side pdfjs-dist the parser's own
     //    unit test reads with. A fresh account, so the .xlsx fixtures already
     //    imported above cannot mask a PDF row the parser silently dropped.
-    await pg.click("#bkNew");
-    await pg.waitForTimeout(300);
-    await pg.evaluate(() => {
-      document.getElementById("na_name").value = "BBVA PDF E2E";
-      document.getElementById("na_kind").value = "bank";
-    });
-    await pg.click("#na_go");
-    await pg.waitForTimeout(500);
+    /* Accounts are created in Configuración › Empresa now — Consolidación
+       bancaria stopped owning a second door to the same decision. This block
+       is about the PDF importer, not about where accounts come from, so it
+       goes the way a person would and comes straight back. */
+    await makeAccount(pg, "BBVA PDF E2E", "bank");
     const pdfAcc = await pg.evaluate(() => {
       const a = erp.state.bankAccounts.find((a) => a.name === "BBVA PDF E2E");
       return a ? a.id : null;
@@ -5020,9 +6352,11 @@ async function testBankAndCash(browser, base) {
     if (pdfAcc) ok("1B·PDF: a fresh account is created for the PDF-format statement");
     else bad("1B·PDF: account created", "not found after drawer");
     await pg.evaluate((id) => {
-      const sel = document.getElementById("bkSel");
-      sel.value = id;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      // The row IS the picker since the select above the card went, and
+      // clicking it toggles — so only click when it is not already chosen.
+      if (bankAcc === id) return;
+      const row = document.querySelector(`#view [data-acct="${id}"]`);
+      if (row) row.click();
     }, pdfAcc);
     await pg.waitForTimeout(500);
     await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-extracto.pdf");
@@ -5089,14 +6423,7 @@ async function testBankAndCash(browser, base) {
 
     // ── 1C: a credit card is an ACCOUNT — created through the product, fed
     //    by the same importer, settled from the bank as an internal transfer.
-    await pg.click("#bkNew");
-    await pg.waitForTimeout(300);
-    await pg.evaluate(() => {
-      document.getElementById("na_name").value = "Visa E2E";
-      document.getElementById("na_kind").value = "card";
-    });
-    await pg.click("#na_go");
-    await pg.waitForTimeout(500);
+    await makeAccount(pg, "Visa E2E", "card");
     const cardAcc = await pg.evaluate(() => {
       const c = erp.state.bankAccounts.find((a) => a.kind === "card" && a.name === "Visa E2E");
       return c ? c.id : null;
@@ -5106,9 +6433,11 @@ async function testBankAndCash(browser, base) {
 
     // The card statement, into the card account, through the same file input.
     await pg.evaluate((id) => {
-      const sel = document.getElementById("bkSel");
-      sel.value = id;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      // The row IS the picker since the select above the card went, and
+      // clicking it toggles — so only click when it is not already chosen.
+      if (bankAcc === id) return;
+      const row = document.querySelector(`#view [data-acct="${id}"]`);
+      if (row) row.click();
     }, cardAcc);
     await pg.waitForTimeout(500);
     await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-movimientos.xlsx");
@@ -5129,9 +6458,9 @@ async function testBankAndCash(browser, base) {
        the other answers to that question rather than on the balances screen. */
     await pg.evaluate(() => {
       const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
-      const sel = document.getElementById("bkSel");
-      sel.value = bank.id;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      if (bankAcc === bank.id) return;
+      const row = document.querySelector(`#view [data-acct="${bank.id}"]`);
+      if (row) row.click();
     });
     await pg.waitForTimeout(500);
     const settled = await pg.evaluate(async (cardId) => {
@@ -5411,13 +6740,16 @@ async function testCashFlow(browser, base) {
     // A red cumulative cell is the point of the screen — seed a trough and
     // check it paints, rather than hoping the sample data happens to dip.
     const red = await pg.evaluate(() => {
-      const acc = erp.state.bankAccounts.find((a) => a.kind !== "till");
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       erp.registerBill(
         {
           supplierId: erp.state.parties.find((p) => p.roles.includes("supplier")).id,
           number: "E2E-CF-1",
           baseCents: 90000000,
           dueDate: erp.today,
+          // This block is about the cash-flow grid going red, not about where
+          // a cost lands — but since PK12 it must land somewhere.
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 90000000 }],
         },
         "backoffice",
       );
@@ -7599,8 +8931,8 @@ async function testProcurement(browser, base) {
           "op",
         );
         const till =
-          erp.state.bankAccounts.find((a) => a.kind === "till") ||
-          erp.addBankAccount({ name: "Caja E2E", kind: "till" }, "bo");
+          erp.state.bankAccounts.find((a) => a.name === "Efectivo E2E") ||
+          erp.addBankAccount({ name: "Efectivo E2E", kind: "bank" }, "bo");
         erp.recordCashMovement(
           till.id,
           {
@@ -8013,7 +9345,12 @@ async function testAdmin(browser, base) {
       const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
       const bill = erp.registerBill(
-        { supplierId: sup.id, number: "E2E-A2", baseCents: 100000, allocations: [] },
+        {
+          supplierId: sup.id,
+          number: "E2E-A2",
+          baseCents: 100000,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 100000 }],
+        },
         "bo",
       );
       const full = erp.billOutstandingCents(bill.id);
@@ -8074,6 +9411,88 @@ async function testAdmin(browser, base) {
       );
     else bad("A2: closed with a reason", JSON.stringify(shortfall));
 
+    /* PK12-S5 · THE PANEL ARRIVES AFTER THE MATCH, AND MUST SAY SO.
+       `matchMovementSplit` has already run by the time this opens, and it wore
+       every affordance of a dialog you can back out of: a question for a
+       title, a Cerrar, two choices. The operator pressed Cerrar expecting to
+       cancel and the movement stayed reconciled. So the panel states the match
+       is done, names the partial payment in those words — the case it was
+       silently the default for — and offers the way back through the SAME
+       door the Conciliados tab uses. */
+    const afterMatch = await pg.evaluate(async () => {
+      const sup = erp.state.parties.find((p) =>
+        (p.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)),
+      );
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const bill = erp.registerBill(
+        {
+          supplierId: sup.id,
+          number: "E2E-S5",
+          baseCents: 40000,
+          vatBp: 0,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 40000 }],
+        },
+        "bo",
+      );
+      const mv = erp.importMovements(
+        acc.id,
+        [{ accountingDate: erp.state.today, concept: "PAGO PARCIAL E2E-S5", amountCents: -20000 }],
+        "bo",
+      )[0];
+      bankAcc = acc.id;
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(mv.id);
+      await new Promise((r) => setTimeout(r, 500));
+      /* The candidate list shows twelve and says so; by this point in the
+         suite there are more open documents than that. So the search box is
+         used, which is what it is for and what a person would do rather than
+         scrolling a list that tells them to narrow it. */
+      const qi = document.getElementById("rcCandQ");
+      qi.value = "E2E-S5";
+      qi.dispatchEvent(new Event("input", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 600));
+      const pick = [...document.querySelectorAll("#dbody [data-pick]")].find((b) =>
+        b.closest(".it").textContent.includes("E2E-S5"),
+      );
+      if (!pick)
+        return { found: false, candidates: document.querySelectorAll("#dbody [data-pick]").length };
+      pick.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const text = document.querySelector(".drawer").innerText;
+      const out = {
+        found: true,
+        saysDone: /ya está conciliado/i.test(text),
+        namesPartial: /pago parcial/i.test(text),
+        offersUndo: !!document.getElementById("sfUndo"),
+        owedAfterMatch: erp.billOutstandingCents(bill.id),
+        matchedNow: !!mv.matched,
+      };
+      // And the way back actually goes back.
+      document.getElementById("sfUndo").click();
+      await new Promise((r) => setTimeout(r, 400));
+      const yes = [...document.querySelectorAll("button")].find((b) =>
+        /^deshacer$/i.test(b.textContent.trim()),
+      );
+      if (yes) yes.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const after = erp.state.movements.find((x) => x.id === mv.id);
+      out.unmatched = !after.matched && after.status === "unallocated";
+      out.owedAgain = erp.billOutstandingCents(bill.id);
+      out.paymentVoided = !erp.state.payments.some((pp) =>
+        (pp.billAllocations || []).some((a) => a.billId === bill.id),
+      );
+      return out;
+    });
+    if (afterMatch.found && afterMatch.saysDone && afterMatch.namesPartial && afterMatch.offersUndo)
+      ok(
+        "A2: the panel says the match is done, names the partial payment, and offers the way back",
+      );
+    else bad("A2: panel states the outcome", JSON.stringify(afterMatch));
+    if (afterMatch.unmatched && afterMatch.owedAgain === 40000 && afterMatch.paymentVoided)
+      ok("A2: …and the way back returns the movement to the queue and voids the payment");
+    else bad("A2: undo from the panel", JSON.stringify(afterMatch));
+
     /* ── B1: one click needs the name, not just the number ────────────────
        An exact amount on the same day with the document's reference in the
        concept scores 0.95 against a threshold of 0.8 — and if the bank line
@@ -8084,7 +9503,12 @@ async function testAdmin(browser, base) {
       const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
       const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
       const bill = erp.registerBill(
-        { supplierId: sup.id, number: "E2E-B1-9931", baseCents: 40000, allocations: [] },
+        {
+          supplierId: sup.id,
+          number: "E2E-B1-9931",
+          baseCents: 40000,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 40000 }],
+        },
         "bo",
       );
       const owed = erp.billOutstandingCents(bill.id);
@@ -8328,14 +9752,90 @@ async function testAdmin(browser, base) {
     await pg.evaluate(() => goTab("banking", "_reconcile"));
     await pg.waitForTimeout(600);
 
-    // Closing must REFUSE while anything is still unreconciled — the whole
-    // point of a closed period is that it cannot contain an open question.
+    /* PK12-S8 · THE LOCK IS A QUARTER, AND ITS RULES ARE ON SCREEN.
+       The operator: "I like the idea of locking but we have to improve on how
+       we decide what to lock and the rules to lock — everything in the period
+       to be locked should be assigned." Two things follow, and both are
+       checked here.
+
+       The old check pressed the button, let the engine refuse, and read the
+       toast. That was a refusal AFTER the press for a lock whose boundaries
+       came from the global period selector — a control meant for filtering, so
+       the period could be drawn around the awkward week. Now the button opens
+       the rules: every blocker is listed with its count before anything is
+       pressed, and the button that would do it is disabled while any remain. */
     await pg.click("#rcClose");
-    await pg.waitForTimeout(600);
-    const closeMsg = await pg.locator("#toast").innerText();
-    if (/^⚠/.test(closeMsg.trim()) && /sin conciliar/.test(closeMsg))
-      ok("conciliación: closing the period is refused while lines are unreconciled");
-    else bad("conciliación: close refuses", closeMsg.slice(0, 120));
+    await pg.waitForTimeout(700);
+    const lock = await pg.evaluate(async () => {
+      // The button opens the RULES for the quarter the period selector shows.
+      const wired = !!document.querySelector("#lkGo") || !!document.querySelector("#dbody");
+      const openedFor = lockQuarter();
+      /* Then read a quarter that is actually blocked. Whichever quarter the
+         selector happens to sit on may be clean — and a check that only ever
+         sees the clean one would pass while the refusal was broken, which is
+         the failure mode this whole package keeps finding. */
+      const q = ["2026-Q2", "2026-Q3", "2026-Q4"].find((x) => erp.periodLockBlockers(x).length > 0);
+      if (!q) return { noBlockedQuarter: true };
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 250));
+      periodLockDrawer(q);
+      await new Promise((r) => setTimeout(r, 400));
+      const body = document.querySelector("#dbody");
+      const txt = body ? body.innerText : "";
+      const blockers = erp.periodLockBlockers(q);
+      const go = document.querySelector("#lkGo");
+      return {
+        wired,
+        openedFor,
+        quarter: q,
+        blockerCount: blockers.length,
+        // Every blocker the engine knows is named on the screen, by its count.
+        allListed: blockers.every((b) => txt.includes(String(b.count))),
+        namesUnreconciled: /sin conciliar/i.test(txt),
+        // The lock is offered, and refused, before the press.
+        buttonDisabled: !!go && go.disabled,
+        // The dates are the quarter's, not whatever the period selector shows.
+        range: erp.quarterRange(q),
+        saysRange: txt.includes(erp.quarterRange(q).from),
+      };
+    });
+    if (
+      lock.wired &&
+      lock.blockerCount > 0 &&
+      lock.allListed &&
+      lock.namesUnreconciled &&
+      lock.buttonDisabled &&
+      lock.saysRange
+    )
+      ok(
+        `conciliación: the quarter lock lists all ${lock.blockerCount} blockers and stays disabled`,
+      );
+    else bad("conciliación: quarter lock rules", JSON.stringify(lock));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    /* …and a quarter with nothing outstanding LOCKS, sealing its own dates and
+       nobody else's. Asserted on a quarter the demo leaves clean, so the check
+       exercises the success path rather than only the refusal. */
+    const locked = await pg.evaluate(() => {
+      const clean = ["2026-Q1", "2025-Q4", "2025-Q3"].find(
+        (q) => erp.periodLockBlockers(q).length === 0,
+      );
+      if (!clean) return { none: true };
+      const r = erp.quarterRange(clean);
+      erp.closeQuarter(clean, "bo");
+      const after = erp.quarterRange("2026-Q2");
+      return {
+        none: false,
+        quarter: clean,
+        inside: erp.bankPeriodClosed(r.from) && erp.bankPeriodClosed(r.to),
+        // The neighbour is untouched — a lock seals its quarter, not the file.
+        outside: !erp.bankPeriodClosed(after.from),
+      };
+    });
+    if (!locked.none && locked.inside && locked.outside)
+      ok(`conciliación: a quarter with everything assigned locks (${locked.quarter})`);
+    else bad("conciliación: clean quarter locks", JSON.stringify(locked));
 
     // ---- §5.7 Comunicaciones: preview with real data, simulate, queue, approve
     await pg.evaluate(() => (location.hash = "messaging"));
@@ -8454,12 +9954,14 @@ async function testAdmin(browser, base) {
     if (oldInputs === 0 && rowSelects === 0)
       ok("ADM-05: the balances screen decides nothing — no field, no row select");
     else bad("banco: row assignment", `old=${oldInputs} selects=${rowSelects}`);
-    await pg.click("#bToRec");
+    /* The hand-over is the TAB, and only the tab. There used to be a button
+       beside it doing the same thing; the operator circled it, along with two
+       others that navigate to a sibling tab already on screen. What is asserted
+       now is that the tab does the job on its own. */
+    await pg.click('.tabstrip [data-tab="_reconcile"]');
     await pg.waitForTimeout(600);
-    // The two are tabs of ADM-05 now, so handing over means selecting the
-    // sibling tab rather than navigating somewhere else.
     const onRec = await pg.locator('.tabstrip [data-tab="_reconcile"].on').count();
-    if (onRec === 1) ok("banco: the screen hands over to Conciliación explicitly");
+    if (onRec === 1) ok("banco: Conciliación is reached by its own tab, with no button beside it");
     else bad("banco: link to reconciliation", `active tab not _reconcile (${pg.url()})`);
 
     // ── 1G: the accountant package is a FILE, opened and READ BACK ────────
@@ -8611,7 +10113,17 @@ async function testControlTowerAndDay(browser, base) {
           number: "E2E-OVERRUN",
           baseCents: e.currentRevenueCents,
           vatBp: 2100,
-          allocations: [{ projectId: open[0].id, amountCents: e.currentRevenueCents }],
+          allocations: [
+            {
+              projectId: open[0].id,
+              ...(() => {
+                const h = (erp.projectChapters(open[0].id) || [])[0];
+                const l = h && h.chapter.lines[0];
+                return l ? { chapterNum: String(h.chapter.num), lineId: l.id } : {};
+              })(),
+              amountCents: e.currentRevenueCents,
+            },
+          ],
         },
         "bo",
       );
@@ -11585,6 +13097,15 @@ async function testErp(browser, base) {
       chap.value = offered[0];
       chap.dispatchEvent(new Event("change", { bubbles: true }));
       await new Promise((r) => setTimeout(r, 300));
+      /* And the subpartida, which since PK12 is not optional on a job cost.
+         The select fills from the chapter above it, so it is set after. */
+      const ln = document.getElementById("ca_line");
+      const lnOpt = ln && [...ln.options].find((o) => o.value);
+      if (lnOpt) {
+        ln.value = lnOpt.value;
+        ln.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 250));
+      }
       document.getElementById("ca_c").value = "Tornillería E2E";
       document.getElementById("ca_a").value = "12.50";
       document.getElementById("ca_go").click();
@@ -12070,13 +13591,19 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "supplier-invoices"));
     await pg.waitForTimeout(700);
     const capCaText = await pg.locator("body").innerText();
+    /* «Safata» and «Emisor por confirmar» were the Bandeja's, and the Bandeja
+       is gone — one panel holding the same documents the register already
+       listed. The strings this screen introduced in its place are the filter
+       and the offline button, so those are what has to reach the translator
+       now. The negative clauses stay negative: an untranslated Spanish string
+       is the failure this check exists for, whichever screen shows it. */
     if (
-      /Safata/i.test(capCaText) &&
+      /Sense assignar/i.test(capCaText) &&
       /Documents/i.test(capCaText) &&
-      !/\bBandeja\b/i.test(capCaText) &&
-      !/Emisor por confirmar/i.test(capCaText)
+      !/\bSin asignar\b/i.test(capCaText) &&
+      /sense cobertura/i.test(capCaText)
     )
-      ok("i18n: CA translates the ADM-03 inbox and register");
+      ok("i18n: CA translates the ADM-03 register, its filter and its buttons");
     else bad("i18n: CA ADM-03", capCaText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "purchasing"));
@@ -12142,12 +13669,25 @@ async function testI18n(browser, base) {
       ok("i18n: CA translates the PRY-03 register, its stages and its total");
     else bad("i18n: CA PRY-03", chgCaText.replace(/\n/g, " ").slice(0, 160));
 
-    await pg.evaluate(() => (location.hash = "petty-cash"));
-    await pg.waitForTimeout(700);
-    const cashCaText = await pg.locator("#view").innerText();
-    if (/a caixa|Entrades|Sortides/i.test(cashCaText) && !/Saldo final\nSaldo/.test(cashCaText))
-      ok("i18n: CA translates the ADM-06 cash screen");
+    /* The cash surface is the WITHDRAWAL panel now — Caja chica went with the
+       till in PK12-S7 — so the language check follows the screen rather than
+       the route it used to live on. */
+    await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(w.id);
+    });
+    await pg.waitForTimeout(900);
+    const cashCaText = await pg.locator("#dbody").innerText();
+    if (
+      /Reintegrament|Retornat al banc|Encara en efectiu/i.test(cashCaText) &&
+      !/Devuelto al banco/.test(cashCaText)
+    )
+      ok("i18n: CA translates the cash-withdrawal panel");
     else bad("i18n: CA ADM-06", cashCaText.replace(/\n/g, " ").slice(0, 160));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
 
     // S12's three surfaces. Every string on them shipped with Catalan in the
     // same commit, and this is what proves it rather than the dictionary
@@ -12257,13 +13797,14 @@ async function testI18n(browser, base) {
     await pg.evaluate(() => (location.hash = "supplier-invoices"));
     await pg.waitForTimeout(700);
     const capEnText = await pg.locator("body").innerText();
+    // Same restatement as the Catalan block above, for the same reason.
     if (
-      /Inbox/i.test(capEnText) &&
+      /Unallocated/i.test(capEnText) &&
       /Allocation/i.test(capEnText) &&
-      !/\bBandeja\b/i.test(capEnText) &&
+      !/\bSin asignar\b/i.test(capEnText) &&
       !/Asignación/i.test(capEnText)
     )
-      ok("i18n: EN translates the ADM-03 inbox and register");
+      ok("i18n: EN translates the ADM-03 register, its filter and its buttons");
     else bad("i18n: EN ADM-03", capEnText.replace(/\n/g, " ").slice(0, 160));
 
     await pg.evaluate(() => (location.hash = "purchasing"));
@@ -12302,7 +13843,9 @@ async function testI18n(browser, base) {
     await openJobWithChapters(pg, "ecoQ");
     const ecoEnText = await pg.locator("#view").innerText();
     if (
-      /Accrued/i.test(ecoEnText) &&
+      // «Acumulado» became «Acumulado real» when the columns were restated to
+      // the operator's six, so the English it resolves to moved with it.
+      /Actual to date/i.test(ecoEnText) &&
       /By line item/i.test(ecoEnText) &&
       !/Pendiente de repartir/.test(ecoEnText)
     )
@@ -12321,12 +13864,22 @@ async function testI18n(browser, base) {
       ok("i18n: EN translates the PRY-03 register, its stages and its total");
     else bad("i18n: EN PRY-03", chgEnText.replace(/\n/g, " ").slice(0, 160));
 
-    await pg.evaluate(() => (location.hash = "petty-cash"));
-    await pg.waitForTimeout(700);
-    const cashEnText = await pg.locator("#view").innerText();
-    if (/in the till|Cash in|Cash out/i.test(cashEnText) && !/Saldo final/.test(cashEnText))
-      ok("i18n: EN translates the ADM-06 cash screen");
+    await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(w.id);
+    });
+    await pg.waitForTimeout(900);
+    const cashEnText = await pg.locator("#dbody").innerText();
+    if (
+      /Cash withdrawal|Returned to the bank|Still in cash/i.test(cashEnText) &&
+      !/Devuelto al banco/.test(cashEnText)
+    )
+      ok("i18n: EN translates the cash-withdrawal panel");
     else bad("i18n: EN ADM-06", cashEnText.replace(/\n/g, " ").slice(0, 160));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
 
     await pg.evaluate(() => (location.hash = "invoicing"));
     await pg.waitForTimeout(700);

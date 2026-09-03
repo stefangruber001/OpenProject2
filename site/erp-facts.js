@@ -643,6 +643,14 @@
     return d;
   }
 
+  /* The translator for the document being built. Set by `docFor` on the way
+     in: the builders below are plain functions reached through a table, and
+     threading one more argument through every one of them to reach the single
+     place that needs it would be a worse trade than this. */
+  let CURRENT_TR = function (x) {
+    return x;
+  };
+
   function invoiceDoc(erp, refs, DOCS, kind) {
     // refs.doc = an unissued preview (previewInvoice's projection) — same
     // shape as renderInvoiceDoc, but with no record behind it yet.
@@ -671,7 +679,9 @@
     if (f.project.site === "—" && doc.worksAddress) f.project.site = doc.worksAddress;
     // The unnumbered preview says so in the document itself — the number is
     // assigned at issue, and the pane's whole point is showing that honestly.
-    const number = doc.number || "Sin numerar — el numero se asigna al emitir";
+    // Through the label layer, because it is the system speaking rather than
+    // anything the document says: on an English invoice it must read English.
+    const number = doc.number || CURRENT_TR("Sin numerar — el número se asigna al emitir");
     f.numbers.invoice = kind === "rectificativa" ? doc.rectifies || "—" : number;
     f.numbers.creditNote = doc.number;
     f.dates.issued = dmy(doc.date);
@@ -729,9 +739,27 @@
    * {changeId} · {projectId} · {invoiceId} · {receiptId} · {purchaseId} ·
    * {subcontractId} · {quarter} · {visitId}.
    */
-  function docFor(erp, kind, refs, doctypes) {
+  /**
+   * `tr` is the DOCUMENT's label layer, not the workspace's.
+   *
+   * Almost everything here is data and must never be translated — a customer's
+   * name, an address, a chapter title. A few strings are not: they are the
+   * system speaking on the document, and «Sin numerar» is one of them. It was
+   * written in Spanish straight into the descriptor, so an English invoice
+   * printed «Invoice · Sin numerar» and no gate could see it — a document is
+   * `translate="no"` by design, and this file is not read by the source audit.
+   * Passing the translator in is what lets a phrase like that be a label.
+   */
+  function docFor(erp, kind, refs, doctypes, tr) {
+    const T =
+      typeof tr === "function"
+        ? tr
+        : function (x) {
+            return x;
+          };
     const DT = doctypes || (typeof CaneiDocTypes !== "undefined" ? CaneiDocTypes : null);
     if (!DT) throw new Error("erp-facts: CaneiDocTypes is not loaded");
+    CURRENT_TR = T;
     const fn = KINDS[kind];
     if (!fn)
       throw new Error(

@@ -678,6 +678,277 @@ assert(r2.applied.length === 0, "a current blob applies no further migrations");
   m19.up({});
 }
 
+/* ---- step 20 in isolation: the job points at the contract that was SIGNED --
+   Step 19 linked the jobs that had no contract; this repairs the ones holding
+   the wrong one. Both writers used `find()` — the first record filed for that
+   budget — and signing never moved the link, so an operator with three
+   contracts on one quote had their job pointing at the first while the third
+   carried the signature. */
+{
+  const m20 = M.MIGRATIONS.find((m) => m.to === 20);
+  const sig = { customerSignedAt: "2026-08-20" };
+
+  // The reported case: the job holds a draft, a later contract is signed.
+  const moved = m20.up({
+    projects: [{ id: "prj_a", budgetId: "bud_1", contractId: "con_1" }],
+    contracts: [
+      {
+        id: "con_1",
+        budgetId: "bud_1",
+        status: "draft",
+        number: "CTR-2026-0003",
+        date: "2026-08-01",
+      },
+      {
+        id: "con_3",
+        budgetId: "bud_1",
+        status: "signed",
+        number: "CTR-2026-0005",
+        date: "2026-08-20",
+        signature: sig,
+      },
+    ],
+  });
+  assert(
+    moved.projects[0].contractId === "con_3",
+    "m20: a job holding a draft moves to the contract that was signed",
+  );
+
+  // A signed holder is the answer, whoever wrote it. Never reassigned.
+  const keptSigned = m20.up({
+    projects: [{ id: "prj_b", budgetId: "bud_2", contractId: "con_first" }],
+    contracts: [
+      {
+        id: "con_first",
+        budgetId: "bud_2",
+        status: "signed",
+        number: "CTR-1",
+        date: "2026-08-01",
+        signature: sig,
+      },
+      {
+        id: "con_later",
+        budgetId: "bud_2",
+        status: "signed",
+        number: "CTR-2",
+        date: "2026-08-09",
+        signature: sig,
+      },
+    ],
+  });
+  assert(
+    keptSigned.projects[0].contractId === "con_first",
+    "m20: a job already held by a SIGNED contract is never moved",
+  );
+
+  // Money already points at the holder's installments: leave it alone.
+  const keptInvoiced = m20.up({
+    projects: [{ id: "prj_c", budgetId: "bud_3", contractId: "con_billed" }],
+    contracts: [
+      {
+        id: "con_billed",
+        budgetId: "bud_3",
+        status: "draft",
+        number: "CTR-3",
+        date: "2026-08-01",
+        installments: [{ idx: 0, invoicedInvoiceId: "inv_9" }],
+      },
+      {
+        id: "con_signed",
+        budgetId: "bud_3",
+        status: "signed",
+        number: "CTR-4",
+        date: "2026-08-10",
+        signature: sig,
+      },
+    ],
+  });
+  assert(
+    keptInvoiced.projects[0].contractId === "con_billed",
+    "m20: a job whose contract has an invoiced milestone is never moved",
+  );
+
+  // Two signatures on one budget: the newest wins, deterministically.
+  const newest = m20.up({
+    projects: [{ id: "prj_d", budgetId: "bud_4", contractId: "con_draft" }],
+    contracts: [
+      { id: "con_draft", budgetId: "bud_4", status: "draft", number: "CTR-5", date: "2026-08-01" },
+      {
+        id: "con_old",
+        budgetId: "bud_4",
+        status: "signed",
+        number: "CTR-6",
+        date: "2026-08-05",
+        signature: sig,
+      },
+      {
+        id: "con_new",
+        budgetId: "bud_4",
+        status: "signed",
+        number: "CTR-7",
+        date: "2026-08-15",
+        signature: sig,
+      },
+    ],
+  });
+  assert(newest.projects[0].contractId === "con_new", "m20: the newest signature wins");
+
+  // A cancelled holder with nothing to replace it is released, not kept.
+  const released = m20.up({
+    projects: [{ id: "prj_e", budgetId: "bud_5", contractId: "con_dead" }],
+    contracts: [
+      {
+        id: "con_dead",
+        budgetId: "bud_5",
+        status: "cancelled",
+        number: "CTR-8",
+        date: "2026-08-01",
+      },
+    ],
+  });
+  assert(
+    released.projects[0].contractId === null,
+    "m20: a cancelled contract stops gating the job it no longer governs",
+  );
+
+  // Nothing signed anywhere: the draft that was there stays there.
+  const untouched = m20.up({
+    projects: [{ id: "prj_f", budgetId: "bud_6", contractId: "con_only" }],
+    contracts: [
+      { id: "con_only", budgetId: "bud_6", status: "draft", number: "CTR-9", date: "2026-08-01" },
+    ],
+  });
+  assert(
+    untouched.projects[0].contractId === "con_only",
+    "m20: with nothing signed, the link is left where it was",
+  );
+
+  // A quick job has no budget to match on.
+  const quick = m20.up({
+    projects: [{ id: "prj_g", budgetId: null, contractId: null }],
+    contracts: [
+      {
+        id: "con_g",
+        budgetId: null,
+        status: "signed",
+        number: "CTR-10",
+        date: "2026-08-01",
+        signature: sig,
+      },
+    ],
+  });
+  assert(quick.projects[0].contractId === null, "m20: a quick job (no budget) is untouched");
+
+  // Idempotent, and tolerant of the arrays being absent entirely.
+  const again = m20.up(JSON.parse(JSON.stringify(moved)));
+  assert(JSON.stringify(again) === JSON.stringify(moved), "m20: re-running changes nothing");
+  m20.up({});
+}
+
+/* ---- step 21 in isolation: a split restated against the taxable base -------
+   `allocateCapture` used to demand the VAT-inclusive total while every other
+   door demanded the base, and `projectCostRows` adds both into one figure — so
+   a ticket allocated through the capture screen charged its job the tax as
+   well as the cost. The operator's own invoice is the fixture. */
+{
+  const m21 = M.MIGRATIONS.find((m) => m.to === 21);
+  const cf = { baseCents: 248380, vatCents: 52160, totalCents: 300540 };
+
+  // The operator's three rows, entered under the old rule against 3.005,40.
+  const restated = m21.up({
+    today: "2026-08-31",
+    audit: [],
+    captured: [
+      {
+        id: "cap_1",
+        stdName: "CERDA_F-2026-4471",
+        confirmed: cf,
+        /* The operator's own distribution as the old rule forced them to
+           enter it: their proportions, scaled up to the VAT-inclusive total.
+           Scaling back must return their figures to the cent — 1.976,14 /
+           329,66 / 178,00 — which is the whole promise of this step. */
+        allocations: [
+          { projectId: "p1", chapterNum: "3", amountCents: 239113 },
+          { projectId: "p1", chapterNum: "4", amountCents: 39889 },
+          { projectId: "p1", chapterNum: null, amountCents: 21538 },
+        ],
+      },
+    ],
+  });
+  const rows = restated.captured[0].allocations;
+  const sum = rows.reduce((t, a) => t + a.amountCents, 0);
+  assert(sum === 248380, "m21: the split now foots to the taxable base", String(sum));
+  assert(
+    rows[0].amountCents === 197614 &&
+      rows[1].amountCents === 32966 &&
+      rows[2].amountCents === 17800 &&
+      rows[2].chapterNum === null,
+    "m21: the operator's own figures come back to the cent, and a row with no partida stays one",
+    JSON.stringify(rows.map((r) => r.amountCents)),
+  );
+  assert(
+    restated.audit.length === 1 && /splitRestated/.test(restated.audit[0].action),
+    "m21: every restatement is written to the audit log",
+  );
+
+  // Already at the base — a re-run, or a split made after the fix.
+  const already = m21.up({
+    captured: [
+      { id: "cap_2", confirmed: cf, allocations: [{ projectId: "p1", amountCents: 248380 }] },
+    ],
+  });
+  assert(
+    already.captured[0].allocations[0].amountCents === 248380,
+    "m21: a split that already foots to the base is left alone",
+  );
+
+  // Matches neither: somebody edited it. Never guessed at.
+  const handEdited = m21.up({
+    captured: [
+      { id: "cap_3", confirmed: cf, allocations: [{ projectId: "p1", amountCents: 100000 }] },
+    ],
+  });
+  assert(
+    handEdited.captured[0].allocations[0].amountCents === 100000,
+    "m21: a split matching neither figure is left exactly as it was",
+  );
+
+  // A document with no tax has a base equal to its total: nothing to restate.
+  const noVat = m21.up({
+    captured: [
+      {
+        id: "cap_4",
+        confirmed: { baseCents: 5000, vatCents: 0, totalCents: 5000 },
+        allocations: [{ overheadCategory: "office", amountCents: 5000 }],
+      },
+    ],
+  });
+  assert(
+    noVat.captured[0].allocations[0].amountCents === 5000,
+    "m21: a document with no tax is untouched",
+  );
+
+  // Unconfirmed, or unallocated: nothing to work with.
+  const bare = m21.up({
+    captured: [
+      { id: "cap_5", confirmed: null, allocations: [{ projectId: "p1", amountCents: 999 }] },
+      { id: "cap_6", confirmed: cf, allocations: [] },
+    ],
+  });
+  assert(
+    bare.captured[0].allocations[0].amountCents === 999,
+    "m21: an unconfirmed document is untouched — there is no base to restate against",
+  );
+
+  // Idempotent, and tolerant of the arrays being absent entirely.
+  const again = m21.up(JSON.parse(JSON.stringify(restated)));
+  assert(
+    again.captured[0].allocations.reduce((t, a) => t + a.amountCents, 0) === 248380,
+    "m21: re-running changes no amount",
+  );
+  m21.up({});
+}
+
 // ---- the dangerous direction is refused ------------------------------------
 throws(
   () => M.migrate({ ...v1, schemaVersion: M.CURRENT_VERSION + 1 }),

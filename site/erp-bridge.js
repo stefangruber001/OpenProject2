@@ -442,9 +442,12 @@
      * throw.
      * ---------------------------------------------------------------- */
     extraction: extraction && {
-      /** Recognised text in; fields, dots, provenance and checks out. */
-      read: function (text, assumeIssueDate) {
-        return extraction.read(text, assumeIssueDate);
+      /** Recognised text in; fields, dots, provenance and checks out.
+          `opts` is the assumed issue date, or `{assumeIssueDate, exclude}` —
+          `exclude` being this company's own name and tax id, so the reader
+          cannot hand back the party being billed as the one that issued. */
+      read: function (text, opts) {
+        return extraction.read(text, opts);
       },
       /** Re-check after a person edits a value. Typed values are checked too. */
       recheck: function (result, corrections) {
@@ -498,7 +501,13 @@
             })
             .map(function (i, idx) {
               return {
+                // `label` is one string for the chart's tooltip; `number` and
+                // `seq` are the same two facts kept apart, so a caller that
+                // renders them as text can put the record in a span the
+                // translator leaves alone and the word in one it does not.
                 label: contract.number + " · hito " + (idx + 1),
+                number: contract.number,
+                seq: idx + 1,
                 date: i.expectedDate,
                 amountCents: i.amountCents,
                 invoiced: i.status === "invoiced",

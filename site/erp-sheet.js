@@ -184,7 +184,14 @@
        kv() and signatures() below), which no external rule can otherwise
        reach. */
     "@media (max-width:700px){" +
-      ".sheet{width:auto;max-width:100%;min-height:0;margin:0;padding:9mm 7mm;box-shadow:none}" +
+      /* `overflow:visible` matters as much as the width here. The base rule
+         clips (a page is a page), so anything still too wide was LOST rather
+         than reachable — and the cage outside scrolls, so it had nothing to
+         scroll because the paper had already swallowed the difference. Visible
+         hands the overflow out to the cage, which means the worst case below
+         this breakpoint is a sideways scroll instead of amounts that are
+         simply not on screen and never said so. */
+      ".sheet{width:auto;max-width:100%;min-height:0;margin:0;padding:9mm 7mm;box-shadow:none;overflow:visible}" +
       ".inner{min-height:0}" +
       ".meta{grid-auto-flow:row}" +
       ".parties{grid-template-columns:1fr;gap:5mm}" +
@@ -193,6 +200,94 @@
       ".facts{gap:4mm}" +
       ".kvgrid{grid-template-columns:1fr!important}" +
       ".sig{grid-template-columns:1fr!important;gap:9mm}" +
+      /* THE TABLES, which the first phone treatment left alone and which are
+         what actually holds a document wide. A line-items table floors at the
+         longest unbreakable thing in it — a code, a description, an IBAN — so
+         the sheet could be told to be fluid and still refuse to go below about
+         520px. Fixed layout makes the columns share what there is; breaking
+         anywhere lets the long values wrap instead of setting the floor. This
+         matters more than it looks: the sheet clips rather than scrolls, so a
+         table wider than its page loses its right-hand column, and the
+         right-hand column of an invoice is the amounts. */
+      /* `.inner` is a FLEX container, so the page table inside it floors at its
+         own min-content — 520px — however fluid the sheet around it is told to
+         be. Exactly the trap PK6-A recorded for the old document class and one
+         level deeper, in the renderer that replaced it: the sheet obediently
+         became 370px wide and went on clipping its right-hand column, which on
+         an invoice is the amounts. Releasing the floor is what lets fixed
+         layout do anything at all. */
+      ".inner>*{min-width:0}" +
+      /* `.inner>*` reaches the page table and stops. The line items sit one
+         layer further in — inside a .flexcol inside a cell of it — so the
+         floor released at the top was still holding down there. Released at
+         every depth instead of at the one depth that was measured. */
+      ".flexcol,.flexcol>*,td,th{min-width:0}" +
+      "table{table-layout:fixed;max-width:100%;min-width:0}" +
+      /* 76mm is 287px, and a phone content column is about 278. The totals
+         block is the last thing on the page and the one nobody can afford to
+         have cropped, so below the breakpoint it takes what there is. */
+      ".totals{min-width:0}" +
+      /* THE LINE ITEMS, RE-PROPORTIONED. Fitting the table inside the page is
+         not the same as making it readable inside it: at 278px the desktop
+         split (47/11/8/15/19) gives the measurement column 31px for a header
+         word that needs 55, so MEDICIÓN printed straight over Ud., and 8px of
+         cell padding each side spent 80 of the 278 on whitespace. Below the
+         breakpoint the description gives back what the figures need, the
+         padding shrinks to what a phone can spare, and the headers are allowed
+         to wrap — the VALUES keep .num's nowrap, because an amount broken
+         across two lines is worse than a heading that is. */
+      /* One notch smaller, which buys about a tenth of every column at once
+         and is cheaper than starving the description to fit a bold subtotal.
+         A phone is already reading a reflowed document here — stacked parties,
+         7mm margins — so the type scale is not the approved sheet's anyway. */
+      /* `.sheet` in front of every one of these, and it is not decoration:
+         the rules they have to beat are `.sheet tbody td` and `.sheet tr.sub
+         td`, so a bare `.items td` loses on specificity and changes nothing.
+         Measured that way round first — the widths moved (they carry
+         !important) while the padding and the type size did not, which is the
+         tell. */
+      ".sheet .dtbl,.sheet .dtbl td{font-size:8.4pt}" +
+      ".sheet .dtbl th,.sheet .dtbl td{padding:4px 3px}" +
+      /* The headers keep their designed 6.7pt — an earlier pass set the type
+         size on `th` as well and made the column headings BIGGER than the
+         approved sheet's, which is how MEDICIÓN came to need two lines. */
+      ".sheet .dtbl thead th{white-space:normal;font-size:6pt}" +
+      /* `anywhere` is the whole sheet's rule and it earns its place there: one
+         unbreakable account number in the payment terms was setting the
+         minimum width of the entire document. Inside the items table it is not
+         needed — `table-layout:fixed` already caps every column whatever the
+         content prefers — and it is actively harmful, breaking «Demolición»
+         after the «Demolició» and stranding the full stop of «Ud.» on a line
+         of its own. `break-word` breaks a word only when it genuinely will not
+         fit. */
+      ".sheet .dtbl th,.sheet .dtbl td,.sheet .dtbl td *{overflow-wrap:break-word;word-break:normal}" +
+      /* …and the description's own flex item has to be allowed to shrink, or
+         `break-word` cannot help it: `break-word` does not lower min-content
+         (only `anywhere` does — the note above the sheet-wide rule says so),
+         so a flex item still floors at its longest word and pushes the cell
+         wide. `.descell` already carries min-width:0; its CHILDREN did not,
+         and they are the flex items that matter. */
+      ".sheet .dtbl .descell>*{min-width:0}" +
+      /* The plate goes ABOVE the words rather than beside them. Beside them it
+         held an 18px column open for the full height of the row — a quarter of
+         the description's width, spent on a picture that is already only 18px
+         tall — and the text wrapped after eight characters to pay for it.
+         Stacked, the description gets the whole column and most rows come out
+         SHORTER despite the extra line, because the words stop breaking. */
+      ".sheet .dtbl .descell{flex-direction:column;align-items:flex-start;gap:3px}" +
+      ".sheet .items th:nth-child(1),.sheet .items td:nth-child(1){width:30%!important}" +
+      ".sheet .items th:nth-child(2),.sheet .items td:nth-child(2){width:17%!important}" +
+      ".sheet .items th:nth-child(3),.sheet .items td:nth-child(3){width:9%!important}" +
+      ".sheet .items th:nth-child(4),.sheet .items td:nth-child(4){width:17%!important}" +
+      ".sheet .items th:nth-child(5),.sheet .items td:nth-child(5){width:27%!important}" +
+      /* EVERYTHING, not only the cells. The first attempt targeted `td`/`th`
+         and moved nothing, because what was holding the page open was an
+         unbreakable account number inside a list item in the payment terms —
+         one 24-character token setting the minimum width of the whole
+         document. `anywhere` is the value that lowers min-content; `break-word`
+         does not. Below the breakpoint only, where the alternative is a
+         document with its amounts cut off. */
+      ".sheet,.sheet *{overflow-wrap:anywhere}" +
       "}",
   ].join("\n");
 
@@ -376,7 +471,7 @@
     if (!d.groups || !d.groups.length) return;
     const h = [];
     h.push(
-      '<table><thead><tr><th style="width:47%">' +
+      '<table class="dtbl items"><thead><tr><th style="width:47%">' +
         this.T("Descripcion") +
         '</th><th class="num" style="width:11%">' +
         this.T("Medicion") +
@@ -435,7 +530,7 @@
     const d = this.doc;
     if (!d.lines || !d.lines.length) return;
     this.push(
-      "<table><thead><tr><th>" +
+      '<table class="dtbl"><thead><tr><th>' +
         this.T("Concepto") +
         '</th><th class="num">' +
         this.T("Importe") +
@@ -474,7 +569,7 @@
   Sheet.prototype.progressBars = function (rows, opts) {
     if (!rows || !rows.length) return;
     this.push(
-      "<table><thead><tr><th>" +
+      '<table class="dtbl"><thead><tr><th>' +
         this.T((opts && opts.label) || "Concepto") +
         '</th><th class="num">' +
         this.T("Avance") +
@@ -502,7 +597,7 @@
   Sheet.prototype.milestones = function (rows) {
     if (!rows || !rows.length) return;
     this.push(
-      "<table><thead><tr><th>" +
+      '<table class="dtbl"><thead><tr><th>' +
         this.T("Fecha") +
         "</th><th>" +
         this.T("Hito") +
@@ -572,7 +667,7 @@
   Sheet.prototype.marginTable = function (rows) {
     if (!rows || !rows.length) return;
     this.push(
-      "<table><thead><tr><th>" +
+      '<table class="dtbl"><thead><tr><th>' +
         this.T("Partida") +
         '</th><th class="num">' +
         this.T("Previsto") +

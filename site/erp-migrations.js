@@ -816,6 +816,136 @@
         return s;
       },
     },
+    {
+      to: 20,
+      name: "the job points at the contract that was signed",
+      /*
+       * STEP 19 LINKED THE JOBS THAT HAD NO CONTRACT. This one repairs the
+       * jobs that have the WRONG one.
+       *
+       * Both writers picked a contract with `find()` — the first record filed
+       * for that budget, draft or superseded — and `signContract` never
+       * touched the link at all. So an operator who drew up three contracts on
+       * one accepted quote and signed the third had a job pointing at the
+       * first since the day it was created, and CON-11 went on refusing the
+       * first invoice on the strength of a draft nobody had signed. The engine
+       * now chooses by signature and claims the job when a contract is signed;
+       * this repairs what was written before it did.
+       *
+       * Rules, in order, and every one of them is about not overwriting a fact
+       * with a default:
+       *   · a job whose contract is SIGNED is never touched — that is the
+       *     answer, whoever wrote it;
+       *   · a job whose contract has an INVOICED milestone is never touched:
+       *     those invoices point at that contract's installments, and moving
+       *     the job would leave the money describing another document;
+       *   · otherwise, if a signed contract exists for the same budget, the
+       *     job moves to it — the newest, if somebody signed more than one;
+       *   · a cancelled contract is released rather than kept, which is what
+       *     `cancelContract` does when it is used;
+       *   · a quick job (no budgetId) is untouched.
+       *
+       * Deliberately NOT rescaled or re-annexed: this moves a pointer and
+       * nothing else. Amounts, annexes and invoices stay exactly as they are.
+       */
+      up: function (s) {
+        var projects = Array.isArray(s.projects) ? s.projects : [];
+        var contracts = Array.isArray(s.contracts) ? s.contracts : [];
+        var byId = {};
+        for (var k = 0; k < contracts.length; k++) byId[contracts[k].id] = contracts[k];
+        var isSigned = function (c) {
+          return !!(c && c.signature && c.signature.customerSignedAt);
+        };
+        var wasInvoiced = function (c) {
+          var ins = (c && c.installments) || [];
+          for (var n = 0; n < ins.length; n++) if (ins[n].invoicedInvoiceId) return true;
+          return false;
+        };
+        var sortKey = function (c) {
+          return String(c.date || "") + "\u0000" + String(c.number || "");
+        };
+        for (var i = 0; i < projects.length; i++) {
+          var p = projects[i];
+          if (!p.budgetId) continue;
+          var held = p.contractId ? byId[p.contractId] : null;
+          if (isSigned(held) || wasInvoiced(held)) continue;
+          var best = null;
+          for (var c2 = 0; c2 < contracts.length; c2++) {
+            var cand = contracts[c2];
+            if (cand.budgetId !== p.budgetId || cand.status === "cancelled") continue;
+            if (!isSigned(cand)) continue;
+            if (best === null || sortKey(cand) > sortKey(best)) best = cand;
+          }
+          if (best) p.contractId = best.id;
+          else if (held && held.status === "cancelled") p.contractId = null;
+        }
+        return s;
+      },
+    },
+    {
+      to: 21,
+      name: "a document's split is restated against the taxable base",
+      /*
+       * TWO DOORS, TWO UNITS, ONE COST FIGURE.
+       *
+       * `allocateCapture` demanded that a split total the VAT-INCLUSIVE amount
+       * while `registerBill` demanded the taxable base, and `projectCostRows`
+       * adds both into one number — so a ticket allocated through the capture
+       * screen charged its job the tax as well as the cost, quietly, by the
+       * rate. (A supplier invoice was spared the wrong figure, because promoting
+       * it to a bill rescales the rows to the base; what it cost instead was
+       * the split being entered twice, once per unit. A ticket never becomes a
+       * bill, so nothing ever restated it.)
+       *
+       * The proportions are the OPERATOR'S and are preserved exactly: they
+       * decided which partida bears what, and only the units were wrong. Each
+       * row is scaled by base ÷ total and the rounding remainder lands on the
+       * largest row, so the split still foots to the cent.
+       *
+       * Restated only where the old rule is unmistakably what produced it:
+       *   · the document is confirmed and states a base AND a different total;
+       *   · its rows currently add up to that TOTAL, within a cent.
+       * A split that already foots to the base is left alone (a re-run, or one
+       * made after the fix). A split that matches neither is left alone too and
+       * NOT guessed at — somebody edited it by hand, and a migration that
+       * rescales a figure it does not understand is worse than one that skips.
+       *
+       * Every restatement is written to the audit log, because this moves
+       * money between the columns a job is measured by and a silent rescale of
+       * somebody's numbers is not something to discover later.
+       */
+      up: function (s) {
+        var caps = Array.isArray(s.captured) ? s.captured : [];
+        if (!Array.isArray(s.audit)) s.audit = [];
+        for (var i = 0; i < caps.length; i++) {
+          var c = caps[i];
+          var cf = c && c.confirmed;
+          var rows = (c && c.allocations) || [];
+          if (!cf || !rows.length) continue;
+          var base = Math.round(cf.baseCents || 0);
+          var total = Math.round(cf.totalCents || 0);
+          if (!(base > 0) || !(total > 0) || base === total) continue;
+          var sum = 0;
+          for (var r = 0; r < rows.length; r++) sum += Math.round(rows[r].amountCents || 0);
+          if (Math.abs(sum - total) > 1) continue; // already the base, or hand-edited
+          var scaled = 0;
+          var biggest = 0;
+          for (var q = 0; q < rows.length; q++) {
+            rows[q].amountCents = Math.round((Math.round(rows[q].amountCents || 0) * base) / total);
+            scaled += rows[q].amountCents;
+            if (Math.abs(rows[q].amountCents) > Math.abs(rows[biggest].amountCents)) biggest = q;
+          }
+          rows[biggest].amountCents += base - scaled; // the rounding remainder
+          s.audit.push({
+            ts: s.today || "",
+            user: "system",
+            action: "m21:splitRestatedToTaxableBase",
+            ref: (c.stdName || c.id) + " " + total + "c → " + base + "c",
+          });
+        }
+        return s;
+      },
+    },
   ];
 
   /**

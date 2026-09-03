@@ -582,6 +582,153 @@ window.CANEI_DICT.ca = {
   "La factura necesita una base imponible": "La factura necessita una base imposable",
   "El reparto debe sumar la base imponible": "El repartiment ha de sumar la base imposable",
   "Factura registrada": "Factura registrada",
+  "Las horas de obra necesitan partida y subpartida":
+    "Les hores d'obra necessiten partida i subpartida",
+  "⚠ Las horas de obra necesitan partida y subpartida":
+    "⚠ Les hores d'obra necessiten partida i subpartida",
+  "El coste de obra necesita partida y subpartida": "El cost d'obra necessita partida i subpartida",
+  "⚠ El coste de obra necesita partida y subpartida":
+    "⚠ El cost d'obra necessita partida i subpartida",
+  "Reparta la factura: a una obra o a gastos generales":
+    "Repartiu la factura: a una obra o a despeses generals",
+  "Cada línea de obra necesita partida y subpartida":
+    "Cada línia d'obra necessita partida i subpartida",
+  "⚠ Cada línea de obra necesita partida y subpartida":
+    "⚠ Cada línia d'obra necessita partida i subpartida",
+  "⚠ Reparta la factura: a una obra o a gastos generales":
+    "⚠ Repartiu la factura: a una obra o a despeses generals",
+  "El movimiento ya está conciliado.": "El moviment ja està conciliat.",
+  "Ha sido un pago parcial": "Ha estat un pagament parcial",
+  "Deshacer la conciliación": "Desfer la conciliació",
+  "Conciliación deshecha": "Conciliació desfeta",
+  "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.":
+    "El moviment torna a la cua sense explicar i s'anul·la el pagament que va crear la conciliació.",
+  "Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.":
+    "Si ha estat un pagament parcial no hi ha res més a fer: la resta continua devent-se i apareixerà com a pendent.",
+  "Por subpartida": "Per subpartida",
+  "Esta partida no tiene subpartidas en su línea base.":
+    "Aquesta partida no té subpartides a la seva línia base.",
+  "Acumulado real": "Acumulat real",
+  "acumulado real": "acumulat real",
+  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
+    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
+  "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
+    "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
+  "Cuentas y tarjetas": "Comptes i targetes",
+  "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
+  "Las cuentas y las tarjetas se crean en Configuración › Empresa.":
+    "Els comptes i les targetes es creen a Configuració › Empresa.",
+  Desactivar: "Desactivar",
+  Reactivar: "Reactivar",
+  Desactivada: "Desactivada",
+  "Borrar la cuenta": "Esborrar el compte",
+  "Bloquear el trimestre": "Bloquejar el trimestre",
+  "🔒 Bloquear trimestre": "🔒 Bloquejar trimestre",
+  "Trimestre bloqueado": "Trimestre bloquejat",
+  "Qué se bloquea": "Què es bloqueja",
+  "Este trimestre ya está bloqueado.": "Aquest trimestre ja està bloquejat.",
+  "Todo lo del trimestre está conciliado y asignado.":
+    "Tot el del trimestre està conciliat i assignat.",
+  "Movimientos sin conciliar": "Moviments sense conciliar",
+  "Costes sin destino — ni obra ni gasto general":
+    "Costos sense destí — ni obra ni despesa general",
+  "Costes de obra sin partida y subpartida": "Costos d'obra sense partida i subpartida",
+  "Horas de obra sin partida y subpartida": "Hores d'obra sense partida i subpartida",
+  "Efectivo retirado y todavía sin justificar": "Efectiu retirat i encara sense justificar",
+  "Documentos capturados y sin registrar": "Documents capturats i sense registrar",
+  "Bloquear un trimestre impide cambiar lo que hay dentro: conciliaciones, costes y horas quedan como están. Se puede reabrir, y la reapertura queda registrada con su motivo.":
+    "Bloquejar un trimestre impedeix canviar el que hi ha dins: conciliacions, costos i hores queden com estan. Es pot reobrir, i la reobertura queda registrada amb el seu motiu.",
+  "Reintegro de efectivo": "Reintegrament d'efectiu",
+  "Devolución de efectivo": "Devolució d'efectiu",
+  "Devuelto al banco": "Retornat al banc",
+  "En efectivo todavía": "Encara en efectiu",
+  "Justificado con documentos": "Justificat amb documents",
+  "queda por justificar": "queda per justificar",
+  "todo justificado": "tot justificat",
+  conciliación: "conciliació",
+  "Desactivar una cuenta la retira de las listas y conserva lo conciliado. Borrar la quita del todo: si tiene movimientos detrás, se avisa de cuántos y se van con ella.":
+    "Desactivar un compte el retira de les llistes i conserva el conciliat. Esborrar-lo el treu del tot: si té moviments al darrere, s'avisa de quants i se'n van amb ell.",
+  Borrar: "Esborrar",
+  "Hay movimientos de otra cuenta que dicen liquidar esta tarjeta":
+    "Hi ha moviments d'un altre compte que diuen liquidar aquesta targeta",
+  "Tiene movimientos en un periodo cerrado — ábralo primero":
+    "Té moviments en un període tancat — obri'l primer",
+  "Tiene movimientos detrás": "Té moviments al darrere",
+  "Tiene extractos importados detrás": "Té extractes importats al darrere",
+  "Borrar la cuenta y sus movimientos": "Esborrar el compte i els seus moviments",
+  "Se borra la cuenta y todos los movimientos que tiene detrás. Las conciliaciones se deshacen primero, así que ninguna factura queda diciendo que la pagó un movimiento que ya no existe. No se puede deshacer.":
+    "S'esborra el compte i tots els moviments que té al darrere. Les conciliacions es desfan primer, així que cap factura queda dient que la va pagar un moviment que ja no existeix. No es pot desfer.",
+  "Se borra la cuenta. No tiene ningún movimiento detrás, así que no se pierde nada conciliado.":
+    "S'esborra el compte. No té cap moviment al darrere, així que no es perd res conciliat.",
+  Elegida: "Triada",
+  "el extracto se importa aquí": "l'extracte s'importa aquí",
+  "elija una cuenta abajo para importar": "triï un compte a sota per importar",
+  "Elegir la foto": "Triar la foto",
+  "Cuenta borrada": "Compte esborrat",
+  "Cuenta desactivada": "Compte desactivat",
+  "Cuenta reactivada": "Compte reactivat",
+  "No hay ninguna cuenta todavía.": "Encara no hi ha cap compte.",
+  "Anular registro": "Anul·lar registre",
+  "Anular el registro": "Anul·lar el registre",
+  Anular: "Anul·lar",
+  "Registro anulado": "Registre anul·lat",
+  "Su pago liquida además otras facturas. Deshaga primero ese pago en Conciliación.":
+    "El seu pagament liquida també altres factures. Desfeu primer aquest pagament a Conciliació.",
+  "La factura sale del registro y el documento archivado vuelve a quedar libre para volver a registrarlo.":
+    "La factura surt del registre i el document arxivat torna a quedar lliure per tornar a registrar-lo.",
+  "La factura sale del registro con su reparto. No se puede deshacer.":
+    "La factura surt del registre amb el seu repartiment. No es pot desfer.",
+  "La factura sale del registro y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.":
+    "La factura surt del registre i el document arxivat torna a quedar sense registrar. No es pot desfer.",
+  "La factura sale del registro con su reparto a las obras. No se puede deshacer.":
+    "La factura surt del registre amb la seva assignació a les obres. No es pot desfer.",
+  "Ir a la factura": "Anar a la factura",
+  Corregir: "Corregir",
+  "Corregir la factura": "Corregir la factura",
+  "Al cambiar de proveedor se recalcula la retención según su perfil fiscal.":
+    "En canviar de proveïdor es recalcula la retenció segons el seu perfil fiscal.",
+  "Cambiar el proveedor": "Canviar el proveïdor",
+  "Proveedor cambiado": "Proveïdor canviat",
+  "Eliminar la factura": "Eliminar la factura",
+  "Factura eliminada": "Factura eliminada",
+  "Nadie ha tocado todavía esta factura. Al eliminarla, el documento archivado vuelve a quedar libre.":
+    "Ningú no ha tocat encara aquesta factura. En eliminar-la, el document arxivat torna a quedar lliure.",
+  "Se borra la factura registrada y el documento archivado vuelve a quedar sin registrar. No se puede deshacer.":
+    "S'esborra la factura registrada i el document arxivat torna a quedar sense registrar. No es pot desfer.",
+  "Se borra la factura registrada y su asignación a las obras. No se puede deshacer.":
+    "S'esborra la factura registrada i la seva assignació a les obres. No es pot desfer.",
+  "Ya tiene un pago registrado. Anule primero el pago.":
+    "Ja té un pagament registrat. Anul·leu primer el pagament.",
+  "Su trimestre ya se ha enviado al asesor. Registre un abono en su lugar.":
+    "El seu trimestre ja s'ha enviat a l'assessor. Registreu un abonament al seu lloc.",
+  "Está casada con un movimiento bancario. Deshaga primero la conciliación.":
+    "Està casada amb un moviment bancari. Desfeu primer la conciliació.",
+  "Tiene un abono que la referencia. Elimine primero el abono.":
+    "Té un abonament que la referencia. Elimineu primer l'abonament.",
+  "Vaciar la cuenta": "Buidar el compte",
+  "Vaciar la cuenta entera": "Buidar el compte sencer",
+  Vaciar: "Buidar",
+  "Cuenta vaciada": "Compte buidat",
+  "Se deshacen conciliaciones": "Es desfan conciliacions",
+  "Pierden su reparto": "Perden el seu repartiment",
+  "Hay movimientos dentro de un periodo cerrado. Reabra el periodo en Conciliación para poder vaciar la cuenta.":
+    "Hi ha moviments dins d'un període tancat. Reobriu el període a Conciliació per poder buidar el compte.",
+  "Para volver a empezar una prueba: borra TODOS los movimientos de esta cuenta, incluidos los ya conciliados.":
+    "Per tornar a començar una prova: esborra TOTS els moviments d'aquest compte, inclosos els ja conciliats.",
+  "Se borran todos los movimientos de esta cuenta y se deshacen sus conciliaciones, con los pagos y cobros que crearon. No se puede deshacer.":
+    "S'esborren tots els moviments d'aquest compte i es desfan les seves conciliacions, amb els pagaments i cobraments que van crear. No es pot desfer.",
+  "— Elija el proveedor —": "— Trieu el proveïdor —",
+  "El emisor del documento no está dado de alta como proveedor":
+    "L'emissor del document no està donat d'alta com a proveïdor",
+  "Nombre del emisor": "Nom de l'emissor",
+  "NIF/CIF del emisor": "NIF/CIF de l'emissor",
+  "Dar de alta este proveedor": "Donar d'alta aquest proveïdor",
+  "Elija el proveedor al que pertenece la factura": "Trieu el proveïdor a qui pertany la factura",
+  "⚠ Elija el proveedor al que pertenece la factura":
+    "⚠ Trieu el proveïdor a qui pertany la factura",
+  "El proveedor necesita un nombre": "El proveïdor necessita un nom",
+  "⚠ El proveedor necesita un nombre": "⚠ El proveïdor necessita un nom",
+  "Proveedor dado de alta": "Proveïdor donat d'alta",
   "Opcionales (aparte)": "Opcionals (a part)",
   "Total por m²": "Total per m²",
   "⚠ Líneas pendientes de precio (no incluidas)": "⚠ Línies pendents de preu (no incloses)",
@@ -934,6 +1081,28 @@ window.CANEI_DICT.ca = {
   "⚠ El lector de documentos no está disponible — introdúzcalo a mano":
     "⚠ El lector de documents no està disponible — introduïu-ho a mà",
   "⚠ No se ha podido leer nada: rellénelo a mano": "⚠ No s'ha pogut llegir res: ompliu-ho a mà",
+  "⚠ No se ha podido leer el documento: rellénelo a mano":
+    "⚠ No s'ha pogut llegir el document: ompliu-ho a mà",
+  "Sin lectura — escríbalo a mano": "Sense lectura — escriviu-ho a mà",
+  "Ver el otro": "Veure l'altre",
+  "Eliminar documento": "Eliminar document",
+  "Eliminar el documento": "Eliminar el document",
+  "Documento eliminado": "Document eliminat",
+  "Ya hay otro documento de este emisor con el mismo número":
+    "Ja hi ha un altre document d'aquest emissor amb el mateix número",
+  "Registrado como factura: elimínala primero": "Registrat com a factura: elimina-la primer",
+  "Se borra el documento y su imagen. No afecta a ninguna factura":
+    "S'esborra el document i la seva imatge. No afecta cap factura",
+  "Se borra el documento archivado y su imagen. No se puede deshacer.":
+    "S'esborra el document arxivat i la seva imatge. No es pot desfer.",
+  "Se borra el documento archivado, su imagen y su asignación a la obra. No se puede deshacer.":
+    "S'esborra el document arxivat, la seva imatge i l'assignació a l'obra. No es pot desfer.",
+  "⚠ El reparto debe sumar la base imponible": "⚠ El repartiment ha de sumar la base imposable",
+  "Se reparte la base imponible": "Es reparteix la base imposable",
+  "El IVA no se reparte: es IVA soportado, no coste de obra":
+    "L'IVA no es reparteix: és IVA suportat, no cost d'obra",
+  "La obra está vinculada a un contrato sin firmar, y hay otro ya firmado para este presupuesto: vincúlelo a la obra desde el contrato.":
+    "L'obra està vinculada a un contracte sense signar, i n'hi ha un altre ja signat per a aquest pressupost: vinculeu-lo a l'obra des del contracte.",
   "Nº documento": "Núm. document",
   Retención: "Retenció",
   "Factura de proveedor": "Factura de proveïdor",
@@ -1167,6 +1336,9 @@ window.CANEI_DICT.ca = {
   "Al 70 % de avance": "Al 70 % d'avanç",
   "Al 80 % de avance": "Al 80 % d'avanç",
   "Al 90 % de avance": "Al 90 % d'avanç",
+  vencida: "vençuda",
+  "en curso": "en curs",
+  previsto: "previst",
   "Vincular obra": "Vincular obra",
   Vincular: "Vincular",
   "Obra vinculada": "Obra vinculada",
