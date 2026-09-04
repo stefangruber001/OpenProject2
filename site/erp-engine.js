@@ -2206,10 +2206,8 @@
          proposal must not move a date the customer has not agreed to. */
       if (delta !== 0 && b.acceptedVersionId === v.id) {
         const prj = this.state.projects.find((x) => x.budgetId === budgetId);
-        if (prj) {
-          this.extendProjectDeadline(prj.id, delta, v.adiNumber, user);
+        if (prj && this.extendProjectDeadline(prj.id, delta, v.adiNumber, user))
           v.scheduleAppliedDays = want;
-        }
       }
       this._log(user, "setAdditionalScheduleDays", v.adiNumber + " +" + want + "d");
       return v;
@@ -3184,12 +3182,44 @@
           this.budgetTotals(budgetId, v.additionalOf).baseCents;
         from.superseded = true;
         from.frozen = true;
+        /* EVERY OTHER ADICIONAL STILL WAITING IS SUPERSEDED BY THIS ONE.
+           They were each cloned from the version this one just replaced, so
+           accepting any of them now would apply a revision of a scope that no
+           longer exists — and two adicionales both revising the same baseline
+           have no defined answer if both are accepted.
+
+           Reported by the operator, who had three on one job: one accepted and
+           two left «Emitido» for ever, which also kept the whole budget
+           reading «Enviados» after it had been settled. Superseded, frozen,
+           and visible as such rather than quietly dropped. */
+        for (const other of b.versions)
+          if (
+            other.additional &&
+            other.id !== v.id &&
+            !other.customerResponse &&
+            !other.superseded
+          ) {
+            other.superseded = true;
+            other.frozen = true;
+            this._log(
+              user,
+              "supersedeAdicional",
+              (other.adiNumber || other.id) + " ← " + v.adiNumber,
+            );
+          }
         b.acceptedVersionId = v.id;
         const prj = this.state.projects.find((x) => x.budgetId === budgetId);
         if (prj) {
           prj.acceptedVersionId = v.id;
-          this.extendProjectDeadline(prj.id, v.scheduleImpactDays, v.adiNumber, user);
-          v.scheduleAppliedDays = Math.max(0, Math.round(v.scheduleImpactDays || 0));
+          /* Marked applied only when it actually moved something.
+             `extendProjectDeadline` returns null on a job with no completion
+             date — it refuses to invent one — and recording the days as
+             applied anyway meant that if a date were set later, the delta
+             logic would believe they had already been counted and skip them.
+             The operator hit exactly this: a job with «Fin previsto» empty,
+             five days recorded, and nothing to show for them. */
+          if (this.extendProjectDeadline(prj.id, v.scheduleImpactDays, v.adiNumber, user))
+            v.scheduleAppliedDays = Math.max(0, Math.round(v.scheduleImpactDays || 0));
           /* The annex carries the DELTA, not the new total: `contractValue` is
              original + annexes, so handing it the whole revised scope would
              count the base twice. A reduction gives a negative annex, which is
@@ -3274,7 +3304,12 @@
          reported it had disappeared. What the row must say is what is waiting
          on somebody, and that is the adicional. */
       const openAdicional = (b.versions || []).some(
-        (v) => v.additional && v.issued && !v.customerResponse && b.acceptedVersionId !== v.id,
+        (v) =>
+          v.additional &&
+          v.issued &&
+          !v.customerResponse &&
+          !v.superseded &&
+          b.acceptedVersionId !== v.id,
       );
       if (openAdicional) return "issued";
       if (b.acceptedVersionId) return "accepted";

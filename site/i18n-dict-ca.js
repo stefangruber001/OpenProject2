@@ -622,6 +622,14 @@ window.CANEI_DICT.ca = {
   Reactivar: "Reactivar",
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
+  "＋ Días de los adicionales": "＋ Dies dels addicionals",
+  "Aplica a las tareas los días que declararon los adicionales aceptados de esta obra":
+    "Aplica a les tasques els dies que van declarar els addicionals acceptats d'aquesta obra",
+  "Planificación actualizada con los días de los adicionales":
+    "Planificació actualitzada amb els dies dels addicionals",
+  "Módulo de planificación no disponible": "Mòdul de planificació no disponible",
+  "Sin tarea derivada para la partida": "Sense tasca derivada per a la partida",
+  "— deriva la planificación primero": "— deriva la planificació primer",
   "Aceptar el adicional": "Acceptar l'addicional",
   "Adenda firmada": "Addenda signada",
   "Adicional aceptado — entra en la obra": "Addicional acceptat — entra a l'obra",

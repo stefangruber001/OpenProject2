@@ -755,6 +755,18 @@ window.CANEI_DICT = {
     ],
     ["Desactivada", "Deactivated"],
     ["Borrar la cuenta", "Delete the account"],
+    ["＋ Días de los adicionales", "＋ Days from the additionals"],
+    [
+      "Aplica a las tareas los días que declararon los adicionales aceptados de esta obra",
+      "Applies to the tasks the days declared by this site's accepted additionals",
+    ],
+    [
+      "Planificación actualizada con los días de los adicionales",
+      "Schedule updated with the additionals' days",
+    ],
+    ["Módulo de planificación no disponible", "Scheduling module not available"],
+    ["Sin tarea derivada para la partida", "No derived task for line item"],
+    ["— deriva la planificación primero", "— derive the schedule first"],
     ["Aceptar el adicional", "Accept the additional"],
     ["Adenda firmada", "Signed annex"],
     ["Adicional aceptado — entra en la obra", "Additional accepted — it enters the site"],
