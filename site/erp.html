@@ -5579,7 +5579,22 @@
    where the PRICE-EXPIRED alert lands. So the menu loses it and everything
    else keeps it: the alert still opens the screen, `#price-list` still works,
    and the register keeps recording. */
-      const HIDDEN_SUBS = new Set(["purchasing", "financials", "alerts", "price-list"]);
+      /* «variations» joins the hidden set rather than being deleted — the
+         operator's choice of the two offered. `state.changes` is not just a
+         screen: `projectEconomics` reads approved changes directly, so the
+         800 € on P-2026-0006 is part of that job's revenue and cost right
+         now, and it also feeds the certification proposal, the invoice draft
+         path and the dashboard counters. Removing the MODEL would move real
+         money; removing the ENTRY does not. The route still renders, so the
+         records already in flight can be finished, and everything new goes
+         through an adicional version instead (PK12-S13). */
+      const HIDDEN_SUBS = new Set([
+        "purchasing",
+        "financials",
+        "alerts",
+        "price-list",
+        "variations",
+      ]);
       const HIDDEN_CONTROLS = new Set(["bcValid"]);
       const SECTIONS = [
         {
@@ -13629,7 +13644,15 @@
         const openLeads = erp.state.opportunities.filter((o) =>
           ["awaitingVisit", "awaitingBudget"].includes(o.status),
         );
-        let mode = doneVisits.length ? "visit" : "lead";
+        /* THE THIRD ORIGIN: a job already under way. An adicional is not a new
+           quote for a new customer — it is a revision of the scope somebody
+           already accepted, so it starts from the job rather than from a
+           visit or a lead. Offered here because this is where the operator
+           looks when there is a budget to write, whatever kind it is. */
+        const revisable = erp.state.projects.filter(
+          (p) => !p.closed && p.budgetId && p.acceptedVersionId,
+        );
+        let mode = doneVisits.length ? "visit" : openLeads.length ? "lead" : "additional";
         const db = openDrawer("Nuevo presupuesto");
         const paint = () => {
           db.innerHTML = `
@@ -13650,10 +13673,30 @@
         ? "No hace falta esperar a la visita para preparar el presupuesto."
         : "No hay ningún lead abierto todavía."
     }</div>
+    <div class="it"><label class="opt">
+      <input type="radio" name="bnmode" value="additional" ${mode === "additional" ? "checked" : ""}${revisable.length ? "" : " disabled"}>
+      <span>Adicional de una obra en marcha</span></label></div>
+    <div class="it" style="color:var(--muted);margin-top:-4px">${
+      revisable.length
+        ? "Se copia el alcance aceptado de la obra para modificarlo, ampliarlo o reducirlo. El presupuesto original se conserva."
+        : "No hay ninguna obra con presupuesto aceptado todavía."
+    }</div>
    </div></div>
    ${
-     mode === "visit"
-       ? `<div class="card"><div class="ch"><h3>Visita</h3></div><div class="daylist" style="gap:9px">
+     mode === "additional"
+       ? `<div class="card"><div class="ch"><h3>Obra</h3></div><div class="daylist" style="gap:9px">
+    <div class="it"><label class="opt">Obra en marcha
+      <select id="bn_prj" style="margin-left:auto">${revisable
+        .map(
+          (p) =>
+            `<option value="${esc(p.id)}">${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</option>`,
+        )
+        .join("")}</select></label></div>
+    <div class="it"><label class="opt">Motivo
+      <input id="bn_why" placeholder="Ampliación de la instalación eléctrica" style="margin-left:auto"></label></div>
+   </div></div>`
+       : mode === "visit"
+         ? `<div class="card"><div class="ch"><h3>Visita</h3></div><div class="daylist" style="gap:9px">
     <div class="it"><label class="opt">Visita realizada
       <select id="bn_visit" style="margin-left:auto">${doneVisits
         .map((x) => {
@@ -13662,7 +13705,7 @@
         })
         .join("")}</select></label></div>
    </div></div>`
-       : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
+         : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
     <div class="it"><label class="opt">Lead abierto
       <select id="bn_lead" style="margin-left:auto">${openLeads
         .map(
@@ -13672,7 +13715,7 @@
         .join("")}</select></label></div>
    </div></div>`
    }
-   <div style="margin-top:10px"><button class="btn primary" id="bn_save"${doneVisits.length || openLeads.length ? "" : " disabled"}>Crear presupuesto</button></div>`;
+   <div style="margin-top:10px"><button class="btn primary" id="bn_save"${doneVisits.length || openLeads.length || revisable.length ? "" : " disabled"}>Crear presupuesto</button></div>`;
           db.querySelectorAll('input[name="bnmode"]').forEach((r) => {
             r.onchange = () => {
               mode = r.value;
@@ -13683,6 +13726,18 @@
         };
         const save = () =>
           mutate(() => {
+            if (mode === "additional") {
+              if (!revisable.length) throw new Error("No hay ninguna obra con alcance aceptado");
+              const prj = revisable.find((x) => x.id === $("#bn_prj").value) || revisable[0];
+              const v = erp.createAdditionalVersion(
+                prj.budgetId,
+                { reason: $("#bn_why").value },
+                "backoffice",
+              );
+              closeDrawer();
+              go("quotes", prj.budgetId);
+              return v;
+            }
             let partyId,
               propertyId,
               visit = null;
@@ -13904,7 +13959,7 @@
    <div class="pb">
     <div class="pbbar">
      <button class="btn sm" id="bBack" title="Todos los presupuestos">←</button>
-     <div class="who"><b>${b.number} · v${V.vNumber}</b><span>${esc(erp.party(b.partyId).name)}${
+     <div class="who"><b>${b.number} · v${V.vNumber}${V.additional ? ` · ${esc(V.adiNumber)}` : ""}</b><span>${esc(erp.party(b.partyId).name)}${
        b.variationOf
          ? (() => {
              try {
@@ -18583,7 +18638,37 @@
             "Contratos vigentes e históricos. El importe vigente se marca en ámbar cuando ya no coincide con el original: significa que hay anexos.";
           if (conWork) return contractScreen(v);
           const all = erp.contractsView();
-          const rows = all.filter((c) => (conTab === "active" ? c.active : !c.active));
+          /* THE THIRD TAB: the adicionales themselves, not the contracts they
+             hang off. An adicional is a version of a budget, so it appears in
+             no contract list — and the operator asked for the one place where
+             they can all be seen and formalised. Built from the versions
+             rather than from a register, because the versions ARE the record;
+             a second list kept beside them would be a second truth. */
+          const adiRows = erp.state.budgets.flatMap((b) =>
+            (b.versions || [])
+              .filter((v) => v.additional)
+              .map((v) => {
+                const prj = erp.state.projects.find((x) => x.budgetId === b.id);
+                const t = erp.budgetTotals(b.id, v.id);
+                const from = erp.budgetTotals(b.id, v.additionalOf);
+                return {
+                  id: b.id + "|" + v.id,
+                  budgetId: b.id,
+                  versionId: v.id,
+                  number: v.adiNumber || b.number,
+                  party: erp.party(b.partyId).name,
+                  projectCode: prj ? prj.code : "—",
+                  deltaCents: t.baseCents - from.baseCents,
+                  days: v.scheduleImpactDays || 0,
+                  accepted: b.acceptedVersionId === v.id,
+                  issued: !!v.issued,
+                };
+              }),
+          );
+          const rows =
+            conTab === "adicionales"
+              ? adiRows
+              : all.filter((c) => (conTab === "active" ? c.active : !c.active));
           const CST = {
             draft: ["Borrador", ""],
             sent: ["Enviado", "b"],
@@ -18594,7 +18679,8 @@
           };
           v.innerHTML = `
    <div class="tabstrip">
-     <button class="tab${conTab === "active" ? " on" : ""}" data-ctab="active">Vigentes</button>
+     <button class="tab${conTab === "active" ? " on" : ""}" data-ctab="active">Contratos vigentes</button>
+     <button class="tab${conTab === "adicionales" ? " on" : ""}" data-ctab="adicionales">Adicionales</button>
      <button class="tab${conTab === "inactive" ? " on" : ""}" data-ctab="inactive">Históricos</button>
    </div>
    <div id="conList"></div>`;
@@ -18610,8 +18696,8 @@
             // Package 2 slide 4: there was no way to create a contract at
             // all — not by hand, and not even from an accepted presupuesto.
             // Every contract in the system came from the seed.
-            newLabel: "＋ Nuevo contrato",
-            onNew: () => newContractDrawer(),
+            newLabel: conTab === "adicionales" ? "＋ Nuevo adicional" : "＋ Nuevo contrato",
+            onNew: () => (conTab === "adicionales" ? newAdditionalDrawer() : newContractDrawer()),
             ids: {
               q: "conQ",
               newBtn: "conNew",
@@ -18634,35 +18720,70 @@
                 .join(" ")
                 .toLowerCase()
                 .includes(q),
-            columns: [
-              { label: "Contrato", primary: true, get: (c) => c.number },
-              { label: "Cliente", get: (c) => c.party },
-              { label: "Obra", get: (c) => c.projectCode || "—" },
-              { label: "Importe original", html: (c) => eur0(c.originalCents) },
-              {
-                label: "Importe vigente",
-                html: (c) =>
-                  c.differs
-                    ? `<span class="pill y">${eur0(c.currentCents)}</span>`
-                    : eur0(c.currentCents),
-              },
-              { label: "Anexos", get: (c) => c.annexes || "—" },
-              {
-                label: "Firma",
-                html: (c) =>
-                  c.signed
-                    ? '<span class="pill g">Firmado</span>'
-                    : '<span class="pill r">Sin firmar</span>',
-              },
-              {
-                label: "Estado",
-                html: (c) => {
-                  const l = CST[c.status] || [c.status, ""];
-                  return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
-                },
-              },
-            ],
+            columns:
+              conTab === "adicionales"
+                ? [
+                    { label: "Adicional", primary: true, get: (r) => r.number },
+                    { label: "Cliente", get: (r) => r.party },
+                    { label: "Obra", get: (r) => r.projectCode },
+                    {
+                      label: "Efecto en venta",
+                      html: (r) =>
+                        `<span style="color:${r.deltaCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${r.deltaCents > 0 ? "+" : ""}${eur0(r.deltaCents)}</span>`,
+                      get: (r) => r.deltaCents,
+                    },
+                    {
+                      label: "Plazo",
+                      html: (r) => (r.days ? adiDays(r.days) : "—"),
+                      get: (r) => r.days,
+                    },
+                    {
+                      /* Through a lookup, not a nested ternary between quoted
+                         literals: the source audit pairs quotes across one and
+                         reports the code between them as a user-visible
+                         string. Fourth variant of that trap in this package. */
+                      label: "Estado",
+                      html: (r) => adiPill(r),
+                      get: (r) => ADI_STATE[adiState(r)][0],
+                    },
+                  ]
+                : [
+                    { label: "Contrato", primary: true, get: (c) => c.number },
+                    { label: "Cliente", get: (c) => c.party },
+                    { label: "Obra", get: (c) => c.projectCode || "—" },
+                    { label: "Importe original", html: (c) => eur0(c.originalCents) },
+                    {
+                      label: "Importe vigente",
+                      html: (c) =>
+                        c.differs
+                          ? `<span class="pill y">${eur0(c.currentCents)}</span>`
+                          : eur0(c.currentCents),
+                    },
+                    { label: "Anexos", get: (c) => c.annexes || "—" },
+                    {
+                      label: "Firma",
+                      html: (c) =>
+                        c.signed
+                          ? '<span class="pill g">Firmado</span>'
+                          : '<span class="pill r">Sin firmar</span>',
+                    },
+                    {
+                      label: "Estado",
+                      html: (c) => {
+                        const l = CST[c.status] || [c.status, ""];
+                        return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
+                      },
+                    },
+                  ],
             onRowClick: (id) => {
+              /* An adicional row opens its BUDGET, because that is what it is.
+                 Sending it to a contract screen would be sending the reader to
+                 the document it will eventually hang off rather than to the
+                 scope they clicked on. */
+              if (conTab === "adicionales") {
+                go("quotes", String(id).split("|")[0]);
+                return;
+              }
               conWork = { id, tab: "datos" };
               render();
             },
@@ -21831,6 +21952,146 @@
               erp.setVariationScheduleDays(b.id, Number($("#ax_days").value) || 0, "backoffice");
               closeDrawer();
             }, "Adenda guardada");
+      }
+      /**
+       * FORMALISING AN ADICIONAL — the operator's point 6.
+       *
+       * Not a second way to create one: the scope was written in the quote
+       * builder like any other. This is where an issued adicional gets its
+       * answer, which is the same question a contract asks and deserves the
+       * same two options — the signed adenda as a file, or an honest record
+       * that the customer said yes by WhatsApp, by email, or on site. Both
+       * land in `acceptVersion`, which has taken `evidence` and `acceptedBy`
+       * since it was written.
+       *
+       * And the days, per partida, because that is where the time is spent
+       * and it is what the schedule can consume.
+       */
+      /** An adicional's stage, and the pill that says it. */
+      /* Label and tone, not markup — the shape `CHANGE_STATUS_LABEL` already
+         uses two screens up. Storing the pills as literals put two backticked
+         strings side by side in one object, and the source audit pairs across
+         them exactly as it does across a ternary. One literal, built once. */
+      const ADI_STATE = {
+        accepted: ["Aceptado", "g"],
+        issued: ["Emitido", "b"],
+        draft: ["Borrador", "y"],
+      };
+      const adiState = (r) => (r.accepted ? "accepted" : r.issued ? "issued" : "draft");
+      const adiPill = (r) => {
+        const [lab, tone] = ADI_STATE[adiState(r)];
+        return `<span class="pill ${tone}">${lab}</span>`;
+      };
+      const adiDays = (n) => `<span translate="no">+${n} d</span>`;
+      function newAdditionalDrawer() {
+        const pending = erp.state.budgets.flatMap((b) =>
+          (b.versions || [])
+            .filter((v) => v.additional && v.issued && b.acceptedVersionId !== v.id)
+            .map((v) => ({ b, v })),
+        );
+        const db = openDrawer("Formalizar un adicional");
+        if (!pending.length) {
+          db.innerHTML = `<div class="card"><div class="ch"><h3>Nada que formalizar</h3></div>
+    <div class="daylist"><div class="it">Un adicional se escribe en Presupuestos — «Nuevo presupuesto» → «Adicional de una obra en marcha» — y se formaliza aquí cuando el cliente responde.</div>
+    <div class="it">Ahora mismo no hay ninguno emitido esperando respuesta.</div></div></div>`;
+          return;
+        }
+        let pick = pending[0];
+        const paint = () => {
+          const prj = erp.state.projects.find((x) => x.budgetId === pick.b.id);
+          const d = erp.diffVersions(pick.b.id, pick.v.additionalOf, pick.v.id);
+          const chapters = erp
+            .version(pick.b.id, pick.v.id)
+            .chapters.filter((c) => c.section === "base");
+          db.innerHTML = `<div class="card"><div class="ch"><h3>Adicional</h3></div>
+    <div class="daylist" style="gap:9px">
+     <div class="it"><label class="opt">Cuál
+       <select id="ad_pick" style="margin-left:auto">${pending
+         .map(
+           (x) =>
+             `<option value="${esc(x.v.id)}"${x.v.id === pick.v.id ? " selected" : ""}>${esc(x.v.adiNumber)} · ${esc(erp.party(x.b.partyId).name)}</option>`,
+         )
+         .join("")}</select></label></div>
+     <div class="it"><span style="flex:1">Obra</span><b>${esc(prj ? prj.code : "—")}</b></div>
+     <div class="it"><span style="flex:1">Efecto en venta</span><b>${d.deltaCents > 0 ? "+" : ""}${eur(d.deltaCents)}</b></div>
+     <div class="it"><span style="flex:1">Efecto en coste</span><b>${d.costDeltaCents > 0 ? "+" : ""}${eur(d.costDeltaCents)}</b></div>
+     <div class="it"><span style="flex:1">Margen después</span><b>${d.marginToPct}%</b></div>
+    </div></div>
+   <div class="card"><div class="ch"><h3>Efecto en plazo, por partida</h3></div>
+    <div class="fgrid" style="padding:12px 16px">
+     ${chapters
+       .map(
+         (c) =>
+           `<div class="field"><label>${esc(c.num)}. ${esc(c.name)}</label>
+        <input class="adDay" data-chap="${esc(c.num)}" type="number" min="0" step="1" value="${Number((pick.v.scheduleDaysByChapter || {})[c.num]) || 0}"></div>`,
+       )
+       .join("")}
+     <div class="field full" style="color:var(--muted);font-size:12.5px">El total mueve la fecha de fin. Se propone la suma; cámbielo si las partidas se solapan.</div>
+     <div class="field"><label>Total de días</label><input id="ad_total" type="number" min="0" step="1" value="${Number(pick.v.scheduleImpactDays) || 0}"></div>
+    </div></div>
+   <div class="card"><div class="ch"><h3>Cómo lo aceptó el cliente</h3></div>
+    <div class="daylist" style="gap:9px">
+     <div class="it"><label class="opt">Quién aceptó
+       <input id="ad_who" placeholder="Nombre de quien dio el visto bueno" style="margin-left:auto"></label></div>
+     <div class="it"><label class="opt">Cómo
+       <select id="ad_how" style="margin-left:auto">
+         <option value="adenda">Adenda firmada</option>
+         <option value="email">Correo electrónico</option>
+         <option value="whatsapp">WhatsApp</option>
+         <option value="verbal">De palabra, en obra</option>
+       </select></label></div>
+     <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Justificante</label>
+      <div id="ad_doc"></div></div>
+     <div class="it" style="color:var(--muted)">Una aceptación informal es un hecho como cualquier otro: se registra quién y cómo, y el adicional entra en la obra igual. Sin justificante queda anotado que no lo hay.</div>
+    </div></div>`;
+          const ev = evidenceField($("#ad_doc"), {
+            value: held,
+            prefix: "adi",
+            hint: "Arrastra aquí la adenda firmada, el correo o la captura del WhatsApp.",
+            onChange: (r) => {
+              held = r;
+            },
+          });
+          void ev;
+          $("#ad_pick").onchange = (e) => {
+            pick = pending.find((x) => x.v.id === e.target.value) || pending[0];
+            paint();
+          };
+          // The total follows the sum until somebody says otherwise.
+          db.querySelectorAll(".adDay").forEach((i) => {
+            i.oninput = () => {
+              const sum = [...db.querySelectorAll(".adDay")].reduce(
+                (a, x) => a + (Number(x.value) || 0),
+                0,
+              );
+              $("#ad_total").value = sum;
+            };
+          });
+          drawerFoot('<button class="btn primary" id="ad_go">Aceptar el adicional</button>');
+          $("#ad_go").onclick = () =>
+            mutate(() => {
+              const by = {};
+              db.querySelectorAll(".adDay").forEach((i) => {
+                by[i.dataset.chap] = Number(i.value) || 0;
+              });
+              erp.setAdditionalScheduleDays(
+                pick.b.id,
+                pick.v.id,
+                by,
+                Number($("#ad_total").value) || 0,
+                "backoffice",
+              );
+              erp.acceptVersion(
+                pick.b.id,
+                pick.v.id,
+                { evidence: held, acceptedBy: $("#ad_who").value || null },
+                "backoffice",
+              );
+              closeDrawer();
+            }, "Adicional aceptado — entra en la obra");
+        };
+        let held = null;
+        paint();
       }
       function newContractDrawer(seed) {
         const linkable = erp.state.budgets.filter(

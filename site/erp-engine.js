@@ -2066,10 +2066,60 @@
         additionalOf: b.acceptedVersionId,
         adiNumber: this.nextNumber("additional"),
         scheduleImpactDays: Math.max(0, Math.round(scheduleImpactDays || 0)),
+        /* PER PARTIDA, because that is where the time is actually spent and it
+           is what the Gantt can consume (`applyChapterDelay` takes a chapter
+           and a number of days). The TOTAL stays a separate figure rather than
+           the sum of these: whether two partidas run one after the other or at
+           the same time is a scheduling judgement, and an engine that summed
+           them would be inventing a plan nobody drew. It defaults to the sum
+           and the operator can say otherwise. */
+        scheduleDaysByChapter: {},
       };
       b.versions.push(v);
       b.currentVersionId = v.id;
       this._log(user, "createAdditionalVersion", b.number + " " + v.adiNumber);
+      return v;
+    }
+    /**
+     * How many days each partida of an adicional adds, and the total.
+     *
+     * Two figures, not one derived from the other. The breakdown is what the
+     * schedule consumes — one delay per partida, through the bridge's
+     * `applyChapterDelay` — and the total is what moves the job's completion
+     * date. They are allowed to differ: three days on partida 1 and two on
+     * partida 4 is five days if they run in sequence and three if they
+     * overlap, and only the person planning the work knows which.
+     *
+     * Applying the breakdown to the Gantt stays a DELIBERATE separate action,
+     * the rule `erp-ownership.json` already records for change orders: one
+     * action, one system of record. Accepting an adicional moves the date and
+     * records the intent; it does not silently redraw somebody's plan.
+     */
+    setAdditionalScheduleDays(budgetId, versionId, byChapter, totalDays, user) {
+      const b = this.budget(budgetId);
+      const v = this.version(budgetId, versionId);
+      if (!v.additional) throw new Error("Only an adicional carries days of its own");
+      const clean = {};
+      for (const k of Object.keys(byChapter || {})) {
+        const n = Math.round(Number(byChapter[k]) || 0);
+        if (n) clean[String(k)] = n;
+      }
+      v.scheduleDaysByChapter = clean;
+      const summed = Object.values(clean).reduce((a, n) => a + n, 0);
+      const want = Math.max(0, Math.round(totalDays == null ? summed : totalDays));
+      const applied = Math.max(0, Math.round(v.scheduleAppliedDays || 0));
+      v.scheduleImpactDays = want;
+      const delta = want - applied;
+      /* Only once accepted, for `setVariationScheduleDays`'s reason: a
+         proposal must not move a date the customer has not agreed to. */
+      if (delta !== 0 && b.acceptedVersionId === v.id) {
+        const prj = this.state.projects.find((x) => x.budgetId === budgetId);
+        if (prj) {
+          this.extendProjectDeadline(prj.id, delta, v.adiNumber, user);
+          v.scheduleAppliedDays = want;
+        }
+      }
+      this._log(user, "setAdditionalScheduleDays", v.adiNumber + " +" + want + "d");
       return v;
     }
     /**
