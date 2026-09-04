@@ -1821,10 +1821,10 @@ async function testShell(browser, base) {
       // (PRY-04, Proyectos): it is a page of its own, so it carries `href` and
       // the menu marks it with ↗, the same shape Datos financieros has.
       shape.subs === 31 &&
-      shape.hidden === "alerts,financials,price-list,purchasing"
+      shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
-      ok("shell: 6 secciones × 31 declared subs, 4 hidden by name");
-    else bad("shell: 6×31 (4 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 31 declared subs, 5 hidden by name");
+    else bad("shell: 6×31 (5 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -1866,9 +1866,12 @@ async function testShell(browser, base) {
     else bad("shell: admin order", adminOrder);
 
     /* Press a section → panel 2 opens with that section's subsections.
-       Five since Part 2 · item 15 moved Adicionales here from Proyectos —
-       asserted by NAME as well as by count, so the next move is a deliberate
-       edit rather than a number nudged until the test goes quiet. */
+       FOUR since PK12-S13 took Adicionales off the menu. An adicional is a
+       version of the budget now, written in Presupuestos and formalised on the
+       Contratos screen, so a section of its own would be a third door onto a
+       decision that already has two. The old register's ROUTE still renders —
+       `state.changes` feeds `projectEconomics` and its records are still live
+       — it is only out of the menu. Asserted by NAME as well as by count. */
     await pg.locator('#p1 .secitem[data-sec="sales"]').click();
     await pg.waitForTimeout(250);
     const salesSubs = await pg.evaluate(() =>
@@ -1876,8 +1879,8 @@ async function testShell(browser, base) {
         b.querySelector("span").textContent.trim(),
       ),
     );
-    if (salesSubs.join(" · ") === "Leads · Visitas · Presupuestos · Contratos · Adicionales")
-      ok("shell: Comercial opens its five subsections, Adicionales among them");
+    if (salesSubs.join(" · ") === "Leads · Visitas · Presupuestos · Contratos")
+      ok("shell: Comercial opens its four subsections — Adicionales is a budget now");
     else bad("shell: section opens panel", salesSubs.join(" · "));
 
     /* …and Proyectos keeps the two that are about building it. Built in page
@@ -7571,11 +7574,41 @@ async function testContract(browser, base) {
     const inactiveRows = await pg.locator("#view table.mlist tr.click").count();
     await pg.locator('[data-ctab="active"]').click();
     await pg.waitForTimeout(500);
-    if (tabs.length === 2 && activeRows > 0 && activeRows !== inactiveRows)
+    /* THREE tabs since PK12-S13: the adicionales got one of their own, and
+       «Vigentes» became «Contratos vigentes» because a tab beside it now lists
+       something else that is also in force. Asserted by NAME as well as by
+       count — the split between the two contract tabs is the property that
+       matters, and a third tab that listed contracts again would pass a bare
+       count of three. */
+    if (
+      tabs.length === 3 &&
+      /Contratos vigentes/.test(tabs[0]) &&
+      /Adicionales/.test(tabs[1]) &&
+      activeRows > 0 &&
+      activeRows !== inactiveRows
+    )
       ok(
-        `COM-04: two tabs split the register (${activeRows} vigentes / ${inactiveRows} históricos)`,
+        `COM-04: three tabs — contracts split in two, adicionales their own (${activeRows}/${inactiveRows})`,
       );
     else bad("COM-04: tabs", `${tabs.join("/")} · ${activeRows}/${inactiveRows}`);
+
+    /* …and the adicionales tab is the versions, not a second register. Empty
+       on the demo, which is the honest state: nothing has been revised yet.
+       What must be true is that the tab exists, switches, and offers its own
+       creation door rather than the contract one. */
+    await pg.locator('[data-ctab="adicionales"]').click();
+    await pg.waitForTimeout(500);
+    const adiTab = await pg.evaluate(() => ({
+      newLabel: (document.querySelector("#conNew") || {}).textContent || "",
+      cols: [...document.querySelectorAll("#view table.mlist thead th")].map((t) =>
+        t.textContent.trim(),
+      ),
+    }));
+    if (/Nuevo adicional/.test(adiTab.newLabel) && adiTab.cols.includes("Adicional"))
+      ok("COM-04: the adicionales tab has its own columns and its own creation door");
+    else bad("COM-04: adicionales tab", JSON.stringify(adiTab));
+    await pg.locator('[data-ctab="active"]').click();
+    await pg.waitForTimeout(500);
 
     // The amber column, checked against the engine rather than against a
     // colour: a pill appears exactly where annexes exist.
