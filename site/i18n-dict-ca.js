@@ -656,6 +656,10 @@ window.CANEI_DICT.ca = {
   "Quién aceptó": "Qui va acceptar",
   "Total de días": "Total de dies",
   "Días de los adicionales": "Dies dels addicionals",
+  "Las duraciones se vuelven a calcular a partir de las cantidades del presupuesto: una barra alargada o acortada a mano vuelve a su duración derivada.":
+    "Les durades es tornen a calcular a partir de les quantitats del pressupost: una barra allargada o escurçada a mà torna a la seva durada derivada.",
+  " Se conservan el avance registrado, las líneas base congeladas, las fechas fijadas a mano y los días de los adicionales ya aplicados.":
+    " Es conserven l'avenç registrat, les línies base congelades, les dates fixades a mà i els dies dels addicionals ja aplicats.",
   "Aplicar a la planificación": "Aplicar a la planificació",
   "En la planificación: pendiente": "A la planificació: pendent",
   "Los días de cada partida alargan su barra en la planificación. El total mueve la fecha de fin de obra: se propone la suma, cámbielo si las partidas se solapan.":

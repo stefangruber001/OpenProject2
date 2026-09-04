@@ -796,6 +796,14 @@ window.CANEI_DICT = {
     ["Quién aceptó", "Who accepted"],
     ["Total de días", "Total days"],
     ["Días de los adicionales", "Days from the additionals"],
+    [
+      "Las duraciones se vuelven a calcular a partir de las cantidades del presupuesto: una barra alargada o acortada a mano vuelve a su duración derivada.",
+      "Durations are recomputed from the quantities in the quote: a bar lengthened or shortened by hand goes back to its derived duration.",
+    ],
+    [
+      " Se conservan el avance registrado, las líneas base congeladas, las fechas fijadas a mano y los días de los adicionales ya aplicados.",
+      " Recorded progress, frozen baselines, dates pinned by hand and the days of additionals already applied are kept.",
+    ],
     ["Aplicar a la planificación", "Apply to the schedule"],
     ["En la planificación: pendiente", "In the schedule: pending"],
     [

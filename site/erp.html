@@ -7487,9 +7487,17 @@
         const before = B ? B.get(erp.state, pid) : null;
         if (before && before.tasks.length) {
           const byHand = before.tasks.filter((t) => !/^group:/.test(t.sourceRef || "")).length;
+          /* THE DURATIONS ARE RECOMPUTED, and this dialogue used to say only
+               what was conserved — so a reader filled the silence in with
+               «durations too». Deriving rebuilds every bar from quantity ÷ daily
+               output; anything lengthened or shortened by hand goes back to the
+               derived figure. The operator pressed it after applying an
+               adicional, watched the whole chart change and could not tell what
+               it was showing any more. Said out loud now, and first. */
           const go = await askConfirm("¿Volver a derivar la planificación?", {
             body:
-              "Se conservan el avance registrado, las líneas base congeladas y las fechas fijadas a mano." +
+              "Las duraciones se vuelven a calcular a partir de las cantidades del presupuesto: una barra alargada o acortada a mano vuelve a su duración derivada." +
+              " Se conservan el avance registrado, las líneas base congeladas, las fechas fijadas a mano y los días de los adicionales ya aplicados." +
               (byHand
                 ? ` Se pierden ${byHand === 1 ? "la tarea o hito añadido" : `las ${byHand} tareas o hitos añadidos`} a mano y las dependencias dibujadas sobre el gráfico.`
                 : " Se pierden las dependencias dibujadas a mano sobre el gráfico."),
@@ -7510,7 +7518,15 @@
               ? `${guessed} sin rendimiento conocido (duración por defecto)`
               : "duraciones derivadas de las cantidades");
           mutate(() => {
-            B.save(erp.state, pid, derived.plan);
+            /* THE ADICIONAL DAYS SURVIVE THE REBUILD. They are a recorded fact
+                 on the version, not a hand-tweak on a bar — the customer agreed
+                 to them and the completion date already moved for them — so a
+                 plan rebuilt from the budget has to carry them back. It did not,
+                 and because the version stays marked as applied the button that
+                 puts them there never returned: five agreed days vanished with
+                 nothing on screen saying so. Re-deriving is now idempotent for
+                 them, which is what makes the button safe to press twice. */
+            B.save(erp.state, pid, reapplyAdiDays(pid, derived.plan, B));
           }, msg);
         } catch (e) {
           toast("⚠ " + e.message);
@@ -22097,6 +22113,35 @@
         return (b.versions || []).filter(
           (v) => v.additional && b.acceptedVersionId === v.id && !v.scheduleAppliedToPlan,
         );
+      }
+      /**
+       * The adicionales of a job whose days are already IN the plan.
+       *
+       * Not the same question as `adiDaysPending`, and it survives supersession
+       * on purpose: days that were applied were applied to real bars, and a
+       * later adicional freezing an unanswered sibling does not un-lengthen the
+       * work that was agreed.
+       */
+      function adiDaysApplied(projectId) {
+        const p = erp.state.projects.find((x) => x.id === projectId);
+        if (!p || !p.budgetId) return [];
+        const b = erp.budget(p.budgetId);
+        return (b.versions || []).filter(
+          (v) =>
+            v.additional &&
+            v.scheduleAppliedToPlan &&
+            Object.keys(v.scheduleDaysByChapter || {}).length,
+        );
+      }
+      /** A freshly derived plan, with the applied adicional days put back on it. */
+      function reapplyAdiDays(projectId, plan, api) {
+        const B = api || ganttApi();
+        if (!B) return plan;
+        let out = plan;
+        for (const v of adiDaysApplied(projectId))
+          for (const num of Object.keys(v.scheduleDaysByChapter))
+            out = B.applyChapterDelay(out, num, v.scheduleDaysByChapter[num]);
+        return out === plan ? plan : B.recalculate(out);
       }
       /**
        * The days an accepted adicional adds, entered against the plan.

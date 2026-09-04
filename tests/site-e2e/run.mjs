@@ -3649,6 +3649,39 @@ async function testVariationBudget(browser, base) {
       out.buttonAfter = !!document.querySelector("#gAdi");
       return out;
     });
+    /* …AND THE DAYS SURVIVE A REBUILD. Deriving recomputes every duration from
+       the quantities, and `mergeDerivedPlan` carries progress, baselines and
+       pinned dates across but not lengths — so the five agreed days were
+       recomputed away while the version stayed marked as applied, which meant
+       the button never came back either. The operator pressed derive after
+       applying an adicional: "all changed. No idea now what is the Graph
+       showing." Idempotence is what makes that button safe to press. */
+    const adiSurvives = adiDoor.skip
+      ? { skip: true }
+      : await pg.evaluate(async () => {
+          const B = ganttApi();
+          const d = document.querySelector("#gDerive");
+          if (!d || d.disabled) return { skip: true };
+          d.click();
+          await new Promise((r) => setTimeout(r, 600));
+          const ok = [...document.querySelectorAll("button")].find((b) =>
+            /Volver a derivar/.test(b.textContent),
+          );
+          const warns = /duraciones se vuelven a calcular/i.test(
+            document.querySelector(".modal, .confirm, #dbody, body").innerText,
+          );
+          if (ok) ok.click();
+          await new Promise((r) => setTimeout(r, 1200));
+          const t = B.get(erp.state, gProject).tasks.find((x) => x.sourceRef === "group:1");
+          return { warns, after: t ? t.durationDays : null };
+        });
+    if (adiSurvives.skip) ok("5-6: adicional days after a re-derive — nothing to derive, skipped");
+    else if (adiSurvives.warns && adiSurvives.after === adiDoor.after)
+      ok(
+        `5-6: re-deriving warns that durations are recomputed and puts the adicional days back (${adiSurvives.after} d)`,
+      );
+    else bad("5-6: adicional days survive a re-derive", JSON.stringify(adiSurvives));
+
     if (adiDoor.skip) ok("5-6: adicional days door — no derived plan to move, skipped");
     else if (
       adiDoor.button &&
