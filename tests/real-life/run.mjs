@@ -109,20 +109,23 @@ const capInfo = await pg.evaluate(async () => {
 });
 await pg.evaluate((id) => captureDrawer(id), capInfo.capId);
 await pg.waitForTimeout(400);
-await pg.click("#cd_bill");
-await pg.waitForTimeout(400);
 /* Since PK12 a bill must be allocated — a cost that belongs to nothing is the
    one thing the rule forbids. An electricity bill is a general expense, so it
    goes where general expenses go, and the drawer refuses before the engine if
-   it does not. */
+   it does not.
+
+   Since PK13-S9 the split and the registration are ONE press: «Asignar» is
+   gone, so the destination is set on the document's own rows and «Registrar
+   como factura» writes the split, files the bill against the supplier the
+   document names, and puts it in front of the bank. */
 await pg.evaluate(() => {
-  const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+  const dest = document.querySelector('#cd_rows [data-ai="0"][data-k="dest"]');
   dest.value = "o:office";
   dest.dispatchEvent(new Event("change", { bubbles: true }));
 });
 await pg.waitForTimeout(300);
-await pg.click("#bd_go");
-await pg.waitForTimeout(600);
+await pg.click("#cd_bill");
+await pg.waitForTimeout(700);
 const bill = await pg.evaluate(() => {
   const b = erp.state.bills.find((x) => x.number === "RL-ENDESA-77");
   return b && { id: b.id, total: b.totalCents, name: b.supplierName, taxId: b.supplierTaxId };

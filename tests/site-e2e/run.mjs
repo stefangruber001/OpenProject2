@@ -2873,36 +2873,38 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: a validated document offers to become a supplier invoice");
     else bad("AP-01: promote button", JSON.stringify(promoteBtn));
 
-    await pg.click("#cd_bill");
-    await pg.waitForTimeout(400);
-    // The supplier read off the page is PROPOSED, and the number and base come
-    // across so the operator confirms rather than retypes.
+    /* PK13-S9 · THE SECOND FORM IS GONE. There is nothing to prefill any more,
+       because nothing is asked twice: the split is set on the document's own
+       rows and one press files the bill off the figures already read. What used
+       to be «the reading is carried into the form» is now «the reading is
+       carried into the bill», which is the same promise with a screen removed
+       from the middle of it. */
     const prefilled = await pg.evaluate(() => ({
-      num: document.getElementById("bd_num").value,
-      base: document.getElementById("bd_base").value,
-      sup: document.getElementById("bd_sup").value,
+      noSecondForm: !document.getElementById("bd_num"),
+      saysSupplier: /proveedor/i.test(
+        document.querySelector("#cd_bill")?.closest(".card")?.textContent || "",
+      ),
+      oneAction: !document.getElementById("cd_alloc") && !!document.getElementById("cd_bill"),
     }));
-    if (prefilled.num === "E2E-CAP-7" && Number(prefilled.base) === 500 && prefilled.sup)
-      ok("AP-01: the reading is carried into the form instead of being retyped");
-    else bad("AP-01: capture prefills the bill", JSON.stringify(prefilled));
+    if (prefilled.noSecondForm && prefilled.saysSupplier && prefilled.oneAction)
+      ok("AP-01: one action on the document itself — no second form to retype it into");
+    else bad("AP-01: no second form", JSON.stringify(prefilled));
 
     await pg.evaluate(() => {
-      const dest = document.querySelector('#bd_rows [data-ai="0"][data-k="dest"]');
+      const dest = document.querySelector('#cd_rows [data-ai="0"][data-k="dest"]');
       dest.value = "o:office";
       dest.dispatchEvent(new Event("change", { bubbles: true }));
       /* The AMOUNT as well as the destination: a row seeded before the base
          was typed carries zero, and a zero row is dropped rather than filed —
          so setting only the destination leaves the bill with no allocation and
          the drawer correctly refuses it. */
-      const amt = document.querySelector('#bd_rows [data-ai="0"][data-k="amountCents"]');
-      amt.value = String(
-        Number(String(document.getElementById("bd_base").value).replace(",", ".")),
-      );
+      const amt = document.querySelector('#cd_rows [data-ai="0"][data-k="amountCents"]');
+      amt.value = "500.00";
       amt.dispatchEvent(new Event("change", { bubbles: true }));
     });
     await pg.waitForTimeout(300);
-    await pg.click("#bd_go");
-    await pg.waitForTimeout(700);
+    await pg.click("#cd_bill");
+    await pg.waitForTimeout(800);
     const linked = await pg.evaluate((id) => {
       const c = erp.state.captured.find((x) => x.id === id);
       const b = erp.state.bills.find((x) => x.number === "E2E-CAP-7");
@@ -4040,7 +4042,9 @@ async function testCapture(browser, base) {
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().fill("100.00");
     await pg.locator('#cd_rows input[data-k="amountCents"]').first().dispatchEvent("change");
     await pg.waitForTimeout(300);
-    await pg.click("#cd_alloc");
+    /* PK13-S9 · «Asignar» is gone: «Registrar como factura» is the whole
+       action now, so the refusal that used to guard the split guards this. */
+    await pg.click("#cd_bill");
     await pg.waitForTimeout(500);
     const refused = await pg.evaluate(() => ({
       allocated: erp.state.captured[erp.state.captured.length - 1].allocations.length,
@@ -4090,7 +4094,7 @@ async function testCapture(browser, base) {
       pct: [...document.querySelectorAll('#cd_rows input[data-k="pct"]')].map((i) => i.value),
       rest: (document.querySelector("#cd_rest") || {}).textContent || "",
       saysBase: /base imponible|taxable base|base imposable/i.test(
-        document.querySelector("#cd_alloc")?.closest(".card")?.textContent || "",
+        document.querySelector("#cd_bill")?.closest(".card")?.textContent || "",
       ),
     }));
     if (basis.pct[0] === "59.4" && basis.pct[1] === "40.6")
@@ -4100,25 +4104,27 @@ async function testCapture(browser, base) {
       ok("ADM-03: …the card says the base is what is being split, and that it foots");
     else bad("ADM-03: the card names its basis", JSON.stringify(basis));
 
-    await pg.click("#cd_alloc");
-    await pg.waitForTimeout(700);
+    await pg.click("#cd_bill");
+    await pg.waitForTimeout(900);
     const allocated = await pg.evaluate(() => {
       const c = erp.state.captured[erp.state.captured.length - 1];
+      const bill = c.billId ? erp.state.bills.find((b) => b.id === c.billId) : null;
       return {
         n: c.allocations.length,
-        status: c.status,
         onlyOneDest: c.allocations.every((a) => !!a.projectId !== !!a.overheadCategory),
         sum: c.allocations.reduce((s, a) => s + a.amountCents, 0),
+        // …and the SAME press filed it, which is the whole point of the change.
+        billed: !!bill,
+        billSupplier: bill ? bill.supplierId === c.supplierId : false,
+        billRows: bill ? bill.allocations.length : 0,
       };
     });
-    if (
-      allocated.n === 2 &&
-      allocated.status === "allocated" &&
-      allocated.onlyOneDest &&
-      allocated.sum === 168396
-    )
+    if (allocated.n === 2 && allocated.onlyOneDest && allocated.sum === 168396)
       ok("ADM-03: a document splits between a project and an overhead, and adds up");
     else bad("ADM-03: split allocation", JSON.stringify(allocated));
+    if (allocated.billed && allocated.billSupplier && allocated.billRows === 2)
+      ok("ADM-03: …and the same press filed the bill against the document's own supplier");
+    else bad("ADM-03: one press files it too", JSON.stringify(allocated));
     /* Allocated is HISTORY, and the filter is what says so now. The old
        assertion was that the document left the tray for the register; there is
        no tray, so the same fact is that it stays in the register and drops out
@@ -4332,6 +4338,108 @@ async function testCapture(browser, base) {
       ok("ADM-03: a captured document's figures can be corrected, and the file name follows");
     else bad("ADM-03: capture is correctable", JSON.stringify(edited));
 
+    /* PK13-S9 · ONE PRESS FROM A PHOTOGRAPH TO SOMETHING THE BANK CAN MATCH.
+       The operator counted the old route out loud: create the Gasto, press
+       Registration, assign a supplier by hand from a picker with no «new
+       supplier» option, go to Maestros, create the supplier, come back, and
+       finally Registrar como factura. Five screens to say one thing — and the
+       engine never needed any of it: `billFromCapture` already carried the
+       number, the dates, the amounts and the split, and wanted a supplier id.
+
+       Now the supplier is settled while the paper is still on screen, and one
+       button writes the split, registers the bill and puts it in front of the
+       bank. Asserted end to end through the engine the screen drives, with the
+       supplier a company nobody had created. */
+    const onepress = await pg.evaluate(() => {
+      // A real CIF: the check digit is computed, so an invented one is refused.
+      const nif = "B12345674";
+      const norm = (v) =>
+        String(v || "")
+          .toUpperCase()
+          .replace(/[^0-9A-Z]/g, "");
+      const before = erp.state.parties.filter((p) => p.active).length;
+      const known = !!erp.state.parties.find((p) => p.active && norm(p.taxId) === nif);
+      // The supplier is born from the document, not found in a picker.
+      const sup = supplierFromDocument(
+        { issuerName: "PROBE SUMINISTROS SL", issuerTaxId: nif },
+        "bo",
+      );
+      const cap = erp.captureDocument(
+        { docType: "supplierInvoice", imageRef: null, supplierId: sup.id },
+        "bo",
+      );
+      erp.confirmCapture(
+        cap.id,
+        {
+          issuerName: "PROBE SUMINISTROS SL",
+          issuerTaxId: nif,
+          docNumber: "E2E-1PRESS",
+          date: erp.today,
+          dueDate: "2026-12-01",
+          baseCents: 10000,
+          vatCents: 2100,
+          totalCents: 12100,
+        },
+        "bo",
+      );
+      /* To an overhead, not a job. What is under test here is that a supplier
+           is born from the paper and that one press files the bill; a general
+           expense needs no partida to prove it, and the project route with its
+           partida and subpartida is driven through the real UI above. */
+      erp.allocateCapture(
+        cap.id,
+        [
+          {
+            projectId: null,
+            overheadCategory: "office",
+            chapterNum: null,
+            lineId: null,
+            kind: "material",
+            amountCents: 10000,
+          },
+        ],
+        "bo",
+      );
+      const bill = erp.billFromCapture(cap.id, {}, "bo");
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      erp.importMovements(
+        acc.id,
+        [{ accountingDate: erp.today, concept: "PAGO PROBE E2E-1PRESS", amountCents: -12100 }],
+        "bo",
+      );
+      const mv = erp.state.movements[erp.state.movements.length - 1];
+      const out = {
+        wasKnown: known,
+        createdOne: erp.state.parties.filter((p) => p.active).length === before + 1,
+        capCarries: cap.supplierId === sup.id,
+        // Nothing was passed to the registration: every figure came off the paper.
+        billSupplier: bill.supplierId === sup.id,
+        number: bill.number,
+        due: bill.dueDate,
+        base: bill.baseCents,
+        reachedTheLine:
+          bill.allocations.length === 1 && bill.allocations[0].overheadCategory === "office",
+        // …and the bank can now see it.
+        isCandidate: erp.reconciliationCandidates(mv.id).some((c) => c.reference === "E2E-1PRESS"),
+      };
+      erp.state.movements = erp.state.movements.filter((x) => x.id !== mv.id);
+      return out;
+    });
+    if (!onepress.wasKnown && onepress.createdOne && onepress.capCarries)
+      ok("ADM-03: an unknown issuer becomes a supplier from the document itself, once");
+    else bad("ADM-03: supplier born from the document", JSON.stringify(onepress));
+    if (
+      onepress.billSupplier &&
+      onepress.number === "E2E-1PRESS" &&
+      onepress.due === "2026-12-01" &&
+      onepress.base === 10000 &&
+      onepress.reachedTheLine &&
+      onepress.isCandidate
+    )
+      ok(
+        "ADM-03: one press writes the split, files the bill off the document's own figures, and the bank can match it",
+      );
+    else bad("ADM-03: one press does all of it", JSON.stringify(onepress));
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

@@ -1351,6 +1351,40 @@ window.CANEI_DICT.ca = {
   "Sin movimientos todavía.": "Encara no hi ha moviments.",
   "Sin movimientos en este periodo.": "Cap moviment en aquest període.",
   "Ir a Gastos": "Anar a Despeses",
+  "Nombre o razón social": "Nom o raó social",
+  "Abrir su ficha": "Obre la seva fitxa",
+  "Lo que dice el documento": "El que diu el document",
+  "Dar de alta el proveedor": "Dona d'alta el proveïdor",
+  "Si el documento lo trae": "Si el document el porta",
+  "Reparta antes el coste: a una obra o a gastos generales":
+    "Repartiu abans el cost: a una obra o a despeses generals",
+  "El NIF del emisor falta o no es válido": "Falta el NIF de l'emissor o no és vàlid",
+  "El documento no dice quién lo emite": "El document no diu qui l'emet",
+  "El NIF del emisor falta o no es válido: corríjalo en el documento":
+    "Falta el NIF de l'emissor o no és vàlid: corregiu-lo al document",
+  "⚠ No se ha podido leer el documento: escríbalo a mano":
+    "⚠ No s'ha pogut llegir el document: escriviu-lo a mà",
+  "⚠ Elija el proveedor al que pertenece el documento":
+    "⚠ Trieu el proveïdor a qui pertany el document",
+  "Factura registrada — ya se puede conciliar": "Factura registrada — ja es pot conciliar",
+  "Factura registrada — el coste entra en la obra y ya se puede conciliar":
+    "Factura registrada — el cost entra a l'obra i ja es pot conciliar",
+  "Alta de proveedor desde documento": "Alta de proveïdor des d'un document",
+  "Falta el emisor: sin él no se puede dar de alta el proveedor":
+    "Falta l'emissor: sense ell no es pot donar d'alta el proveïdor",
+  "El NIF del emisor falta o no es válido: compruébelo en el documento":
+    "Falta el NIF de l'emissor o no és vàlid: comproveu-lo al document",
+  "En el fichero": "Al fitxer",
+  "Se dará de alta": "Es donarà d'alta",
+  "Ya está en el fichero": "Ja és al fitxer",
+  "El NIF no es válido": "El NIF no és vàlid",
+  "Compruébelo en el documento: el dígito de control no cuadra.":
+    "Comproveu-ho al document: el dígit de control no quadra.",
+  "revíselo antes de darlo de alta": "reviseu-ho abans de donar-lo d'alta",
+  "El emisor no está en el fichero": "L'emissor no és al fitxer",
+  "Darlo de alta con lo leído": "Dona'l d'alta amb el que s'ha llegit",
+  "Es uno que ya está dado de alta": "És un que ja està donat d'alta",
+  "＋ Alta desde documento": "＋ Alta des d'un document",
   "Sin conciliar": "Sense conciliar",
   Explicado: "Explicat",
   "Movimientos por explicar": "Moviments per explicar",

@@ -5069,6 +5069,15 @@
           status: "captured",
           allocations: [],
           billId: null,
+          /* WHOSE DOCUMENT THIS IS, settled at capture rather than four screens
+             later. The party is created from what the document says, so the
+             document is where the answer belongs — and until it had somewhere
+             to live, registering a bill had to ask for it again through a
+             picker that only listed companies somebody had already created by
+             hand elsewhere. Null means the question has not been answered yet,
+             which is a state only records written before this field existed
+             can still be in. */
+          supplierId: doc.supplierId || null,
           keyFields: doc.keyFields || {}, // CAP-10 manual key fields for photos with no text
           // Gaps 10 and 11 of the workbook mapping. `sourcePath` is where the
           // file came from before it was ours — the "Ruta completa" column of
@@ -5232,6 +5241,29 @@
      * either — renaming a filed invoice because somebody added a note would
      * be a surprise, and a surprise in an archive is a lost document.
      */
+    /**
+     * Which supplier a captured document belongs to.
+     *
+     * Its own method rather than a fourth key on `updateCapture`, whose three
+     * fields are the free text a person adds to a filed document and which
+     * validates none of them because none of them refers to anything. This one
+     * points at a party record, so it checks that the party exists and is one
+     * this company can be billed by — a dangling reference here would surface
+     * as a bill filed against nobody.
+     */
+    setCaptureSupplier(capId, supplierId, user) {
+      const c = this.state.captured.find((x) => x.id === capId);
+      if (!c) throw new Error("Captured document not found: " + capId);
+      if (supplierId) {
+        const p = this.state.parties.find((x) => x.id === supplierId);
+        if (!p) throw new Error("Unknown supplier: " + supplierId);
+        if (!(p.roles || []).some((r) => ["supplier", "subcontractor", "selfEmployed"].includes(r)))
+          throw new Error("That party is not filed as a supplier: " + p.name);
+      }
+      c.supplierId = supplierId || null;
+      this._log(user, "setCaptureSupplier", capId);
+      return c;
+    }
     updateCapture(capId, patch, user) {
       const c = this.state.captured.find((x) => x.id === capId);
       if (!c) throw new Error("Captured document not found: " + capId);
@@ -6289,13 +6321,17 @@
       const cf = c.confirmed;
       if (!cf) throw new Error("Confirm what the document says before registering it");
       const o = opts || {};
-      if (!o.supplierId) throw new Error("Choose the supplier this document belongs to");
+      /* The capture's own answer is the default. It was settled at the moment
+         the document was read, against the paper, so a caller that has nothing
+         to add should not have to ask a person the same question twice. */
+      const supplierId = o.supplierId || c.supplierId;
+      if (!supplierId) throw new Error("Choose the supplier this document belongs to");
       const baseCents = o.baseCents != null ? cents(o.baseCents) : cents(cf.baseCents);
       const rows = o.allocations || c.allocations || [];
       const scaled = this._rescaleAllocations(rows, baseCents);
       return this.registerBill(
         {
-          supplierId: o.supplierId,
+          supplierId,
           number: o.number != null ? o.number : cf.docNumber || "",
           date: o.date || cf.date || this.state.today,
           dueDate: o.dueDate || cf.dueDate || null,
