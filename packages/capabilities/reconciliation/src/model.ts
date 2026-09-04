@@ -46,6 +46,7 @@ export interface CandidateDoc {
 export type MatchReason =
   | "exactAmount"
   | "amountWithinTolerance"
+  | "partialPayment"
   | "sameDate"
   | "dateWithinTolerance"
   | "referenceQuoted"

@@ -2286,6 +2286,35 @@ assert(
     `${beforeFirst} → ${afterFirst}`,
   );
 
+  /* AND NOTHING WITH NO DATE AT ALL. An empty due date compared false against
+     every bucket bound, so the row fell through to -1 and was dropped in
+     silence — while the footer of the screen that draws this grid promises
+     that what is owed does not disappear for having passed its date. The
+     operator went looking for a part-paid supplier invoice in Salidas and
+     found the whole row empty. It is owed now, so it is counted now. */
+  const beforeUndated = erp.cashFlowGrid({ mode: "week", periods: 4 }).groups[1].totals[0];
+  const undated = erp.registerBill(
+    {
+      supplierId,
+      number: "SIM-NODUE-1",
+      baseCents: 300000,
+      date: addDaysISO(erp.today, -10),
+      allocations: [{ overheadCategory: "office", kind: "material", amountCents: 300000 }],
+    },
+    "backoffice",
+  );
+  /* Emptied on the record rather than passed in, because `registerBill` fills
+     a missing due date from the supplier's payment terms and is right to — the
+     shape this guards against is a document that arrived from somewhere else:
+     an import, an older migration, a statement line promoted to a bill. */
+  erp.state.bills.find((b) => b.id === undated.id).dueDate = "";
+  const afterUndated = erp.cashFlowGrid({ mode: "week", periods: 4 }).groups[1].totals[0];
+  assert(
+    afterUndated > beforeUndated,
+    "a pending bill with no due date is counted as due, not dropped in silence",
+    `${beforeUndated} → ${afterUndated}`,
+  );
+
   // Month buckets: the first is a stub from today, the rest are whole months.
   const m = erp.cashFlowGrid({ mode: "month", periods: 3 });
   assert(
@@ -3694,6 +3723,16 @@ assert(
     drill.length === 1 && drill[0].amountCents === 30000 && drill[0].lineId === vl.id,
     "the chapter drill-down lists exactly that cost, with its partida",
     JSON.stringify(drill),
+  );
+  /* WHO ISSUED IT TRAVELS WITH IT. This projection listed six fields and the
+     counterparty was not one of them, so every screen that tried to name the
+     supplier behind a cost printed nothing at all — the row said Factura,
+     a number, an amount and a date, belonging to nobody. */
+  const supRec = e.billSupplier(e.state.bills.find((b) => b.id === bill.id));
+  assert(
+    drill[0].party === supRec.name && drill[0].taxId === supRec.taxId && !!drill[0].kind,
+    "a cost row carries who issued it, their tax id and what it bought",
+    JSON.stringify(drill[0]),
   );
 
   // Progress: marking the variation's line moves the project's own percent.

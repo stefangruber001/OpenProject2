@@ -599,6 +599,10 @@ window.CANEI_DICT.ca = {
     "⚠ Repartiu la factura: a una obra o a despeses generals",
   "El movimiento ya está conciliado.": "El moviment ja està conciliat.",
   "Ha sido un pago parcial": "Ha estat un pagament parcial",
+  "Pago parcial — el resto sigue debiéndose": "Pagament parcial — la resta se segueix devent",
+  Registrar: "Registrar",
+  "Un pago parcial no cierra nada: el resto sigue debiéndose y aparecerá como pendiente. Los demás motivos sí dan el documento por cerrado, y quedan anotados.":
+    "Un pagament parcial no tanca res: la resta se segueix devent i apareixerà com a pendent. Els altres motius sí que donen el document per tancat, i queden anotats.",
   "Deshacer la conciliación": "Desfer la conciliació",
   "Conciliación deshecha": "Conciliació desfeta",
   "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.":
@@ -1303,6 +1307,7 @@ window.CANEI_DICT.ca = {
   "Sin documento": "Sense document",
   "mismo día": "mateix dia",
   "importe exacto": "import exacte",
+  "pago parcial": "pagament parcial",
   "más. Busca para acotar.": "més. Cerca per acotar.",
   "El extracto no nombra a la contraparte. Compruébalo antes de conciliar.":
     "L'extracte no anomena la contrapart. Comprova-ho abans de conciliar.",

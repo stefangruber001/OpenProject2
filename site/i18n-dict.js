@@ -722,6 +722,11 @@ window.CANEI_DICT = {
     ],
     ["El movimiento ya está conciliado.", "The movement is already reconciled."],
     ["Ha sido un pago parcial", "It was a partial payment"],
+    ["Pago parcial — el resto sigue debiéndose", "Partial payment — the rest is still owed"],
+    [
+      "Un pago parcial no cierra nada: el resto sigue debiéndose y aparecerá como pendiente. Los demás motivos sí dan el documento por cerrado, y quedan anotados.",
+      "A partial payment closes nothing: the rest is still owed and will show as pending. The other reasons do close the document, and are recorded.",
+    ],
     ["Deshacer la conciliación", "Undo the reconciliation"],
     ["Conciliación deshecha", "Reconciliation undone"],
     [
@@ -3554,6 +3559,7 @@ window.CANEI_DICT = {
     ["Sin documento", "No document"],
     ["mismo día", "same day"],
     ["importe exacto", "exact amount"],
+    ["pago parcial", "partial payment"],
     ["más. Busca para acotar.", "more. Search to narrow it down."],
     [
       "El extracto no nombra a la contraparte. Compruébalo antes de conciliar.",

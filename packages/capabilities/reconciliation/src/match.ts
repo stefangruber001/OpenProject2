@@ -127,12 +127,44 @@ function score(
   const gap = Math.abs(differenceCents);
 
   let points = 0;
+  let partial = false;
   if (gap === 0) {
     points += W_AMOUNT_EXACT;
     reasons.push("exactAmount");
   } else if (gap <= config.amountToleranceCents) {
     points += W_AMOUNT_NEAR;
     reasons.push("amountWithinTolerance");
+  } else if (
+    docs.length === 1 &&
+    target < total &&
+    referenceQuoted(movement.text, docs[0]!.reference)
+  ) {
+    /**
+     * A PART PAYMENT IS NOT A NEAR MISS.
+     *
+     * Everything beyond tolerance used to be discarded here, and the reasoning
+     * held for a random amount that happens to sit nearby: it is not the same
+     * money, and proposing it fills the screen with noise. It does not hold
+     * when the bank concept NAMES the document. "PAGO PARCIAL 50% FRA
+     * 2026/2210" for 199,77 € against 399,54 € open is not a coincidence to be
+     * filtered out — it is the supplier's own invoice number, typed by
+     * somebody with that invoice in front of them, and paying half on account
+     * is ordinary trade.
+     *
+     * Three conditions, all needed. ONE document, because a part payment
+     * against a combination is a guess about which of them it went to. LESS
+     * than what is open, because more than open is an overpayment, a different
+     * event with a different answer. And the reference quoted, which is the
+     * whole evidence: without it this is exactly the noise the old rule was
+     * right to refuse.
+     *
+     * It earns no amount points — the amount is precisely what does NOT agree
+     * — so it cannot climb near the one-click threshold on reference, date and
+     * name alone. That is the intended shape: a part payment is always looked
+     * at, never accepted blind.
+     */
+    partial = true;
+    reasons.push("partialPayment");
   } else {
     // Beyond tolerance this is simply not the same money. Returning a
     // low-confidence suggestion here would fill the screen with noise that a
@@ -183,7 +215,7 @@ function score(
    * be accepted — it just is not the button the eye lands on.
    */
   const autoAcceptable =
-    confidence >= config.autoAcceptScore && reasons.includes("counterpartyNamed");
+    !partial && confidence >= config.autoAcceptScore && reasons.includes("counterpartyNamed");
 
   return {
     movementId: movement.id,

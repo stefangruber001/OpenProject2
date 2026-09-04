@@ -3541,14 +3541,33 @@ async function testVariationBudget(browser, base) {
       sub.click();
       await new Promise((r) => setTimeout(r, 500));
       const text = document.querySelector("#view").innerText;
+      /* PK13-S4 · WHAT A COST ROW HAS TO SAY. The operator: "it should open the
+           full expenses list, with all the important details: supplier name, NIF,
+           invoice, amount, date". It named the document and the amount and left
+           the counterparty blank on every row — `chapterCosts` dropped `party`
+           one line after `projectCostRows` had resolved it. Asserted against the
+           supplier's own record so the check fails if the name stops travelling
+           with the cost, not merely if a cell is empty. */
+      const row = [...document.querySelectorAll("#view tbody tr")].find((r) =>
+        /E2E-VB/.test(r.innerText),
+      );
+      const sup = erp.state.parties.find((x) =>
+        (x.roles || []).some((k) => ["supplier", "subcontractor", "selfEmployed"].includes(k)),
+      );
       return {
         named: /E2E-VB/.test(text),
         stillNoDrawer: !document.querySelector(".drawer.on .card"),
+        saysSupplier: !!row && row.innerText.includes(sup.name),
+        saysTaxId: !!row && !!sup.taxId && row.innerText.includes(sup.taxId),
+        saysDate: !!row && /\d{2}\/\d{2}\/\d{4}/.test(row.innerText),
       };
     }, joined.num);
     if (drill && drill.named && drill.stillNoDrawer)
       ok("5-6: opening a subpartida lists the documents behind it, in place");
     else bad("5-6: cost drill-down", JSON.stringify(drill));
+    if (drill && drill.saysSupplier && drill.saysTaxId && drill.saysDate)
+      ok("5-6: …and each document names its supplier, its NIF and its date, not just a figure");
+    else bad("5-6: cost row detail", JSON.stringify(drill));
 
     // Revenue click-through: lands on the invoice register filtered to the job.
     const jump = await pg.evaluate((projectId) => {
@@ -9426,8 +9445,11 @@ async function testAdmin(browser, base) {
 
     await pg.locator("#dbody [data-accept]").first().click();
     await pg.waitForTimeout(900);
-    // The shortfall panel may open on top; dismiss it by keeping the rest owed.
-    if ((await pg.locator("#sfKeep").count()) > 0) await pg.locator("#sfKeep").click();
+    /* The shortfall panel may open on top; dismiss it by keeping the rest owed
+       — which since PK13-S3 is the select's own first option, not a button of
+       its own, so answering it is choosing the default and pressing Registrar. */
+    if ((await pg.locator("[data-sfclose]").count()) > 0)
+      await pg.locator("[data-sfclose]").first().click();
     await pg.waitForTimeout(500);
     const openAfter = await pg.evaluate(
       () => erp.unreconciledMovements(periodRange().from, periodRange().to, bankAcc).length,
@@ -9622,11 +9644,20 @@ async function testAdmin(browser, base) {
       if (!pick) return { found: false };
       pick.click();
       await new Promise((r) => setTimeout(r, 800));
-      const asked = !!document.getElementById("sfKeep");
-      const owed = erp.billOutstandingCents(bill.id);
-      // Answer it: closed, with a reason.
+      /* ONE QUESTION, ONE CONTROL since PK13-S3. «Pago parcial» was a green
+           button beside a select of write-off reasons, and the operator read the
+           pair as one question asked twice: "Pago parcial should be one of the
+           options in the dropdown, not the green button." It is the first option
+           and the default now, so the panel is «asked» when the select offers it
+           and there is no second button competing with it. */
       const reasonSel = document.querySelector("[data-sfr]");
-      const reason = reasonSel ? reasonSel.value : null;
+      const asked = !!reasonSel && reasonSel.options[0].value === "partial";
+      const noGreenButton = !document.getElementById("sfKeep");
+      const owed = erp.billOutstandingCents(bill.id);
+      // Answer it the other way: closed, with a reason.
+      const writeOffOpt = [...reasonSel.options].find((o) => o.value !== "partial");
+      reasonSel.value = writeOffOpt.value;
+      const reason = reasonSel.value;
       const closeBtn = document.querySelector("[data-sfclose]");
       if (closeBtn) closeBtn.click();
       await new Promise((r) => setTimeout(r, 700));
@@ -9634,6 +9665,7 @@ async function testAdmin(browser, base) {
       return {
         found: true,
         asked,
+        noGreenButton,
         owedBefore: owed,
         owedAfter: erp.billOutstandingCents(bill.id),
         writeOff: (rec.writeOffs || [])[0] || null,
@@ -9641,8 +9673,13 @@ async function testAdmin(browser, base) {
         stillMatched: !!(mv.matched && mv.matched.documents.length === 1),
       };
     });
-    if (shortfall.found && shortfall.asked && shortfall.owedBefore === 1250)
-      ok("A2: a short payment asks whether the rest is still owed or closed");
+    if (
+      shortfall.found &&
+      shortfall.asked &&
+      shortfall.noGreenButton &&
+      shortfall.owedBefore === 1250
+    )
+      ok("A2: a short payment asks — in ONE control — whether the rest is owed or closed");
     else bad("A2: the question is asked", JSON.stringify(shortfall));
     if (
       shortfall.owedAfter === 0 &&
@@ -10081,6 +10118,78 @@ async function testAdmin(browser, base) {
     if (!locked.none && locked.inside && locked.outside)
       ok(`conciliación: a quarter with everything assigned locks (${locked.quarter})`);
     else bad("conciliación: clean quarter locks", JSON.stringify(locked));
+
+    /* PK13-S2 · A PART PAYMENT IS PROPOSED, NOT DISCARDED. The operator's own
+       line: «00007 TRANSFERENCIAS | GESTIO DE RESIDUS VALLES, S.L. PAGO PARCIAL
+       50% FRA 2026/2210», 199,77 € against 399,54 € open, and Propuestas said
+       0 while the invoice sat one search away in Candidatos. The matcher threw
+       away everything beyond the amount tolerance before looking at the
+       reference — right for a random near-miss, wrong when the bank concept
+       quotes the document number. Asserted through the RENDERED panel, because
+       what was missing was a proposal on a screen. */
+    const partialProp = await pg.evaluate(async () => {
+      const acc = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      const sup = erp.state.parties.find((p) => (p.roles || []).includes("supplier"));
+      const bill = erp.registerBill(
+        {
+          supplierId: sup.id,
+          number: "2026/2210",
+          baseCents: 39954,
+          allocations: [{ overheadCategory: "office", kind: "material", amountCents: 39954 }],
+        },
+        "bo",
+      );
+      const open = erp.billOutstandingCents(bill.id);
+      erp.importMovements(
+        acc.id,
+        [
+          {
+            accountingDate: erp.today,
+            concept: "TRANSFERENCIAS | " + sup.name + " PAGO PARCIAL 50% FRA 2026/2210",
+            amountCents: -Math.round(open / 2),
+          },
+        ],
+        "bo",
+      );
+      const mv = erp.state.movements[erp.state.movements.length - 1];
+      bankAcc = acc.id;
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(mv.id);
+      await new Promise((r) => setTimeout(r, 600));
+      const body = document.querySelector("#dbody");
+      const text = body ? body.innerText : "";
+      const R = reconApi();
+      const raw = R ? R.suggest(erp, mv.id) : [];
+      const out = {
+        proposals: body ? body.querySelectorAll(".sugg").length : 0,
+        saysPartial: /pago parcial/i.test(text),
+        namesDoc: /2026\/2210/.test(text),
+        // Never one click: the amount is exactly what does not agree.
+        oneClick: raw.some((x) => x.autoAcceptable),
+        reasons: raw[0] ? raw[0].reasons : [],
+      };
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 300));
+      // Leave the queue as it was found — a stray unexplained line changes what
+      // the checks after this one are counting. Nothing was matched here, so
+      // there is nothing to undo: the line and its document simply go.
+      erp.state.movements = erp.state.movements.filter((x) => x.id !== mv.id);
+      erp.state.bills = erp.state.bills.filter((x) => x.id !== bill.id);
+      persist();
+      return out;
+    });
+    if (
+      partialProp.proposals > 0 &&
+      partialProp.saysPartial &&
+      partialProp.namesDoc &&
+      !partialProp.oneClick &&
+      partialProp.reasons.includes("partialPayment")
+    )
+      ok(
+        "conciliación: half an invoice whose number the concept quotes is proposed as a part payment",
+      );
+    else bad("conciliación: part payment proposed", JSON.stringify(partialProp));
 
     // ---- §5.7 Comunicaciones: preview with real data, simulate, queue, approve
     await pg.evaluate(() => (location.hash = "messaging"));

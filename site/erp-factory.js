@@ -2075,12 +2075,16 @@ var ErpFactory = (() => {
     const differenceCents = target - total;
     const gap = Math.abs(differenceCents);
     let points = 0;
+    let partial = false;
     if (gap === 0) {
       points += W_AMOUNT_EXACT;
       reasons.push("exactAmount");
     } else if (gap <= config.amountToleranceCents) {
       points += W_AMOUNT_NEAR;
       reasons.push("amountWithinTolerance");
+    } else if (docs.length === 1 && target < total && referenceQuoted(movement.text, docs[0].reference)) {
+      partial = true;
+      reasons.push("partialPayment");
     } else {
       return null;
     }
@@ -2101,7 +2105,7 @@ var ErpFactory = (() => {
       reasons.push("counterpartyNamed");
     }
     const confidence = round2(clamp01(points));
-    const autoAcceptable = confidence >= config.autoAcceptScore && reasons.includes("counterpartyNamed");
+    const autoAcceptable = !partial && confidence >= config.autoAcceptScore && reasons.includes("counterpartyNamed");
     return {
       movementId: movement.id,
       docIds: docs.map((d) => d.id),

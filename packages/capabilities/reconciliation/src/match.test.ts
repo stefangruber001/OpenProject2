@@ -454,6 +454,68 @@ describe("one click needs the name, not just the number (B1)", () => {
   });
 });
 
+describe("a part payment", () => {
+  /* The operator's own line: a supplier paid half on account, the concept
+     naming the invoice, and the panel offering nothing at all because the
+     amount was 199,77 € short of an open 399,54 €. */
+  const partial = mv({
+    id: "m1",
+    amountCents: -19977,
+    date: "2026-10-25",
+    text: "TRANSFERENCIAS | GESTIO DE RESIDUS VALLES, S.L. PAGO PARCIAL 50% FRA 2026/2210",
+  });
+  const open = doc({
+    id: "b1",
+    amountCents: 39954,
+    direction: "out",
+    reference: "2026/2210",
+    counterparty: "Gestió de Residus Vallès SL",
+    date: "2026-10-22",
+  });
+
+  it("is proposed when the concept names the document", () => {
+    const [top] = suggestMatches(partial, [open], cfg());
+    expect(top).toBeDefined();
+    expect(top!.reasons).toContain("partialPayment");
+    expect(top!.reasons).toContain("referenceQuoted");
+    expect(top!.differenceCents).toBe(-19977);
+  });
+
+  it("is never one click, however well everything else agrees", () => {
+    const [top] = suggestMatches(partial, [open], cfg());
+    expect(top!.reasons).toContain("counterpartyNamed");
+    expect(top!.autoAcceptable).toBe(false);
+    // Reference, near date and name and nothing from the amount: under 0.8.
+    expect(top!.confidence).toBeLessThan(cfg().autoAcceptScore);
+  });
+
+  it("is refused without the reference — that is the whole evidence", () => {
+    const anonymous = mv({ ...partial, text: "TRANSFERENCIAS | PAGO A CUENTA" });
+    expect(suggestMatches(anonymous, [open], cfg())).toEqual([]);
+  });
+
+  it("is refused when the movement is bigger than what is open", () => {
+    // More than owed is an overpayment, a different event with a different
+    // answer — not something to file against this invoice on its number.
+    const over = mv({ ...partial, amountCents: -59900 });
+    expect(suggestMatches(over, [open], cfg())).toEqual([]);
+  });
+
+  it("is refused for a combination — which of them did it pay?", () => {
+    const other = doc({
+      id: "b2",
+      amountCents: 39954,
+      direction: "out",
+      reference: "2026/2211",
+      counterparty: "Gestió de Residus Vallès SL",
+      date: "2026-10-22",
+    });
+    const all = suggestMatches(partial, [open, other], cfg());
+    expect(all.every((x) => x.docIds.length === 1)).toBe(true);
+    expect(all.map((x) => x.docIds[0])).toEqual(["b1"]);
+  });
+});
+
 describe("config", () => {
   it("defaults to a week of slack, half a euro, and three documents", () => {
     expect(cfg()).toEqual({

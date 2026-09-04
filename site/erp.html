@@ -10325,6 +10325,7 @@
       const REC_REASON = {
         exactAmount: "importe exacto",
         amountWithinTolerance: "importe casi exacto",
+        partialPayment: "pago parcial",
         sameDate: "misma fecha",
         dateWithinTolerance: "fecha próxima",
         referenceQuoted: "referencia citada",
@@ -11316,7 +11317,22 @@
                  anything, and offers the way back rather than leaving it to be found
                  on the next tab. */
         const db = openDrawer("Movimiento conciliado");
-        db.innerHTML = `<div class="it" style="margin-bottom:10px;color:var(--muted)">
+        /* ONE QUESTION, ONE CONTROL. «¿Qué es esta diferencia?» used to be
+                 asked twice: a select of write-off reasons with its own button per
+                 document, and a green button underneath for the fifth answer. The
+                 operator, looking at the pair: "Pago parcial should be one of the
+                 options in the dropdown, not the green button." They are not the
+                 same KIND of answer — a part payment writes nothing off, the rest
+                 stays owed — but they answer the same question, and splitting one
+                 question across two controls is what made the panel read wrong.
+
+                 So it is the first option and the default, because it is what the
+                 system already believed and it is the commonest case; choosing it
+                 changes no figure and simply takes the document off the list. */
+        const PARTIAL = "partial";
+        const partialLabel = "Pago parcial — el resto sigue debiéndose";
+        const paint = () => {
+          db.innerHTML = `<div class="it" style="margin-bottom:10px;color:var(--muted)">
            <span>El movimiento ya está conciliado.</span>
            <span>No cubre del todo ${short.length === 1 ? "este documento" : "estos documentos"}, así que queda una diferencia.</span></div>
          ${short
@@ -11327,23 +11343,47 @@
              ) => `<div class="card" style="margin:0 0 10px"><div class="daylist" style="padding:10px 14px">
             <div class="it"><span class="k" style="flex:1">${esc(d.ref)}</span><span>Sigue debiendo</span><b>${eur(d.open)}</b></div>
             <div class="it">
-              <select class="inline" data-sfr="${i}">${reasons.map((x) => `<option value="${x.code}">${esc(x.es)}</option>`).join("")}</select>
+              <select class="inline" data-sfr="${i}"><option value="${PARTIAL}">${partialLabel}</option>${reasons.map((x) => `<option value="${x.code}">${esc(x.es)}</option>`).join("")}</select>
               <span style="flex:1"></span>
-              <button class="btn sm" data-sfclose="${i}">Se da por cerrado</button></div>
+              <button class="btn sm" data-sfclose="${i}">Registrar</button></div>
            </div></div>`,
            )
            .join("")}
-         <div class="daylist" style="margin-top:6px"><div class="it" style="color:var(--muted)">Si ha sido un pago parcial no hay nada más que hacer: el resto sigue debiéndose y aparecerá como pendiente.</div></div>
+         <div class="daylist" style="margin-top:6px"><div class="it" style="color:var(--muted)">Un pago parcial no cierra nada: el resto sigue debiéndose y aparecerá como pendiente. Los demás motivos sí dan el documento por cerrado, y quedan anotados.</div></div>
          <div class="field full" style="margin-top:6px;display:flex;gap:8px">
-           <button class="btn primary" id="sfKeep">Ha sido un pago parcial</button>
            <span style="flex:1"></span>
            <button class="btn danger" id="sfUndo">Deshacer la conciliación</button></div>`;
-        $("#sfKeep").onclick = () => closeDrawer();
+          wire();
+        };
+        function wire() {
+          $("#sfUndo").onclick = undoIt;
+          db.querySelectorAll("[data-sfclose]").forEach(
+            (b) =>
+              (b.onclick = () => {
+                const i = Number(b.dataset.sfclose);
+                const d = short[i];
+                const reason = db.querySelector(`[data-sfr="${i}"]`).value;
+                /* Nothing to write: the balance stays owed, which is what the
+                     register already says. The row leaves the list because the
+                     question has been answered, not because anything changed. */
+                if (reason === PARTIAL) {
+                  short.splice(i, 1);
+                  if (!short.length) return closeDrawer();
+                  return paint();
+                }
+                mutate(() => {
+                  erp.settleShortfall(d.kind, d.id, reason, "backoffice");
+                  closeDrawer();
+                  setTimeout(() => shortfallDrawer(splits, movId), 0);
+                }, "Cerrado con su motivo");
+              }),
+          );
+        }
         /* The SAME door the Conciliados tab uses, not a second one:
                  `unexplainMovement` dispatches to `unmatchMovement` for a matched
                  movement and voids the payment the match created. Two ways to undo
                  the same thing is how they come to behave differently. */
-        $("#sfUndo").onclick = async () => {
+        const undoIt = async () => {
           const yes = await askConfirm("Deshacer la conciliación", {
             body: "El movimiento vuelve a la cola sin explicar y se anula el pago que creó la conciliación.",
             okLabel: "Deshacer",
@@ -11355,19 +11395,7 @@
             closeDrawer();
           }, "Conciliación deshecha");
         };
-        db.querySelectorAll("[data-sfclose]").forEach(
-          (b) =>
-            (b.onclick = () => {
-              const i = Number(b.dataset.sfclose);
-              const d = short[i];
-              const reason = db.querySelector(`[data-sfr="${i}"]`).value;
-              mutate(() => {
-                erp.settleShortfall(d.kind, d.id, reason, "backoffice");
-                closeDrawer();
-                setTimeout(() => shortfallDrawer(splits, movId), 0);
-              }, "Cerrado con su motivo");
-            }),
-        );
+        paint();
       }
       function commsApi() {
         return typeof ErpBridge !== "undefined" && ErpBridge.comms && ErpBridge.comms.available
@@ -24036,6 +24064,16 @@
         const signedPct = (cents, bp) =>
           `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${bp === null ? "—" : (bp / 100).toFixed(1) + "%"}</td>`;
         const SRC2 = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
+        /* What the money bought, in the words the cost was booked under. Built
+                 as a lookup rather than a chain of ternaries between quoted strings,
+                 which is the shape the source audit reads as a sentence. */
+        const KIND_LABEL = {
+          material: "Material",
+          labour: "Mano de obra",
+          subcontract: "Subcontrata",
+          equipment: "Maquinaria",
+          other: "Otros",
+        };
         const out = [];
         for (const c of tableRows) {
           const key = "c:" + c.chapter;
@@ -24091,13 +24129,31 @@
               out.push(
                 `<tr><td colspan="7" style="padding-left:52px;color:var(--muted)">Sin documentos todavía.</td></tr>`,
               );
-            for (const r of docs)
+            /* THE WHOLE EXPENSE, NOT A NUMBER WITH A DATE. The operator, on the
+                     documents behind a subpartida: "it should open the full expenses
+                     list, with all the important details: supplier name, NIF, invoice,
+                     amount, date, etc." What it showed was the kind, the reference, the
+                     amount and the date — the counterparty was in the template and never
+                     rendered, because `chapterCosts` dropped `party` on its way out of
+                     `projectCostRows`.
+
+                     It stays IN the table rather than opening a drawer: this drill-down
+                     is deliberately the table itself, and the amount sits in the same
+                     column as the subtotal above it so the eye can check that the
+                     documents add up to the line they hang off. */
+            for (const r of docs) {
+              const who = r.party ? esc(r.party) : "—";
+              const nif = r.taxId ? esc(r.taxId) : "—";
+              const what = KIND_LABEL[r.kind] || "";
               out.push(
-                `<tr><td style="padding-left:52px;color:var(--muted)">${esc(SRC2[r.source] || r.source)} · ${esc(r.ref || "—")}${r.party ? " · " + esc(r.party) : ""}</td>` +
-                  `<td class="num"></td>` +
+                `<tr><td style="padding-left:52px;color:var(--muted)">${esc(SRC2[r.source] || r.source)} · ${esc(r.ref || "—")}</td>` +
+                  `<td style="color:var(--muted)">${who}</td>` +
                   `<td class="num">${eur0(r.amountCents)}</td>` +
-                  `<td colspan="4" style="color:var(--muted)">${r.date ? fmtD(r.date) : ""}</td></tr>`,
+                  `<td style="color:var(--muted)" translate="no">${nif}</td>` +
+                  `<td style="color:var(--muted)">${r.date ? fmtD(r.date) : "—"}</td>` +
+                  `<td colspan="2" style="color:var(--muted)">${esc(what)}</td></tr>`,
               );
+            }
           }
         }
         /* The money that names no partida, at the foot and in the same table.
@@ -24451,7 +24507,9 @@
           <div class="daylist" style="border-top:1px solid var(--line)"><div class="it">
             Sólo entra lo que tiene fecha comprometida: facturas pendientes por su vencimiento, hitos de
             contrato por su fecha prevista, facturas de proveedor por su vencimiento. Lo ya vencido se
-            acumula en el primer periodo — no desaparece por haber pasado de fecha.
+            acumula en el primer periodo — no desaparece por haber pasado de fecha, y lo que no tiene
+            fecha de vencimiento se cuenta ahí también. Un movimiento ya conciliado no aparece aquí:
+            ese dinero ya se ha movido y está en el saldo de hoy.
           </div></div>
          </div>`;
 

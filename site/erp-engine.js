@@ -8245,6 +8245,14 @@
       }
       // Bucket 0 absorbs everything already due — see note 3 above.
       const bucketOf = (dateIso) => {
+        /* AND EVERYTHING WITH NO DATE AT ALL. An empty date compares false
+           against every bound below, so the row fell through to -1 and `put`
+           dropped it in silence — while the screen's own footer promises that
+           what is due does not disappear for having passed its date. A
+           supplier invoice sitting unpaid with no due date recorded is exactly
+           the money a cash forecast exists to show; it is owed now, so it is
+           counted now, in the same bucket as anything else overdue. */
+        if (!dateIso) return 0;
         if (dateIso <= periods[0].to) return 0;
         for (let i = 1; i < periods.length; i++)
           if (dateIso >= periods[i].from && dateIso <= periods[i].to) return i;
@@ -8259,7 +8267,9 @@
       const invoiceCells = empty();
       for (const r of this.receivables())
         if (r.outstandingCents > 0 && (!projectId || r.projectId === projectId))
-          put(invoiceCells, r.dueDate, r.outstandingCents);
+          // The issue date when there is no due date: a better guess than
+          // nothing, and still bucket 0 when it is already behind us.
+          put(invoiceCells, r.dueDate || r.date, r.outstandingCents);
 
       const milestoneCells = empty();
       for (const c of this.state.contracts) {
@@ -8286,7 +8296,7 @@
           // a part-paid bill owes each job a part of what is left, not all.
           share = allocated ? Math.round((outstanding * mine) / allocated) : outstanding;
         }
-        put(billCells, b.dueDate, share);
+        put(billCells, b.dueDate || b.date, share);
       }
 
       const rowsIn = [
@@ -9053,8 +9063,30 @@
         });
       return rows;
     }
+    /**
+     * The documents behind one chapter of a job.
+     *
+     * WHO ISSUED IT TRAVELS WITH IT. This projection listed six fields and
+     * `party` was not among them, so every reader that tried to name the
+     * counterparty printed nothing and the drill-down showed a number, a
+     * reference and a date belonging to nobody. `projectCostRows` had already
+     * resolved the name — through `billSupplier`, which answers with what the
+     * document said on the day it was filed rather than what the party file
+     * says today — and this dropped it on the floor one line later.
+     *
+     * The tax id is looked up here rather than carried, because only a
+     * supplier document has one: hours worked and a card payment have a person
+     * and a merchant, not a taxpayer, and inventing an empty field for them
+     * would suggest the data is missing rather than inapplicable.
+     */
     chapterCosts(projectId, chapterNum) {
       const num = String(chapterNum);
+      const taxIdOf = (r) => {
+        if (r.source !== "bill") return "";
+        const id = String(r.id || "").split(":")[1];
+        const b = this.state.bills.find((x) => x.id === id);
+        return b ? this.billSupplier(b).taxId || "" : "";
+      };
       return this.projectCostRows(projectId)
         .filter((r) => r.chapterNum === num)
         .map((r) => ({
@@ -9062,6 +9094,9 @@
           ref: r.ref,
           date: r.date,
           desc: r.desc,
+          party: r.party || "",
+          taxId: taxIdOf(r),
+          kind: r.kind || "",
           lineId: r.lineId,
           amountCents: r.amountCents,
         }));
