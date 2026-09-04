@@ -3266,6 +3266,17 @@
      */
     budgetStage(budgetOrId) {
       const b = typeof budgetOrId === "string" ? this.budget(budgetOrId) : budgetOrId;
+      /* AN ADICIONAL OUT WITH THE CUSTOMER OUTRANKS THE ACCEPTANCE BEHIND IT.
+         `acceptedVersionId` alone said «Aceptado» the moment any version was
+         accepted — true of the base, and badly misleading once an adicional
+         has been issued against it: the register showed the job as settled
+         while a revision sat unanswered, so the operator sent one twice and
+         reported it had disappeared. What the row must say is what is waiting
+         on somebody, and that is the adicional. */
+      const openAdicional = (b.versions || []).some(
+        (v) => v.additional && v.issued && !v.customerResponse && b.acceptedVersionId !== v.id,
+      );
+      if (openAdicional) return "issued";
       if (b.acceptedVersionId) return "accepted";
       if (b.versions.some((v) => v.customerResponse && !v.customerResponse.accepted))
         return "rejected";

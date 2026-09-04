@@ -5370,7 +5370,20 @@ assert(
   });
   assert(e.lineDeleteBlock(prj.id, fresh.id) === null, "S13: a line with nothing behind it can go");
   e.issueVersion(prj.budgetId, {}, "bo");
+  /* SENT, AND FINDABLE. The operator sent an adicional to the client twice and
+     reported it had disappeared from Presupuestos: the register lists budgets,
+     an adicional is a version, and its parent's row said «Aceptado» because
+     `budgetStage` returned that the moment ANY version was accepted. What is
+     waiting on somebody is the adicional, so that is what the row must say. */
+  assert(
+    e.budgetStage(b) === "issued",
+    "S13: a budget with an adicional out with the customer reads as issued, not accepted",
+  );
   e.acceptVersion(prj.budgetId, v1.id, {}, "bo");
+  assert(
+    e.budgetStage(b) === "accepted",
+    "S13: …and goes back to accepted once the adicional is answered",
+  );
   assert(
     e.project(prj.id).acceptedVersionId === v1.id && b.acceptedVersionId === v1.id,
     "S13: accepting it moves the baseline for progress and economics",

@@ -13578,7 +13578,19 @@
               primary: true,
               html: (b) => {
                 const num = esc(b.number);
-                if (!b.variationOf) return num;
+                /* Either shape of adicional wears the pill: the old
+                   `variationOf` budget, and a budget whose live version IS an
+                   adicional (PK12-S13). The operator could not find the one
+                   they had just sent — its row looked like every other quote
+                   and said «Aceptados» besides. */
+                const adiV = (b.versions || []).find(
+                  (v) => v.additional && b.acceptedVersionId !== v.id,
+                );
+                if (!b.variationOf && !adiV) return num;
+                if (adiV && !b.variationOf) {
+                  const prj = erp.state.projects.find((x) => x.budgetId === b.id);
+                  return `${num} <span class="pill b">Adicional</span> <span style="color:var(--muted)">${esc(adiV.adiNumber || "")}${prj ? " · " + esc(prj.code) : ""}</span>`;
+                }
                 let code = "";
                 try {
                   code = erp.project(b.variationOf).code;
@@ -14008,11 +14020,11 @@
      ${locked && stage !== "accepted" ? '<span class="pill b">Congelada</span>' : ""}
      <div class="tot"><span>Total <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></span><b id="pbTotal">${eur(t.grandCents)}</b></div>
      <div class="acts">
-      ${locked && !b.acceptedVersionId ? '<button class="btn sm" id="bNewVer">Nueva versión</button>' : ""}
+      ${locked && !b.acceptedVersionId && !V.additional ? '<button class="btn sm" id="bNewVer">Nueva versión</button>' : ""}
       <button class="btn sm" id="bSave">Guardar</button>
       <button class="btn sm" id="bPreview">Vista previa</button>
       ${
-        V.issued && !V.customerResponse && !b.acceptedVersionId
+        versionAnswerable(b, V)
           ? '<button class="btn primary sm" id="bAnswer">Respuesta del cliente</button>'
           : ""
       }
@@ -23289,6 +23301,20 @@
           )
           .join("");
       }
+      /**
+       * Can this version still be answered by the customer?
+       *
+       * The gate used to be `!b.acceptedVersionId` — once a budget had an
+       * accepted version, no other could be answered, which was exactly right
+       * until adicionales existed. An adicional's budget ALWAYS has one (that
+       * is what it revises), so the button could never appear: the operator
+       * sent one to the client twice and had nowhere to record the reply. An
+       * adicional is answerable until it is itself the accepted version.
+       */
+      function versionAnswerable(b, V) {
+        if (!V || !V.issued || V.customerResponse) return false;
+        return V.additional ? b.acceptedVersionId !== V.id : !b.acceptedVersionId;
+      }
       /** Which paper a version prints as.
        *
        *  An ADICIONAL prints as its own document showing only what changed —
@@ -23679,7 +23705,7 @@
 
         So the action lives where the version does. Same three conditions as
         the toolbar, read from the version ON SCREEN. */
-     V.issued && !V.customerResponse && !b.acceptedVersionId
+     versionAnswerable(b, V)
        ? `<div class="card"><div class="ch"><h3>Respuesta del cliente</h3>
      <span class="tag">v${V.vNumber}</span></div><div class="daylist">
     <div class="it"><span>Esta versión se envió y todavía no tiene respuesta.</span>

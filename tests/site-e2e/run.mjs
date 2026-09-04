@@ -3271,6 +3271,37 @@ async function testVariationBudget(browser, base) {
       ok("5-6: the register says «Adicional» on the row, and the days reached the record");
     else bad("5-6: adicional identified in the register", JSON.stringify(marked));
 
+    /* AND A SENT ADICIONAL CAN BE ANSWERED. The operator sent one to the client
+       twice and reported it had disappeared: the answer control was gated on
+       `!b.acceptedVersionId`, and an adicional's budget always has one — that
+       is what it revises — so the button could never appear. Asserted on the
+       RENDERED control, not on the engine rule behind it, because the rule was
+       never the thing that was missing. */
+    const answerable = await pg.evaluate(async (projectId) => {
+      const prj = erp.project(projectId);
+      const b = erp.budget(prj.budgetId);
+      const v = erp.createAdditionalVersion(prj.budgetId, { reason: "E2E respuesta" }, "bo");
+      const l = v.chapters[0].lines[0];
+      erp.editLine(prj.budgetId, l.id, { qtyMilli: l.qtyMilli + 1000 }, { user: "bo" });
+      erp.issueVersion(prj.budgetId, {}, "bo");
+      const stage = erp.budgetStage(b);
+      openBuilder(prj.budgetId);
+      await new Promise((r) => setTimeout(r, 900));
+      const out = {
+        // The register no longer calls the job settled while this is unanswered.
+        stage,
+        toolbar: !!document.querySelector("#bAnswer"),
+      };
+      budgetDrawer(prj.budgetId, v.id);
+      await new Promise((r) => setTimeout(r, 700));
+      out.inDocument = !!document.querySelector("#bdAnswer");
+      closeDrawer();
+      return out;
+    }, pid);
+    if (answerable.stage === "issued" && answerable.toolbar && answerable.inDocument)
+      ok("5-6: a sent adicional can be answered — from the toolbar and from its document");
+    else bad("5-6: adicional answerable", JSON.stringify(answerable));
+
     /* PK12-S12 · AN ADICIONAL IS NOT A NEW CONTRACT. The operator, looking at
        «Nuevo contrato» opened from an accepted adicional: "Is not related. The
        budget is already created and it has the extra cost. The extra in days
