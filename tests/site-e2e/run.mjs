@@ -3595,6 +3595,72 @@ async function testVariationBudget(browser, base) {
       else bad("5-6: targetEnd written", String(saved));
     } else bad("5-6: Fin previsto field", JSON.stringify(endField));
 
+    /* PK12-S13b · THE DAYS OF AN ADICIONAL HAVE A DOOR WHEREVER IT WAS
+       ACCEPTED. The operator, looking at a schedule toolbar with no such
+       button on a job whose adicional was accepted and live: "where is the
+       button?" It rendered only when a breakdown per line item had already
+       been typed, and the one screen that asks for that breakdown lists
+       adicionales still WAITING for an answer. Accept from the quote screen —
+       the ordinary door, the one that also creates the job — and the days had
+       nowhere to be recorded and nothing to record them with: a rule with a
+       closed door on both sides.
+
+       The adicional accepted above went through exactly that route
+       (`acceptVersion`, no breakdown), so this asserts on the rendered
+       control and then on the bar it is supposed to move. */
+    const adiDoor = await pg.evaluate(async () => {
+      const B = ganttApi();
+      if (!B) return { skip: true };
+      /* Accepted the way the quote screen accepts: the response drawer calls
+         exactly this and knows nothing about days per line item. */
+      const prj = erp.project(gProject);
+      const bud = erp.budget(prj.budgetId);
+      const adi = (bud.versions || []).find((v) => v.additional && v.issued && !v.superseded);
+      if (!adi) return { skip: true };
+      erp.acceptVersion(bud.id, adi.id, { acceptedBy: "E2E" }, "bo");
+      persist();
+      render();
+      await new Promise((r) => setTimeout(r, 900));
+      if (!B.get(erp.state, gProject).tasks.length) {
+        const d = document.querySelector("#gDerive");
+        if (d && !d.disabled) d.click();
+        await new Promise((r) => setTimeout(r, 900));
+      }
+      const plan0 = B.get(erp.state, gProject);
+      const t0 = plan0.tasks.find((t) => t.sourceRef === "group:1");
+      if (!t0) return { skip: true };
+      const before = t0.durationDays;
+      const out = { before, button: !!document.querySelector("#gAdi") };
+      if (!out.button) return out;
+      document.querySelector("#gAdi").click();
+      await new Promise((r) => setTimeout(r, 700));
+      const fields = [...document.querySelectorAll(".apDay")];
+      out.fields = fields.length;
+      const one = fields.find((f) => f.dataset.chap === "1");
+      out.hasChapterOne = !!one;
+      if (!one) return out;
+      one.value = "5";
+      one.dispatchEvent(new Event("input", { bubbles: true }));
+      document.querySelector("#ap_go").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const t1 = B.get(erp.state, gProject).tasks.find((t) => t.sourceRef === "group:1");
+      out.after = t1 ? t1.durationDays : null;
+      // Once applied it is settled: the button does not offer to do it twice.
+      out.buttonAfter = !!document.querySelector("#gAdi");
+      return out;
+    });
+    if (adiDoor.skip) ok("5-6: adicional days door — no derived plan to move, skipped");
+    else if (
+      adiDoor.button &&
+      adiDoor.hasChapterOne &&
+      adiDoor.after === adiDoor.before + 5 &&
+      !adiDoor.buttonAfter
+    )
+      ok(
+        `5-6: an adicional accepted from the quote screen still reaches the plan (${adiDoor.before} → ${adiDoor.after} d)`,
+      );
+    else bad("5-6: adicional days door", JSON.stringify(adiDoor));
+
     if (!errs.length) ok("5-6: no console errors");
     else bad("5-6: console", errs.slice(0, 2).join(" | "));
   } catch (e) {

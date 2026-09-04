@@ -623,8 +623,8 @@ window.CANEI_DICT.ca = {
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
   "＋ Días de los adicionales": "＋ Dies dels addicionals",
-  "Aplica a las tareas los días que declararon los adicionales aceptados de esta obra":
-    "Aplica a les tasques els dies que van declarar els addicionals acceptats d'aquesta obra",
+  "Lleva a la planificación los días de los adicionales aceptados de esta obra":
+    "Porta a la planificació els dies dels addicionals acceptats d'aquesta obra",
   "Planificación actualizada con los días de los adicionales":
     "Planificació actualitzada amb els dies dels addicionals",
   "Módulo de planificación no disponible": "Mòdul de planificació no disponible",
@@ -655,6 +655,13 @@ window.CANEI_DICT.ca = {
   "Obra en marcha": "Obra en marxa",
   "Quién aceptó": "Qui va acceptar",
   "Total de días": "Total de dies",
+  "Días de los adicionales": "Dies dels addicionals",
+  "Aplicar a la planificación": "Aplicar a la planificació",
+  "En la planificación: pendiente": "A la planificació: pendent",
+  "Los días de cada partida alargan su barra en la planificación. El total mueve la fecha de fin de obra: se propone la suma, cámbielo si las partidas se solapan.":
+    "Els dies de cada partida allarguen la seva barra a la planificació. El total mou la data de fi d'obra: es proposa la suma, canvieu-lo si les partides se solapen.",
+  "El total mueve la fecha de fin. Se propone la suma; cámbielo si las partidas se solapan.":
+    "El total mou la data de fi. Es proposa la suma; canvieu-lo si les partides se solapen.",
   "＋ Nuevo adicional": "＋ Nou addicional",
   "Se copia el alcance aceptado de la obra para modificarlo, ampliarlo o reducirlo. El presupuesto original se conserva.":
     "Es copia l'abast acceptat de l'obra per modificar-lo, ampliar-lo o reduir-lo. El pressupost original es conserva.",

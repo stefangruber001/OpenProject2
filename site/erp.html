@@ -18724,6 +18724,7 @@
                   contractNumber: con ? con.number : "—",
                   deltaCents: t.baseCents - from.baseCents,
                   days: v.scheduleImpactDays || 0,
+                  daysApplied: !!v.scheduleAppliedToPlan,
                   acceptedAt: (v.customerResponse && v.customerResponse.date) || v.date || null,
                   accepted: true,
                   issued: !!v.issued,
@@ -18799,8 +18800,14 @@
                       get: (r) => r.deltaCents,
                     },
                     {
+                      /* Two different facts in one column, because they are one
+                         question to the reader: how much time it added, and
+                         whether the plan knows. An accepted adicional whose days
+                         never reached the schedule is the failure this package
+                         was opened for, so the row says so rather than showing a
+                         confident number that no bar on the chart agrees with. */
                       label: "Plazo",
-                      html: (r) => (r.days ? adiDays(r.days) : "—"),
+                      html: (r) => adiPlazoCell(r),
                       get: (r) => r.days,
                     },
                     {
@@ -19035,7 +19042,7 @@
                 NB: no back-ticks in this comment. It sits inside a template
                 literal, so one would end the string and take the rest of the
                 screen with it. -->
-           ${adiDaysPending(pid).length ? `<button class="btn sm primary" id="gAdi" title="Aplica a las tareas los días que declararon los adicionales aceptados de esta obra">＋ Días de los adicionales</button>` : ""}
+           ${adiDaysPending(pid).length ? `<button class="btn sm primary" id="gAdi" title="Lleva a la planificación los días de los adicionales aceptados de esta obra">＋ Días de los adicionales</button>` : ""}
            <span style="flex:1"></span>
            ${
              sch && plan.tasks.length
@@ -19165,40 +19172,7 @@
           $("#gDerive").onclick = () => deriveFromBudget(pid, cal);
           $("#gResched").onclick = () => rescheduleCashDrawer(pid);
           const gAdi = $("#gAdi");
-          if (gAdi)
-            gAdi.onclick = () =>
-              mutate(() => {
-                const B = ganttApi();
-                if (!B) throw new Error("Módulo de planificación no disponible");
-                const pending = adiDaysPending(pid);
-                let plan = B.get(erp.state, pid);
-                const missed = [];
-                let moved = 0;
-                for (const v of pending) {
-                  for (const num of Object.keys(v.scheduleDaysByChapter)) {
-                    const days = v.scheduleDaysByChapter[num];
-                    const after = B.applyChapterDelay(plan, num, days);
-                    /* A partida with no bar yet is REPORTED, not skipped in
-                             silence: the plan may simply not have been derived, and
-                             a button that says it worked while doing nothing is the
-                             fault this whole package keeps finding. */
-                    if (after === plan) missed.push(num);
-                    else {
-                      plan = after;
-                      moved += days;
-                    }
-                  }
-                  v.scheduleAppliedToPlan = erp.state.today;
-                }
-                B.save(erp.state, pid, B.recalculate(plan));
-                if (missed.length)
-                  throw new Error(
-                    "Sin tarea derivada para la partida " +
-                      missed.join(", ") +
-                      " — deriva la planificación primero",
-                  );
-                void moved;
-              }, "Planificación actualizada con los días de los adicionales");
+          if (gAdi) gAdi.onclick = () => adiPlanDaysDrawer(pid);
           const goBudget = $("#gGoBudget");
           if (goBudget)
             goBudget.onclick = () => {
@@ -22092,6 +22066,13 @@
                only what is accepted, so there is one state left and no pill needed
                to say it. */
       const adiDays = (n) => `<span translate="no">+${n} d</span>`;
+      /** The Plazo cell of an accepted adicional: how many days, and whether the plan has them. */
+      function adiPlazoCell(r) {
+        if (r.daysApplied) return r.days ? adiDays(r.days) : "—";
+        const pend = "En la planificación: pendiente";
+        if (!r.days) return `<span class="pill y">${pend}</span>`;
+        return adiDays(r.days) + ` <span class="pill y">${pend}</span>`;
+      }
       /**
        * The accepted adicionales of a job whose days have not reached the plan.
        *
@@ -22105,13 +22086,109 @@
         const p = erp.state.projects.find((x) => x.id === projectId);
         if (!p || !p.budgetId) return [];
         const b = erp.budget(p.budgetId);
+        /* NOT filtered by whether a breakdown was already typed. That filter
+           was here and it closed the only door: an adicional accepted from the
+           quote screen never passed through the formalisation drawer, so it
+           had no breakdown, so no button offered to ask for one, and the
+           drawer that does ask lists only what is still unanswered. Accepted
+           with the days recorded nowhere was a dead end. What settles the
+           question is APPLYING, which is why the mark that clears this list is
+           written there and not by typing. */
         return (b.versions || []).filter(
-          (v) =>
-            v.additional &&
-            b.acceptedVersionId === v.id &&
-            !v.scheduleAppliedToPlan &&
-            Object.keys(v.scheduleDaysByChapter || {}).length,
+          (v) => v.additional && b.acceptedVersionId === v.id && !v.scheduleAppliedToPlan,
         );
+      }
+      /**
+       * The days an accepted adicional adds, entered against the plan.
+       *
+       * One deliberate action, as erp-ownership.json asks for a change order:
+       * accepting moves the completion date and records the intent, redrawing
+       * somebody else plan stays a decision taken here. Applying zero days is
+       * a real answer and closes the question too, because an extra can cost
+       * money and no time at all.
+       */
+      function adiPlanDaysDrawer(projectId) {
+        const pending = adiDaysPending(projectId);
+        if (!pending.length) return;
+        const p = erp.project(projectId);
+        const b = erp.budget(p.budgetId);
+        const db = openDrawer("Días de los adicionales");
+        db.innerHTML = pending
+          .map((v) => {
+            const chapters = erp.version(b.id, v.id).chapters.filter((c) => c.section === "base");
+            const by = v.scheduleDaysByChapter || {};
+            return `<div class="card"><div class="ch"><h3>${esc(v.adiNumber || b.number)}</h3>
+             ${v.reason ? `<span class="tag">${esc(v.reason)}</span>` : ""}</div>
+            <div class="fgrid" style="padding:12px 16px">
+             ${chapters
+               .map(
+                 (c) =>
+                   `<div class="field"><label>${esc(c.num)}. ${esc(c.name)}</label>
+               <input class="apDay" data-ver="${esc(v.id)}" data-chap="${esc(c.num)}" type="number" min="0" step="1" value="${Number(by[c.num]) || 0}"></div>`,
+               )
+               .join("")}
+             <div class="field full" style="color:var(--muted);font-size:12.5px">Los días de cada partida alargan su barra en la planificación. El total mueve la fecha de fin de obra: se propone la suma, cámbielo si las partidas se solapan.</div>
+             <div class="field"><label>Total de días</label><input class="apTot" data-ver="${esc(v.id)}" type="number" min="0" step="1" value="${Number(v.scheduleImpactDays) || 0}"></div>
+            </div></div>`;
+          })
+          .join("");
+        /* Selectors are built by filtering, not by pasting an id into a query
+           string: the audit that counts translatable text reads a quoted
+           fragment joined with + as a sentence under construction. */
+        const daysOf = (verId) =>
+          [...db.querySelectorAll(".apDay")].filter((x) => x.dataset.ver === verId);
+        const totOf = (verId) =>
+          [...db.querySelectorAll(".apTot")].find((x) => x.dataset.ver === verId);
+        db.querySelectorAll(".apDay").forEach((i) => {
+          // The total follows the sum until somebody says otherwise.
+          i.oninput = () => {
+            const t = totOf(i.dataset.ver);
+            if (t) t.value = daysOf(i.dataset.ver).reduce((a, x) => a + (Number(x.value) || 0), 0);
+          };
+        });
+        drawerFoot('<button class="btn primary" id="ap_go">Aplicar a la planificación</button>');
+        $("#ap_go").onclick = () =>
+          mutate(() => {
+            const B = ganttApi();
+            if (!B) throw new Error("Módulo de planificación no disponible");
+            /* Read everything, try the whole move, and only then write. mutate()
+               does not roll back — it toasts and leaves what already happened —
+               so a half-applied plan with a warning on top is a state nobody
+               asked for. The dry run makes the refusal total. */
+            const asked = pending.map((v) => {
+              const by = {};
+              daysOf(v.id).forEach((i) => {
+                const n = Number(i.value) || 0;
+                if (n) by[i.dataset.chap] = n;
+              });
+              const t = totOf(v.id);
+              return { v, by, total: t ? Number(t.value) || 0 : null };
+            });
+            let plan = B.get(erp.state, projectId);
+            const missed = [];
+            for (const a of asked)
+              for (const num of Object.keys(a.by)) {
+                const after = B.applyChapterDelay(plan, num, a.by[num]);
+                /* A partida with no bar yet is REPORTED, not skipped in
+                   silence: the plan may simply not have been derived, and a
+                   button that says it worked while doing nothing is the fault
+                   this whole package keeps finding. */
+                if (after === plan) missed.push(num);
+                else plan = after;
+              }
+            if (missed.length)
+              throw new Error(
+                "Sin tarea derivada para la partida " +
+                  missed.join(", ") +
+                  " — deriva la planificación primero",
+              );
+            for (const a of asked) {
+              erp.setAdditionalScheduleDays(b.id, a.v.id, a.by, a.total, "backoffice");
+              a.v.scheduleAppliedToPlan = erp.state.today;
+            }
+            B.save(erp.state, projectId, B.recalculate(plan));
+            closeDrawer();
+          }, "Planificación actualizada con los días de los adicionales");
       }
       /** Where «←» goes from the quote builder, when it is not Presupuestos. */
       let budgetBackTo = null;

@@ -757,8 +757,8 @@ window.CANEI_DICT = {
     ["Borrar la cuenta", "Delete the account"],
     ["＋ Días de los adicionales", "＋ Days from the additionals"],
     [
-      "Aplica a las tareas los días que declararon los adicionales aceptados de esta obra",
-      "Applies to the tasks the days declared by this site's accepted additionals",
+      "Lleva a la planificación los días de los adicionales aceptados de esta obra",
+      "Takes this site's accepted additionals and their days into the schedule",
     ],
     [
       "Planificación actualizada con los días de los adicionales",
@@ -795,6 +795,17 @@ window.CANEI_DICT = {
     ["Obra en marcha", "Site under way"],
     ["Quién aceptó", "Who accepted"],
     ["Total de días", "Total days"],
+    ["Días de los adicionales", "Days from the additionals"],
+    ["Aplicar a la planificación", "Apply to the schedule"],
+    ["En la planificación: pendiente", "In the schedule: pending"],
+    [
+      "Los días de cada partida alargan su barra en la planificación. El total mueve la fecha de fin de obra: se propone la suma, cámbielo si las partidas se solapan.",
+      "The days of each line item lengthen its bar in the schedule. The total moves the completion date: the sum is proposed, change it if the line items overlap.",
+    ],
+    [
+      "El total mueve la fecha de fin. Se propone la suma; cámbielo si las partidas se solapan.",
+      "The total moves the completion date. The sum is proposed; change it if the line items overlap.",
+    ],
     ["＋ Nuevo adicional", "＋ New additional"],
     [
       "Se copia el alcance aceptado de la obra para modificarlo, ampliarlo o reducirlo. El presupuesto original se conserva.",
