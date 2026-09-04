@@ -11096,7 +11096,7 @@
 
          <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Candidatos</h3><span class="tag">${candidates.length}</span>
            <span style="flex:1"></span>
-           ${closed ? "" : `<button class="btn sm" id="rcAdd">${m.amountCents < 0 ? "＋ Añadir gasto" : "＋ Nueva factura"}</button>`}</div>
+           ${closed ? "" : `<button class="btn sm" id="rcAdd">${m.amountCents < 0 ? "Ir a Gastos" : "＋ Nueva factura"}</button>`}</div>
           <div style="padding:10px 14px 0">
            <input id="rcCandQ" placeholder="Buscar documento por número, quién o importe…" value="${esc(rcCandQ)}"
              style="width:100%;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius: 0;background:var(--paper);color:var(--ink)">
@@ -11204,13 +11204,25 @@
         const add = $("#rcAdd");
         if (add)
           add.onclick = () => {
-            /* The missing document, captured without leaving the queue —
-                     a supplier invoice for money out, a customer invoice for money
-                     in. Both are the drawers those registers already use; opening a
-                     second way of writing the same record is how two of them drift
-                     apart. */
-            if (m.amountCents < 0) billDrawer();
-            else newInvoiceDrawer();
+            /* A COST GOES IN WHERE COSTS GO IN. This opened the bill drawer
+                     with no document behind it — a supplier invoice typed from
+                     memory beside a bank line, which is the one way of creating a
+                     cost that has no paper anywhere. The operator, circling the
+                     button: "This button should bring you to Gastos, not give the
+                     option of creating an expense with no document behind."
+
+                     So it walks there instead, where the document is captured, read
+                     and filed first and the cost is what comes out of it. The
+                     movement is not lost by leaving: it stays in the queue and the
+                     new bill will be waiting under Candidatos on the way back.
+
+                     Money IN keeps its drawer, because that direction is not the
+                     same act: a customer invoice is a document this company issues,
+                     and issuing it here IS creating the paper, not skipping it. */
+            if (m.amountCents < 0) {
+              closeDrawer();
+              go("supplier-invoices");
+            } else newInvoiceDrawer();
           };
 
         /* The two identifications that used to sit in the Destino select on
@@ -15460,23 +15472,55 @@
           kind: a.kind || "material",
           amountCents: a.amountCents,
         }));
+        /* WHAT THE READER GOT WRONG HAS TO BE CORRECTABLE. These five figures
+                 arrived from an OCR pass and a validation screen, and after that they
+                 were carved in stone: a misread number, a date off by a digit or a
+                 total that took the wrong line meant deleting the document and
+                 capturing it again. The operator: "We should be able to modify the
+                 information we have enter on + Captura documento."
+
+                 `confirmCapture` is the same door the validation screen uses, so
+                 saving here re-derives the standard name and re-runs duplicate
+                 detection exactly as the first confirmation did — one way of
+                 recording what a document says, not two.
+
+                 NOT once it is a bill. From then on these figures live on the
+                 registered invoice, and editing the capture would leave the two
+                 disagreeing with nothing to say which is right. Same rule the
+                 delete button already follows, and it names the way out. */
+        const eur2 = (cents) => ((cents || 0) / 100).toFixed(2);
+        const readBlock = c.billId
+          ? `<div class="daylist">
+           <div class="it"><span>Emisor</span><span style="flex:1"></span><b>${cf ? esc(cf.issuerName || "—") : "—"}</b></div>
+           <div class="it"><span>NIF</span><span style="flex:1"></span><b translate="no">${cf ? esc(cf.issuerTaxId || "—") : "—"}</b></div>
+           <div class="it"><span>Nº documento</span><span style="flex:1"></span><b translate="no">${cf ? esc(cf.docNumber || "—") : "—"}</b></div>
+           <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${cf && cf.date ? fmtD(cf.date) : "—"}</b></div>
+           <div class="it"><span>Total</span><span style="flex:1"></span><b>${cf ? eur(cf.totalCents) : "—"}</b></div>
+           <div class="it" style="color:var(--muted)">Ya está registrado como factura: estas cifras se corrigen en la factura, no aquí.</div>
+          </div>`
+          : `<div class="fgrid" style="padding:10px 12px 12px">
+           <div class="field full"><label>Emisor</label><input id="cd_iss" value="${cf ? esc(cf.issuerName || "") : ""}" placeholder="Quién emite el documento"></div>
+           <div class="field"><label>NIF</label><input id="cd_nif" value="${cf ? esc(cf.issuerTaxId || "") : ""}" placeholder="NIF o CIF"></div>
+           <div class="field"><label>Nº documento</label><input id="cd_num" value="${cf ? esc(cf.docNumber || "") : ""}" placeholder="Número de la factura o del ticket"></div>
+           <div class="field"><label>Fecha</label><input id="cd_date" type="date" value="${cf ? esc(cf.date || "") : ""}"></div>
+           <div class="field"><label>Base imponible (€)</label><input id="cd_base" type="number" step="0.01" value="${cf ? eur2(cf.baseCents) : ""}"></div>
+           <div class="field"><label>IVA (€)</label><input id="cd_vat" type="number" step="0.01" value="${cf ? eur2(cf.vatCents) : ""}"></div>
+           <div class="field"><label>Total (€)</label><input id="cd_tot" type="number" step="0.01" value="${cf ? eur2(cf.totalCents) : ""}"></div>
+           <div class="field full" style="color:var(--muted);font-size:12.5px">Lo que el lector propuso y una persona aceptó. Corríjalo aquí si el documento dice otra cosa: se vuelve a comprobar si hay un duplicado y se rehace el nombre del archivo.</div>
+           <div class="field full"><button class="btn" id="cd_readSave">Guardar los datos del documento</button></div>
+          </div>`;
         db.innerHTML = `
          <div class="card"><div class="ch"><h3>${esc(CAP_TYPE_LABEL[c.docType] || c.docType)}</h3>
            <span class="pill ${CAP_STATUS[c.status] ? CAP_STATUS[c.status][1] : ""}">${esc(CAP_STATUS[c.status] ? CAP_STATUS[c.status][0] : c.status)}</span></div>
-          <div class="daylist">
-           <div class="it"><span>Emisor</span><span style="flex:1"></span><b>${cf ? esc(cf.issuerName || "—") : "—"}</b></div>
-           <div class="it"><span>NIF</span><span style="flex:1"></span><b>${cf ? esc(cf.issuerTaxId || "—") : "—"}</b></div>
-           <div class="it"><span>Nº documento</span><span style="flex:1"></span><b>${cf ? esc(cf.docNumber || "—") : "—"}</b></div>
-           <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${cf && cf.date ? fmtD(cf.date) : "—"}</b></div>
-           <div class="it"><span>Total</span><span style="flex:1"></span><b>${cf ? eur(cf.totalCents) : "—"}</b></div>
+          ${readBlock}
            ${
              dupOther
-               ? `<div class="it"><span class="pill r">Posible duplicado</span>
+               ? `<div class="daylist"><div class="it"><span class="pill r">Posible duplicado</span>
              <span style="flex:1;margin-left:8px"><span>Ya hay otro documento de este emisor con el mismo número</span> <b translate="no">${esc(dupOther.stdName || dupOther.id)}</b></span>
-             <button class="btn sm" id="cd_seeDup">Ver el otro</button></div>`
+             <button class="btn sm" id="cd_seeDup">Ver el otro</button></div></div>`
                : ""
            }
-          </div></div>
+          </div>
          <div class="card"><div class="ch"><h3>Archivo</h3><span class="tag">de dónde viene y con qué se relaciona</span></div>
           <div class="fgrid" style="padding:10px 12px 12px">
            <div class="field full"><label>Referencia</label><input id="cd_ref" value="${esc(c.reference || "")}" placeholder="Nº de pedido, obra o expediente"></div>
@@ -15515,6 +15559,30 @@
           </div></div>
          ${billBlock}`;
 
+        if ($("#cd_readSave"))
+          $("#cd_readSave").onclick = () =>
+            mutate(() => {
+              const money = (sel) => Math.round((Number($(sel).value) || 0) * 100);
+              /* Everything `confirmCapture` holds, not only the fields on
+                     screen: it replaces the confirmed record wholesale, so a due
+                     date or an IBAN the reader found would be erased by a partial
+                     object. Spread first, override second. */
+              erp.confirmCapture(
+                c.id,
+                Object.assign({}, cf || {}, {
+                  issuerName: $("#cd_iss").value.trim(),
+                  issuerTaxId: $("#cd_nif").value.trim(),
+                  docNumber: $("#cd_num").value.trim(),
+                  date: $("#cd_date").value || erp.today,
+                  baseCents: money("#cd_base"),
+                  vatCents: money("#cd_vat"),
+                  totalCents: money("#cd_tot"),
+                }),
+                "backoffice",
+              );
+              closeDrawer();
+              setTimeout(() => captureDrawer(id), 0);
+            }, "Datos del documento corregidos");
         $("#cd_save").onclick = () =>
           mutate(() => {
             erp.updateCapture(
@@ -19963,17 +20031,49 @@
             return;
           }
           if (bankAcc && !accs.some((a) => a.id === bankAcc)) bankAcc = "";
-          // The last five of the SELECTED account, or of all of them when none
-          // is chosen — the same rule the picker already states, applied to a
-          // window instead of to a register.
+          /* THE PERIOD IS ON THE SCREEN, SO IT APPLIES HERE TOO. This card took
+                 the last five movements of all time and ignored the range in the
+                 header entirely — the operator had 01/01/2026 – 31/01/2026 selected
+                 and was reading November. A window that sits under a period picker
+                 and answers a different question is worse than no window: every
+                 figure around it is scoped and this one silently was not.
+
+                 And it is the whole period now, not five of it. "This should be
+                 Últimos Movimientos del Periodo. And show you all the movements of
+                 the period." That is the account statement, which is exactly what
+                 the accounts tab is for; the ten-at-a-time queue next door is a
+                 different job. It scrolls rather than running down the page. */
+          const per = periodRange();
+          const inPeriod = (m) =>
+            (!bankAcc || m.accountId === bankAcc) &&
+            m.accountingDate >= per.from &&
+            m.accountingDate <= per.to;
           const recent = erp.state.movements
-            .filter((m) => !bankAcc || m.accountId === bankAcc)
+            .filter(inPeriod)
             .slice()
-            .sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)))
-            .slice(0, 5);
+            .sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)));
+          const openHere = recent.filter((m) => m.status === "unallocated").length;
           const openAll = erp.state.movements.filter(
             (m) => (!bankAcc || m.accountId === bankAcc) && m.status === "unallocated",
           ).length;
+          /* Both counts, when they differ. Scoping the queue to the period is
+                 right and it is also how somebody comes to believe a clean month
+                 means a clean book, so the card says what is waiting outside the
+                 window it is showing. */
+          const openMore = openAll - openHere;
+          /* Built as a statement, not inside the template. A conditional that
+                 opens a nested template literal is what the source audit reads as
+                 prose with no translation — the trap this file has now recorded six
+                 times. */
+          const outsideTag =
+            openMore > 0 ? `<span class="tag">${openMore} fuera del periodo</span>` : "";
+          const hereTag = openHere ? `<span class="pill y">${openHere}</span>` : "";
+          const pendingNote =
+            openHere || openMore > 0
+              ? `<div class="daylist" style="border-top:1px solid var(--hair);padding:10px 14px">
+             <div class="it"><span style="flex:1">Movimientos por explicar</span>${hereTag}${outsideTag}</div>
+            </div>`
+              : "";
 
           v.innerHTML = `
          <div class="stepbar">
@@ -19984,8 +20084,8 @@
            <button class="btn sm" id="bkUndo">↩ Deshacer importación</button>
          </div>
          ${accountLines(accs)}
-         <div class="card"><div class="ch"><h3>Últimos movimientos</h3><span class="tag">${recent.length}</span></div>
-         <div class="daylist" style="padding:10px 14px">
+         <div class="card"><div class="ch"><h3>Movimientos del periodo</h3><span class="tag">${esc(per.label)}</span><span class="tag">${recent.length}</span></div>
+         <div class="daylist" style="padding:10px 14px;max-height:420px;overflow:auto">
          ${
            recent
              .map(
@@ -19995,10 +20095,11 @@
             ${m.status === "unallocated" ? '<span class="pill y">Sin conciliar</span>' : '<span class="pill g">Explicado</span>'}
             <b style="color:${m.amountCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur(m.amountCents)}</b></div>`,
              )
-             .join("") || '<div class="it">Sin movimientos todavía.</div>'
+             .join("") || '<div class="it">Sin movimientos en este periodo.</div>'
          }
-         ${openAll ? `<div class="it" style="border-top:1px solid var(--hair)"><span style="flex:1">Movimientos por explicar</span><span class="pill y">${openAll}</span></div>` : ""}
-         </div></div>`;
+         </div>
+         ${pendingNote}
+         </div>`;
 
           // Clicking the account's own line is the same act as choosing it in
           // the picker — a second way in, not a second piece of state.

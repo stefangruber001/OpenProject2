@@ -4290,6 +4290,48 @@ async function testCapture(browser, base) {
       ok("ADM-03: un-registering the bill releases the document, which can then be deleted");
     else bad("ADM-03: the way out works end to end", JSON.stringify(freed));
 
+    /* PK13-S6 · WHAT THE READER GOT WRONG HAS TO BE CORRECTABLE. Emisor, NIF,
+       número, fecha and importes arrived from an OCR pass and a validation
+       screen and were then carved in stone: a misread digit meant deleting the
+       document and capturing it again. The operator: "We should be able to
+       modify the information we have enter on + Captura documento." Corrected
+       through `confirmCapture`, the same door the validation screen uses, so
+       the standard name is rebuilt and duplicates re-checked — and refused
+       once the document is a registered bill, where those figures live on the
+       invoice instead. */
+    const edited = await pg.evaluate(async (capId) => {
+      captureDrawer(capId);
+      await new Promise((r) => setTimeout(r, 500));
+      const before = erp.state.captured.find((c) => c.id === capId);
+      const wasName = before.stdName;
+      const f = document.querySelector("#cd_num");
+      if (!f) return { editable: false };
+      document.querySelector("#cd_iss").value = "PROVEEDOR CORREGIDO SL";
+      f.value = "E2E-FIXED-9";
+      document.querySelector("#cd_tot").value = "123.45";
+      document.querySelector("#cd_readSave").click();
+      await new Promise((r) => setTimeout(r, 700));
+      const after = erp.state.captured.find((c) => c.id === capId);
+      return {
+        editable: true,
+        number: after.confirmed.docNumber,
+        issuer: after.confirmed.issuerName,
+        totalCents: after.confirmed.totalCents,
+        // confirmCapture re-derives it, which is how the correction reaches the
+        // register's own Documento column rather than only the drawer.
+        renamed: after.stdName !== wasName && /E2E-FIXED-9/.test(after.stdName),
+      };
+    }, routed.capId);
+    if (
+      edited.editable &&
+      edited.number === "E2E-FIXED-9" &&
+      edited.issuer === "PROVEEDOR CORREGIDO SL" &&
+      edited.totalCents === 12345 &&
+      edited.renamed
+    )
+      ok("ADM-03: a captured document's figures can be corrected, and the file name follows");
+    else bad("ADM-03: capture is correctable", JSON.stringify(edited));
+
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
@@ -10119,6 +10161,49 @@ async function testAdmin(browser, base) {
       ok(`conciliación: a quarter with everything assigned locks (${locked.quarter})`);
     else bad("conciliación: clean quarter locks", JSON.stringify(locked));
 
+    /* PK13-S7 · THE PERIOD ON THE SCREEN APPLIES TO THIS CARD TOO. It took the
+       last five movements of all time and ignored the range in the header, so
+       the operator had January selected and was reading November. And it is
+       the whole period now, not five of it: "This should be Últimos
+       Movimientos del Periodo. And show you all the movements of the period."
+       Asserted against the engine's own count for the same window, so the card
+       cannot pass by showing a different five. */
+    const periodCard = await pg.evaluate(async () => {
+      goTab("banking", "_bankAccounts");
+      await new Promise((r) => setTimeout(r, 800));
+      const per = periodRange();
+      const mine = erp.state.movements.filter(
+        (m) =>
+          (!bankAcc || m.accountId === bankAcc) &&
+          m.accountingDate >= per.from &&
+          m.accountingDate <= per.to,
+      );
+      const outside = erp.state.movements.filter(
+        (m) =>
+          (!bankAcc || m.accountId === bankAcc) &&
+          (m.accountingDate < per.from || m.accountingDate > per.to),
+      );
+      const card = [...document.querySelectorAll("#view .card")].find((c) =>
+        /Movimientos del periodo/.test(c.innerText),
+      );
+      if (!card) return { found: false };
+      const rows = card.querySelectorAll(".daylist .it").length;
+      const text = card.innerText;
+      return {
+        found: true,
+        rows,
+        expected: mine.length,
+        // Every row is inside the window: no stray date from another month.
+        noStrays: outside.every((m) => !text.includes(fmtD(m.accountingDate))) || !outside.length,
+        saysWhichPeriod: text.includes(per.label),
+      };
+    });
+    if (periodCard.found && periodCard.rows >= periodCard.expected && periodCard.saysWhichPeriod)
+      ok(
+        `conciliación: the accounts card shows the whole selected period and names it (${periodCard.expected})`,
+      );
+    else bad("conciliación: movements card obeys the period", JSON.stringify(periodCard));
+
     /* PK13-S2 · A PART PAYMENT IS PROPOSED, NOT DISCARDED. The operator's own
        line: «00007 TRANSFERENCIAS | GESTIO DE RESIDUS VALLES, S.L. PAGO PARCIAL
        50% FRA 2026/2210», 199,77 € against 399,54 € open, and Propuestas said
@@ -10161,6 +10246,7 @@ async function testAdmin(browser, base) {
       const text = body ? body.innerText : "";
       const R = reconApi();
       const raw = R ? R.suggest(erp, mv.id) : [];
+      const addBtn = document.querySelector("#rcAdd");
       const out = {
         proposals: body ? body.querySelectorAll(".sugg").length : 0,
         saysPartial: /pago parcial/i.test(text),
@@ -10168,7 +10254,19 @@ async function testAdmin(browser, base) {
         // Never one click: the amount is exactly what does not agree.
         oneClick: raw.some((x) => x.autoAcceptable),
         reasons: raw[0] ? raw[0].reasons : [],
+        /* PK13-S8 · A COST GOES IN WHERE COSTS GO IN. This button opened the
+             bill drawer with no document behind it — the one way of creating a
+             cost with no paper anywhere. "This button should bring you to
+             Gastos, not give the option of creating an expense with no document
+             behind." It walks there instead, and says so on its face. */
+        addLabel: addBtn ? addBtn.textContent.trim() : null,
       };
+      if (addBtn) {
+        addBtn.click();
+        await new Promise((r) => setTimeout(r, 800));
+        out.wentToGastos = /supplier-invoices/.test(location.hash);
+        out.noBillDrawer = !document.querySelector("#bd_go");
+      }
       closeDrawer();
       await new Promise((r) => setTimeout(r, 300));
       // Leave the queue as it was found — a stray unexplained line changes what
@@ -10190,6 +10288,13 @@ async function testAdmin(browser, base) {
         "conciliación: half an invoice whose number the concept quotes is proposed as a part payment",
       );
     else bad("conciliación: part payment proposed", JSON.stringify(partialProp));
+    if (
+      /gastos/i.test(partialProp.addLabel || "") &&
+      partialProp.wentToGastos &&
+      partialProp.noBillDrawer
+    )
+      ok("conciliación: the missing cost is added in Gastos, not typed beside the bank line");
+    else bad("conciliación: the add button goes to Gastos", JSON.stringify(partialProp));
 
     // ---- §5.7 Comunicaciones: preview with real data, simulate, queue, approve
     await pg.evaluate(() => (location.hash = "messaging"));

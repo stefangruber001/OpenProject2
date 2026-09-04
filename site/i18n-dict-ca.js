@@ -457,6 +457,17 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "IVA (€)": "IVA (€)",
+  "Total (€)": "Total (€)",
+  "Guardar los datos del documento": "Desa les dades del document",
+  "Quién emite el documento": "Qui emet el document",
+  "NIF o CIF": "NIF o CIF",
+  "Número de la factura o del ticket": "Número de la factura o del tiquet",
+  "Datos del documento corregidos": "Dades del document corregides",
+  "Ya está registrado como factura: estas cifras se corrigen en la factura, no aquí.":
+    "Ja està registrat com a factura: aquestes xifres es corregeixen a la factura, no aquí.",
+  "Lo que el lector propuso y una persona aceptó. Corríjalo aquí si el documento dice otra cosa: se vuelve a comprobar si hay un duplicado y se rehace el nombre del archivo.":
+    "El que el lector va proposar i una persona va acceptar. Corregiu-ho aquí si el document diu una altra cosa: es torna a comprovar si hi ha un duplicat i es refà el nom de l'arxiu.",
   "↩ Deshacer importación": "↩ Desfer importació",
   "En un periodo cerrado": "Dins d'un període tancat",
   "Conciliado con un documento": "Conciliat amb un document",
@@ -1336,7 +1347,10 @@ window.CANEI_DICT.ca = {
   "Cuántas cuentas hay y cuánto hay en cada una. Los movimientos se explican en Conciliación; el coste de obra se asigna en Gastos.":
     "Quants comptes hi ha i quants diners hi ha a cadascun. Els moviments s'expliquen a Conciliació; el cost d'obra s'assigna a Despeses.",
   "Últimos movimientos": "Darrers moviments",
+  "Movimientos del periodo": "Moviments del període",
   "Sin movimientos todavía.": "Encara no hi ha moviments.",
+  "Sin movimientos en este periodo.": "Cap moviment en aquest període.",
+  "Ir a Gastos": "Anar a Despeses",
   "Sin conciliar": "Sense conciliar",
   Explicado: "Explicat",
   "Movimientos por explicar": "Moviments per explicar",
