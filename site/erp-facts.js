@@ -198,6 +198,66 @@
       return budgetDoc(erp, refs, DOCS, "presupuestoAceptado");
     },
 
+    /* An adicional prints the DIFFERENCE, so it cannot go through
+       `budgetDoc`: that one renders a whole version, and a whole version is
+       precisely what the customer must not be handed here. The engine's
+       `renderAdditionalDoc` has already reduced the two versions to the rows
+       that changed and the amount they change by. */
+    adicional(erp, refs, DOCS) {
+      const b = erp.budget(refs.budgetId);
+      const a = erp.renderAdditionalDoc(refs.budgetId, refs.versionId);
+      const f = baseFacts(erp);
+      f.customer = partyBlock(erp.party(b.partyId));
+      const prj = erp.state.projects.find((x) => x.budgetId === b.id);
+      f.project = projectBlock(erp, prj ? prj.id : null);
+      if (f.project.site === "—") f.project.site = f.customer.address;
+      f.numbers.quote = a.number;
+      f.numbers.ofQuote = a.ofNumber;
+      f.dates.issued = dmy(a.date);
+      f.taxRate = a.totals.vatBp / 100;
+      f.adicional = {
+        reason: a.reason,
+        ofNumber: a.ofNumber,
+        ofVersion: a.ofVersion,
+        days: a.scheduleDays,
+      };
+      f.chapters = a.chapters
+        .filter(function (c) {
+          return c.rows.length;
+        })
+        .map(function (c) {
+          return {
+            code: String(c.num),
+            name: c.name,
+            rows: c.rows.map(function (r) {
+              return {
+                chapter: String(c.num),
+                code: r.code,
+                item: refs.lineText ? refs.lineText(r) : r.desc,
+                flag: false,
+                plateHtml: null,
+                note: "",
+                qty: String(r.qtyMilli / 1000),
+                unit: r.unit,
+                price: r.priceCents,
+                amount: r.amountCents,
+              };
+            }),
+          };
+        });
+      const d = DOCS.adicional.build(f);
+      exactTotals(d, {
+        taxableCents: a.totals.taxableCents,
+        vatBp: a.totals.vatBp,
+        vatCents: a.totals.vatCents,
+        irpfBp: 0,
+        irpfCents: 0,
+        grandCents: a.totals.grandCents,
+      });
+      d.facts[0][1] = eur(a.totals.taxableCents);
+      return d;
+    },
+
     contrato(erp, refs, DOCS) {
       const doc = erp.renderContractDoc(refs.contractId);
       const c = erp.state.contracts.find((x) => x.id === refs.contractId);

@@ -23279,11 +23279,23 @@
           )
           .join("");
       }
-      /** The quote as its sheet + annex. Accepted versions print as the frozen
-       *  «Presupuesto aceptado»; drafts and sent versions as «Presupuesto». */
+      /** Which paper a version prints as.
+       *
+       *  An ADICIONAL prints as its own document showing only what changed —
+       *  the operator's choice, and the reason is the reader: handed the whole
+       *  revised scope, a customer has to diff two papers to find what they
+       *  are being asked to agree to. Otherwise: an accepted version is the
+       *  frozen «Presupuesto aceptado», a draft or sent one is «Presupuesto».
+       */
+      function budgetDocKind(b, versionId) {
+        const v = (b.versions || []).find((x) => x.id === versionId);
+        if (v && v.additional) return "adicional";
+        return b.acceptedVersionId === versionId ? "presupuestoAceptado" : "presupuesto";
+      }
+      /** The quote as its sheet + annex. */
       function budgetSheetHtml(id, versionId, doc, annex, perPage) {
         const b = erp.budget(id);
-        const kind = b.acceptedVersionId === versionId ? "presupuestoAceptado" : "presupuesto";
+        const kind = budgetDocKind(b, versionId);
         return (
           sheetDocHtml(
             kind,
@@ -23433,7 +23445,7 @@
             ? ErpBridge.docs.annex(doc)
             : { enabled: false, pages: [], plateCount: 0, markedItems: [] };
         const perPage = (doc.annex && doc.annex.imagesPerPage) || 2;
-        const kind = b.acceptedVersionId === versionId ? "presupuestoAceptado" : "presupuesto";
+        const kind = budgetDocKind(b, versionId);
         const lang = doc.language || "es";
         const L = DOCL[lang] || DOCL.es;
         const descriptor = CaneiErpFacts.docFor(

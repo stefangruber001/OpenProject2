@@ -2081,6 +2081,98 @@
       return v;
     }
     /**
+     * The adicional as a DOCUMENT: only what changed, and by how much.
+     *
+     * The operator's choice on numbering — internally a version, externally
+     * its own paper. A customer handed «PRE-2026-0009 v1.2» reads a re-quote
+     * of the whole job and has to diff two documents to find the extra; what
+     * they should receive says «ADI-2026-0001» and lists the difference.
+     *
+     * Every row is a DELTA, which is what makes the arithmetic honest: an
+     * added line prints its whole quantity, a modified one prints only the
+     * part that is new, and a reduced one prints a negative. The total is
+     * therefore the amount the contract grows by — the same figure that goes
+     * on the annex, so the document and the contract cannot disagree.
+     */
+    renderAdditionalDoc(budgetId, versionId) {
+      const b = this.budget(budgetId);
+      const v = this.version(budgetId, versionId);
+      if (!v.additional) throw new Error("That version is not an adicional");
+      const from = this.version(budgetId, v.additionalOf);
+      const prior = new Map();
+      for (const c of from.chapters)
+        for (const l of c.lines) prior.set(l.id, { line: l, chapter: c });
+      const chapters = [];
+      for (const c of v.chapters.filter((x) => (x.section || "base") === "base")) {
+        const rows = [];
+        for (const l of c.lines) {
+          const was = prior.get(l.id);
+          const beforeQty = was ? was.line.qtyMilli : 0;
+          const beforeAmt = was ? mul(was.line.qtyMilli, was.line.priceCents) : 0;
+          const nowAmt = mul(l.qtyMilli, l.priceCents);
+          if (was && beforeQty === l.qtyMilli && was.line.priceCents === l.priceCents) continue;
+          rows.push({
+            id: l.id,
+            num: l.num,
+            code: l.code || "",
+            desc: l.desc,
+            unit: l.unit || "",
+            /* The CHANGE, in the units the line is measured in. A line that
+               went from 34 to 51 prints 17, because 17 is what is being
+               agreed to now — printing 51 would ask the customer to pay for
+               the 34 they already have. */
+            qtyMilli: l.qtyMilli - beforeQty,
+            priceCents: l.priceCents,
+            amountCents: nowAmt - beforeAmt,
+            kind: was ? "changed" : "added",
+          });
+        }
+        /* A line the adicional REMOVED is not in the new version at all, so it
+           has to be found from the other side. It prints as a negative of what
+           it was, which is what "we are no longer doing this" costs. */
+        for (const [id, was] of prior)
+          if (
+            was.chapter.num === c.num &&
+            !c.lines.some((l) => l.id === id) &&
+            (was.chapter.section || "base") === "base"
+          )
+            rows.push({
+              id,
+              num: was.line.num,
+              code: was.line.code || "",
+              desc: was.line.desc,
+              unit: was.line.unit || "",
+              qtyMilli: -was.line.qtyMilli,
+              priceCents: was.line.priceCents,
+              amountCents: -mul(was.line.qtyMilli, was.line.priceCents),
+              kind: "removed",
+            });
+        if (rows.length) chapters.push({ num: c.num, name: c.name, section: "base", rows });
+      }
+      const baseCents = sum(
+        chapters.flatMap((c) => c.rows),
+        (r) => r.amountCents,
+      );
+      const vatCents = pctOf(baseCents, b.vatBp || 0);
+      return {
+        number: v.adiNumber,
+        ofNumber: b.number,
+        ofVersion: from.vNumber,
+        date: v.date,
+        reason: v.reason || "",
+        scheduleDays: v.scheduleImpactDays || 0,
+        scheduleByChapter: v.scheduleDaysByChapter || {},
+        chapters,
+        totals: {
+          taxableCents: baseCents,
+          vatBp: b.vatBp || 0,
+          vatCents,
+          irpfCents: 0,
+          grandCents: baseCents + vatCents,
+        },
+      };
+    }
+    /**
      * How many days each partida of an adicional adds, and the total.
      *
      * Two figures, not one derived from the other. The breakdown is what the

@@ -190,6 +190,47 @@
     "Coste real": ["Coste real", "Cost real", "Actual cost"],
     "Desviacion de plazo": ["Desviación de plazo", "Desviació de termini", "Schedule variance"],
 
+    /* ---- the adicional (PK12-S13) ---------------------------------------- *
+       Its own vocabulary, because its rows are DIFFERENCES and every label has
+       to say so. A reader who takes «17 m2» on this paper for a total rather
+       than an increase has misread the document, and no amount of arithmetic
+       further down corrects that. */
+    ADICIONAL: ["ADICIONAL", "ADDICIONAL", "VARIATION"],
+    "Adicional al presupuesto": [
+      "Adicional al presupuesto",
+      "Addicional al pressupost",
+      "Variation to the quotation",
+    ],
+    "Sobre el presupuesto": ["Sobre el presupuesto", "Sobre el pressupost", "Against quotation"],
+    "Version revisada": ["Versión revisada", "Versió revisada", "Revised version"],
+    "Partidas afectadas": ["Partidas afectadas", "Partides afectades", "Line items affected"],
+    "Plazo adicional": ["Plazo adicional", "Termini addicional", "Additional time"],
+    "Cambios sobre el presupuesto aceptado": [
+      "Cambios sobre el presupuesto aceptado",
+      "Canvis sobre el pressupost acceptat",
+      "Changes to the accepted quotation",
+    ],
+    "cantidades e importes son la diferencia, no el total": [
+      "cantidades e importes son la diferencia, no el total",
+      "quantitats i imports són la diferència, no el total",
+      "quantities and amounts are the difference, not the total",
+    ],
+    "Este adicional se suma al contrato en vigor y se cobra como un hito propio.": [
+      "Este adicional se suma al contrato en vigor y se cobra como un hito propio.",
+      "Aquest addicional se suma al contracte en vigor i es cobra com una fita pròpia.",
+      "This variation is added to the contract in force and is billed as a milestone of its own.",
+    ],
+    "Las cantidades e importes de esta hoja son la DIFERENCIA sobre el presupuesto aceptado.": [
+      "Las cantidades e importes de esta hoja son la DIFERENCIA sobre el presupuesto aceptado.",
+      "Les quantitats i imports d'aquest full són la DIFERÈNCIA sobre el pressupost acceptat.",
+      "The quantities and amounts on this sheet are the DIFFERENCE against the accepted quotation.",
+    ],
+    "El presupuesto original se conserva sin cambios y sigue siendo consultable.": [
+      "El presupuesto original se conserva sin cambios y sigue siendo consultable.",
+      "El pressupost original es conserva sense canvis i continua sent consultable.",
+      "The original quotation is kept unchanged and remains available.",
+    ],
+
     /* ---- band labels ----------------------------------------------------- */
     "Detalle por partidas": ["Detalle por partidas", "Detall per partides", "Detail by line item"],
     "precios unitarios sin impuesto": [

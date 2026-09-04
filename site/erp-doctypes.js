@@ -229,6 +229,59 @@
       },
     },
 
+    /* THE ADICIONAL, and what makes it its own document rather than a second
+       quote: every row is a DIFFERENCE. A customer who is handed the whole
+       revised scope has to diff two papers to find what they are agreeing to;
+       this one says «ADI-2026-0001», names the quote it revises, and its total
+       is the amount the contract grows by. */
+    adicional: {
+      title: "Adicional",
+      audience: "cliente",
+      template: "01-cliente/01-presupuesto.html",
+      build(f) {
+        const t = taxTotals(f);
+        const a = f.adicional || {};
+        return {
+          docType: "ADICIONAL",
+          number: f.numbers.quote,
+          audience: "cliente",
+          title: "Adicional al presupuesto",
+          subtitle: a.reason || f.project.workName || f.project.site,
+          meta: [
+            ["Fecha", f.dates.issued],
+            ["Sobre el presupuesto", a.ofNumber || "—"],
+            ["Version revisada", a.ofVersion || "—"],
+            ["Contacto", f.company.phone],
+          ],
+          facts: [
+            ["Base (sin impuesto)", eur(t.base)],
+            ["Partidas afectadas", String(f.chapters.length)],
+            ["Proyecto", f.project.code],
+          ].concat(a.days ? [["Plazo adicional", a.days + " dias"]] : []),
+          parties: parties(f),
+          groups: chapterGroups(f),
+          sections: [
+            {
+              type: "table",
+              label: "Cambios sobre el presupuesto aceptado",
+              note: "cantidades e importes son la diferencia, no el total",
+            },
+            { type: "totals" },
+          ],
+          totals: t.rows,
+          payment: [
+            "Este adicional se suma al contrato en vigor y se cobra como un hito propio.",
+            "El impuesto se aplica en la factura final segun la regla legal aplicable.",
+          ],
+          notes: [
+            "Las cantidades e importes de esta hoja son la DIFERENCIA sobre el presupuesto aceptado.",
+            "El presupuesto original se conserva sin cambios y sigue siendo consultable.",
+          ].concat(a.days ? ["La fecha de fin de obra se amplia en " + a.days + " dias."] : []),
+          signatures: ["Por " + f.company.legal, "Conforme - el cliente (firma y fecha)"],
+        };
+      },
+    },
+
     contrato: {
       title: "Contrato de obra",
       audience: "cliente",

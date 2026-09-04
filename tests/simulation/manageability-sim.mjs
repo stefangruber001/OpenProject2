@@ -5397,6 +5397,27 @@ assert(
     e.lineDeleteBlock(prj.id, lineId) === "has-progress",
     "S13: a line with progress behind it refuses to be deleted",
   );
+  /* THE DOCUMENT PRINTS DIFFERENCES. The whole reason an adicional has paper
+     of its own: handed the revised scope, a customer has to diff two documents
+     to find what they are agreeing to — and a row that reads 15 when only 5 is
+     new asks them to pay twice for the 10 they already have. */
+  const paper = e.renderAdditionalDoc(prj.budgetId, v1.id);
+  const modified = paper.chapters[0].rows.find((r) => r.id === lineId);
+  assert(
+    modified && modified.kind === "changed" && modified.qtyMilli === 5000,
+    "S13: a modified line prints the quantity that is NEW, not its new total",
+  );
+  const addedRow = paper.chapters[0].rows.find((r) => r.kind === "added");
+  assert(
+    addedRow && addedRow.amountCents === 1000,
+    "S13: a line the adicional adds prints in full",
+  );
+  /* And the paper's total IS the annex value — one number, so the document the
+     customer signs and the contract it joins cannot disagree. */
+  assert(
+    paper.totals.taxableCents === annex.valueCents,
+    "S13: the document total is the amount the contract grows by",
+  );
 }
 
 const failed = checks.filter((c) => !c.pass);
