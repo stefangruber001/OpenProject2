@@ -622,6 +622,21 @@ window.CANEI_DICT.ca = {
   Reactivar: "Reactivar",
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
+  "Adenda al contrato": "Addenda al contracte",
+  "Adenda guardada": "Addenda desada",
+  Adenda: "Addenda",
+  "Qué se añade": "Què s'afegeix",
+  "Importe del adicional": "Import de l'addicional",
+  "Días que añade a la obra": "Dies que afegeix a l'obra",
+  "Fin previsto de la obra": "Fi previst de l'obra",
+  "Cambiar este número mueve esa fecha por la diferencia, no por el total.":
+    "Canviar aquest número mou aquesta data per la diferència, no pel total.",
+  "Guardar la adenda": "Desar l'addenda",
+  "Esta obra todavía no tiene contrato: la adenda se añadirá cuando lo tenga.":
+    "Aquesta obra encara no té contracte: l'addenda s'afegirà quan en tingui.",
+  "sin fecha": "sense data",
+  "El importe, el cliente y la obra salen del presupuesto: no se teclean aquí. Se cobra como un hito propio, añadido a los del contrato, que conservan su importe.":
+    "L'import, el client i l'obra surten del pressupost: no es teclegen aquí. Es cobra com un fita pròpia, afegida a les del contracte, que conserven el seu import.",
   "Contraer todo": "Contraure-ho tot",
   "Desplegar todo": "Desplegar-ho tot",
   "Sin documentos todavía.": "Encara sense documents.",

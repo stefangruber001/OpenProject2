@@ -3265,6 +3265,43 @@ async function testVariationBudget(browser, base) {
       ok("5-6: the register says «Adicional» on the row, and the days reached the record");
     else bad("5-6: adicional identified in the register", JSON.stringify(marked));
 
+    /* PK12-S12 · AN ADICIONAL IS NOT A NEW CONTRACT. The operator, looking at
+       «Nuevo contrato» opened from an accepted adicional: "Is not related. The
+       budget is already created and it has the extra cost. The extra in days
+       is just plugged here." That window asked for an execution term, a
+       signature and a fresh 100 % milestone schedule — none of which an extra
+       has — and would have produced a SECOND contract beside the annex that
+       acceptance already writes. It offers the adenda instead, and the picker
+       that opens new contracts no longer lists an adicional at all. */
+    const doors = await pg.evaluate(async (projectId) => {
+      const b = erp.state.budgets.find((x) => x.variationOf === projectId);
+      // The new-contract picker must not offer it.
+      newContractDrawer();
+      await new Promise((r) => setTimeout(r, 500));
+      const sel = document.querySelector("#cn_budget");
+      const offered = sel ? [...sel.options].some((o) => o.value === b.id) : false;
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 300));
+      // …and the adenda door reads the money instead of asking for it.
+      annexDrawer(b.id);
+      await new Promise((r) => setTimeout(r, 500));
+      const body = document.querySelector("#dbody");
+      const txt = body ? body.innerText : "";
+      const t = erp.budgetTotals(b.id, b.acceptedVersionId);
+      const out = {
+        offeredAsNewContract: offered,
+        asksDays: !!document.querySelector("#ax_days"),
+        // No field for money anywhere in it: it is read, never retyped.
+        asksMoney: !!body && !!body.querySelector('input[type="number"]:not(#ax_days)'),
+        showsAmount: txt.includes(eur(t.grandCents)),
+      };
+      closeDrawer();
+      return out;
+    }, pid);
+    if (!doors.offeredAsNewContract && doors.asksDays && !doors.asksMoney && doors.showsAmount)
+      ok("5-6: an adicional opens an adenda, not a second contract — days asked, money read");
+    else bad("5-6: adicional goes to the adenda door", JSON.stringify(doors));
+
     // Build and accept through the engine — the builder's own UI is already
     // covered by two suites; what is NEW is the join on acceptance.
     const joined = await pg.evaluate((projectId) => {
@@ -7731,8 +7768,12 @@ async function testContract(browser, base) {
       const sum = d.installments.reduce((s, i) => s + i.amountCents, 0);
       return {
         taxed: (val.vatBp || 0) > 0,
-        // The milestones split the ORIGINAL gross; annexes bill separately.
-        agrees: Math.abs(sum - val.originalTotalCents) <= d.installments.length,
+        /* The milestones cover the contract AS IT STANDS. They used to split
+           the original gross while annexes billed separately — so an adicional
+           was agreed and billable with no milestone against it. PK12-S12
+           appends one per annex, which makes the stronger statement true and
+           this the figure to compare with. */
+        agrees: Math.abs(sum - val.totalCents) <= d.installments.length,
         grossExposed:
           typeof val.originalTotalCents === "number" && val.originalTotalCents > val.originalCents,
       };

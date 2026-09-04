@@ -2888,6 +2888,7 @@
          was missing and the contract had to be drawn up by hand. */
       if (b.variationOf) {
         this.extendProjectDeadline(b.variationOf, b.scheduleImpactDays, b.number, user);
+        b.scheduleAppliedDays = Math.max(0, Math.round(b.scheduleImpactDays || 0));
         this.writeContractAnnex(
           b.variationOf,
           { valueCents: this.budgetTotals(b.id, v.id).baseCents || 0, budgetId: b.id },
@@ -4081,8 +4082,53 @@
         date: this.state.today,
       };
       con.annexes.push(rec);
-      this._log(user, "writeContractAnnex", rec.number);
+      /* THE MONEY GETS A COLLECTION DATE, appended as its own milestone.
+         The operator chose this over redistributing across the unbilled ones,
+         and it is what `contractValue` already assumed: "annexes bill
+         separately, through their own invoices". Appending leaves every
+         existing milestone's cents exactly as the customer was shown them —
+         redistribution would silently re-price figures already agreed, and
+         some of them are already invoiced and cannot move at all.
+
+         Gross, because milestones are priced on the gross (`_finishContract`
+         splits `rec.totalCents`) while an annex value is a base. Adding a base
+         to a list of grosses would understate every adicional by its tax. */
+      const grossCents = (rec.valueCents || 0) + pctOf(rec.valueCents || 0, con.vatBp || 0);
+      con.installments = con.installments || [];
+      con.installments.push({
+        idx: con.installments.length,
+        annexNumber: rec.number,
+        amountCents: grossCents,
+        trigger: "onAnnex",
+        expectedDate: this.state.today,
+        status: "planned",
+      });
+      this._log(user, "writeContractAnnex", rec.number + " · " + grossCents + "c");
       return rec;
+    }
+    /**
+     * Set (or change) the days an adicional adds, applying only the DIFFERENCE.
+     *
+     * The days are asked for twice on purpose — once when the adicional is
+     * created, once when it joins the contract, which is where the operator
+     * expects to state a term. Two doors onto one number means the second must
+     * not add the whole figure again, so what is applied is the delta against
+     * what this budget has already moved, and the budget remembers it.
+     */
+    setVariationScheduleDays(budgetId, days, user) {
+      const b = this.budget(budgetId);
+      if (!b.variationOf) throw new Error("Only an adicional carries days of its own");
+      const want = Math.max(0, Math.round(days || 0));
+      const applied = Math.max(0, Math.round(b.scheduleAppliedDays || 0));
+      b.scheduleImpactDays = want;
+      const delta = want - applied;
+      if (delta !== 0 && b.acceptedVersionId) {
+        /* Only once accepted. Before that the adicional is a proposal, and a
+           proposal must not move a date the customer has not agreed to. */
+        this.extendProjectDeadline(b.variationOf, delta, b.number, user);
+        b.scheduleAppliedDays = want;
+      }
+      return b;
     }
     /**
      * The extras of one obra — or, with no argument, of every obra.

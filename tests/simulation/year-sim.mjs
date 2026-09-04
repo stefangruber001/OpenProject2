@@ -1082,10 +1082,19 @@ assert(
     "contract control view complete & durations mandatory",
     "",
   );
-  const sumsOk = S.contracts.every(
-    (c) => Math.abs(c.installments.reduce((s, i) => s + i.amountCents, 0) - c.totalCents) <= 1,
-  );
-  assert(sumsOk, "installments sum to contract total (±1c)", "");
+  /* THE MILESTONES FOOT TO THE CONTRACT AS IT STANDS TODAY, annexes included.
+     They used to foot to the ORIGINAL gross, because an adicional appeared in
+     `contractValue` and nowhere in the collection plan — the extra was agreed,
+     billable, and had no date on which anybody expected to be paid for it.
+     PK12-S12 appends each annex as its own milestone (the operator's choice
+     over redistributing, so agreed figures keep their cents), which makes the
+     stronger statement true: every euro of the current contract has a
+     milestone against it. Compared against the vigente gross for that reason. */
+  const sumsOk = S.contracts.every((c) => {
+    const v = erp.contractValue(c.id);
+    return Math.abs(c.installments.reduce((s, i) => s + i.amountCents, 0) - v.totalCents) <= 1;
+  });
+  assert(sumsOk, "installments sum to the contract as it stands, annexes included (±1c)", "");
 }
 // 21. Warranty register generated at close (CON-08)
 {

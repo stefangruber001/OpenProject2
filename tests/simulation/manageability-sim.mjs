@@ -5227,6 +5227,49 @@ assert(
     (con.annexes || []).length === annexesBefore + 2,
     "S11: the same source never writes a second annex",
   );
+  /* PK12-S12 · the adicional is COLLECTED, as its own milestone. The operator
+     chose appending over redistributing across the unbilled ones: agreed
+     figures keep the cents the customer was shown, and some are already
+     invoiced and cannot move at all. */
+  const instBefore = con.installments.map((i) => i.amountCents);
+  const vb2 = e.createVariationBudget(prj.id, { reason: "Segunda", scheduleImpactDays: 4 }, "bo");
+  const vch2 = e.addChapter(vb2.id, { name: "Extra 2", section: "base" });
+  e.addLine(vb2.id, vch2.id, {
+    code: "X2",
+    desc: "extra 2",
+    unit: "ud",
+    qtyMilli: 1000,
+    priceCents: 30000,
+    costCents: 10000,
+  });
+  e.issueVersion(vb2.id, {}, "bo");
+  const v2 = e.budget(vb2.id).versions[e.budget(vb2.id).versions.length - 1];
+  e.acceptVersion(vb2.id, v2.id, {}, "bo");
+  const instAfter = con.installments.map((i) => i.amountCents);
+  assert(
+    JSON.stringify(instAfter.slice(0, instBefore.length)) === JSON.stringify(instBefore),
+    "S12: appending an adicional leaves every existing milestone's cents alone",
+  );
+  assert(
+    instAfter.length === instBefore.length + 1,
+    "S12: …and gives the adicional one milestone of its own",
+  );
+  assert(
+    Math.abs(instAfter.reduce((a, b) => a + b, 0) - e.contractValue(con.id).totalCents) <=
+      instAfter.length,
+    "S12: the milestones foot to the contract as it stands, annexes included",
+  );
+  /* The days are asked twice — at creation and again when the adicional joins
+     the contract — so the second door must apply the DIFFERENCE, or stating
+     the same number twice moves the date twice. */
+  const endBefore = prj.dates.targetEnd;
+  e.setVariationScheduleDays(vb2.id, 4, "bo");
+  assert(prj.dates.targetEnd === endBefore, "S12: re-stating the same days moves nothing");
+  e.setVariationScheduleDays(vb2.id, 6, "bo");
+  assert(
+    prj.dates.targetEnd === addDaysISO(endBefore, 2),
+    "S12: raising them applies only the two days that are new",
+  );
   // A job with no completion date is left alone rather than given an invented one.
   const e2 = new ERP("2026-03-01");
   assert(

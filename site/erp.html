@@ -13926,9 +13926,11 @@
            that has just been accepted, and only while it has no contract
            yet — a second one against the same acceptance is what the picker
            already refuses. */
-        b.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === b.id)
-          ? '<button class="btn primary sm" id="bContract">Crear contrato</button>'
-          : ""
+        b.acceptedVersionId && b.variationOf
+          ? '<button class="btn primary sm" id="bAnnex">Adenda al contrato</button>'
+          : b.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === b.id)
+            ? '<button class="btn primary sm" id="bContract">Crear contrato</button>'
+            : ""
       }
       ${locked ? "" : '<button class="btn primary sm" id="bSend">Enviar</button>'}
      </div>
@@ -14124,6 +14126,8 @@
         // Seeded with THIS quote, so the picker opens on it rather than on
         // whichever accepted quote happens to sort first.
         if (mkCon) mkCon.onclick = () => newContractDrawer({ budgetId: id });
+        const mkAnx = $("#bAnnex");
+        if (mkAnx) mkAnx.onclick = () => annexDrawer(id);
         const nv = $("#bNewVer");
         if (nv)
           nv.onclick = async () => {
@@ -21736,9 +21740,77 @@
        * own signed file rather than printing a generated one over it. What is
        * removed is the way to make a NEW one from this screen.
        */
+      /**
+       * An adicional joining the contract it belongs to.
+       *
+       * The operator, looking at «Nuevo contrato» opened from an accepted
+       * adicional: "Is not related. The budget is already created and it has
+       * the extra cost. The extra in days is just plugged here." Exactly so —
+       * that window asked for an execution term, a signature and a fresh 100 %
+       * milestone schedule, none of which an adicional has. What it actually
+       * needs is one number.
+       *
+       * So the money is READ, never retyped: the amount is the accepted
+       * version's own total, the customer and the contract come from the job.
+       * The only field is the days, because the days are the only thing the
+       * budget does not already know.
+       */
+      function annexDrawer(budgetId) {
+        const b = erp.budget(budgetId);
+        const prj = erp.project(b.variationOf);
+        const con = prj.contractId
+          ? erp.state.contracts.find((c) => c.id === prj.contractId)
+          : null;
+        const t = erp.budgetTotals(b.id, b.acceptedVersionId);
+        const db = openDrawer(`Adenda · ${b.number}`);
+        const annex = con ? (con.annexes || []).find((a) => a.budgetId === b.id) : null;
+        db.innerHTML = `<div class="card"><div class="ch"><h3>Qué se añade</h3>
+     <span class="tag">${esc(prj.code)}</span></div>
+    <div class="daylist">
+     <div class="it"><span style="flex:1">Obra</span><b>${esc(prj.code)}</b></div>
+     <div class="it"><span style="flex:1">Contrato</span><b>${esc(con ? con.number : "—")}</b></div>
+     <div class="it"><span style="flex:1">Adenda</span><b>${esc(annex ? annex.number : "—")}</b></div>
+     <div class="it"><span style="flex:1">Importe del adicional</span><b>${eur(t.grandCents)}</b></div>
+     <div class="it" style="color:var(--muted)">El importe, el cliente y la obra salen del presupuesto: no se teclean aquí. Se cobra como un hito propio, añadido a los del contrato, que conservan su importe.</div>
+    </div></div>
+   <div class="card"><div class="ch"><h3>Efecto en plazo</h3></div>
+    <div class="fgrid" style="padding:12px 16px">
+     <div class="field"><label>Días que añade a la obra</label>
+      <input id="ax_days" type="number" min="0" step="1" value="${Number(b.scheduleImpactDays) || 0}"></div>
+     <!-- Two elements, not one sentence with a date bolted into its middle:
+          an interpolation there splits the sentence into two text nodes and
+          the second half arrives at the dictionary as a fragment beginning
+          with a full stop. Label and value on one line, the whole sentence on
+          the next. -->
+     <div class="field full" style="color:var(--muted);font-size:12.5px">
+      <div>Fin previsto de la obra <b>${esc(prj.dates && prj.dates.targetEnd ? fmtD(prj.dates.targetEnd) : "sin fecha")}</b></div>
+      <div>Cambiar este número mueve esa fecha por la diferencia, no por el total.</div></div>
+    </div></div>`;
+        drawerFoot(
+          con
+            ? `<button class="btn primary" id="ax_go">Guardar la adenda</button>`
+            : `<span style="color:var(--muted)">Esta obra todavía no tiene contrato: la adenda se añadirá cuando lo tenga.</span>`,
+        );
+        const go = $("#ax_go");
+        if (go)
+          go.onclick = () =>
+            mutate(() => {
+              erp.setVariationScheduleDays(b.id, Number($("#ax_days").value) || 0, "backoffice");
+              closeDrawer();
+            }, "Adenda guardada");
+      }
       function newContractDrawer(seed) {
         const linkable = erp.state.budgets.filter(
-          (b) => b.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === b.id),
+          /* AN ADICIONAL IS NOT A NEW CONTRACT. It joins the one the job
+             already has, as an adenda — so it must not appear in a picker
+             whose whole purpose is to open a second one. Offering it here gave
+             the same extra two representations: the annex written on
+             acceptance, and a separate contract with its own execution term
+             and its own 100 % milestone schedule. */
+          (b) =>
+            b.acceptedVersionId &&
+            !b.variationOf &&
+            !erp.state.contracts.some((c) => c.budgetId === b.id),
         );
         const s = seed || {};
         const db = openDrawer("Nuevo contrato");
@@ -24956,8 +25028,15 @@
         /* B1 · the milestones were priced on the GROSS (contract total, tax
            included); comparing their sum against the taxable base painted a
            red «sobre el contratado» on every contract with tax. Gross against
-           gross, and both labels say which figure they are. */
-        const diff = sum - d.originalTotalCents;
+           gross, and both labels say which figure they are.
+
+           PK12-S12 · and against the contract AS IT STANDS, not as it was
+           signed. An adicional now appends its own milestone, so a contract
+           with annexes has milestones summing past the original — comparing
+           against the original would paint that same red pill on a contract
+           whose collection plan is exactly right, which is the reverse of what
+           this foot is for. */
+        const diff = sum - d.totalCents;
         host.innerHTML = `<div class="scroll"><table><thead><tr>
      <th>Motivo</th><th class="num">Importe <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></th><th>Prevista</th><th>Factura</th></tr></thead><tbody>
    ${
@@ -24976,7 +25055,7 @@
    <tr class="tot"><td>Suma de hitos <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></td><td class="num">${eur(sum)}</td>
      <td colspan="2">${
        Math.abs(diff) <= d.installments.length
-         ? `<span class="pill g">cuadra con el contratado</span> <span style="color:var(--muted)"><span translate="no">${eur(d.originalTotalCents)}</span> <span>base</span> <span translate="no">${eur(d.originalCents)}</span></span>`
+         ? `<span class="pill g">cuadra con el contratado</span> <span style="color:var(--muted)"><span translate="no">${eur(d.totalCents)}</span> <span>base</span> <span translate="no">${eur(d.currentCents)}</span></span>`
          : `<span class="pill r"><span translate="no">${diff > 0 ? "+" : ""}${eur(diff)}</span> <span>sobre el contratado (IVA incl.)</span></span>`
      }</td></tr>
    </tbody></table></div>
