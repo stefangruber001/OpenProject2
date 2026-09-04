@@ -40,10 +40,19 @@
       * {
         box-sizing: border-box;
       }
+      /* `clip`, NOT `hidden` — with `hidden` the element becomes a scroll
+         container, and a scroll container between a sticky element and the
+         viewport silently disables the sticking. That is why the dark rail
+         scrolled away with the page instead of standing full height: it is
+         `position: sticky`, and this rule two ancestors up was cancelling it.
+         `clip` refuses the sideways scroll without creating the container.
+         `hidden` is kept first as the fallback for anything too old for
+         `clip`: there the rail does not stick, which is what it did anyway. */
       html {
         touch-action: manipulation;
         -webkit-text-size-adjust: 100%;
         overflow-x: hidden;
+        overflow-x: clip;
       }
       body {
         margin: 0;
@@ -52,6 +61,7 @@
         letter-spacing: -0.004em;
         min-height: 100vh;
         overflow-x: hidden;
+        overflow-x: clip; /* see the note on html above */
         background:
           radial-gradient(1100px 560px at 90% -14%, rgba(72, 115, 60, 0.15), transparent 58%),
           radial-gradient(760px 430px at -6% 2%, rgba(242, 194, 48, 0.09), transparent 55%),

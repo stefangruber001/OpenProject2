@@ -8281,3 +8281,30 @@ pill beside one, so the sheets stopped being one height — 318 against 296. The
 uniform height from S64 is the promise that every tab opens in the same place,
 so the number follows the content: re-measured to 318, spread back to 0.0px
 across all five, still flush at the bottom.
+
+**S71 · The sidebar reaches the bottom, and why it did not.** Operator, with
+the empty strip below the dark rail circled: «the bar should go all the way
+down».
+
+Not a height bug. The rail is `position: sticky` and already
+`height: calc(100vh - top)`; measured at 1600x800 it filled the screen at the
+top of the page and, scrolled to the bottom, sat at `top: -512px` with 576px of
+nothing under it. It was not sticking at all — it was scrolling away with the
+document.
+
+The cause was two ancestors up: `html` and `body` carried `overflow-x: hidden`.
+`hidden` makes an element a scroll container, and a scroll container between a
+sticky element and the viewport disables the sticking silently — no error, no
+warning, just an element that quietly behaves as `relative`. The rule was there
+to refuse sideways scrolling and did that job; it was also cancelling the
+sidebar, and nothing connected the two.
+
+`overflow-x: clip` refuses the sideways scroll WITHOUT creating the container,
+which is the whole reason `clip` exists. `hidden` is kept on the line above as
+the fallback for anything too old for it: there the rail does not stick, which
+is exactly what it was already doing.
+
+Verified both halves, because the discarded rule was load-bearing: the rail now
+sits at `top: 64, bottom: 800` — gap 0 — at the top of the page AND scrolled to
+the bottom; and horizontal overflow is still 0 across five screens at 390 and
+1440, plus the suite's own overflow checks at four widths.
