@@ -622,6 +622,35 @@ window.CANEI_DICT.ca = {
   Reactivar: "Reactivar",
   Desactivada: "Desactivada",
   "Borrar la cuenta": "Esborrar el compte",
+  "Adenda al contrato": "Addenda al contracte",
+  "Adenda guardada": "Addenda desada",
+  Adenda: "Addenda",
+  "Qué se añade": "Què s'afegeix",
+  "Importe del adicional": "Import de l'addicional",
+  "Días que añade a la obra": "Dies que afegeix a l'obra",
+  "Fin previsto de la obra": "Fi previst de l'obra",
+  "Cambiar este número mueve esa fecha por la diferencia, no por el total.":
+    "Canviar aquest número mou aquesta data per la diferència, no pel total.",
+  "Guardar la adenda": "Desar l'addenda",
+  "Esta obra todavía no tiene contrato: la adenda se añadirá cuando lo tenga.":
+    "Aquesta obra encara no té contracte: l'addenda s'afegirà quan en tingui.",
+  "sin fecha": "sense data",
+  "El importe, el cliente y la obra salen del presupuesto: no se teclean aquí. Se cobra como un hito propio, añadido a los del contrato, que conservan su importe.":
+    "L'import, el client i l'obra surten del pressupost: no es teclegen aquí. Es cobra com un fita pròpia, afegida a les del contracte, que conserven el seu import.",
+  "Contraer todo": "Contraure-ho tot",
+  "Desplegar todo": "Desplegar-ho tot",
+  "Sin documentos todavía.": "Encara sense documents.",
+  "Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.":
+    "Tot el cost d'aquesta obra té partida. La taula quadra amb el projecte.",
+  "La tabla no cuadra con el coste del proyecto.": "La taula no quadra amb el cost del projecte.",
+  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
+    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. Premi una partida per veure les seves subpartides, i una subpartida per veure els documents que hi ha darrere. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
+  "Motivo del adicional": "Motiu de l'addicional",
+  "Días de plazo que añade": "Dies de termini que afegeix",
+  "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",
+  "Se abre el presupuestador con una versión nueva sobre esa obra. Al aceptarse, sus partidas entran en la economía, el avance y la certificación, la fecha de fin se amplía con los días indicados y se añade la adenda al contrato.":
+    "S'obre el pressupostador amb una versió nova sobre aquesta obra. En acceptar-se, les seves partides entren a l'economia, l'avanç i la certificació, la data de fi s'amplia amb els dies indicats i s'afegeix l'addenda al contracte.",
+  Adicional: "Addicional",
   "Bloquear el trimestre": "Bloquejar el trimestre",
   "🔒 Bloquear trimestre": "🔒 Bloquejar trimestre",
   "Trimestre bloqueado": "Trimestre bloquejat",
