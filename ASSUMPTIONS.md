@@ -8154,3 +8154,62 @@ Noted while there: the wizard rule from S66 was written against `.steps`, and
 `#p2list` carries that class too. It was inert only because `#p2list` is a
 grid — a rule that misses by luck lands the day the grid becomes a flex column.
 Scoped to `.steps:not(#p2list)`.
+
+**S68 · The journey gets a home, and looks like the ERP.** Operator, on the
+Full Journey: apply the same design principles; make it reachable and
+leaveable; and «ensure that the Full journey is only another UI to enter and
+pull data from the ERP». On the navigation they asked specifically: «create a
+sub name (Customer Journey — in slight prominent way) in the tab projects. One
+button below sites and financial progress a bit bigger.»
+
+**Design.** The page adopts the DECISIONS rather than the stylesheet. Loading
+`erp-ds.css` wholesale was tried and reverted: it squares what it recognises
+but also restyles `.tag`, `.links` and the buttons of a header it was never
+written for, and the result matched the ERP on corners while looking worse
+everywhere else. So the page keeps its own components and takes the same
+self-hosted Geist (both tokens — it was still setting headings in Roboto Serif,
+the most visible way the two read as different products) and the same square
+corners. Measured: 63 rounded boxes down to 3, and those three are the count
+and status pills the ERP keeps round for the same reason.
+
+**Navigation.** «Recorrido del cliente» is now PRY-04 under Proyectos, full
+width and below the two screens, with the ↗ that marks an entry leaving the
+shell. It renders into a new `#p2wide` container rather than into `#p2list`:
+the list flows by COLUMN so its screens read down then across, a full-width
+child cannot take part in that, and inside the grid the browser placed it
+first — above the two screens it is meant to follow. `--steprows` now counts
+the grid's own children, because counting the wide entry gave the grid a row
+nothing occupied and stacked the pair into one column.
+
+A fixed «← ERP» control was added bottom right. The page always had ERP links,
+but they sit in a header that scrolls away, which is why it read as a screen
+you get stuck in.
+
+**Two traps this uncovered, both fixed at the source rather than papered over:**
+
+The crawler followed the new entry off-site. `journey.html` is already crawled
+through `STATIC_PAGES`; adding it as a workspace route as well made the crawl
+navigate the application away mid-run, and every route after it was harvested
+from whatever page happened to be open — 28 findings became 42, none of them on
+the page it added. `DISCOVER_ROUTES` now skips subsections carrying `href`: a
+separate page is not a route of this one. `financials` had the same shape and
+escaped only by being hidden.
+
+And a language fix was tried, then deliberately reverted. `journey.html`
+declares `lang="en"` while some of its strings are Spanish, so i18n reads the
+base as English and leaves them — which is why the mode buttons showed «Crear
+nuevo proyecto» with EN selected. Setting `lang="es"` is no better: the page's
+source is a MIX, mostly English (stage names, folder tree) with some Spanish,
+so it merely swaps which half leaks — and it moved three gate ceilings at once
+(source audit 205 → 331 in both languages, EN crawl over its limit). Reverted.
+The real fix is to make that page's source one language and translate from it,
+which is its own change, not a side effect of a layout pass.
+
+**Still open, and the operator has chosen it: «fully live».** Asked whether the
+walkthrough should keep its own on-device database, they chose that every step
+writes straight to the ERP. That is NOT in this change. Today «Crear nuevo
+proyecto» saves to a separate `caneiJourney` IndexedDB by design, while
+«Proyecto existente» already reads real ERP data; rewiring the first to the
+engine touches a 5,367-line page and, once live, every abandoned run leaves
+real customers, quotes and invoices in the books. It needs its own change with
+its own verification, not a corner of this one.

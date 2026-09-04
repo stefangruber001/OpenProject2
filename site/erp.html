@@ -5091,6 +5091,12 @@
                subsección must not be counted as one. -->
           <div class="p2flow" id="p2flow" hidden></div>
           <div id="p2list"></div>
+          <!-- Full-width entries live BELOW the grid, not in it. `#p2list`
+               flows by column so its numbers read down then across; an item
+               spanning both columns cannot take part in that, and placed
+               inside it the browser put it first — above the two screens it
+               is supposed to follow. -->
+          <div id="p2wide"></div>
           <div class="p2next" id="p2next" hidden></div>
         </aside>
       </div>
@@ -5619,6 +5625,21 @@
           subs: [
             { k: "progress", lab: "Obras", code: "PRY-01" },
             { k: "economics", lab: "Avance económico", code: "PRY-02" },
+            /* The end-to-end walkthrough gets a home in the navigation instead
+               of hiding behind the identity menu (operator). It is a page of
+               its own, so it carries `href` like Datos financieros does, and
+               the menu marks it with the same ↗ — the arrow is the honest
+               signal that this one leaves the shell. `wide` gives it the
+               slightly larger tile the operator asked for: it is a different
+               kind of thing from the two screens above it, and looking
+               identical to them would say otherwise. */
+            {
+              k: "journey",
+              lab: "Recorrido del cliente",
+              code: "PRY-04",
+              href: "journey.html",
+              wide: true,
+            },
           ],
         },
         // Administración in money-flow order, the operator's choice for
@@ -5813,7 +5834,9 @@
         });
 
         const list = $("#p2list");
+        const wide = $("#p2wide");
         list.innerHTML = "";
+        wide.innerHTML = "";
         let n = 0;
         visibleSubs(s).forEach((x) => {
           // The one place menu hiding happens. Route, SUBMAP entry, aliases
@@ -5833,13 +5856,14 @@
              The count pill stays: it answers «how many are waiting», which is
              a different question from «which step is this», and it was added
              precisely so the two could not be confused. */
+          if (x.wide) b.classList.add("wide");
           b.innerHTML = `<span class="nvl">${x.lab}</span>${x.href ? '<span class="ext">↗</span>' : c !== "" ? `<span class="ct${x.k === "torre" && c ? " alert" : ""}">${c}</span>` : ""}`;
           b.dataset.k = x.k;
           b.onclick = () => {
             closeSection();
             go(x.k);
           };
-          list.appendChild(b);
+          (x.wide ? wide : list).appendChild(b);
         });
         list.classList.toggle("steps", step >= 0);
         /* THE NUMBERS RUN DOWN, THEN ACROSS.
@@ -5850,8 +5874,17 @@
            has. CSS cannot count children, so the count is handed to it here:
            half the items, rounded up. Written as a custom property rather
            than a grid declaration, so the stylesheet keeps every other
-           decision about this list. */
-        list.style.setProperty("--steprows", String(Math.max(1, Math.ceil(n / 2))));
+           decision about this list.
+
+           Counted from the grid's own children, not from `n`: full-width
+           entries are appended to `#p2wide` instead, and counting them here
+           would give the grid a row nothing occupies — with two screens and
+           one wide entry it asked for two rows and stacked the pair into a
+           single column. */
+        list.style.setProperty(
+          "--steprows",
+          String(Math.max(1, Math.ceil(list.children.length / 2))),
+        );
 
         /* The hand-off. At the foot of Comercial: «→ Proyectos». It is the
            one thing a menu of screens cannot say on its own — that when this

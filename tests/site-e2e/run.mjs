@@ -1817,11 +1817,14 @@ async function testShell(browser, base) {
     if (
       shape.sections === 6 &&
       // 30 since PK12-S7 took Caja chica out: cash is a bank withdrawal now.
-      shape.subs === 30 &&
+      // 31 since the end-to-end walkthrough was given a home in the navigation
+      // (PRY-04, Proyectos): it is a page of its own, so it carries `href` and
+      // the menu marks it with ↗, the same shape Datos financieros has.
+      shape.subs === 31 &&
       shape.hidden === "alerts,financials,price-list,purchasing"
     )
-      ok("shell: 6 secciones × 30 declared subs, 4 hidden by name");
-    else bad("shell: 6×30 (4 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 31 declared subs, 4 hidden by name");
+    else bad("shell: 6×31 (4 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the

@@ -1,4 +1,13 @@
 <!doctype html>
+<!-- lang="en" is LEFT AS IT WAS, and it is not simply right. i18n.js reads
+     the base language here, so under "en" the Spanish strings on this page go
+     untranslated — which is why the mode buttons read «Crear nuevo proyecto»
+     with EN selected. Switching it to "es" was tried and is no better: this
+     page’s source is a MIX, mostly English (the stage names, the folder tree)
+     with some Spanish, so "es" leaves the English half unmatched instead and
+     moved three gate ceilings at once. The real fix is to make the source one
+     language and translate from it; that is its own change, not a side effect
+     of a layout pass. Recorded rather than half-done. -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -1294,6 +1303,84 @@
         margin-top: 2px;
       }
     </style>
+    <!-- The design layer is deliberately NOT loaded here. It was tried: it
+         squares what it knows about, but it also restyles `.tag`, `.links` and
+         the buttons of a header it was never written for, and the result was a
+         page that matched the ERP on corners while looking worse than before
+         everywhere else. This page keeps its own components and adopts the
+         DECISIONS instead — square corners, the same palette — which is what
+         «apply the same design principles» actually asks for. -->
+    <style>
+      /* The same face the ERP uses, self-hosted from the same file, so no
+         browser here calls a font CDN either. Both tokens point at it: the
+         redesign went sans-only, and this page was still setting its headings
+         in Roboto Serif — the most visible way the two looked like different
+         products. */
+      @font-face {
+        font-family: "Geist";
+        src: url("fonts/Geist-Variable.woff2") format("woff2");
+        font-weight: 100 900;
+        font-display: swap;
+      }
+      :root {
+        --serif: "Geist", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --sans: "Geist", Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      /* The journey's own boxes, squared to match the ERP's square corners.
+         These classes are this page's alone, so nothing else could reach
+         them. */
+      .stage,
+      .fsec,
+      .field input,
+      .field textarea,
+      .field select,
+      .chap input,
+      .card,
+      .rail,
+      .ledger,
+      .seg,
+      .seg button,
+      .btn,
+      .projpicker,
+      .loadedbar,
+      .modebar .seg,
+      .top .links a,
+      .st,
+      .tblwrap,
+      .track,
+      .track > *,
+      .fdr {
+        border-radius: 0 !important;
+      }
+      /* `.tag` and `.fcount` stay round: they are count and status pills, the
+         same shapes the ERP keeps round for the same reason — they are not
+         boxes, and squaring them would make a count look like a step. */
+      /* Always a way back. The header carries ERP links, but it scrolls away —
+         on a phone that leaves no exit at all, which is why this reads as a
+         screen you get stuck in. Fixed, so it is there at any scroll depth. */
+      .backerp {
+        position: fixed;
+        right: 10px;
+        bottom: 14px;
+        z-index: 90;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 13px;
+        font: 600 13px var(--sans, system-ui);
+        color: var(--greenDeep, #24421c);
+        background: rgba(255, 255, 255, 0.94);
+        border: 1px solid var(--line, #d9e0d4);
+        text-decoration: none;
+        backdrop-filter: blur(6px);
+      }
+      .backerp:hover {
+        background: #fff;
+      }
+      /* Bottom right, not top left: at the top it covered the logo, and the
+         header it would have sat beside is the very thing that scrolls away.
+         Down here it clears the native tab bar and stays under the thumb. */
+    </style>
     <script src="erp-modal.js"></script>
     <!-- MUST precede erp-pdf.js: the writer takes the pictograms from the
      global at factory time, so loading this after would leave every quote line
@@ -1321,6 +1408,7 @@
     <script src="erp-store.js"></script>
   </head>
   <body>
+    <a class="backerp" href="erp.html#progress">← ERP</a>
     <header class="top">
       <div class="logo">
         <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-label="Canei Subirats">

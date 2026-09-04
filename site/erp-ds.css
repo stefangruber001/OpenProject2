@@ -3896,3 +3896,32 @@ td.num.late {
     overflow: visible;
   }
 }
+
+/* ------------------------------- 67 · the journey has a place in the menu
+   Operator: «create a sub name (Customer Journey — in slight prominent way) in
+   the tab projects. One button below sites and financial progress a bit
+   bigger.»
+
+   A `wide` subsection spans both columns and stands a little taller. Two
+   reasons it is not simply a third equal tile: it sits below Obras and Avance
+   económico rather than beside one of them, which is the position asked for
+   and also the honest one — it is the end of the list, not a peer half-way
+   down it; and it is a different KIND of entry, a page of its own rather than
+   a screen of this one, which the ↗ already says and the size now agrees
+   with. */
+#p2wide {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+#p2wide .navitem {
+  width: 100%;
+}
+@media (max-width: 700px) {
+  #p2wide .navitem {
+    min-height: 58px;
+    font-weight: 600;
+    background: var(--accentSoft);
+    border-color: var(--accentDeep);
+  }
+}

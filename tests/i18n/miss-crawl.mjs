@@ -90,7 +90,14 @@ const DISCOVER_ROUTES = `() => {
   try {
     if (typeof SECTIONS === "undefined" || !SECTIONS) return [];
     const out = [];
-    for (const s of SECTIONS) for (const sub of s.subs || []) if (sub && sub.k) out.push(sub.k);
+    // A sub-section carrying \`href\` is a SEPARATE PAGE, not a route of this
+    // one. Following it navigates the workspace away mid-crawl, and every
+    // route after it is then harvested from whatever page happened to be
+    // open — which is how one visible off-site entry turned 28 findings into
+    // 42, none of them on the page it added. Those pages are crawled in their
+    // own right through STATIC_PAGES, so skipping them here loses no coverage.
+    for (const s of SECTIONS)
+      for (const sub of s.subs || []) if (sub && sub.k && !sub.href) out.push(sub.k);
     return out;
   } catch (e) {
     return [];
