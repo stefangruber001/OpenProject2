@@ -24,6 +24,15 @@
     creditNote: "ABO-",
     purchaseOrder: "OC-",
     subcontract: "SUB-",
+    /* PK12-S13 · an adicional is a VERSION internally and a DOCUMENT to the
+       customer. The version numbering (1.0, 1.1 …) is what makes the scope
+       work — ids, progress and the baseline all follow it — but a customer
+       handed «PRE-2026-0009 v1.1» reads a re-quote of the whole job and has to
+       diff two documents to find the extra. So the version also carries a
+       number of its own, and the document printed against it shows only what
+       changed. Quote series are not gap-audited (`seriesGaps` is asked for
+       invoices and receipts), so this series costs nothing fiscally. */
+    additional: "ADI-",
   };
 
   /* ---------------- money & misc helpers (cents everywhere) ---------------- */
@@ -2007,6 +2016,85 @@
       this._log(author, "newVersion", b.number + " v" + v.vNumber);
       return v;
     }
+    /**
+     * An ADICIONAL: a new version of the accepted scope, cloned from it.
+     *
+     * The operator's own description — "this is a copy, is other version of
+     * the previous budget… the initial budget version will still be there for
+     * consultation" — and it maps onto machinery that already exists, which is
+     * why it is the safe shape rather than merely the convenient one.
+     *
+     * `newVersion` already clones the previous chapters with a deep copy, and
+     * a deep copy PRESERVES IDS. That single fact is what makes modifying a
+     * line safe: every cost and every hour addresses a line by id, so a line
+     * that is edited here is still the same line those records point at. The
+     * progress recorded on it (`progressPct`) comes across with the clone too,
+     * so a revision does not lose what has been built.
+     *
+     * What it deliberately does NOT do is touch the accepted version. That one
+     * stays frozen, stays in `b.versions`, and stays the live baseline until
+     * this adicional is itself accepted — so a job in execution keeps
+     * reporting against agreed figures while an extra is still being quoted.
+     */
+    createAdditionalVersion(budgetId, { reason, scheduleImpactDays } = {}, user) {
+      const b = this.budget(budgetId);
+      if (!b.acceptedVersionId)
+        throw new Error("An adicional revises an accepted budget — this one has none");
+      const prj = this.state.projects.find((x) => x.budgetId === budgetId);
+      if (!prj) throw new Error("That budget has no job to revise");
+      if (prj.closed) throw new Error("A closed project cannot take an adicional");
+      const prev = this.version(budgetId, b.acceptedVersionId);
+      const v = {
+        id: this._id("ver"),
+        vNumber: "1." + b.versions.length,
+        date: this.state.today,
+        author: user || "backoffice",
+        reason: reason || "",
+        frozen: false,
+        issued: false,
+        sent: null,
+        customerResponse: null,
+        docRef: null,
+        superseded: false,
+        chapters: clone(prev.chapters),
+        /* What makes it an adicional rather than an ordinary next version:
+           where it came from, its own customer-facing number, and the days it
+           adds. `additionalOf` is the version it revises, which is what the
+           change summary and the customer's document are both computed
+           against. */
+        additional: true,
+        additionalOf: b.acceptedVersionId,
+        adiNumber: this.nextNumber("additional"),
+        scheduleImpactDays: Math.max(0, Math.round(scheduleImpactDays || 0)),
+      };
+      b.versions.push(v);
+      b.currentVersionId = v.id;
+      this._log(user, "createAdditionalVersion", b.number + " " + v.adiNumber);
+      return v;
+    }
+    /**
+     * The lines an adicional must not lose, and why.
+     *
+     * The operator's rule: "make it only additive or reduce; so it does not
+     * desaparecer". A line carrying costs, hours or progress is a line real
+     * records point at — deleting it from the scope would leave every one of
+     * them addressing something the current scope no longer contains, and the
+     * economics table would stop footing while claiming underneath that it
+     * agrees. Reducing it to zero says the same thing about the work and keeps
+     * the history addressable.
+     */
+    lineDeleteBlock(projectId, lineId) {
+      if (!projectId) return null;
+      const has = (arr, f) => arr.some(f);
+      if (has(this.state.bills, (b) => (b.allocations || []).some((a) => a.lineId === lineId)))
+        return "has-costs";
+      if (has(this.state.labour, (h) => h.lineId === lineId)) return "has-hours";
+      for (const { version } of this._projectVersions(this.project(projectId)))
+        for (const c of version.chapters)
+          for (const l of c.lines)
+            if (l.id === lineId && (l.progressPct || 0) > 0) return "has-progress";
+      return null;
+    }
     addChapter(budgetId, ch) {
       // PRE-01/06: section = base|optional|outOfScope|extras
       const v = this._editableVersion(budgetId);
@@ -2711,7 +2799,13 @@
       // QUO-03
       const A = this.version(budgetId, aId),
         B = this.version(budgetId, bId);
-      const key = (l) => l.code || l.num + "|" + l.desc;
+      /* Keyed on the LINE ID first. A version cloned from another preserves
+         ids, so the same line is recognisably the same line even when its code
+         or its wording changed — keyed on the code, a renamed subpartida read
+         as one line removed and another added, which is the opposite of what a
+         change summary is for. The old key stays as the fallback, because two
+         versions that were not cloned from one another share no ids. */
+      const key = (l) => l.id || l.code || l.num + "|" + l.desc;
       const mapA = new Map(),
         mapB = new Map();
       A.chapters.forEach((c) => c.lines.forEach((l) => mapA.set(key(l), l)));
@@ -2722,13 +2816,28 @@
       for (const [k, lb] of mapB) {
         const la = mapA.get(k);
         if (!la) continue;
-        if (la.qtyMilli !== lb.qtyMilli || la.priceCents !== lb.priceCents)
+        if (
+          la.qtyMilli !== lb.qtyMilli ||
+          la.priceCents !== lb.priceCents ||
+          la.costCents !== lb.costCents
+        )
           changed.push({
             key: k,
+            /* Named, because a summary that says «line lin_617 grew» is a
+               summary nobody can check against the quote in front of them. */
+            num: lb.num,
+            desc: lb.desc,
             qtyFrom: la.qtyMilli / 1000,
             qtyTo: lb.qtyMilli / 1000,
             priceFromCents: la.priceCents,
             priceToCents: lb.priceCents,
+            costFromCents: la.costCents || 0,
+            costToCents: lb.costCents || 0,
+            /* What the line is worth before and after — the figure the
+               operator actually reads, rather than the two inputs it comes
+               from. */
+            totalFromCents: mul(la.qtyMilli, la.priceCents),
+            totalToCents: mul(lb.qtyMilli, lb.priceCents),
           });
       }
       const tA = this.budgetTotals(budgetId, aId),
@@ -2743,6 +2852,22 @@
         deltaPct: tA.grandCents
           ? Math.round(((tB.grandCents - tA.grandCents) / tA.grandCents) * 1000) / 10
           : 0,
+        /* THE COST SIDE AND THE MARGIN, which the operator asked for by name:
+           "this XX subpartida grew in YY euros meaning an extra total price of
+           %, and extra total cost of %, the new total margin is…". Price alone
+           reads like good news; an adicional that raises the sale 8 % and the
+           cost 11 % is worse than the job was before, and that is exactly the
+           moment to see it — before it goes to the customer. */
+        costFromCents: tA.costBaseCents,
+        costToCents: tB.costBaseCents,
+        costDeltaCents: tB.costBaseCents - tA.costBaseCents,
+        costDeltaPct: tA.costBaseCents
+          ? Math.round(((tB.costBaseCents - tA.costBaseCents) / tA.costBaseCents) * 1000) / 10
+          : 0,
+        marginFromCents: tA.marginBaseCents,
+        marginToCents: tB.marginBaseCents,
+        marginFromPct: tA.marginBasePct,
+        marginToPct: tB.marginBasePct,
       };
     }
     /**
@@ -2834,15 +2959,33 @@
       const b = this.budget(budgetId);
       const v = this.version(budgetId, versionId);
       if (!v.issued) throw new Error("Only an issued version can be accepted");
-      if (b.acceptedVersionId) throw new Error("A version is already accepted");
+      /* An ADICIONAL is the one version that may be accepted after another
+         already was — that is what it is for. Everything else keeps the guard:
+         without it an accepted quote could be re-answered, overwriting the
+         customer's decision with no trace of which one they actually gave. */
+      if (b.acceptedVersionId && !v.additional) throw new Error("A version is already accepted");
+      if (v.additional && b.acceptedVersionId === v.id)
+        throw new Error("This adicional is already the accepted scope");
       /* A variation joining its project must not collide with the chapter
          numbers already in use there — every cost allocation, every progress
          mark and every report addresses a chapter by (projectId, num). So its
          chapters are RENUMBERED to carry on from the project's highest, at the
          last moment before the freeze; after it, the numbers are history like
          everything else in the version. */
+      /* Only a variation BUDGET is renumbered. An adicional VERSION keeps
+         every number it cloned — that is the point: the same partida stays the
+         same partida, so a cost booked to it still lands where it was booked
+         and the reader sees one scope rather than two glued together. */
       if (b.variationOf) {
-        const taken = this.projectChapters(b.variationOf).map((x) => Number(x.chapter.num) || 0);
+        /* Every chapter in the version, not only the base-section ones. This
+           counted `projectChapters`, which filters to `section === "base"`, so
+           a job with an optional chapter 6 handed its next variation the
+           number 6 as well — measured on the seeded job, and the collision was
+           silent: marking progress on the variation's partida found the
+           optional chapter first and marked that instead. */
+        const taken = this._projectVersions(this.project(b.variationOf)).flatMap((x) =>
+          x.version.chapters.map((c) => Number(c.num) || 0),
+        );
         let next = (taken.length ? Math.max(...taken) : 0) + 1;
         for (const c of v.chapters) {
           c.num = String(next++);
@@ -2886,6 +3029,36 @@
          write no annex, while an approved change wrote the annex and left the
          deadline alone — so whichever route was taken, half the consequence
          was missing and the contract had to be drawn up by hand. */
+      /* AN ADICIONAL VERSION BECOMES THE BASELINE. Everything downstream —
+         economics, progress, certification — reads the project's accepted
+         version through one walk, so moving that pointer is the whole of the
+         operator's "the base of the progress changes to this new version".
+         The superseded one stays in `b.versions`, frozen, and the version
+         navigator still opens it: nothing is lost, it stops being current. */
+      if (v.additional) {
+        const from = this.version(budgetId, v.additionalOf);
+        const delta =
+          this.budgetTotals(budgetId, v.id).baseCents -
+          this.budgetTotals(budgetId, v.additionalOf).baseCents;
+        from.superseded = true;
+        from.frozen = true;
+        b.acceptedVersionId = v.id;
+        const prj = this.state.projects.find((x) => x.budgetId === budgetId);
+        if (prj) {
+          prj.acceptedVersionId = v.id;
+          this.extendProjectDeadline(prj.id, v.scheduleImpactDays, v.adiNumber, user);
+          v.scheduleAppliedDays = Math.max(0, Math.round(v.scheduleImpactDays || 0));
+          /* The annex carries the DELTA, not the new total: `contractValue` is
+             original + annexes, so handing it the whole revised scope would
+             count the base twice. A reduction gives a negative annex, which is
+             the honest representation of scope removed. */
+          this.writeContractAnnex(
+            prj.id,
+            { valueCents: delta, budgetId, versionId: v.id, ref: v.adiNumber },
+            user,
+          );
+        }
+      }
       if (b.variationOf) {
         this.extendProjectDeadline(b.variationOf, b.scheduleImpactDays, b.number, user);
         b.scheduleAppliedDays = Math.max(0, Math.round(b.scheduleImpactDays || 0));
@@ -4063,21 +4236,28 @@
      * extra agreed before the contract exists is ordinary, and refusing it
      * would block the work for a document that is still being drafted.
      */
-    writeContractAnnex(projectId, { valueCents, changeId, budgetId }, user) {
+    writeContractAnnex(projectId, { valueCents, changeId, budgetId, versionId, ref }, user) {
       const p = this.state.projects.find((x) => x.id === projectId);
       if (!p || !p.contractId) return null;
       const con = this.state.contracts.find((x) => x.id === p.contractId);
       if (!con) return null;
       con.annexes = con.annexes || [];
       // Never twice for the same source — acceptance can be re-run.
-      const already = con.annexes.find(
-        (a) => (changeId && a.changeId === changeId) || (budgetId && a.budgetId === budgetId),
+      /* Keyed on the VERSION when there is one: a budget can carry several
+         adicionales over its life, so matching on budgetId alone would let the
+         first one swallow every later. */
+      const already = con.annexes.find((a) =>
+        versionId
+          ? a.versionId === versionId
+          : (changeId && a.changeId === changeId) || (budgetId && a.budgetId === budgetId),
       );
       if (already) return already;
       const rec = {
         number: con.number + "-A" + (con.annexes.length + 1),
         changeId: changeId || null,
         budgetId: budgetId || null,
+        versionId: versionId || null,
+        ref: ref || null,
         valueCents: valueCents || 0,
         date: this.state.today,
       };

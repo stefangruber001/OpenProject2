@@ -5278,6 +5278,127 @@ assert(
   );
 }
 
+/* ── PK12-S13 · an adicional is a new VERSION of the accepted scope ──────────
+   The operator's own model: "this is a copy, is other version of the previous
+   budget… the initial budget version will still be there for consultation",
+   and once approved "the base of the progress changes to this new version".
+   What makes it safe is that `newVersion`'s clone preserves ids, so a line
+   that is modified is still the line every cost and every hour points at. */
+{
+  const e = new ERP("2026-03-01");
+  const cust = e.addParty(
+    {
+      roles: ["customer"],
+      partyType: "individual",
+      name: "Cli S13",
+      email: "s13@example.com",
+      mobile: "600000013",
+      taxId: "12345678Z",
+      billStreet: "C/ Prova 2",
+      billPostalCode: "08001",
+      billCity: "Barcelona",
+    },
+    "bo",
+  );
+  const b = e.createBudget({ partyId: cust.id, activityLine: "renovation" }, "bo");
+  const ch = e.addChapter(b.id, { name: "Base", section: "base" });
+  e.addLine(b.id, ch.id, {
+    code: "B1",
+    desc: "base",
+    unit: "ud",
+    qtyMilli: 10000,
+    priceCents: 10000,
+    costCents: 6000,
+  });
+  e.issueVersion(b.id, {}, "bo");
+  const v0 = b.versions[b.versions.length - 1];
+  e.acceptVersion(b.id, v0.id, {}, "bo");
+  const prj = e.createProjectFromAcceptance(b.id, "bo");
+  prj.dates = prj.dates || {};
+  prj.dates.targetEnd = "2026-06-30";
+  const con = e.createContract(
+    b.id,
+    {
+      installments: [{ pct: 100, trigger: "onSignature", expectedDate: e.today }],
+      duration: { estimatedDays: 30 },
+    },
+    "bo",
+  );
+  prj.contractId = con.id;
+  const lineId = v0.chapters[0].lines[0].id;
+  e.markLineProgress(prj.id, lineId, { pct: 40 }, "bo");
+
+  const v1 = e.createAdditionalVersion(
+    prj.budgetId,
+    { reason: "Ampliación", scheduleImpactDays: 5 },
+    "bo",
+  );
+  assert(/^ADI-/.test(v1.adiNumber), "S13: an adicional carries its own customer-facing number");
+  assert(
+    v1.chapters[0].lines[0].id === lineId,
+    "S13: the clone keeps line ids — a modified line is still the line costs point at",
+  );
+  assert(
+    v1.chapters[0].lines[0].progressPct === 40,
+    "S13: …and carries the progress already recorded on it",
+  );
+  assert(
+    e.project(prj.id).acceptedVersionId === v0.id,
+    "S13: the baseline does not move while the adicional is only drafted",
+  );
+  // Modify: raise the quantity by half.
+  e.editLine(prj.budgetId, lineId, { qtyMilli: 15000 }, { user: "bo" });
+  const d = e.diffVersions(prj.budgetId, v0.id, v1.id);
+  assert(
+    d.changed.length === 1 && d.changed[0].totalToCents === 150000,
+    "S13: the summary names the line that changed and what it is worth now",
+  );
+  assert(
+    typeof d.costDeltaCents === "number" && typeof d.marginToPct === "number",
+    "S13: …with the cost side and the margin, not the sale alone",
+  );
+  /* A line added by the adicional itself, checked BEFORE the version freezes:
+     once accepted it is immutable like any other, which is the guard working
+     rather than a limitation of the adicional. */
+  const fresh = e.addLine(prj.budgetId, v1.chapters[0].id, {
+    code: "N1",
+    desc: "nueva",
+    unit: "ud",
+    qtyMilli: 1000,
+    priceCents: 1000,
+    costCents: 500,
+  });
+  assert(e.lineDeleteBlock(prj.id, fresh.id) === null, "S13: a line with nothing behind it can go");
+  e.issueVersion(prj.budgetId, {}, "bo");
+  e.acceptVersion(prj.budgetId, v1.id, {}, "bo");
+  assert(
+    e.project(prj.id).acceptedVersionId === v1.id && b.acceptedVersionId === v1.id,
+    "S13: accepting it moves the baseline for progress and economics",
+  );
+  assert(
+    e.version(prj.budgetId, v0.id).frozen && e.version(prj.budgetId, v0.id).superseded,
+    "S13: the version it replaced stays, frozen, for consultation",
+  );
+  assert(
+    e.project(prj.id).dates.targetEnd === "2026-07-05",
+    "S13: the days it declared reach the completion date",
+  );
+  const annex = (con.annexes || []).find((a) => a.versionId === v1.id);
+  /* 51.000c: the modified line grew by 500 € and the new one adds 10 €. The
+     revised scope is 1.510 € — handing THAT to the annex would count the base
+     a second time, because `contractValue` is original + annexes. */
+  assert(
+    annex && annex.valueCents === 51000,
+    "S13: the contract annex carries the DELTA, not the revised total",
+  );
+  /* Nothing disappears: a line with real records against it cannot be deleted
+     from the scope, it is reduced. */
+  assert(
+    e.lineDeleteBlock(prj.id, lineId) === "has-progress",
+    "S13: a line with progress behind it refuses to be deleted",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
