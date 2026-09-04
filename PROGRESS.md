@@ -2144,5 +2144,27 @@ ignoring the filter above it. None of them threw. Every one of them was caught
 by a person using the thing, which is the argument for the operator's stream and
 against trusting a green suite that asks the engine what the screen does.
 
+**S9 · From the paper to the bank in one press.** The operator counted the old
+route: create the Gasto, press Registration, assign a supplier by hand from a
+picker with no «new supplier» option, go to Maestros, create the supplier, come
+back, press Registrar como factura. Five screens, and the engine never needed
+any of them — `billFromCapture` already carried the number, the dates, the
+amounts and the split, and wanted a supplier id.
+
+The supplier is now settled on the reading screen, where the paper still is:
+matched by tax id, or created from what was read, or picked from the file when
+the reader got the number wrong. A document answering none of the three is
+refused, because the party record is built from the document. Then «Asignar»
+disappears and «Registrar como factura» is the whole action: it writes the
+split, files the bill off the document's own figures, and puts it in front of
+the bank. Maestros → Proveedores gained the same door for a supplier with no
+cost attached, and the image is read and let go.
+
+The one thing worth restating, because it reads like a regression and is the
+opposite of one: matching a tax id is not the guessing package 11 removed. That
+was a picker choosing whichever supplier came first for a document that matched
+nobody. A tax id compared to a tax id is the identifier the law uses to say two
+records are one company.
+
 **Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
 ("Forget about this for the moment") and still the oldest unanswered item.
