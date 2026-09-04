@@ -2073,3 +2073,76 @@ shipped, which is the rule in `CLAUDE.md` §3 broken quietly for a whole package
 — the code was green every time and the record was not kept. Noted here rather
 than tidied away, because the Definition of Done asks for governance files that
 are honest and current, and for a while these were neither.
+
+## Package 13 — the 04/09 UAT stream (started 2026-09-04)
+
+Nine reports from the operator against the live workspace, arriving faster than
+they could be batched, and every one of them a screen that was silent rather
+than wrong. Four shipped commits, each one green on the unfiltered browser run
+before it was made.
+
+**S1 · «Where is the button?»** The `＋ Días de los adicionales` control rendered
+only when a breakdown per partida had already been typed, and the only screen
+that asks for that breakdown lists adicionales still WAITING for an answer.
+Accept from the quote screen — the ordinary door, the one that also creates the
+obra — and the days had nowhere to be recorded and nothing to record them with:
+a rule with a closed door on both sides. Third instance in three packages of the
+same shape, an engine rule with no reachable caller.
+
+**S1b · Deriving threw the days away.** Then, after applying them, the operator
+pressed «Derivar del presupuesto» and the whole chart changed. `mergeDerivedPlan`
+carries progress, status, pinned dates, baselines and the log across a
+re-derivation; duration is not on that list and never was. Five agreed days were
+recomputed away while the version stayed marked as applied, so the button did
+not come back either. `reapplyAdiDays` makes deriving idempotent for them —
+which is what makes the button safe to press — and the confirmation now says
+first that durations are recomputed.
+
+**S2 · A part payment is not a near miss.** `score()` discarded every candidate
+beyond the amount tolerance before it looked at the reference, so «PAGO PARCIAL
+50% FRA 2026/2210» for 199,77 € of 399,54 € open produced zero proposals while
+the invoice sat one search away. One document, less than what is open, and the
+reference quoted in the concept: proposed as a part payment, and never
+one-click, because the amount is precisely what does not agree.
+
+**S3 · One question, one control.** The shortfall panel asked "what is this
+difference?" through a select of write-off reasons AND a green button beside it.
+«Pago parcial» is the first option and the default now — which matters more than
+the tidiness, because the default action used to be a write-off with a reason
+nobody had chosen.
+
+**S4 · Who issued it travels with it.** `chapterCosts` listed six fields and
+`party` was not among them, one line after `projectCostRows` had resolved it, so
+every document behind a subpartida named a kind, a number, an amount and a date
+belonging to nobody. It carries the supplier, the tax id and what the money
+bought.
+
+**S5 · Nothing with no date falls through the forecast.** `bucketOf` returned -1
+for an empty date and `put` dropped the row in silence, while the same screen's
+footer promises that what is owed does not disappear for having passed its date.
+
+**S6 · What the reader got wrong is correctable.** The five figures a capture
+carries were carved in stone after validation: a misread digit meant deleting
+the document and capturing it again. Editable through `confirmCapture`, the same
+door the validation screen uses, and read-only with its reason once the document
+is a registered bill.
+
+**S7 · The period on the screen applies to that card too.** «Últimos
+movimientos» took the last five of all time under a period picker — January
+selected, November on screen. It is «Movimientos del periodo» now and shows the
+whole period, scrolling.
+
+**S8 · A cost goes in where costs go in.** «＋ Añadir gasto» opened the bill
+drawer with no document behind it, the one way in the product to create a cost
+with no paper anywhere. It walks to Gastos.
+
+**What this package is about.** Eight of the nine were the product being
+confidently silent: a button that did not render, a duration recomputed with no
+note, a proposal filtered out before the evidence was read, a supplier name
+dropped one projection short of the screen, a row bucketed to -1, a card
+ignoring the filter above it. None of them threw. Every one of them was caught
+by a person using the thing, which is the argument for the operator's stream and
+against trusting a green suite that asks the engine what the screen does.
+
+**Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
+("Forget about this for the moment") and still the oldest unanswered item.
