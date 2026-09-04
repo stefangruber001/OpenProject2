@@ -3742,7 +3742,12 @@ td.num.late {
    change size, which is the part that had to stay fixed. */
 @media (max-width: 860px) {
   .p2 {
-    --sheet-h: 296px;
+    /* 318, up from 296: the stage strip became a timeline (section 68) and a
+       node above its label is taller than a pill beside one. The number is
+       still the tallest natural sheet, re-measured — the point of one height
+       is that every tab opens in the same place, so it has to follow the
+       content when the content changes. */
+    --sheet-h: 318px;
     min-height: var(--sheet-h);
     display: flex;
     flex-direction: column;
@@ -3923,5 +3928,120 @@ td.num.late {
     font-weight: 600;
     background: var(--accentSoft);
     border-color: var(--accentDeep);
+  }
+}
+
+/* ------------------------------- 68 · the three stages become a timeline
+   Operator, on the strip at the head of every flow panel: «make the 3 look
+   more like a timeline».
+
+   It was three filled pills in a row. Pills say «pick one of these»; a process
+   says «this, then this, then this», and the difference is the line between
+   them. The phone rule used to switch the connector off outright — «an inline
+   row of pills carries its own order» — which was true of pills and is the
+   thing being corrected.
+
+   So: a node per stage on a shared rail, the label beneath it, and the rail
+   FILLED as far as the stage you are in. The fill is what makes it a timeline
+   rather than three dots: it shows position in a sequence, not just membership
+   of a set. Three equal columns put the node centres at 1/6, 3/6 and 5/6 of
+   the width, which is where the rail starts, ends and is measured from.
+
+   The fill is driven by `:has()` on the active step rather than by a class the
+   renderer would have to set, so nothing in the page has to know this drawing
+   exists — the same reason the strip reads the sections' own names. */
+@media (max-width: 700px) {
+  .p2flow {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    align-items: start;
+    gap: 0;
+    padding-bottom: 12px;
+  }
+  /* the rail: from the first node centre to the last */
+  .p2flow::before {
+    content: "";
+    display: block;
+    position: absolute;
+    left: 16.67%;
+    right: 16.67%;
+    top: 10px;
+    height: 2px;
+    background: var(--line);
+    z-index: 0;
+  }
+  /* and the part of it already walked */
+  .p2flow::after {
+    content: "";
+    position: absolute;
+    left: 16.67%;
+    top: 10px;
+    height: 2px;
+    width: 0;
+    background: var(--accent);
+    z-index: 0;
+    transition: width 0.18s ease;
+  }
+  .p2flow:has(.p2step:nth-child(2).on)::after {
+    width: 33.33%;
+  }
+  .p2flow:has(.p2step:nth-child(3).on)::after {
+    width: 66.66%;
+  }
+
+  .p2step {
+    position: relative;
+    z-index: 1;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    background: none;
+    min-width: 0;
+  }
+  /* The node sits ON the rail, so it needs an opaque fill of its own or the
+     line runs straight through the digit. */
+  .p2step .n {
+    width: 22px;
+    height: 22px;
+    font-size: 10.5px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--line);
+    color: var(--muted);
+    box-sizing: border-box;
+  }
+  .p2step .l {
+    font-size: 11.5px;
+    text-align: center;
+    color: var(--muted);
+  }
+  /* The pill fills go, all of them. A filled block behind a stage covers the
+     rail running through it, and a covered rail is three pills again. */
+  .p2step.done,
+  .p2step:hover {
+    background: none;
+  }
+  .p2step.done .n {
+    background: var(--paper);
+    border-color: var(--accent);
+    color: var(--accentDeep);
+  }
+  .p2step.done .l {
+    color: var(--accentDeep);
+  }
+  .p2step.on {
+    background: none;
+  }
+  .p2step.on .n {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .p2step.on .l {
+    color: var(--ink);
+    font-weight: 700;
   }
 }

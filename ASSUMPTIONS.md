@@ -8250,3 +8250,34 @@ proyecto» saves to a separate `caneiJourney` IndexedDB by design, while
 engine touches a 5,367-line page and, once live, every abandoned run leaves
 real customers, quotes and invoices in the books. It needs its own change with
 its own verification, not a corner of this one.
+
+**S70 · The three stages become a timeline.** Operator, on the strip at the
+head of every flow panel: «also make the 3 look like more like a timeline».
+
+They were three filled pills in a row. A pill says «pick one of these»; a
+process says «this, then this, then this», and the difference is the line
+between them. The phone rule had switched the connector off outright — «an
+inline row of pills carries its own order», true of pills, and the thing being
+corrected.
+
+Now: a node per stage on a shared rail, the label beneath it, and the rail
+FILLED as far as the stage you are in. The fill is what makes it a timeline
+rather than three dots — it shows position in a sequence, not membership of a
+set. Three equal columns put the node centres at 1/6, 3/6 and 5/6, which is
+where the rail starts, ends and is measured from.
+
+Driven by `:has()` on the active step rather than a class the renderer sets, so
+nothing in the page has to know this drawing exists — the same reason the strip
+reads the sections' own names rather than carrying its own.
+
+Two things the first attempt got wrong, both found by looking at it. The pill
+fills had to go from `.done` and `:hover` as well as `.on`: a filled block
+behind a stage covers the rail running through it, and a covered rail is three
+pills again. And the node needs an opaque fill of its own, or the line runs
+straight through the digit.
+
+Knock-on, handled rather than left: a node above its label is taller than a
+pill beside one, so the sheets stopped being one height — 318 against 296. The
+uniform height from S64 is the promise that every tab opens in the same place,
+so the number follows the content: re-measured to 318, spread back to 0.0px
+across all five, still flush at the bottom.
