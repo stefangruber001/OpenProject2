@@ -82,10 +82,50 @@ export async function allUsers(tenantId: string): Promise<UserRecord[]> {
   return [...rows, ...envUsers().filter((u) => !seen.has(u.email))];
 }
 
+/**
+ * THE SINGLE-SEAT OPERATOR IS THE ADMINISTRATOR OF THEIR OWN SERVER.
+ *
+ * A deployment with no accounts and no shared password has one identity:
+ * `ERP_OPERATOR`, the name `requireUser` stamps on every record so the audit
+ * trail is attributable. That person has no row and no environment account, so
+ * `findUser` used to answer null for them — which was harmless while nothing
+ * asked, and became a lockout the moment the command runner started asking.
+ * They could not record an invoice on a server that is entirely theirs.
+ *
+ * Narrow on purpose. It applies ONLY when sign-in is not configured at all, so
+ * it can never widen a deployment that does have accounts: there,
+ * `requireUser` returns whoever the session cookie names and never this value.
+ */
+function singleSeatOperator(): UserRecord | null {
+  const operator = process.env.ERP_OPERATOR?.trim();
+  if (!operator) return null;
+  const configured =
+    Boolean(process.env.ERP_USERS?.trim()) || Boolean(process.env.ERP_ACCESS_PASSWORD?.trim());
+  if (configured && process.env.SESSION_SECRET?.trim()) return null;
+  const epoch = new Date(0);
+  return {
+    email: operator.trim().toLowerCase(),
+    name: operator,
+    role: "admin",
+    state: "active",
+    // No password: there is nothing to sign in to. This record exists to answer
+    // "what may they do", not "is this them" — that question was already
+    // settled by the configuration itself.
+    hash: "",
+    sessionsValidFrom: epoch,
+    createdAt: epoch,
+    createdBy: "env",
+    disabledAt: null,
+  };
+}
+
 /** The one user, or null. */
 export async function findUser(tenantId: string, email: string): Promise<UserRecord | null> {
   const wanted = email.trim().toLowerCase();
-  return (await allUsers(tenantId)).find((u) => u.email === wanted) ?? null;
+  const found = (await allUsers(tenantId)).find((u) => u.email === wanted);
+  if (found) return found;
+  const solo = singleSeatOperator();
+  return solo && solo.email === wanted ? solo : null;
 }
 
 /**
