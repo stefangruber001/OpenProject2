@@ -1882,6 +1882,24 @@ td.k,
   border-color: var(--accent);
   color: #fff;
 }
+/* Something waiting on a person is not something finished. Green is the colour
+   this workspace uses for «approved and settled», so the button that says how
+   many hours are STILL open had been reading as good news.
+   A PALE gold, not the full one: at full strength it was the loudest thing on
+   the screen, which is the wrong rank for a queue — it is work waiting, not an
+   alarm. The edge and the dark ink carry the meaning; the fill only tints. */
+.btn.warn {
+  background: #fdf1cc;
+  border-color: #eccb63;
+  color: #6b5312;
+  font-weight: 700;
+  justify-content: center;
+  text-align: center;
+}
+.btn.warn:hover:not([disabled]):not(:disabled) {
+  background: #fbe7ac;
+  border-color: #e2b420;
+}
 .secitem .lb {
   font: 600 10.5px var(--sans);
   letter-spacing: 0.01em;
@@ -4160,6 +4178,12 @@ td.num.late {
 .weekbar .hday.wknd {
   background: var(--hair);
 }
+/* Saturday and Sunday keep a grey number. The ink colour is what the eye reads
+   as "a day with work in it", and a weekend printed in the same blue as a
+   Tuesday makes the strip say something the week does not. */
+.weekbar .hday.wknd .n {
+  color: var(--faint);
+}
 .weekbar .hday.on {
   background: var(--accent);
   border-color: var(--accent);
@@ -4249,45 +4273,131 @@ td.num.late {
   padding: 2px 6px;
   white-space: nowrap;
 }
+/* EVERY FIELD SAYS WHAT IT IS. The row used to be three unlabelled dropdowns
+   stacked under each other with an unexplained box floating to their right, and
+   the only way to learn that the box wanted hours was to try it. Now each
+   control sits under its own caption, every control is the same width as its
+   neighbours, and the hours field is the last field of the same list rather
+   than a separate column — so the eye runs down one edge instead of hunting. */
 .wcard .wrow {
   display: grid;
-  grid-template-columns: 1fr 72px;
-  gap: 9px;
-  align-items: center;
-  padding: 9px 11px;
+  gap: 8px;
+  padding: 10px 11px;
   border-bottom: 1px solid var(--hair);
 }
 .wcard .wwhere {
   min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+/* Partida and subpartida share a line, as hour type and hours do below: four
+   stacked fields per entry made a three-line day scroll like a form. */
+.wcard .wpair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+.wcard .wend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+}
+.wcard .wf {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.wcard .wf > label,
+.wcard .whrs > label {
+  font: 700 9px var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.wcard .whrs > label {
+  text-align: center;
+}
+/* A VALUE, NOT A CONTROL. Same box a select occupied, so a card of three
+   entries lines up down one edge and every row is the same height — which is
+   what a select could never give, because its height came from the browser. */
+.wcard .wf .val {
+  font-size: 13px;
+  color: var(--ink);
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wcard .wf .val.strong {
+  font-weight: 600;
+}
+.wcard .wrow.empty2 {
+  padding: 12px 11px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.wcard .wch .tot {
+  font: 700 13px var(--sans);
+  color: var(--greenDeep);
+  white-space: nowrap;
 }
 .wcard .wproj {
   font-weight: 600;
   font-size: 13px;
+  padding: 6px 0;
 }
 .wcard .wline,
 .wcard .wkind,
 .wcard .wsel {
-  margin-top: 3px;
   font-size: 11.5px;
   color: var(--muted);
+  min-width: 0;
 }
 .wcard .wline .sub {
   color: var(--muted);
 }
-.wcard .wwhere select.inline {
-  max-width: 100%;
+/* The selects a blank row offers are the widest thing in the card, and a
+   `max-width` on them was what let one sit at half the width of the next. */
+.wcard .wwhere select.inline,
+.wcard .wend select.inline {
+  width: 100%;
+  max-width: none;
 }
+.wcard .wline select.inline + select.inline {
+  margin-top: 5px;
+}
+.wcard .whrs {
+  display: grid;
+  gap: 3px;
+}
+/* `input.inline` caps itself at 130px, which is right for a field in a table
+   row and wrong for the one field this row exists to collect. */
 .wcard .whrs input.hin {
   width: 100%;
+  max-width: none;
   text-align: center;
   font: 700 15px var(--sans);
   padding: 7px 4px;
 }
+/* The hours box keeps the height and the border the input had, so a row of
+   values still reads as the row that collects them. */
 .wcard .whrs .ro {
-  display: block;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  background: var(--paper);
   font: 700 15px var(--sans);
-  color: var(--muted);
+  color: var(--ink);
+  padding: 5px 4px;
 }
 .wcard .wcf {
   display: flex;
@@ -4311,11 +4421,15 @@ td.num.late {
   color: var(--muted);
 }
 
-/* ---- one bar of actions, at the end of the day's work ---- */
+/* ---- one bar of actions, ABOVE the day's work ----
+   It used to sit at the end, which is fine on a day with three lines and wrong
+   on a day with thirty: adding a line meant scrolling past every line already
+   there to reach the button that adds one. The actions are about the day, so
+   they belong where the day starts. */
 .hdock {
   display: flex;
   gap: 7px;
-  margin: 12px 0 4px;
+  margin: 4px 0 12px;
 }
 .hdock .btn {
   flex: 1;
@@ -4328,7 +4442,308 @@ td.num.late {
   text-overflow: ellipsis;
 }
 
-/* ---- corrections: the register as a list of entries, each editable ---- */
+/* ---- the summary's own scope: which job, over what stretch ---- */
+.hscope {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hscope .hstop,
+.hscope .hsbot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.hscope .plbl {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.hscope input,
+.hscope select {
+  font: 12.5px var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 6px 9px;
+  outline: 0;
+  min-width: 0;
+}
+.hscope select {
+  font-weight: 600;
+}
+.hscope .hstop input {
+  flex: 1;
+}
+.hscope .hsbot select {
+  flex: 1;
+}
+.hscope .fav {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 2px;
+  color: var(--faint);
+  flex: 0 0 auto;
+}
+.hscope .fav.on {
+  color: var(--gold);
+}
+.hscope .fav[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* One segmented control for the stretch of time. Equal cells, one filled — the
+   same shape the language switch and the Mine/Everyone group already use, so
+   the workspace has one way of saying "pick one of these". */
+.hscope .hseg {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--line);
+}
+.hscope .hseg .sg {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font: 600 12px var(--sans);
+  padding: 7px 4px;
+  cursor: pointer;
+  min-width: 0;
+}
+.hscope .hseg .sg.on {
+  background: var(--accent);
+  color: #fff;
+}
+/* The period label is a BUTTON — pressing it is how you reach another day,
+   week, month or year — so it is styled as one, and the native picker that
+   replaces it keeps the same footprint so the strip does not jump. */
+.hscope .hseg .lb {
+  padding: 7px 12px;
+  border: 0;
+  background: var(--accentPale);
+  font: 700 11px var(--sans);
+  color: var(--greenDeep);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hscope .hseg .lb:hover {
+  background: var(--accentSoft);
+}
+.hscope .hseg .lbp {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+  font: 700 12px var(--sans);
+  color: var(--ink);
+  padding: 6px 8px;
+  outline: 0;
+  min-width: 0;
+  width: 150px;
+}
+@media (max-width: 560px) {
+  .hscope .hseg {
+    flex-wrap: wrap;
+  }
+  .hscope .hseg .lb,
+  .hscope .hseg .lbp {
+    flex: 1 0 100%;
+    width: auto;
+    padding: 7px 8px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    text-align: center;
+  }
+}
+/* Given room, the three stacked rows become one toolbar. Stretched to 1440px
+   the search box was a third of a metre wide and each period cell the size of a
+   button nobody needs that large — width the layout was given rather than
+   width it wanted. */
+@media (min-width: 900px) {
+  .hscope {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+  }
+  .hscope .hstop,
+  .hscope .hsbot {
+    flex: 0 1 auto;
+  }
+  .hscope .hstop input {
+    flex: 0 0 auto;
+    width: 220px;
+  }
+  .hscope .hsbot select {
+    flex: 0 0 auto;
+    width: 340px;
+    max-width: 40vw;
+  }
+  .hscope .hseg {
+    margin-left: auto;
+  }
+  .hscope .hseg .sg {
+    flex: 0 0 auto;
+    padding: 7px 16px;
+  }
+}
+
+/* ---- who worked: three numbers, one column each ---- */
+.hwlist {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.hwlist .hwh,
+.hwlist .hworker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px 62px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 11px;
+}
+.hwlist .hwh {
+  background: var(--accentPale);
+  border-bottom: 1px solid var(--line);
+  font: 700 9px var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.hwlist .hwh .n {
+  text-align: right;
+}
+.hwlist .hworker {
+  border-bottom: 1px solid var(--hair);
+}
+.hwlist .hworker:last-child {
+  border-bottom: 0;
+}
+.hwlist .who {
+  min-width: 0;
+}
+.hwlist .nm {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwlist .r {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwlist .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.hwlist .hh {
+  font-weight: 700;
+}
+.hwlist .ot {
+  color: var(--gold);
+  font-weight: 600;
+}
+.hwlist .ot.zero {
+  color: var(--faint);
+  font-weight: 400;
+}
+.hwlist .cc {
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .hwlist .hwh,
+  .hwlist .hworker {
+    grid-template-columns: minmax(0, 1fr) 48px 48px 74px;
+    gap: 6px;
+    padding: 8px 9px;
+  }
+  .hwlist .n {
+    font-size: 12px;
+  }
+}
+
+/* ---- the office's sign-off, at the head of the review ----
+   Deliberately the first thing on this tab and deliberately NOT on the day
+   sheet: approving locks a week, and a lock is not something to place on the
+   screen the crew's hours are typed into. */
+.happ {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.happ .haph {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+}
+.happ .haph .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--greenDeep);
+}
+.happ .haph .n {
+  font: 700 11px var(--sans);
+  color: var(--paper);
+  background: var(--accentDeep);
+  padding: 1px 7px;
+}
+.happ .haprow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.happ .haprow:last-child {
+  border-bottom: 0;
+}
+.happ .haprow .who {
+  min-width: 0;
+}
+.happ .haprow .nm {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.happ .haprow .sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.happ .haprow .sub b {
+  color: var(--ink);
+  font-weight: 700;
+}
+.happ .empty {
+  padding: 12px;
+}
+
+/* ---- review: the register as a list of entries, each editable ---- */
 .rfilters {
   display: flex;
   gap: 6px;
@@ -4343,10 +4758,16 @@ td.num.late {
   padding: 6px 0;
   cursor: pointer;
 }
+/* A FILTER IS NOT AN ACTION. Full accent green is what this workspace puts on
+   things that DO something — approve, issue, register — so a filter wearing it
+   read as the button you press rather than the state you are in. Soft ground,
+   deep-green text, accent only on the edge: unmistakably selected, obviously
+   not a verb. */
 .rfilters .rf.on {
-  background: var(--accent);
+  background: var(--accentSoft);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--greenDeep);
+  font-weight: 700;
 }
 .rcount {
   display: flex;
@@ -4532,8 +4953,14 @@ td.num.late {
   gap: 7px;
   margin-bottom: 6px;
 }
-.hacts .btn.primary {
-  flex: 1.4 1 0;
+.hacts .btn.primary,
+.hacts .btn.warn {
+  flex: 2.2 1 0;
+}
+.hacts .btn:not(.primary):not(.warn) {
+  flex: 0 0 auto;
+  padding-left: 18px;
+  padding-right: 18px;
 }
 .hacts .btn {
   flex: 1 1 0;
@@ -4963,28 +5390,23 @@ body.siteworker .rail {
 .jstep:hover .l {
   color: var(--ink);
 }
-.jstep.s-done .n,
-.jdot.s-done {
+.jstep.s-done .n {
   background: #ccfbf1;
   border-color: #99e6da;
   color: #0f766e;
 }
-.jstep.s-doing .n,
-.jdot.s-doing {
+.jstep.s-doing .n {
   background: #fef3c7;
   border-color: #f0d69a;
   color: #b45309;
 }
-.jstep.s-waiting .n,
-.jdot.s-waiting {
+.jstep.s-waiting .n {
   background: #dbeafe;
   border-color: #b3cdf7;
   color: #1d4ed8;
 }
 .jstep.s-blocked .n,
-.jstep.s-late .n,
-.jdot.s-blocked,
-.jdot.s-late {
+.jstep.s-late .n {
   background: #fee2e2;
   border-color: #f4bcbc;
   color: #b91c1c;
@@ -5010,6 +5432,14 @@ body.siteworker .rail {
   .jstep .l {
     max-width: 68px;
   }
+}
+
+/* ---- the invitation drawer's explanation line ---- */
+.invnote {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.45;
 }
 
 /* --------------------------- 71 · the same thirteen phases, at row size

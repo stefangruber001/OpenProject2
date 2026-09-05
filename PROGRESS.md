@@ -2333,7 +2333,7 @@ E2E; workspace audit **0/0** across eighteen screens; source literals
 37/97 — an EN raise against the hours release's 33, argued in ASSUMPTIONS S75g
 rather than adjusted quietly.
 
-### PK14-S76 · The recorrido as the operator uses it (05/09)
+### PK14-S77 · The recorrido as the operator uses it (05/09)
 
 Three requests off two phone screenshots of the live workspace, plus four
 defects the screenshots showed without being mentioned.
@@ -2362,24 +2362,27 @@ inside the phase by `sheetDocHtml`, the same sheet the PDF is printed from, so
 changing the document changes this screen too. Two screens keep a named way
 out, the presupuestador and the carta Gantt, because reproducing a three-pane
 builder in a card would be the second implementation this screen exists to
-avoid (ASSUMPTIONS S76d).
+avoid (ASSUMPTIONS S77d).
 
 **«Lo hecho hasta ahora».** A last card listing every action performed and
 every document produced, newest first, each with `⤓ PDF` / `⤓ Word` through
 `downloadHistoryDoc` — the Historial's own route, so the document offered is
 the one the customer already has. Built from the records, not the audit log,
 and ordered by each record's own date because several are backdatable
-(S76f). 458 rows over the workspace, 176 with a document. `project.diary` gets
+(S77f). 458 rows over the workspace, 176 with a document. `project.diary` gets
 its first reader in the product.
 
 On the way past: `histRows` read four field names that do not exist on the
 record, so the Historial modal's date column had been blank since it was
-written (S76i).
+written (S77i).
 
 Gates, measured on this tree: site E2E **717/717 unfiltered** (the recorrido
 suite 18 → 28 checks); workspace audit **0/0**; source literals **162/162**,
 back to main's number after four engine guards quoted in comments were requoted
 and six block reasons given entries; rendered pages **91/67**; miss ledger
-**33/94**, ratcheted down from 37/97. `pnpm lint · check-types · test ·
+**33/94** locally against ceilings that STAY at 37/97 — main reverted exactly
+this ratchet in `f31a1c2` after CI failed on it, and the crawl walks a different
+set of pages per branch, so one local reading is not the number CI sees
+(ASSUMPTIONS S77h). `pnpm lint · check-types · test ·
 boundaries · build` green, nav manifest and ownership guard green. No
 capability changed, so the committed `site/erp-factory` bundle is byte-identical.
