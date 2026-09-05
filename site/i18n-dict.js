@@ -5894,7 +5894,11 @@ window.CANEI_DICT = {
     ],
     ["← Todos los recorridos", "← All journeys"],
     ["Ningún recorrido coincide con la búsqueda.", "No journey matches the search."],
-    ["Abrir la pantalla completa ↗", "Open the full screen ↗"],
+    /* Was «Abrir la pantalla completa ↗» on every phase, which said nothing
+       about what it opened. Only two screens keep a way out, and they are named
+       after the screen: the presupuestador and the carta Gantt. */
+    ["Abrir el presupuesto completo ↗", "Open the full quote ↗"],
+    ["Abrir la carta Gantt ↗", "Open the Gantt chart ↗"],
     ["Ir a la fase", "Go to phase"],
     /* Not «Sin obra», which the hours release already owns for an apunte with no
        obra assigned. This is a different fact — a lead that has not become one
@@ -5929,6 +5933,9 @@ window.CANEI_DICT = {
     ["Registrar la visita", "Record the visit"],
     ["＋ Nuevo presupuesto", "＋ New quote"],
     ["Enviar y congelar", "Send and freeze"],
+    /* The one thing left to do on a sent-and-frozen quote: a presupuesto past
+       its validity date is sent again, which is what resets it. */
+    ["Volver a enviar", "Send again"],
     ["Registrar la respuesta", "Record the reply"],
     ["Iniciar la obra", "Start the works"],
     ["Abrir la obra", "Open the job"],
@@ -5941,10 +5948,44 @@ window.CANEI_DICT = {
     ["Obra creada", "Job created"],
     ["Obra cerrada", "Job closed"],
     ["Reseña registrada", "Review recorded"],
+    /* «Lo hecho hasta ahora» — every action performed and every document
+       produced, one time-ordered list at the end of the recorrido. The labels
+       are the ROW's vocabulary; the value beside each one is the record's own
+       (a number, a code, a name) and is not translated. */
+    ["Lo hecho hasta ahora", "What has happened so far"],
+    ["anotaciones", "entries"],
+    ["Todavía no se ha hecho nada en este recorrido", "Nothing has happened on this journey yet"],
+    ["Oportunidad abierta", "Lead opened"],
+    ["Presupuesto creado", "Quote created"],
+    ["Enviado al cliente", "Sent to the customer"],
+    ["Adicional enviado y congelado", "Variation sent and frozen"],
+    ["Aceptado por el cliente", "Accepted by the customer"],
+    ["Rechazado por el cliente", "Refused by the customer"],
+    ["Contrato redactado", "Contract drawn up"],
+    ["Material recibido", "Goods received"],
+    ["Rectificativa emitida", "Credit note issued"],
+    ["Pago a proveedor", "Supplier paid"],
+    ["Recibo entregado", "Receipt handed over"],
+    ["Incidencia en obra", "Site incident"],
+    ["Entrega en obra", "Site delivery"],
+    ["Parte de obra", "Site diary entry"],
+    ["Reseña del cliente", "Customer review"],
+    /* Two engine enums this card is the first screen to print. */
+    ["En papel", "On paper"],
+    ["Firma digital", "Digital signature"],
     [
       "Un adicional se une a su obra, no abre otra",
       "A variation joins its job, it does not open another",
     ],
+    /* The same refusals WITHOUT the warning mark: the recorrido prints them as
+       the «Falta» row of a phase whose verb is disabled, where a toast's ⚠ would
+       be shouting at a screen that is simply describing itself. */
+    ["Antes hace falta una oportunidad", "A lead is needed first"],
+    ["Antes hace falta un presupuesto", "A quote is needed first"],
+    ["Antes hace falta una obra", "A job is needed first"],
+    ["El presupuesto todavía no se ha enviado", "The quote has not been sent yet"],
+    ["Hace falta un presupuesto aceptado", "An accepted quote is needed"],
+    ["El contrato no está firmado", "The contract is not signed"],
     ["⚠ Antes hace falta una oportunidad", "⚠ A lead is needed first"],
     ["⚠ Antes hace falta un presupuesto", "⚠ A quote is needed first"],
     ["⚠ Antes hace falta una obra", "⚠ A job is needed first"],

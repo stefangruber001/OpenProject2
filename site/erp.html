@@ -22380,6 +22380,18 @@
         late: ["Vencida", "r"],
         pending: ["Pendiente", ""],
       };
+      /* How a contract came to be signed. `signature.method` is an engine enum
+         and there are only these two — a screen showed the raw «physical» to the
+         operator, which is neither Spanish nor a word. */
+      const SIGN_METHOD = { physical: "En papel", digital: "Firma digital" };
+      /* The channel a presupuesto went out by, in the same words the send drawer
+         offers. `issueVersion` defaults to «email» and stores the enum. */
+      const SEND_CHANNEL = {
+        email: "Correo electrónico",
+        whatsapp: "WhatsApp",
+        sms: "SMS",
+        physical: "En mano",
+      };
       // jSubject names the record picked, prefixed prj or opp. Never a record
       // of its own: this screen writes none.
       let jSubject = null,
@@ -22539,7 +22551,7 @@
                 })
               : S("pending", [["Estado", "Sin visita registrada"]], {
                   lab: "＋ Programar visita",
-                  // `scheduleVisit`: "A visit needs an opportunity".
+                  // `scheduleVisit`: «A visit needs an opportunity».
                   block: opp ? null : "Antes hace falta una oportunidad",
                   run: () => scheduleVisitDrawer(opp.id, { stay: true }),
                 }),
@@ -22588,7 +22600,7 @@
               ? S("blocked", [["Estado", "Presupuesto rechazado"]])
               : S(issued.length ? "waiting" : "pending", [["Estado", "Sin respuesta"]], {
                   lab: "Registrar la respuesta",
-                  // `acceptVersion`: "Only an issued version can be accepted".
+                  // `acceptVersion`: «Only an issued version can be accepted».
                   block: last ? null : "El presupuesto todavía no se ha enviado",
                   run: () => budgetResponseDrawer(budget.id, last.id),
                 }),
@@ -22611,7 +22623,7 @@
               )
             : S(accepted ? "doing" : "pending", [["Estado", "Sin contrato formal"]], {
                 lab: "＋ Nuevo contrato",
-                // `createContract`: "Contract requires an accepted budget version".
+                // `createContract`: «Contract requires an accepted budget version».
                 block: accepted ? null : "Hace falta un presupuesto aceptado",
                 run: () => newContractDrawer({ budgetId: budget.id }, { stay: true }),
               }),
@@ -22621,7 +22633,7 @@
             : project
               ? S("doing", [["Estado", "Obra creada, sin iniciar"]], {
                   lab: "Iniciar la obra",
-                  // `startWorks`: "Contract not signed — works blocked (CON-11)".
+                  // `startWorks`: «Contract not signed — works blocked (CON-11)».
                   block:
                     contract && !contract.signature.customerSignedAt
                       ? "El contrato no está firmado"
@@ -23124,7 +23136,8 @@
              <button class="btn sm" id="jFwd"${jStep === 12 ? " disabled" : ""}>Siguiente ›</button>
            </div>
            ${journeyStepBody(c, jStep)}
-           ${journeyDoc(c, jStep)}</div>`;
+           ${journeyDoc(c, jStep)}</div>` +
+          journeyLedger(c);
 
         $("#jBack").onclick = () => {
           jSubject = null;
@@ -23148,6 +23161,7 @@
           (tr) => (tr.onclick = () => invoiceDrawer(tr.dataset.inv)),
         );
         if ($("#jOpen")) $("#jOpen").onclick = () => full.run();
+        journeyLedgerWire(v, c);
         $("#jPrev").onclick = () => {
           jStep = Math.max(0, jStep - 1);
           render();
@@ -23283,6 +23297,286 @@
             ${journeyRow(["Avance", e.progressPct + "%"])}</div>`;
         }
         return "";
+      }
+
+      /* ======================= WHAT THIS JOB HAS BEEN THROUGH =======================
+         The last card of the recorrido: every action already performed and every
+         document already produced, in one time-ordered list, each with its paper
+         attached. «Quote was created — the PDF is there — and the action is
+         completed, it was sent to the customer», in the operator's words.
+
+         BUILT FROM THE RECORDS, NOT FROM THE AUDIT LOG. Every record here carries
+         its own event date and a hard foreign key to this job; `state.audit`
+         carries a free-form string reference, day granularity and no id, so
+         matching a row to it is substring guesswork — and a history that
+         occasionally attributes somebody else's document to this job is worse than
+         no history. The audit is asked for one thing only: WHO, and only where the
+         record does not say (`by`, below).
+
+         Ordered by the record's own date, with the emission order as tiebreaker,
+         because several of these dates are BACKDATABLE — a contract registered from
+         paper was signed before anybody typed it in, and `acceptVersion` takes a
+         date. `audit.ts` is when it was typed; the row wants when it happened. */
+      function journeyLedgerRows(c) {
+        const ev = [];
+        /** @param doc a row `downloadHistoryDoc` understands — the same descriptor
+         *             the Historial modal passes it, so the buttons here are the
+         *             ERP's own document route and not a second one. */
+        /* `evidence` is the FILE ITSELF when somebody uploaded one — the viewer
+           opens it. `ref` is only the name a paper document was filed under, so
+           it is stated and not offered: a chip that opens nothing is worse than
+           a label that never promised to. A row may carry both a generated
+           document and a filed copy of the signed original; they are different
+           papers and both are shown. */
+        const add = (when, lab, val, doc, evidence, ref) => {
+          if (!when) return;
+          ev.push({
+            when,
+            lab,
+            val: val || "",
+            doc: doc || null,
+            evidence: (evidence && evidence.storageKey && evidence) || null,
+            ref:
+              ref || (evidence && !evidence.storageKey && (evidence.ref || evidence.name)) || null,
+            i: ev.length,
+          });
+        };
+        const { opp, budget, contract, project } = c;
+
+        if (opp) add(opp.date, "Oportunidad abierta", opp.requestedWork || "—");
+        if (opp)
+          erp.state.visits
+            .filter((v) => v.opportunityId === opp.id)
+            .forEach((v) => {
+              add(
+                v.scheduledAt,
+                "Visita programada",
+                v.owner === "operations" ? "Obra" : "Oficina",
+              );
+              /* No «2 med.» here: a count welded to a word is one text node no
+                 dictionary can reach — `countTag`'s lesson. What the visit
+                 measured is on the Visita phase, in a table. */
+              add(v.completedAt, "Visita realizada", v.owner === "operations" ? "Obra" : "Oficina");
+            });
+
+        if (budget) {
+          const row = {
+            id: budget.id,
+            ref: budget.number,
+            doc: "presupuesto",
+            budgetId: budget.id,
+            excel: true,
+          };
+          add(budget.date, "Presupuesto creado", budget.number, row);
+          (budget.versions || []).forEach((ver) => {
+            const t = erp.budgetTotals(budget.id, ver.id);
+            if (ver.issued)
+              add(
+                (ver.sent || {}).date || ver.date,
+                ver.additional ? "Adicional enviado y congelado" : "Enviado al cliente",
+                ver.vNumber +
+                  " · " +
+                  eur0(t.grandCents) +
+                  ((ver.sent || {}).channel
+                    ? " · " + (SEND_CHANNEL[ver.sent.channel] || ver.sent.channel)
+                    : ""),
+                row,
+              );
+            const r = ver.customerResponse;
+            if (r)
+              add(
+                r.date,
+                r.accepted ? "Aceptado por el cliente" : "Rechazado por el cliente",
+                r.accepted ? ver.vNumber + " · " + eur0(t.grandCents) : r.reason || "",
+                null,
+                r.evidence,
+                r.evidenceRef,
+              );
+          });
+        }
+
+        if (contract) {
+          const row = {
+            id: contract.id,
+            ref: contract.number,
+            doc: "contrato",
+            contractId: contract.id,
+          };
+          add(
+            contract.date,
+            "Contrato redactado",
+            contract.number + " · " + eur0(contract.totalCents),
+            row,
+          );
+          add(
+            contract.signature.customerSignedAt,
+            "Contrato firmado",
+            SIGN_METHOD[contract.signature.method] || contract.signature.method || "",
+            row,
+            contract.signature.document,
+            (contract.signature.document || {}).ref,
+          );
+        }
+
+        if (project) {
+          const row = {
+            id: project.id,
+            ref: project.code,
+            doc: "fichaProyecto",
+            projectId: project.id,
+          };
+          add(project.dates.start, "Obra iniciada", project.code, row);
+          erp.state.purchases
+            .filter((x) => x.projectId === project.id)
+            .forEach((x) => {
+              add(
+                x.date,
+                "Pedido de compra",
+                x.number + " · " + erp.party(x.supplierId).name + " · " + eur0(x.totalCents),
+              );
+              (x.receipts || []).forEach((r) => add(r.date, "Material recibido", x.number));
+            });
+          erp.state.bills
+            .filter((b) => (b.allocations || []).some((a) => a.projectId === project.id))
+            .forEach((b) =>
+              add(b.date, "Factura de proveedor", (b.number || "") + " · " + eur0(b.totalCents)),
+            );
+          erp.state.invoices
+            .filter((i) => i.projectId === project.id)
+            .forEach((i) =>
+              add(
+                i.date,
+                i.kind === "creditNote" ? "Rectificativa emitida" : "Factura emitida",
+                i.number + " · " + eur0(i.totalCents),
+                {
+                  id: i.id,
+                  ref: i.number,
+                  doc: i.kind === "creditNote" ? "rectificativa" : "factura",
+                  invoiceId: i.number,
+                },
+              ),
+            );
+          const mine = new Set(
+            erp.state.invoices.filter((i) => i.projectId === project.id).map((i) => i.id),
+          );
+          (erp.state.collections || []).forEach((col) => {
+            if (!(col.allocations || []).some((a) => mine.has(a.invoiceId))) return;
+            add(
+              col.date,
+              "Cobro registrado",
+              eur0(col.amountCents) + " · " + erp.listLabel("paymentMethods", col.method),
+            );
+          });
+          const billIds = new Set(
+            erp.state.bills
+              .filter((b) => (b.allocations || []).some((a) => a.projectId === project.id))
+              .map((b) => b.id),
+          );
+          (erp.state.payments || []).forEach((pay) => {
+            if (!(pay.billAllocations || []).some((a) => billIds.has(a.billId))) return;
+            add(
+              pay.date,
+              "Pago a proveedor",
+              eur0(pay.amountCents) + " · " + erp.listLabel("paymentMethods", pay.method),
+            );
+          });
+          erp.state.receipts
+            .filter((r) => r.projectId === project.id)
+            .forEach((r) =>
+              add(
+                r.date,
+                "Recibo entregado",
+                (r.number || "") +
+                  " · " +
+                  eur0(r.amountCents) +
+                  " · " +
+                  erp.listLabel("paymentMethods", r.method),
+                {
+                  id: r.id,
+                  ref: r.number || r.id,
+                  doc: "recibo",
+                  receiptId: r.id,
+                },
+              ),
+            );
+          /* `project.diary` is written by `addDiaryEntry` and, until this card,
+             was rendered on no screen in the product. */
+          (project.diary || []).forEach((d) =>
+            add(
+              d.date,
+              d.incident ? "Incidencia en obra" : d.delivery ? "Entrega en obra" : "Parte de obra",
+              d.note || d.workDone || "",
+            ),
+          );
+          add(project.dates.actualEnd, "Obra cerrada", project.code);
+          (erp.state.feedback || [])
+            .filter((f) => f.projectId === project.id)
+            .forEach((f) =>
+              add(
+                f.date,
+                "Reseña del cliente",
+                (f.rating != null ? f.rating + "/5" : "") + (f.text ? " · " + f.text : ""),
+              ),
+            );
+        }
+
+        ev.sort((a, b) => String(a.when).localeCompare(String(b.when)) || a.i - b.i);
+        /* Newest first: the question this card answers on a phone is «qué acaba
+           de pasar», and the whole history is one scroll below it. */
+        return ev.reverse();
+      }
+
+      /** The ledger as a card. `journeyLedgerRows` is pure, so the download
+       *  handlers below recompute it rather than closing over a descriptor that
+       *  a re-render would have made stale. */
+      function journeyLedger(c) {
+        const ev = journeyLedgerRows(c);
+        if (!ev.length)
+          return `<div class="card"><div class="ch"><h3>Lo hecho hasta ahora</h3></div>
+            <div class="daylist">${journeyRow([
+              "Estado",
+              "Todavía no se ha hecho nada en este recorrido",
+            ])}</div></div>`;
+        const rows = ev
+          .map((e, n) => {
+            let ext = e.doc
+              ? `<button class="btn sm" data-led="pdf" data-row="${n}">⤓ PDF</button>
+                <button class="btn sm" data-led="docx" data-row="${n}">⤓ Word</button>`
+              : "";
+            if (e.evidence)
+              ext += `<a href="#" class="tag" data-evidence="${esc(
+                JSON.stringify(e.evidence),
+              )}">${esc(e.evidence.name || "Ver el documento")}</a>`;
+            else if (e.ref) ext += `<span class="tag">${esc(e.ref)}</span>`;
+            return `<div class="it" style="flex-wrap:wrap;gap:6px">
+              <span class="k" style="min-width:6rem">${fmtD(e.when)}</span>
+              <span style="min-width:11rem">${esc(e.lab)}</span>
+              <span style="flex:1;color:var(--muted);font-size:12.5px">${esc(e.val)}</span>
+              ${ext}</div>`;
+          })
+          .join("");
+        return `<div class="card"><div class="ch"><h3>Lo hecho hasta ahora</h3>
+            <span class="tag"><span>${ev.length}</span> <span>anotaciones</span></span></div>
+          <div class="daylist" id="jLedger">${rows}</div></div>`;
+      }
+
+      /** The ledger's download buttons, wired after it is in the DOM — the same
+       *  route `downloadHistoryDoc` gives the Historial modal, so the document
+       *  offered here is the one the customer already has. */
+      function journeyLedgerWire(v, c) {
+        v.querySelectorAll("[data-led]").forEach((btn) => {
+          btn.onclick = async () => {
+            const row = journeyLedgerRows(c)[Number(btn.dataset.row)];
+            if (!row || !row.doc) return;
+            btn.disabled = true;
+            try {
+              await downloadHistoryDoc(row.doc, btn.dataset.led);
+            } catch (e) {
+              toast("⚠ No se pudo generar el documento: " + ((e && e.message) || e));
+            }
+            btn.disabled = false;
+          };
+        });
       }
 
       function journeyPicker(v) {
@@ -23596,7 +23890,7 @@
             return h.budgets.map((b) => ({
               id: b.id,
               ref: b.number,
-              when: b.createdAt,
+              when: b.date,
               note: erp.budgetStage ? erp.budgetStage(b) : "",
               doc: "presupuesto",
               budgetId: b.id,
@@ -23606,7 +23900,7 @@
             return h.contracts.map((c) => ({
               id: c.id,
               ref: c.number,
-              when: c.signedAt || c.createdAt,
+              when: c.signature.customerSignedAt || c.date,
               note: c.origin === "external" ? "externo" : "",
               doc: c.origin === "external" ? null : "contrato",
               contractId: c.id,
@@ -23615,7 +23909,7 @@
             return h.projects.map((p) => ({
               id: p.id,
               ref: p.code,
-              when: p.startDate || p.createdAt,
+              when: p.dates.start || p.dates.targetEnd,
               note: p.name || "",
               doc: "fichaProyecto",
               projectId: p.id,
@@ -23624,7 +23918,7 @@
             return h.invoices.map((i) => ({
               id: i.id,
               ref: i.number,
-              when: i.issueDate || i.createdAt,
+              when: i.date,
               note: money(i.totalCents || 0),
               doc: i.kind === "creditNote" ? "rectificativa" : "factura",
               invoiceId: i.number,
@@ -23642,7 +23936,7 @@
             return h.bills.map((b) => ({
               id: b.id,
               ref: b.number || b.id,
-              when: b.issueDate || b.date,
+              when: b.date,
               note: money(b.totalCents || 0),
               // A supplier's own invoice is THEIR document, not ours: this
               // system files it, it does not print it. Offering to generate
