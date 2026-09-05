@@ -49,7 +49,7 @@ jobs:
     steps:
       # Full history: deploy-now works out the newest commit that actually
       # builds an image, and a depth-1 clone cannot answer that.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
