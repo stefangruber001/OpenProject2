@@ -5307,9 +5307,13 @@ body.siteworker .rail {
   display: none !important;
 }
 
-/* ---- a site worker's shell: what is not theirs is not drawn ---- */
+/* ---- a site worker's shell: what is not theirs is not drawn ----
+   #btnCog is the phone's route to Configuración, and Configuración is not a
+   site worker's screen. Masking only; the server refuses the section's calls
+   whether or not the button was drawn. */
 body.siteworker #btnCreate,
 body.siteworker #btnBell,
+body.siteworker #btnCog,
 body.siteworker .gsearch,
 body.siteworker #p1,
 body.siteworker .rail {

@@ -108,6 +108,13 @@ const PAGES = [
  *     `lang="en"` and every string would need a Spanish key INVENTED as well
  *     as a Catalan form written. It is read once, by whoever installs the
  *     system, and English is the language that audience already works in.
+ *   · company-setup-guide.html — the first-run guide, written beside the one
+ *     above and for the same audience, on the same decision. Both stopped
+ *     loading the i18n layer when it turned out to be doing the worst possible
+ *     thing to them: with the stored language Spanish and the pages declared
+ *     `lang="en"`, it translated back through the reverse map and caught only
+ *     the phrases that happen to have a Spanish form, leaving an English
+ *     document patched with Spanish.
  *   · backend.html — captured HTTP traffic and API paths. `GET`,
  *     `…/invoices/{id}` and "captured from the running server" are not phrases
  *     with a Catalan form.
@@ -117,7 +124,7 @@ const PAGES = [
  * different thing from a Spanish screen that lost its translation, and a check
  * that cannot tell them apart reports a number nobody can act on.
  */
-const ENGLISH_BY_DESIGN = ["setup-guide.html", "backend.html"];
+const ENGLISH_BY_DESIGN = ["setup-guide.html", "company-setup-guide.html", "backend.html"];
 
 /**
  * Strings that being identical in two languages says nothing about.
@@ -266,19 +273,31 @@ const HARVEST = `() => {
   const skip = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 1 };
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
+  // A LANGUAGE SWITCHER IS THE RULER, NOT WHAT IS BEING MEASURED.
+  // It names each language in its own language, so Català is Català in every
+  // render by design, and its buttons are the codes ES/CA/EN. Counting them
+  // reports a translation gap that does not exist.
+  //
+  // Read from the translate="no" attribute, which site/i18n.js already honours
+  // and the pill already sets on itself. It used to be pinned to the pill's id,
+  // which had two failure modes: a switcher drawn anywhere else was counted,
+  // and the pill is INJECTED, so whether these six strings landed in the report
+  // depended on winning a race with a 700ms wait — a silent thirty-string swing
+  // in a budget of ninety-one.
+  //
+  // No backticks below: this function is carried to the browser inside a
+  // template literal, and one would end the string early.
+  const optedOut = (el) => !!(el && el.closest && el.closest('[translate="no"]'));
   while ((n = walker.nextNode())) {
     const p = n.parentElement;
     if (!p || skip[p.nodeName]) continue;
     // Only what is actually on screen. Hidden tabs are still real UI, so
-    // display:none is allowed through — but the language pill itself is not.
-    if (p.closest('#canei-lang-pill')) continue;
+    // display:none is allowed through — but a language switcher is not.
+    if (optedOut(p)) continue;
     push(n.nodeValue, p.nodeName.toLowerCase() + (p.id ? '#' + p.id : ''));
   }
   for (const el of document.querySelectorAll('[placeholder],[title],[aria-label],input[type=button],input[type=submit],option')) {
-    // The switcher names each language in its own language, so "Català" is
-    // identical in all three renders by design. Counting it would be counting
-    // the ruler as part of what it measures.
-    if (el.closest('#canei-lang-pill')) continue;
+    if (optedOut(el)) continue;
     push(el.getAttribute('placeholder'), 'placeholder');
     push(el.getAttribute('title'), 'title');
     push(el.getAttribute('aria-label'), 'aria-label');

@@ -257,6 +257,53 @@
         gap: 7px;
         flex-wrap: wrap;
       }
+      /* WHO IS SIGNED IN, on every screen, without opening anything.
+         Two people share the office machine and a third is a site worker on a
+         phone; «👤» said none of that, and the first thing anybody wanted to
+         know from a screenshot was which account it was taken from. Initials
+         answer it in two characters, and the colour answers the question behind
+         it: a site worker sees a different ERP from an administrator, so the
+         two must not look alike.
+
+         Only two colours are DECIDED — green for an administrator, light blue
+         for a site worker, as asked. Oficina and Gestoría take a neutral tone on
+         purpose rather than a fourth invented one: a palette where every role is
+         a different colour teaches nothing, whereas «green or blue, and grey for
+         everyone else» is legible at 26px. The colour is never the only signal —
+         the initials, the title and the menu all name the account. */
+      .who {
+        min-width: 30px;
+        justify-content: center;
+        font: 700 11px var(--sans);
+        letter-spacing: 0.04em;
+        border-color: var(--line);
+        background: var(--paper);
+        color: var(--muted);
+      }
+      .who[data-role="admin"] {
+        background: var(--greenSoft);
+        border-color: var(--green);
+        color: var(--greenDeep);
+      }
+      .who[data-role="site"] {
+        background: #dceaf5;
+        border-color: #5b9bc4;
+        color: #1f5878;
+      }
+      /* The phone's route to Configuración. On a wide screen the section has an
+         icon in the rail and this button would be a second way to the same
+         place; on a phone the rail becomes a five-icon bar and Configuración is
+         the one that leaves it, so without this there is NO route at all.
+
+         Declared hidden HERE, early, on purpose: the phone rule that shows it
+         lives in the bottom-of-file media block and carries the same
+         specificity, so whichever is written later wins. `.mobonly` is the
+         cautionary tale — it is declared after its own media query and is
+         therefore a no-op everywhere it is not rescued by a more specific
+         selector. */
+      .gactions .cog {
+        display: none;
+      }
       .menuwrap {
         position: relative;
       }
@@ -305,6 +352,87 @@
         height: 1px;
         background: var(--hair);
         margin: 5px 2px;
+      }
+      /* The language switch, inside the profile menu.
+         `.menu button` turns every child into a full-width block row, which is
+         right for a command and wrong for one of three choices. Re-declared with
+         a selector one step more specific rather than fought with !important —
+         and `.on` is written AFTER `:hover` so the language you are already in
+         stays marked while the pointer is over it. */
+      .menu .msec {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 10px 6px;
+      }
+      .menu .msec .ml {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font: 600 12.5px var(--sans);
+        color: var(--body);
+      }
+      .menu .msec .ml i {
+        font-style: normal;
+      }
+      .menu .mseg {
+        display: inline-flex;
+        border: 1px solid var(--line);
+      }
+      .menu .mseg button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: auto;
+        min-width: 33px;
+        padding: 4px 7px;
+        font: 700 11px var(--sans);
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        background: var(--paper);
+      }
+      .menu .mseg button + button {
+        border-left: 1px solid var(--line);
+      }
+      .menu .mseg button:hover {
+        background: var(--greenSoft);
+        color: var(--ink);
+      }
+      .menu .mseg button.on {
+        background: var(--greenSoft);
+        color: var(--greenDeep);
+      }
+      /* Who this menu belongs to. Same two role colours as the badge that opens
+         it, so the pill and the button read as one statement. */
+      .menu .mwho {
+        padding: 8px 10px 6px;
+        line-height: 1.35;
+      }
+      .menu .mwho b {
+        display: block;
+        font: 600 12.5px var(--sans);
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .menu .mwho span {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 7px;
+        font: 700 10px var(--sans);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: var(--hair);
+        color: var(--muted);
+      }
+      .menu .mwho span[data-role="admin"] {
+        background: var(--greenSoft);
+        color: var(--greenDeep);
+      }
+      .menu .mwho span[data-role="site"] {
+        background: #dceaf5;
+        color: #1f5878;
       }
       .menu .none {
         padding: 10px;
@@ -4953,8 +5081,15 @@
         }
         /* Five icons, and they FIT — no horizontal scroll. There are six
        secciones, so one has to leave the bar: Configuración, because it is
-       the one nobody reaches for on a phone on site. It is a tap away in the
-       profile menu, which is where the guides and the recorrido already live. */
+       the one nobody reaches for on a phone on site. It keeps a route — the
+       ⚙️ button in the header, right of the period and left of the profile.
+       That button exists FOR this rule: hide the section here without adding
+       it there and the phone loses Configuración altogether, which is where
+       the company's own record, its people and its chapters are entered. */
+        .gactions .cog {
+          display: inline-flex;
+          align-items: center;
+        }
         .p1 {
           flex-direction: row;
           height: auto;
@@ -5100,16 +5235,19 @@
         <select class="period" id="periodMode" aria-label="Periodo"></select>
         <input class="dt" type="date" id="periodFrom" aria-label="Desde" hidden />
         <input class="dt" type="date" id="periodTo" aria-label="Hasta" hidden />
+        <button class="btn sm cog" id="btnCog" title="Configuración" aria-label="Configuración">
+          ⚙️
+        </button>
         <div class="menuwrap">
           <button
-            class="btn sm"
+            class="btn sm who"
             id="btnUser"
             title="Perfil y ayuda"
             aria-label="Perfil y ayuda"
             aria-haspopup="true"
             aria-expanded="false"
           >
-            👤
+            <span id="uInit" translate="no">··</span>
           </button>
           <div class="menu" id="mUser"></div>
         </div>
@@ -5540,6 +5678,7 @@
         }
         measureTopbar();
         buildPeriodControls();
+        paintUserBadge();
         buildUserMenu();
         render();
         if (bootNotice) toast(bootNotice);
@@ -6776,20 +6915,133 @@
       }
       $("#btnBell").onclick = () => toggleMenu("#btnBell", "#mBell");
 
+      /* ---------- who is signed in ---------- */
+      /**
+       * Two characters that identify an account.
+       *
+       * From the NAME when there is one — a two-word name gives the initial of
+       * each, which is what a colleague recognises. From the ADDRESS when there
+       * is not, splitting on the punctuation people actually use in a work
+       * address, so `ana.ruiz@canei.es` is AR rather than AN. One word gives its
+       * first two letters.
+       *
+       * No example name in quotes here, however much it would help: a quoted
+       * phrase inside a comment is read as a user-visible string by
+       * `tests/i18n/source-audit.mjs`, and it counts against the ceiling exactly
+       * like a label on a screen.
+       *
+       * Never empty: an account with an unreadable name still gets «··», because
+       * a button that renders as a blank square is a button that looks broken.
+       */
+      function initialsFor(name, email) {
+        const from = (s) =>
+          String(s || "")
+            .split(/[\s._\-+]+/)
+            .map((w) => w.trim())
+            .filter(Boolean);
+        const words = from(name).length ? from(name) : from(String(email || "").split("@")[0]);
+        if (!words.length) return "··";
+        const letters =
+          words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2).padEnd(2, words[0]);
+        return letters.toUpperCase();
+      }
+      function paintUserBadge() {
+        const b = $("#btnUser");
+        const t = $("#uInit");
+        if (!b || !t) return;
+        const role = SESSION.role || "admin";
+        /* NO ACCOUNT, NO INITIALS. The published static copy has no server to
+           ask who you are, so there is nobody to abbreviate; two dots would be
+           initials that stand for nothing. The person glyph says there is no
+           sign-in here, honestly, and it is what that copy showed before this
+           existed. (No quotation marks around that phrase — source-audit.mjs
+           counts a quoted phrase in a comment as a user-visible string.) */
+        const named = SESSION.name || SESSION.email;
+        t.textContent = named ? initialsFor(SESSION.name, SESSION.email) : "👤";
+        if (named) b.dataset.role = role;
+        else delete b.dataset.role;
+        /* The title expands the initials, and carries NOTHING ELSE.
+           It used to append the permission too, which composed a Spanish word
+           onto an already-translated phrase — and a composition is not a
+           dictionary key, so it stayed Spanish in English and the workspace
+           audit counted it, rightly. What is left is the account's own name or
+           address, which is data no dictionary should touch; the permission is
+           named in the menu instead, as its own node, where it translates. On a
+           phone there is no hover anyway, which is why the menu is where the
+           identity actually lives.
+
+           And no example of that composed string written out here, in any kind
+           of quotation mark: a quoted phrase inside a comment is counted by
+           source-audit.mjs exactly like a label on a screen. */
+        b.title = named ? "Perfil y ayuda — " + named : "Perfil y ayuda";
+      }
+
       /* ---------- profile & help ---------- */
+      /* TWO GUIDES, IN THE ORDER YOU NEED THEM: what to fill in the first day,
+         then how to work every other day. The menu used to carry four entries
+         and a settings shortcut, which is how a help menu turns into a second
+         navigation nobody trusts — the recorrido is a screen (#journey) reached
+         from Proyectos, the beta guide was written for a TestFlight round that
+         has shipped, and Configuración is a section of the application with its
+         own place in the rail (and, on a phone, its own button in the header). */
       function buildUserMenu() {
         const m = $("#mUser");
-        m.innerHTML = `<a href="setup-guide.html">📘 Guía de operaciones</a>
-          <a href="ios-beta-guide.html">📱 Guía de la beta</a>
-          <a href="journey.html">▶️ Recorrido completo</a>
-          <button id="uSettings" class="mobonly">⚙️ Configuración</button>
+        /* THE LANGUAGE SWITCH LIVES HERE TOO, and DMC-09 stays.
+           Changing the interface language is a personal preference somebody
+           reaches for on their first day and twice a year after that, and
+           sending them into Configuración for it is three taps too many — on a
+           phone, four, because Configuración is itself behind a header button.
+           The screen keeps the part a two-letter segment cannot do: explaining
+           what the choice does NOT change — not the customer's documents, not
+           the stored data. This is the same call, offered where the rest of a
+           person's own settings already are.
+
+           Drawn only when the i18n layer is present. A dead control that looks
+           live is worse than no control, and these files are also published as
+           a static copy.
+
+           `data-menulang`, NOT `data-uilang`: three checks in the browser suite
+           use `[data-uilang]` as the name of the DMC-09 control — counting its
+           options, reading its marked one, measuring its tap target. Reusing the
+           attribute here made every one of them ambiguous, and the failure was
+           not "the new control is wrong" but three unrelated tests breaking at
+           once. A second control is a second name. */
+        const i18n = typeof CANEI_I18N !== "undefined" ? CANEI_I18N : null;
+        const curLang = i18n ? i18n.lang() : "";
+        const SHORT = { es: "ES", ca: "CA", en: "EN" };
+        const langRow = i18n
+          ? `<div class="msec"><span class="ml"><i>🌐</i>Idioma</span>
+             <span class="mseg" role="group" aria-label="Idioma">${(i18n.LANGS || ["es", "ca", "en"])
+               .map(
+                 (k) =>
+                   `<button class="ms${k === curLang ? " on" : ""}" data-menulang="${k}" translate="no" title="${esc((i18n.NAMES || {})[k] || k)}"${k === curLang ? ' aria-current="true"' : ""}>${SHORT[k] || k.toUpperCase()}</button>`,
+               )
+               .join("")}</span></div>`
+          : "";
+        /* WHO, in words. The initials on the button are two characters; on a
+           phone there is no hover to expand them, and «which account is this»
+           is the question the badge exists to answer. Named here once, at the
+           top, where a person opens the menu to check. */
+        const role = SESSION.role || "admin";
+        const roleName = (USER_ROLES.find((r) => r[0] === role) || [, role])[1];
+        const whoRow = `<div class="mwho"><b>${esc(SESSION.name || SESSION.email || "—")}</b>
+          <span data-role="${esc(role)}">${esc(roleName)}</span></div>
+          <div class="sep"></div>`;
+        m.innerHTML = `${whoRow}<a href="company-setup-guide.html">🏁 Guía de puesta en marcha</a>
+          <a href="setup-guide.html">📘 Guía de operaciones</a>
+          ${langRow}
           <div class="sep"></div>
           <button id="uExport">⤓ Exportar datos</button>
           <button id="uReset">↻ Recargar datos de demostración</button>`;
-        $("#uSettings").onclick = () => {
-          closeMenus();
-          toggleSection("settings");
-        };
+        m.querySelectorAll("[data-menulang]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              /* `set` writes the choice and reloads the page, so there is no
+                 menu left to close and re-tapping the current language would be
+                 a reload that changes nothing. */
+              if (b.dataset.menulang !== curLang && i18n.set) i18n.set(b.dataset.menulang);
+            }),
+        );
         $("#uExport").onclick = () => {
           closeMenus();
           exportData();
@@ -6800,6 +7052,14 @@
         };
       }
       $("#btnUser").onclick = () => toggleMenu("#btnUser", "#mUser");
+      /* Opens the section, exactly as its rail icon does on a wide screen — not
+         a shortcut to one screen inside it, because which screen you want on the
+         first day (the company record) is not the one you want on the tenth
+         (a new worker, a new chapter). */
+      $("#btnCog").onclick = () => {
+        closeMenus();
+        toggleSection("settings");
+      };
       /* Task counts by status, computed by @repo/capability-scheduling through
          ErpBridge — the first read that crosses into the typed capability layer.
          Renders nothing at all if the bundle is unavailable, so the page is never
@@ -22259,7 +22519,7 @@
 
       VIEWS.users = (v) => {
         $("#sub").textContent =
-          "Altas, bajas y permisos. Al crear una cuenta, la persona elige su propia contraseña: nadie más la conoce.";
+          "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.";
         // The legend is documentation, not data, so it renders with or without a
         // server: what the four permissions mean is worth being able to read while
         // deciding which one somebody should get.
@@ -23638,9 +23898,9 @@
           ? `<div class="pill g">Borrador en el buzón de la empresa${
               inv.folder ? " · " + esc(inv.folder) : ""
             }</div>
-            <p class="invnote">Está escrito y dirigido a ${esc(email)}, esperando en Borradores. Ábrelo en tu correo y dale a enviar cuando quieras. La persona elige su contraseña; tú no llegas a conocerla.</p>`
+            <p class="invnote">Está escrito y dirigido a ${esc(email)}, esperando en Borradores. Ábrelo en tu correo y dale a enviar cuando quieras.</p>`
           : `<div class="pill y">No se ha enviado ningún correo</div>
-            <p class="invnote">${esc(inv.reason || "Este servidor todavía no tiene buzón configurado.")} Hazle llegar este enlace a mano — por WhatsApp o en persona. La persona elige su contraseña; tú no llegas a conocerla.</p>`;
+            <p class="invnote">${esc(inv.reason || "Este servidor todavía no tiene buzón configurado.")} Hazle llegar estos datos a mano — por WhatsApp o en persona.</p>`;
         /* A link nobody outside this machine can open is worse than no link: it
            looks like the answer. Said plainly, next to the link itself. */
         const reach =
@@ -23648,21 +23908,52 @@
             ? `<div class="field full"><div class="pill r">Este enlace no sale de este servidor</div>
               <p class="invnote">La dirección pública no está configurada, así que el enlace apunta a la máquina en vez de al dominio. Configura ERP_PUBLIC_URL en el servidor y vuelve a emitir la invitación.</p></div>`
             : "";
+        /* THE CREDENTIALS COME FIRST, and the link second. That is the order in
+           which they get used: the person opens the sign-in page and pastes a
+           password. The link — choose your own password, once, within 7 days —
+           is the better credential and stays available, but it is no longer the
+           only way in, which is what made it the whole drawer. */
+        const pw = inv.tempPassword
+          ? `<div class="field full"><label>Contraseña temporal</label>
+              <input id="uPw" value="${esc(inv.tempPassword)}" readonly translate="no" style="font-family:ui-monospace,monospace;font-size:16px;font-weight:700;letter-spacing:.06em"></div>
+             <div class="field full"><button class="btn primary" id="uCopyPw">Copiar contraseña</button>
+              <button class="btn" id="uCopyPack">Copiar todo</button></div>
+             <p class="invnote">Funciona ya. Es temporal y tú la conoces, así que pídele que la cambie al entrar.</p>`
+          : `<p class="invnote">No se ha podido asignar una contraseña a esta cuenta, así que la única entrada es el enlace de abajo.</p>`;
         db.innerHTML = `<div class="form">
          <div class="field full">${state}</div>
          ${reach}
-         <div class="field full"><label>Enlace de activación (caduca ${fmtD(inv.expiresAt.slice(0, 10))})</label>
+         <div class="field full"><label>Página de acceso</label>
+          <input id="uLogin" value="${esc(inv.loginUrl || "")}" readonly style="font-family:ui-monospace,monospace;font-size:12px"></div>
+         <div class="field full"><label>Usuario</label>
+          <input id="uWho" value="${esc(email)}" readonly style="font-family:ui-monospace,monospace;font-size:12px"></div>
+         ${pw}
+         <div class="field full"><label>O bien, enlace para elegir contraseña (caduca ${fmtD(inv.expiresAt.slice(0, 10))})</label>
           <input id="uLink" value="${esc(inv.link)}" readonly style="font-family:ui-monospace,monospace;font-size:12px"></div>
-         <div class="field full"><button class="btn primary" id="uCopy">Copiar enlace</button></div></div>`;
-        $("#uCopy").onclick = async () => {
+         <div class="field full"><button class="btn" id="uCopy">Copiar enlace</button></div></div>`;
+        /* Clipboard first, selection second. `navigator.clipboard` needs a
+           secure context, and this screen is opened over plain HTTP on the
+           office machine often enough that a copy button which silently does
+           nothing would be the common case, not the rare one. */
+        const copy = async (text, node, what) => {
           try {
-            await navigator.clipboard.writeText(inv.link);
-            toast("Enlace copiado");
+            await navigator.clipboard.writeText(text);
+            toast(what);
           } catch (e) {
-            $("#uLink").select();
+            node.select();
             toast("Seleccionado — copie con Ctrl+C");
           }
         };
+        $("#uCopy").onclick = () => copy(inv.link, $("#uLink"), "Enlace copiado");
+        if (inv.tempPassword) {
+          $("#uCopyPw").onclick = () => copy(inv.tempPassword, $("#uPw"), "Contraseña copiada");
+          $("#uCopyPack").onclick = () =>
+            copy(
+              `${inv.loginUrl}\n${email}\n${inv.tempPassword}`,
+              $("#uPw"),
+              "Datos de acceso copiados",
+            );
+        }
       }
 
       function newUserDrawer() {
@@ -23671,7 +23962,7 @@
          <div class="field full"><label>Correo electrónico</label><input id="u_email" type="email" placeholder="nombre@empresa.es"></div>
          <div class="field full"><label>Nombre</label><input id="u_name" placeholder="Cómo aparecerá en el registro de actividad"></div>
          <div class="field full"><label>Permiso</label><select id="u_role">${USER_ROLES.map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</select></div>
-         <div class="field full" style="font-size:12.5px;color:var(--body)">Se creará la cuenta y se generará un enlace de activación. La persona elige su propia contraseña.</div>
+         <div class="field full" style="font-size:12.5px;color:var(--body)">Se creará la cuenta con una contraseña temporal y se dejará el correo escrito en Borradores.</div>
          <div class="field full"><button class="btn primary" id="u_save">Crear e invitar</button></div></div>`;
         $("#u_save").onclick = async () => {
           try {

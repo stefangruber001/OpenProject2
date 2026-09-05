@@ -54,7 +54,14 @@ export async function POST(
 
     const origin = publicOrigin(req);
     const invitation = await issueInvitation(tenant, target, purpose, who, origin);
-    const draft = await draftInvitation(tenant, target, invitation.link, purpose);
+    const draft = await draftInvitation(tenant, {
+      to: target,
+      loginUrl: invitation.loginUrl,
+      tempPassword: invitation.tempPassword,
+      link: invitation.link,
+      purpose,
+      company: "",
+    });
     return json({
       invitation: {
         ...invitation,

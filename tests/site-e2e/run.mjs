@@ -600,11 +600,102 @@ async function testNoOverflow(browser, base) {
     else bad("mobile: five-icon bottom bar", JSON.stringify(bar));
 
     // …and the one that left is still reachable, or it is simply missing.
+    //
+    // It used to be a line in the profile menu. That menu is now two guides and
+    // two data actions, so the route is the ⚙️ button in the header — which
+    // exists ONLY for this rule and is hidden on a wide screen, where the
+    // section has its rail icon. Assert it OPENS the section, not merely that it
+    // is drawn: the old check read `#uSettings`, which `.menu button` had been
+    // overriding to visible at every width for months, so it would have passed
+    // just as happily with the button doing nothing.
+    if (await page.locator("#btnCog").isVisible()) {
+      await page.click("#btnCog");
+      await page.waitForTimeout(350);
+      const openedOn = await page.evaluate(() => document.querySelector("#p2h")?.textContent || "");
+      if (/config/i.test(openedOn)) ok(`mobile: the header ⚙️ opens Configuración (${openedOn})`);
+      else bad("mobile: settings reachable", `⚙️ opened "${openedOn}"`);
+    } else bad("mobile: settings reachable", "#btnCog not visible at 390px");
+
+    // The profile menu is TWO GUIDES, the language switch, and two data actions
+    // — set up, operate, then your own preferences. Pinned because it has been
+    // the dumping ground twice: it grew a beta guide written for one TestFlight
+    // round, a link to the recorrido after the recorrido had become a screen of
+    // the workspace, and a Configuración shortcut. Each was defensible alone;
+    // together they were a second navigation. Assert what belongs AND the
+    // absence of what left, or "tidy the menu" is a change that undoes itself.
+    //
+    // Close the subsection sheet the ⚙️ just opened FIRST. `.subscrim` is a
+    // full-screen overlay at z-index 50 and it sits over the header, so the
+    // click on the profile button times out with the locator resolved and
+    // nothing happening — a failure that reads like a missing button.
+    await page.evaluate(() => closeSection());
+    await page.waitForTimeout(250);
     await page.click("#btnUser");
     await page.waitForTimeout(250);
-    if (await page.locator("#uSettings").isVisible())
-      ok("mobile: Configuración is reachable from the profile menu");
-    else bad("mobile: settings reachable", "#uSettings not visible at 390px");
+    const menu = await page.evaluate(() => ({
+      links: [...document.querySelectorAll("#mUser a")].map((a) => a.getAttribute("href")),
+      buttons: [...document.querySelectorAll("#mUser button")].map((b) => b.id),
+      langs: [...document.querySelectorAll("#mUser [data-menulang]")].map(
+        (b) => b.dataset.menulang,
+      ),
+      // Exactly one language marked, and it is the one the page is in.
+      on: [...document.querySelectorAll("#mUser [data-menulang].on")].map(
+        (b) => b.dataset.menulang,
+      ),
+      lang: window.CANEI_I18N ? window.CANEI_I18N.lang() : "",
+    }));
+    const wanted = ["company-setup-guide.html", "setup-guide.html"];
+    if (
+      JSON.stringify(menu.links) === JSON.stringify(wanted) &&
+      !menu.buttons.includes("uSettings") &&
+      JSON.stringify(menu.langs) === JSON.stringify(["es", "ca", "en"]) &&
+      JSON.stringify(menu.on) === JSON.stringify([menu.lang])
+    )
+      ok(`profile menu: two guides, the language switch on ${menu.lang}, nothing else`);
+    else bad("profile menu contents", JSON.stringify(menu));
+
+    // And it WORKS: the switch stores the choice and reloads, so the proof is
+    // that the page comes back in the other language. Asserted on the menu's own
+    // label, which is a dictionary entry — a control that only repaints itself
+    // would pass a "the button is highlighted" check and change nothing.
+    await page.click('#mUser [data-menulang="en"]');
+    await page.waitForLoadState("networkidle");
+    await bootedShell(page);
+    await page.waitForTimeout(500);
+    await page.click("#btnUser");
+    await page.waitForTimeout(250);
+    const after = await page.evaluate(() => ({
+      lang: window.CANEI_I18N ? window.CANEI_I18N.lang() : "",
+      guide: document.querySelector('#mUser a[href="setup-guide.html"]')?.textContent.trim() || "",
+    }));
+    if (after.lang === "en" && /Operations guide/i.test(after.guide))
+      ok(`profile menu: the switch changes the language for real (${after.guide})`);
+    else bad("profile menu: language switch", JSON.stringify(after));
+
+    // WHO IS SIGNED IN, in two characters. The rule is tested where it lives:
+    // this published copy has no server to ask, so the button honestly shows the
+    // person glyph and carries no role — asserting initials here would be
+    // asserting a fabricated account. The abbreviation itself is exercised
+    // directly, including the case that matters most in a work address, where
+    // the surname is behind a dot rather than a space.
+    const badge = await page.evaluate(() => ({
+      shown: document.querySelector("#uInit")?.textContent || "",
+      role: document.querySelector("#btnUser")?.dataset.role ?? null,
+      twoWords: initialsFor("Ana Ruiz", ""),
+      dotted: initialsFor("", "ana.ruiz@canei.es"),
+      oneWord: initialsFor("Ana", ""),
+      nothing: initialsFor("", ""),
+    }));
+    if (
+      badge.role === null &&
+      badge.shown === "👤" &&
+      badge.twoWords === "AR" &&
+      badge.dotted === "AR" &&
+      badge.oneWord === "AN" &&
+      badge.nothing === "··"
+    )
+      ok("profile badge: initials from a name or an address, and no invented account");
+    else bad("profile badge", JSON.stringify(badge));
   } catch (e) {
     bad("mobile: bottom bar", String(e).slice(0, 140));
   }
@@ -1636,6 +1727,7 @@ async function testSmoke(browser, base) {
   const pages = [
     "erp.html#journey",
     "setup-guide.html",
+    "company-setup-guide.html",
     "master-data.html",
     "financial-data.html",
     "erp.html",

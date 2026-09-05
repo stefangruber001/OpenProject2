@@ -2466,7 +2466,6 @@ window.CANEI_DICT.ca = {
   "Web propia": "Web propi",
   "Administrador de fincas": "Administrador de finques",
   "Plataforma de leads": "Plataforma de leads",
-  "⚙️ Configuración": "⚙️ Configuració",
   Leads: "Leads",
   "＋ Crear": "＋ Crear",
   "🗒️ Nueva tarea": "🗒️ Nova tasca",
@@ -2474,9 +2473,8 @@ window.CANEI_DICT.ca = {
   Trimestre: "Trimestre",
   Mes: "Mes",
   Rango: "Interval",
+  "🏁 Guía de puesta en marcha": "🏁 Guia de posada en marxa",
   "📘 Guía de operaciones": "📘 Guia d'operacions",
-  "📱 Guía de la beta": "📱 Guia de la beta",
-  "▶️ Recorrido completo": "▶️ Recorregut complet",
   "⤓ Exportar datos": "⤓ Exportar dades",
   "＋ Oportunidad/visita": "＋ Oportunitat/visita",
   "＋ Tarea": "＋ Tasca",
@@ -2824,6 +2822,19 @@ window.CANEI_DICT.ca = {
   "Entrada añadida": "Entrada afegida",
   "Enlace copiado": "Enllaç copiat",
   "Seleccionado — copie con Ctrl+C": "Seleccionat — copieu amb Ctrl+C",
+  "Página de acceso": "Pàgina d'accés",
+  "Contraseña temporal": "Contrasenya temporal",
+  "Copiar contraseña": "Copiar contrasenya",
+  "Copiar todo": "Copiar-ho tot",
+  "Contraseña copiada": "Contrasenya copiada",
+  "Datos de acceso copiados": "Dades d'accés copiades",
+  "Perfil y ayuda —": "Perfil i ajuda —",
+  "Funciona ya. Es temporal y tú la conoces, así que pídele que la cambie al entrar.":
+    "Funciona ja. És temporal i tu la coneixes, així que demana-li que la canviï en entrar.",
+  "No se ha podido asignar una contraseña a esta cuenta, así que la única entrada es el enlace de abajo.":
+    "No s'ha pogut assignar una contrasenya a aquest compte, així que l'única entrada és l'enllaç de sota.",
+  "Se creará la cuenta con una contraseña temporal y se dejará el correo escrito en Borradores.":
+    "Es crearà el compte amb una contrasenya temporal i es deixarà el correu escrit a Esborranys.",
   "Usuario actualizado": "Usuari actualitzat",
   "Cliente eliminado": "Client eliminat",
   "Datos de demostración recargados — 2024 a 2026":

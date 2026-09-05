@@ -8516,3 +8516,72 @@ a number the parallel session had measured twice and argued in S75g, and CI
 failed with «34 … ceiling 33». Reverted in `f31a1c2`. The ceilings are 37 and
 97 and they are meant to have slack in them; anyone tidying that slack away
 should first measure twice, in both places.
+
+**S78 · Removing «⚙️ Configuración» from the profile menu costs the phone its
+only route to that section, so the header grew a ⚙️ button.** The operator
+struck three entries off the menu — the beta guide, the recorrido and
+Configuración. The first two are straightforward: the beta guide was written for
+a TestFlight round that has shipped, and the recorrido stopped being a page when
+it became `erp.html#journey`.
+
+Configuración is not. `.secitem[data-sec="settings"]` is hidden below 860px
+because the bottom bar holds five icons and there are six sections, and the CSS
+comment naming the profile menu as its replacement route was written at the same
+time. Deleting the entry without replacing it would have left a phone with no way
+to reach the company record, the workers or the chapters — the screens the new
+first-run guide sends people to.
+
+So `#btnCog` sits in the header, phone-only, and opens the section exactly as the
+rail icon does. The menu is what was asked for; the function is still there. Two
+things fell out of writing it: `.mobonly` is declared AFTER its own media query
+and equal in specificity, so it has been a no-op wherever a more specific rule
+did not rescue it — which is why `#uSettings` was visible on desktop too, and why
+the check that "Configuración is reachable on mobile" would have passed with the
+button doing nothing. The new check asserts the section actually opens.
+
+**S79 · The two guides stopped loading the i18n layer, and their PDFs are now
+printed rather than made by hand.** Both are English by design (operator,
+2026-08-17; `ENGLISH_BY_DESIGN` in `tests/i18n/audit.mjs`) and both were loading
+the dictionaries anyway. With the stored language Spanish and the page declared
+`lang="en"`, the runtime translated back through the reverse map and reached only
+the phrases that happen to have a Spanish form: the cover read «Reformas,
+sencillamente complejas.», the meta strip «DOCUMENTO», the contents «7 · Horas:
+site to payroll». An English document patched with Spanish is worse than either
+language alone, and it was invisible on screen until the page was printed.
+
+`site/Canei-Subirats-ERP-Operations-Guide.pdf` was made by hand on 13 Aug and
+nothing regenerated it, so the largest button on a rewritten page handed the
+reader the previous version. `scripts/guides-pdf.mjs` prints both guides from the
+published HTML with the same browser the e2e suite uses. Deliberately NOT a gate:
+a browser binary is not available in every checkout, and a gate that cannot run
+everywhere is a gate that gets skipped. It is a command, written down next to the
+thing it maintains — run it after editing either guide.
+
+**S80 · There are THREE harvesters, and they all excused the language switcher
+by an id that no longer exists.** `tests/i18n/harvest.mjs`, `workspace-audit.mjs`
+and `audit.mjs` each carry their own copy of the "collect every visible string"
+walker, and each one skipped `#canei-lang-pill` — the floating switcher that was
+retired when the choice moved to Configuración → Idioma. Putting a switcher back
+in the profile menu made all three count `ES`, `CA`, `EN`, `Español`, `Català`
+and `English` as untranslated, which they are and always will be: a switcher
+names each language in its own language, and counting it is counting the ruler
+as part of what it measures.
+
+All three now read `translate="no"`, the standard HTML opt-out, which
+`site/i18n.js` already honours and the pill already sets on itself. That is one
+attribute the runtime and the measurement share, instead of an id three files
+copy and none of them owns.
+
+`audit.mjs` was the interesting one. The pill is INJECTED, so whether its six
+strings landed in the report depended on winning a race with a 700 ms wait —
+a silent thirty-string swing inside a budget of ninety-one. The ceiling has
+been sitting exactly on 91 and 67 with that coin-flip underneath it. It is
+stable now; if either number moves, something real moved.
+
+**Two comment traps caught again in one session**, both already known and both
+re-learned the hard way: a quoted phrase inside a comment is counted by
+`source-audit.mjs` as a user-visible string — in ENGLISH too, not only Spanish
+— and a backtick inside a comment that lives within a template literal ends the
+string and makes the file a syntax error. Both are now stated in the comments
+where they happened, because knowing the rule in the abstract did not stop me
+writing an example name in quotes twice.

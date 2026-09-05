@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Canei Subirats ERP — Initial Company Setup</title>
+<style>
+  :root{
+    --green:#48733c; --greenLt:#6ba85a; --greenDeep:#31532a; --greenSoft:#e7f0e1; --greenPale:#dce8d4; --spark:#f2c230;
+    --ink:#14160f; --body:#3f4339; --muted:#7c8072; --line:#d8e0d1; --hair:#e7eee1; --bg:#fff; --panel:#f4f8f1;
+    --crit:#9a3b33; --warn:#a56a1c;
+    --serif:"Roboto Serif",Georgia,"Times New Roman",serif;
+    --sans:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact;overflow-x:hidden;-webkit-text-size-adjust:100%}
+  @media screen{body{overflow-x:hidden}}
+  body{margin:0;color:var(--body);font:13px/1.6 var(--sans);background:#e9eee6;letter-spacing:-.003em}
+  h1,h2,h3,h4{font-family:var(--serif);color:var(--ink);margin:0;font-weight:600;letter-spacing:-.01em}
+  p{margin:0 0 10px} b{color:var(--ink)} a{color:var(--green)}
+  .mono{font-family:var(--mono);font-size:.92em}
+  code{font-family:var(--mono);font-size:.86em;background:var(--greenSoft);color:var(--greenDeep);padding:1.5px 6px;border-radius:5px;white-space:nowrap}
+
+  .page{max-width:820px;margin:22px auto;background:var(--bg);border-radius:6px;
+    box-shadow:0 22px 50px -30px rgba(20,30,15,.4);padding:46px 54px 40px;position:relative;overflow:hidden}
+  .page + .page{margin-top:26px}
+  @media print{
+    body{background:#fff}
+    .page{margin:0;border-radius:0;box-shadow:none;padding:16mm 15mm;max-width:none;min-height:auto}
+    .page + .page{page-break-before:always;margin-top:0}
+    .noprint{display:none}
+    .avoid{break-inside:avoid}
+  }
+  @page{size:A4;margin:0}
+
+  /* cover */
+  .cover{min-height:940px;display:flex;flex-direction:column;
+    background:linear-gradient(150deg,var(--greenDeep),var(--green) 62%,#5a874b);color:#fff;padding:0}
+  .cover .inner{padding:64px 60px;display:flex;flex-direction:column;height:100%;flex:1}
+  .cover .mark{display:flex;align-items:center;gap:14px}
+  .cover .mark .nm{font-family:var(--serif);font-size:22px;font-weight:600;color:#fff;line-height:1.05}
+  .cover .mark .nm small{display:block;font-size:11px;font-style:italic;color:rgba(255,255,255,.72);font-family:var(--sans)}
+  .cover h1{color:#fff;font-size:46px;line-height:1.05;margin:auto 0 8px}
+  .cover .sub{font-size:17px;color:rgba(255,255,255,.9);max-width:52ch}
+  .cover .meta{margin-top:34px;display:flex;gap:34px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.24);padding-top:22px}
+  .cover .meta div span{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.66);font-weight:700}
+  .cover .meta div b{font-size:15px;color:#fff;font-family:var(--serif)}
+  .cover .pill{align-self:flex-start;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;
+    border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:6px 13px;background:rgba(255,255,255,.14);color:#fff;margin-bottom:26px}
+
+  /* section chrome */
+  .kicker{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);font-weight:700}
+  h2.sec{font-size:26px;margin:4px 0 4px;padding-bottom:12px;border-bottom:3px solid var(--green)}
+  h3{font-size:16px;margin:22px 0 8px}
+  h4{font-size:13.5px;margin:16px 0 6px;color:var(--greenDeep)}
+  .lead{font-size:14px;color:var(--body);margin-bottom:16px}
+  .pagenum{position:absolute;bottom:16px;right:20px;font-size:10px;color:var(--muted)}
+  .brandfoot{position:absolute;bottom:14px;left:20px;font-size:10px;color:var(--muted)}
+
+  ul,ol{margin:0 0 12px;padding-left:20px} li{margin:4px 0}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--green);background:var(--panel);border-radius:0 10px 10px 0;padding:12px 16px;margin:14px 0;font-size:12.5px}
+  .callout.warn{border-left-color:var(--warn);background:#fbf4e6}
+  .callout.stop{border-left-color:var(--crit);background:#fbeeec}
+  .callout b{color:var(--ink)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0}
+  th{background:var(--greenSoft);color:var(--greenDeep);text-align:left;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:8px 9px;border:1px solid var(--line)}
+  td{padding:8px 9px;border:1px solid var(--line);vertical-align:top}
+  td.c{text-align:center;font-weight:700}
+  td.req{color:var(--crit);font-weight:700;text-align:center}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fff}
+  .box h4{margin:0 0 6px;color:var(--ink)}
+  .box .k{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+
+  /* step cards */
+  .step{display:flex;gap:14px;margin:0 0 14px;break-inside:avoid}
+  .step .no{flex:none;width:30px;height:30px;border-radius:9px;background:var(--green);color:#fff;font-weight:700;
+    display:grid;place-items:center;font-size:14px;box-shadow:0 6px 14px -8px rgba(72,115,60,.7)}
+  .step .bd{flex:1}
+  .step .bd>b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+  .step .why b{color:var(--ink)}
+  .step .bd .why{font-size:11.5px;color:var(--muted)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+  .chip{font-size:10.5px;font-weight:600;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 10px;color:var(--greenDeep)}
+  .chip.req{border-color:#e4bcb7;background:#fbeeec;color:var(--crit)}
+
+  /* the screen coordinate every section opens with */
+  .where{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);
+    border:1px solid var(--line);border-left:3px solid var(--green);background:var(--panel);
+    border-radius:0 8px 8px 0;padding:7px 12px;margin:0 0 14px}
+  .where b{color:var(--ink)} .where .code{font-family:var(--mono);font-size:10.5px;color:var(--greenDeep)}
+
+  /* toc */
+  .toc{columns:2;column-gap:34px;font-size:13px}
+  .toc a{display:flex;justify-content:space-between;gap:10px;text-decoration:none;color:var(--body);padding:5px 0;border-bottom:1px dotted var(--line)}
+  .toc a b{color:var(--ink);font-weight:600}
+  .toc a span{color:var(--muted)}
+  svg{display:block;max-width:100%}
+</style>
+<!-- No i18n layer: this guide is English by design, like the operations guide
+     beside it. Loading the dictionaries translated a scattering of phrases back
+     into Spanish and left the rest in English — see the note in
+     setup-guide.html. -->
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<section class="page cover">
+  <div class="inner">
+    <div class="mark">
+      <svg width="46" height="46" viewBox="0 0 40 40" fill="none">
+        <rect x="1" y="1" width="38" height="38" rx="11" fill="#fff" fill-opacity="0.16" stroke="#fff" stroke-opacity="0.45"/>
+        <path d="M11 21.5 L20 13 L29 21.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M13.5 20 V28.5 H26.5 V20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <rect x="18" y="23.5" width="4" height="5" rx="1" fill="#fff"/>
+        <rect x="28" y="28" width="6.5" height="6.5" rx="2" fill="#f2c230"/>
+      </svg>
+      <div class="nm">Canei Subirats<small>Renovations, simply complex.</small></div>
+    </div>
+    <div style="margin:auto 0">
+      <div class="pill">ERP · Initial company setup</div>
+      <h1>Making the ERP<br>your company's</h1>
+      <div class="sub">You have installed the app. This is everything you fill in — once — so that the
+      system knows who you are, what you charge, who works for you and what you build. About an hour of
+      typing, and four fields of it are the difference between a system that can invoice and one that
+      cannot.</div>
+    </div>
+    <div class="meta">
+      <div><span>Read before</span><b>Your first quote</b></div>
+      <div><span>Time needed</span><b>~60 minutes</b></div>
+      <div><span>Who does it</span><b>Owner or office</b></div>
+      <div><span>Then read</span><b>Operations guide</b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTENTS ============ -->
+<section class="page">
+  <div class="kicker">Contents</div>
+  <h2 class="sec">What's in this guide</h2>
+  <p class="lead">Work through it in order — later sections reuse what earlier ones set up. Sections
+  marked <span class="chip req">required</span> block invoicing until they are done; everything else can
+  be finished in the first week.</p>
+  <div class="toc">
+    <a href="#s1"><b>1 · Before you start</b><span>p.3</span></a>
+    <a href="#s2"><b>2 · Getting in: app and browser</b><span>p.4</span></a>
+    <a href="#s3"><b>3 · Your company record</b><span>p.5</span></a>
+    <a href="#s4"><b>4 · The numbers behind every document</b><span>p.7</span></a>
+    <a href="#s5"><b>5 · The company mailbox</b><span>p.8</span></a>
+    <a href="#s6"><b>6 · Accounts, cards and cash</b><span>p.9</span></a>
+    <a href="#s7"><b>7 · Your catalogue of work</b><span>p.10</span></a>
+    <a href="#s8"><b>8 · Your people and their access</b><span>p.11</span></a>
+    <a href="#s9"><b>9 · The small lists</b><span>p.13</span></a>
+    <a href="#s10"><b>10 · The setup checklist</b><span>p.14</span></a>
+    <a href="#s11"><b>11 · When something looks wrong</b><span>p.15</span></a>
+  </div>
+
+  <div class="callout"><b>The one-sentence version.</b> Everything the ERP prints — a quote, a contract,
+  an invoice, a reminder — is assembled from one place: <b>Configuración → Empresa</b>. Fill that in
+  properly and nothing downstream has to be typed twice; leave it empty and the system will politely
+  refuse to issue a single invoice, which is the correct behaviour and not a fault.</div>
+
+  <h3>How this guide relates to the other one</h3>
+  <p>Two documents, and they do not overlap:</p>
+  <ul>
+    <li><b>This guide — Initial Company Setup.</b> The one-off work: identity, tax defaults, catalogue,
+      people, bank. Done once, revisited when something about the company changes.</li>
+    <li><b>Operations Guide.</b> The everyday work: lead → visit → quote → contract → project →
+      purchasing → hours → invoice → collection → close. Read it after this one.</li>
+  </ul>
+  <p>Both open from the <b>👤 profile menu</b> in the top-right corner of the workspace.</p>
+</section>
+
+<!-- ============ 1 · BEFORE YOU START ============ -->
+<section class="page" id="s1">
+  <div class="kicker">Section 1</div>
+  <h2 class="sec">Before you start</h2>
+  <p class="lead">Collect these first. Hunting for a Registro Mercantil folio number halfway through is
+  what turns twenty minutes into an afternoon.</p>
+
+  <h3>Documents to have open</h3>
+  <table class="avoid">
+    <thead><tr><th style="width:31%">What</th><th>Where it usually is</th><th style="width:16%">Needed for</th></tr></thead>
+    <tbody>
+      <tr><td><b>Escritura de constitución</b></td><td>Company deed — gives the legal name, the registered
+        address and the Registro Mercantil entry (tomo, folio, hoja)</td><td>Section 3</td></tr>
+      <tr><td><b>Tarjeta de identificación fiscal</b></td><td>The NIF/CIF card from the Agencia
+        Tributaria</td><td>Section 3</td></tr>
+      <tr><td><b>A bank certificate or a recent statement</b></td><td>For the IBAN and BIC that customers
+        will pay into</td><td>Sections 3 &amp; 6</td></tr>
+      <tr><td><b>Your logo</b></td><td>PNG or SVG, transparent background if you have one. It goes on every
+        PDF the system produces</td><td>Section 3</td></tr>
+      <tr><td><b>The company email password</b></td><td>The mailbox everything should be sent from — for
+        example the shared <span class="mono">info@</span> address</td><td>Section 5</td></tr>
+      <tr><td><b>Your last three quotes</b></td><td>Paper or PDF. They tell you what your real chapters and
+        sub-chapters are, and what you actually charge</td><td>Section 7</td></tr>
+      <tr><td><b>A list of your people</b></td><td>Name, mobile, hourly cost, and whether they need a
+        login</td><td>Section 8</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Decisions to make (nobody can make them for you)</h3>
+  <div class="grid2">
+    <div class="box"><div class="k">Tax</div><h4>Your standard IVA and IRPF</h4>
+      <p style="margin:0;font-size:12px">Most renovation work for private customers runs at the reduced
+      rate; new build and commercial work does not. Set the one you use <b>most often</b> — each quote
+      and invoice can still be changed line by line.</p></div>
+    <div class="box"><div class="k">Terms</div><h4>How long you give customers to pay</h4>
+      <p style="margin:0;font-size:12px">The number you put in <b>Plazo de pago</b> is what every due date
+      and every overdue alert is computed from. Put in what you actually enforce, not what you wish.</p></div>
+    <div class="box"><div class="k">Language</div><h4>Spanish, Catalan or English</h4>
+      <p style="margin:0;font-size:12px">The workspace language is per person; the <b>document</b>
+      language follows the customer's own preference, so a Catalan client can receive a Catalan
+      quote while you work in Spanish.</p></div>
+    <div class="box"><div class="k">People</div><h4>Who gets a login at all</h4>
+      <p style="margin:0;font-size:12px">A worker whose hours somebody else enters does not need an
+      account. Give logins to the people who will type — see the roles table in section 8.</p></div>
+  </div>
+
+  <div class="callout"><b>You do not have to finish in one sitting.</b> Everything saves as you type it.
+  The only sequence that matters is that the company record (section 3) comes before your first quote,
+  and the catalogue (section 7) makes quoting fast rather than possible.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">3</div>
+</section>
+
+<!-- ============ 2 · GETTING IN ============ -->
+<section class="page" id="s2">
+  <div class="kicker">Section 2</div>
+  <h2 class="sec">Getting in: the app and the browser</h2>
+  <p class="lead">The same system, two ways in. Both show the same records — there is no
+  synchronising, no "phone copy" and nothing to reconcile.</p>
+
+  <div class="grid2">
+    <div class="box"><div class="k">On a computer</div><h4>A web address</h4>
+      <p style="margin:0;font-size:12px">Open the address your installer gave you in Chrome, Edge or
+      Safari. Nothing to install. Bookmark it — the office will live here.</p></div>
+    <div class="box"><div class="k">On a phone or tablet</div><h4>The Canei Subirats app</h4>
+      <p style="margin:0;font-size:12px">Installed from TestFlight while the app is in beta, and from the
+      App Store afterwards. It is the same workspace in a native shell, with the camera wired in for
+      site photos.</p></div>
+  </div>
+
+  <h3>The first sign-in</h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>You receive an invitation</b>
+    <p style="margin:0">Whoever installed the system creates the first administrator — you. The
+    invitation carries a personal <b>activation link</b>.</p></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>Open the link and set a password</b>
+    <p style="margin:0">The link is single-use and belongs to one email address. If it has expired, ask
+    for the invitation to be sent again; nothing is lost.</p></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Choose your language</b>
+    <p style="margin:0">Top-right, in the header. Spanish, Catalan or English — your choice only, it does
+    not change what your colleagues see or what your customers receive.</p></div></div>
+
+  <h3>Finding your way around on a phone</h3>
+  <p>The screen is small, so the layout is not the same as on a computer, and two things are worth
+  knowing on day one:</p>
+  <ul>
+    <li>The bottom bar carries <b>five</b> section icons. Tapping the section you are already in opens
+      the list of its screens.</li>
+    <li><b>Configuración</b> — where everything in this guide happens — is not in that bar. It is the
+      <b>⚙️ button in the header</b>, to the left of your profile picture. On a computer it is the last
+      icon in the left-hand rail instead.</li>
+  </ul>
+
+  <div class="callout warn"><b>Set the company up on a computer if you can.</b> Everything here is
+  possible on the phone, but you are typing thirty fields, an address and a bank account. The phone is
+  built for the site: photos, hours, progress, a quick look at the numbers.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">4</div>
+</section>
+
+<!-- ============ 3 · COMPANY RECORD ============ -->
+<section class="page" id="s3">
+  <div class="kicker">Section 3 · <span style="color:var(--crit)">required</span></div>
+  <h2 class="sec">Your company record</h2>
+  <div class="where"><b>Configuración → Empresa</b><span class="code">ORG-01</span></div>
+  <p class="lead">This is the single most important screen in the system. Everything printed on a quote,
+  a contract, an invoice or a reminder is read from here, so it is typed once and never again.</p>
+
+  <h3>The four fields that unlock invoicing</h3>
+  <p>Spanish invoicing law (RD 1619/2012) requires an invoice to say who issued it, its tax number and
+  where it is; and an invoice nobody can pay is not an invoice. So the system refuses to issue anything
+  until these four are filled:</p>
+  <table class="avoid">
+    <thead><tr><th style="width:26%">Field</th><th>What to put</th><th style="width:12%">Card</th></tr></thead>
+    <tbody>
+      <tr><td><b>Denominación social</b></td><td>The full legal name exactly as it appears on the deed —
+        including <span class="mono">S.L.</span>, <span class="mono">S.L.U.</span> or
+        <span class="mono">S.A.</span></td><td>Identidad</td></tr>
+      <tr><td><b>NIF / CIF</b></td><td>Nine characters, no spaces or dashes: <span class="mono">B12345674</span></td><td>Identidad</td></tr>
+      <tr><td><b>Dirección de trabajo</b></td><td>The address that goes in the document header — your
+        office, which may not be the registered one</td><td>Dirección de trabajo</td></tr>
+      <tr><td><b>IBAN</b></td><td>The account customers transfer to. It is printed on every invoice</td><td>Banco</td></tr>
+    </tbody>
+  </table>
+  <p>Until all four are present, a red band sits at the top of the Control Tower and of this screen
+  naming exactly what is missing. When they are there the band turns green and reads
+  <i>"La empresa puede emitir presupuestos, contratos y facturas."</i></p>
+
+  <h3>Identidad</h3>
+  <ul>
+    <li><b>Nombre comercial</b> — the name customers know you by, if it differs from the legal one. Used
+      in headings and emails; the legal name is still what appears in the fiscal block.</li>
+    <li><b>Logotipo</b> — upload it once. It is embedded in every PDF and in the header of every generated
+      email, so a change here restyles the whole document set.</li>
+  </ul>
+
+  <h3>Two addresses, on purpose</h3>
+  <p><b>Domicilio social</b> is the address in the Registro Mercantil; it belongs in the fiscal block at
+  the foot of a document. <b>Dirección de trabajo</b> is where you actually are and what goes in the
+  header. For most companies they are the same — tick <b>«Igual que el domicilio social»</b> and the
+  second one fills itself and stays in step.</p>
+
+  <h3>Registro Mercantil</h3>
+  <p>Registry, <b>tomo</b>, <b>folio</b> and <b>hoja</b>, from the deed. These print in small type at the
+  foot of your documents. They are not required to invoice, but a document without them looks like it
+  came from a company that has not registered.</p>
+
+  <h3>Contacto and Pie legal</h3>
+  <p>Phone, email and website appear in the document header. <b>Pie legal</b> is a free line printed at
+  the foot of every document — data-protection wording or a reference to your general conditions. Ask
+  your gestoría what they want it to say; leave it empty until they answer rather than inventing it.</p>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">5</div>
+</section>
+
+<!-- ============ 3b · WORKED EXAMPLE ============ -->
+<section class="page">
+  <div class="kicker">Section 3 · continued</div>
+  <h2 class="sec">What a filled-in record looks like</h2>
+  <p class="lead">A complete example, so you can compare field by field rather than guess what "good"
+  means. Your own values will differ; the <i>shape</i> should not.</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:34%">Field</th><th>Example</th><th style="width:10%">Req.</th></tr></thead>
+    <tbody>
+      <tr><td>Denominación social</td><td class="mono">Canei Subirats, S.L.</td><td class="req">✓</td></tr>
+      <tr><td>Nombre comercial</td><td class="mono">Canei Subirats</td><td></td></tr>
+      <tr><td>NIF / CIF</td><td class="mono">B12345674</td><td class="req">✓</td></tr>
+      <tr><td>Domicilio social</td><td class="mono">Carrer Major 12 · 08960 · Sant Just Desvern · Barcelona · España</td><td></td></tr>
+      <tr><td>Dirección de trabajo</td><td class="mono">Igual que el domicilio social</td><td class="req">✓</td></tr>
+      <tr><td>Registro Mercantil</td><td class="mono">Barcelona · Tomo 45231 · Folio 88 · Hoja B-489021</td><td></td></tr>
+      <tr><td>Teléfono · Email · Web</td><td class="mono">+34 933 000 000 · info@…  · www…</td><td></td></tr>
+      <tr><td>IBAN</td><td class="mono">ES91 2100 0418 4502 0005 1332</td><td class="req">✓</td></tr>
+      <tr><td>BIC · Banco</td><td class="mono">CAIXESBBXXX · CaixaBank</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><b>Check it on a real document, not on the screen.</b> Once the record is saved,
+  build a throwaway quote for a test customer and open the PDF. Every mistake in this section is visible
+  there in ten seconds — a missing accent in the legal name, an IBAN with a transposed pair, a logo with
+  a white box around it. Delete the test quote afterwards.</div>
+
+  <h3>Changing it later</h3>
+  <p>You can edit this screen at any time, and you should when the company moves or changes bank. Two
+  things to understand about what that does:</p>
+  <ul>
+    <li><b>Documents already issued do not change.</b> An invoice is a legal record of what was sent; it
+      keeps the identity, the address and the account it was issued with.</li>
+    <li><b>New documents pick the change up immediately.</b> There is nothing to regenerate and no cache
+      to clear.</li>
+  </ul>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">6</div>
+</section>
+
+<!-- ============ 4 · DEFAULTS ============ -->
+<section class="page" id="s4">
+  <div class="kicker">Section 4</div>
+  <h2 class="sec">The numbers behind every document</h2>
+  <div class="where"><b>Configuración → Empresa → Valores por defecto</b><span class="code">ORG-01</span></div>
+  <p class="lead">Nine numbers that used to be fixed inside the program and are now yours. They are
+  applied to <b>new</b> documents; a quote or contract that already exists keeps the values it was
+  created with.</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:30%">Setting</th><th>What it decides</th><th style="width:14%">Typical</th></tr></thead>
+    <tbody>
+      <tr><td><b>IVA por defecto</b></td><td>The tax rate proposed on each new quote and invoice line.
+        Changeable per line — this is the starting point, not a rule</td><td>21 % / 10 %</td></tr>
+      <tr><td><b>IRPF por defecto</b></td><td>Withholding proposed where it applies. Leave at 0 if you do
+        not withhold</td><td>0 % / 15 %</td></tr>
+      <tr><td><b>Plazo de pago</b></td><td>Days from issue to due date. Drives every due date, the ageing
+        of receivables and the overdue alerts</td><td>30 days</td></tr>
+      <tr><td><b>Validez del presupuesto</b></td><td>How long a quote stands. Printed on the quote and used
+        to mark it expired</td><td>30 days</td></tr>
+      <tr><td><b>Interés de demora</b></td><td>Annual late-payment interest quoted in your conditions</td><td>8 %</td></tr>
+      <tr><td><b>Días de cortesía</b></td><td>Grace after the due date before an invoice is treated as
+        overdue and starts appearing in alerts</td><td>5 days</td></tr>
+      <tr><td><b>Planificar en</b></td><td>How soon after acceptance a job should be scheduled before the
+        system flags it</td><td>7 days</td></tr>
+      <tr><td><b>Empezar en</b></td><td>How soon after scheduling work should actually start before it is
+        flagged</td><td>15 days</td></tr>
+      <tr><td><b>Margen mínimo, alerta</b></td><td>The margin below which a quote or a job raises a
+        warning. The number that stops you selling work at a loss</td><td>15 %</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn"><b>The last one earns its keep.</b> «Margen mínimo» is the only setting on
+  this page that catches a mistake before it costs money. Set it to the margin you would refuse to work
+  below, not to the one you dream of — an alert that fires on every job is an alert nobody reads.</div>
+
+  <h3>A note on how rates are stored</h3>
+  <p>You type <span class="mono">21</span> and the system stores <span class="mono">2100</span> — basis
+  points — because 21 % of one cent has to land somewhere predictable. You will never see that; it
+  matters only if you ever export the raw data.</p>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">7</div>
+</section>
+
+<!-- ============ 5 · MAILBOX ============ -->
+<section class="page" id="s5">
+  <div class="kicker">Section 5</div>
+  <h2 class="sec">The company mailbox</h2>
+  <div class="where"><b>Configuración → Empresa → Correo de la empresa</b><span class="code">ORG-01</span></div>
+  <p class="lead">Connect the address your company already sends from — the shared one, not a personal
+  account. Everything the system writes for you ends up in its <b>Drafts</b> folder.</p>
+
+  <h3>What connecting it actually does</h3>
+  <div class="grid2">
+    <div class="box"><div class="k">It does</div><h4>Write finished drafts</h4>
+      <p style="margin:0;font-size:12px">Quote emails, invoices, payment reminders, the accountant's
+      package, user invitations — each one composed, branded, with the PDF attached, and filed in
+      Drafts.</p></div>
+    <div class="box"><div class="k">It does not</div><h4>Send anything, ever</h4>
+      <p style="margin:0;font-size:12px">There is no send button in the system and no mail server behind
+      it. You open the draft in your own mail program, read it, and press send. Nothing leaves your
+      company without a person deciding it should.</p></div>
+  </div>
+
+  <h3>Connecting it</h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>Type the address and its password</b>
+    <p style="margin:0">Use the mailbox everybody already recognises — <span class="mono">info@</span>,
+    <span class="mono">administracion@</span> — so replies land where somebody reads them.</p></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>Press «Conectar el buzón»</b>
+    <p style="margin:0">The system connects to the mail server for real before saving anything. A wrong
+    password fails here, on this screen, rather than silently three weeks later.</p></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Check your Drafts folder</b>
+    <p style="margin:0">Generate any document and look. If the draft is there, the connection is
+    done.</p></div></div>
+
+  <div class="callout"><b>Where the password lives.</b> Encrypted, on the server, and nowhere else. It is
+  not part of the company data, so it does not travel to phones, does not appear in exports or backups of
+  your records, and cannot be read back from this screen by anyone — including you. To change it, type a
+  new one.</div>
+
+  <div class="callout warn"><b>If you skip this section</b> the system still works: every document is
+  produced and downloadable, and you attach it to an email yourself. You lose the branded body text and
+  the filing, not the document.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">8</div>
+</section>
+
+<!-- ============ 6 · ACCOUNTS ============ -->
+<section class="page" id="s6">
+  <div class="kicker">Section 6</div>
+  <h2 class="sec">Accounts, cards and cash</h2>
+  <div class="where"><b>Configuración → Empresa → Cuentas y tarjetas</b><span class="code">ORG-01</span></div>
+  <p class="lead">Every euro that moves belongs to an account. Create one row for each real place money
+  sits — and none for places it does not.</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:24%">Kind</th><th>Create one for…</th></tr></thead>
+    <tbody>
+      <tr><td><b>Bank account</b></td><td>Each current account, with its IBAN. The one on your invoices is
+        normally the first</td></tr>
+      <tr><td><b>Credit card</b></td><td>Each card. A card is its own account, not a line inside the bank
+        account, because its statement arrives separately and is reconciled separately</td></tr>
+      <tr><td><b>Cash box</b></td><td>The petty cash the site actually uses — the float that pays for a bag
+        of screws and the coffee</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Retiring an account</h3>
+  <p>Two different buttons, because they answer two different questions:</p>
+  <ul>
+    <li><b>Desactivar</b> — the account stops appearing in the lists you choose from, and everything
+      already reconciled against it stays exactly as it is. This is what you want for a closed account.</li>
+    <li><b>Borrar</b> — removes it entirely. If it has movements behind it the system tells you how many
+      and that they go with it. If you are not certain, deactivate.</li>
+  </ul>
+
+  <div class="callout"><b>Why this is on the company screen and not on the banking screen.</b> Accounts
+  belong to the company, not to the act of reconciling. They used to be created inside bank
+  reconciliation, which meant a workspace that had been demonstrated on carried its demonstration
+  accounts for ever, with nowhere to remove them.</div>
+
+  <h3>What happens next with these</h3>
+  <p>Once accounts exist you can import a bank statement (Administración → Consolidación bancaria),
+  match movements against invoices and bills, and give cash spending on site a destination. None of that
+  is setup — it is in the Operations Guide — but it is why this section matters now.</p>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">9</div>
+</section>
+
+<!-- ============ 7 · CATALOGUE ============ -->
+<section class="page" id="s7">
+  <div class="kicker">Section 7</div>
+  <h2 class="sec">Your catalogue of work</h2>
+  <div class="where"><b>Configuración → Partidas y subpartidas</b><span class="code">DMC-01</span>
+    <span>·</span> <b>Unidades de medida</b><span class="code">DMC-03</span></div>
+  <p class="lead">The catalogue is what makes a quote take fifteen minutes instead of two hours, and it
+  is the reason costs can later be compared against what you sold. It is worth an evening.</p>
+
+  <h3>Two levels, and what each is for</h3>
+  <div class="grid2">
+    <div class="box"><div class="k">Level 1</div><h4>Partida — the chapter</h4>
+      <p style="margin:0;font-size:12px">The blocks a customer recognises: demolition, plumbing,
+      electrics, tiling, carpentry, painting. This is how the quote is grouped and how the job's money is
+      reported back to you.</p></div>
+    <div class="box"><div class="k">Level 2</div><h4>Subpartida — the line</h4>
+      <p style="margin:0;font-size:12px">The thing you actually price: "chapado de pared, 60×60,
+      porcelánico". Each carries its unit, its price and, where it helps, brand, model and quality.</p></div>
+  </div>
+
+  <h3>Building it from what you already have</h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>Take your last three quotes</b>
+    <p style="margin:0">Not a blank sheet. The chapters you already use are the right ones, and they are
+    already in your customers' vocabulary.</p></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>Enter the chapters first, all of them</b>
+    <p style="margin:0">Ten to fifteen is normal for a reformas company. Get the list right before you go
+    down a level.</p></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Then the sub-chapters you use every week</b>
+    <p style="margin:0">Not every line you have ever quoted. The rare ones can be typed straight onto a
+    quote as a one-off, and added to the catalogue if they turn out to repeat.</p></div></div>
+  <div class="step"><div class="no">4</div><div class="bd"><b>Check the units of measure</b>
+    <p style="margin:0">m², ml, ud, h, kg, jornada. The unit is what makes a measurement mean something —
+    "18" is a number, "18 m²" is work.</p></div></div>
+
+  <div class="callout"><b>Prices are a starting point, not a promise.</b> Every price can be overridden on
+  the quote, and the quote remembers what it was sold at. Put in the price you would normally quote today
+  and correct it as you go; a catalogue that is 80 % right on Monday beats one that is perfect in
+  March.</div>
+
+  <div class="callout warn"><b>This is also your cost reporting.</b> Purchases, subcontractor bills and
+  hours are all charged to a chapter — and, where you want the detail, to a sub-chapter. A catalogue with
+  three chapters gives you a job report with three lines. That is the whole trade-off, and it is worth
+  ten more minutes now.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">10</div>
+</section>
+
+<!-- ============ 8 · PEOPLE ============ -->
+<section class="page" id="s8">
+  <div class="kicker">Section 8</div>
+  <h2 class="sec">Your people and their access</h2>
+  <div class="where"><b>Datos maestros → Personal interno</b><span class="code">DMT-04</span>
+    <span>·</span> <b>Configuración → Usuarios</b><span class="code">DMC-08</span></div>
+  <p class="lead">Two separate ideas, and confusing them is the commonest setup mistake: a
+  <b>worker</b> is somebody whose hours and cost the company records. A <b>user</b> is somebody who can
+  log in. Many people are both. Some are only one.</p>
+
+  <h3>First: the workers</h3>
+  <p>In <b>Personal interno</b>, one record per person on the payroll, with their <b>hourly cost</b> and
+  overtime rate. This is what turns hours into money: every hour booked to a job is valued at that
+  person's cost and lands on the job's chapter.</p>
+  <div class="callout"><b>Cost, not price.</b> This is what the person costs you per hour — gross plus
+  social security, as your gestoría computes it. It never appears on a customer document; it appears in
+  your job margin, which is the number that tells you whether the work was worth doing.</div>
+
+  <h3>Then: who can log in</h3>
+  <p>In <b>Usuarios</b>, invite people by email address and give each one a permission level:</p>
+  <table class="avoid">
+    <thead><tr><th style="width:24%">Permission</th><th>Can do</th></tr></thead>
+    <tbody>
+      <tr><td><b>Administrador</b></td><td>Everything, including managing users. The owner, and normally
+        one other person so you are never locked out</td></tr>
+      <tr><td><b>Oficina</b></td><td>Quotes, invoices, collections and payments. Does not manage
+        users</td></tr>
+      <tr><td><b>Trabajador de obra</b></td><td>Books their own hours and sees only their own. No amounts,
+        no customers, no rest of the ERP</td></tr>
+      <tr><td><b>Gestoría</b></td><td>Read and export only. Never sees margins or selling prices</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warn"><b>«Trabajador de obra» is a boundary, not a label.</b> The screens a site
+  worker cannot use are not merely hidden from them — the server refuses the request as well. A worker
+  cannot reach another worker's hours, or the money, by typing a different address into the phone.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">11</div>
+</section>
+
+<!-- ============ 8b · INVITATIONS ============ -->
+<section class="page">
+  <div class="kicker">Section 8 · continued</div>
+  <h2 class="sec">Inviting somebody, and linking them to their hours</h2>
+
+  <h3>What happens when you invite</h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>You enter an email and a permission level</b>
+    <p style="margin:0">The account is created immediately, in state <b>Invitado</b>, with a
+    <b>temporary password</b> that works straight away.</p></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>The invitation is written into your Drafts</b>
+    <p style="margin:0">A proper branded email carrying the sign-in address and that password. If the
+    company mailbox is connected (section 5), the drawer confirms <i>«Borrador en el buzón de la
+    empresa»</i> — open it in your mail program and press send.</p></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Or hand it over directly</b>
+    <p style="margin:0">The drawer has <b>Copiar todo</b>: the address, the user and the password in one
+    block, ready to paste into WhatsApp — which is what site crews actually read.</p></div></div>
+  <div class="step"><div class="no">4</div><div class="bd"><b>They sign in and the account turns Activo</b>
+    <p style="margin:0">Signing in is what activation means; until it happens the account stays listed as
+    invited, so you can always see who has not got in yet.</p></div></div>
+
+  <div class="callout"><b>The temporary password is temporary.</b> You know it, because you just read it
+  off the screen — so ask the person to change it once they are in. The invitation also carries a
+  one-time link that lets them choose their own password instead, valid for 7 days; either route works
+  and neither is required.</div>
+
+  <div class="callout warn"><b>If the drawer warns that the link cannot be reached from outside</b>, the
+  server does not yet know its own public address. The account and the password are valid; the address in
+  the email is not. Tell whoever installed the system — it is one setting on their side — rather than
+  inviting the person again.</div>
+
+  <h3>Linking a login to a worker record</h3>
+  <p>A site worker's account is joined to their <b>Personal interno</b> record. That link is what makes
+  «Mis horas» show <i>their</i> hours: without it the person can log in and see an empty sheet, which
+  looks exactly like a broken app. When you invite a site worker, set the link at the same time.</p>
+
+  <h3>A shape that works for a ten-person company</h3>
+  <table class="avoid">
+    <thead><tr><th style="width:30%">Person</th><th style="width:26%">Worker record</th><th>Login</th></tr></thead>
+    <tbody>
+      <tr><td>Owner</td><td>Yes, if they work on site</td><td><b>Administrador</b></td></tr>
+      <tr><td>Office / administration</td><td>Yes</td><td><b>Oficina</b></td></tr>
+      <tr><td>Foreman</td><td>Yes</td><td><b>Trabajador de obra</b>, or Oficina if they also quote</td></tr>
+      <tr><td>Crew</td><td>Yes, each one</td><td><b>Trabajador de obra</b> — or none, if the foreman books
+        for everybody</td></tr>
+      <tr><td>Gestoría</td><td>No</td><td><b>Gestoría</b></td></tr>
+      <tr><td>Subcontractors</td><td>No — they are suppliers, not staff</td><td>None</td></tr>
+    </tbody>
+  </table>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">12</div>
+</section>
+
+<!-- ============ 9 · SMALL LISTS ============ -->
+<section class="page" id="s9">
+  <div class="kicker">Section 9</div>
+  <h2 class="sec">The small lists</h2>
+  <p class="lead">Four short screens that shape the drop-downs you will use every day. Ten minutes
+  between them, and they are the difference between reporting you trust and a "varios" bucket.</p>
+
+  <h3>Fuentes de leads <span class="mono" style="color:var(--muted);font-size:11px">DMC-04</span></h3>
+  <p>Where enquiries come from: referral, own website, property manager, lead platform, passing trade.
+  Every opportunity is tagged with one, so this list is what later answers "which of these is actually
+  worth paying for". Keep it short — six entries you will use beats twenty you will not.</p>
+
+  <h3>Formas de pago <span class="mono" style="color:var(--muted);font-size:11px">DMC-05</span></h3>
+  <p>Transfer, direct debit, card, cash, and any staged arrangement you offer. Chosen on the quote,
+  carried to the contract, printed on the invoice, and used when matching bank movements.</p>
+
+  <h3>Comunicaciones <span class="mono" style="color:var(--muted);font-size:11px">DMC-06</span></h3>
+  <p>The wording of what goes out: the covering text for a quote, an invoice, a payment reminder, a review
+  request. The defaults are written and usable — read them once in your own voice and adjust the two or
+  three that do not sound like you.</p>
+
+  <h3>Idioma <span class="mono" style="color:var(--muted);font-size:11px">DMC-09</span></h3>
+  <p>Spanish, Catalan or English. Two independent choices:</p>
+  <ul>
+    <li><b>Your workspace</b> — what you see. Personal, changed from the header at any time.</li>
+    <li><b>The customer's documents</b> — set on the customer's own record. A Catalan customer receives a
+      Catalan quote whatever language the office works in.</li>
+  </ul>
+
+  <div class="callout"><b>Unidades de medida</b> lives here too <span class="mono">(DMC-03)</span>, but it
+  belongs with the catalogue — see section 7.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">13</div>
+</section>
+
+<!-- ============ 10 · CHECKLIST ============ -->
+<section class="page" id="s10">
+  <div class="kicker">Section 10</div>
+  <h2 class="sec">The setup checklist</h2>
+  <p class="lead">Print this page. Work down it. When the last box is ticked the system is yours and the
+  Operations Guide takes over.</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:5%">✓</th><th style="width:38%">Step</th><th>Done when</th></tr></thead>
+    <tbody>
+      <tr><td class="c">☐</td><td><b>1 · Sign in and set your password</b></td><td>You can see the Control
+        Tower</td></tr>
+      <tr><td class="c">☐</td><td><b>2 · Company identity</b> — legal name, NIF, logo</td><td>The Identidad
+        card is complete</td></tr>
+      <tr><td class="c">☐</td><td><b>3 · Addresses</b> — registered, and working</td><td>Both cards filled,
+        or the checkbox ticked</td></tr>
+      <tr><td class="c">☐</td><td><b>4 · Registro Mercantil</b> — tomo, folio, hoja</td><td>They appear at
+        the foot of a test PDF</td></tr>
+      <tr><td class="c">☐</td><td><b>5 · Bank</b> — IBAN, BIC, bank name</td><td>The red band at the top of
+        the screen has turned green</td></tr>
+      <tr><td class="c">☐</td><td><b>6 · Defaults</b> — the nine numbers</td><td>IVA, payment terms and
+        minimum margin are yours, not the examples</td></tr>
+      <tr><td class="c">☐</td><td><b>7 · Company mailbox</b></td><td>«Conectar el buzón» succeeded</td></tr>
+      <tr><td class="c">☐</td><td><b>8 · Accounts and cards</b></td><td>One row per real account; no demo
+        rows left</td></tr>
+      <tr><td class="c">☐</td><td><b>9 · Chapters</b></td><td>Your ten-to-fifteen chapters exist</td></tr>
+      <tr><td class="c">☐</td><td><b>10 · Sub-chapters and units</b></td><td>The lines you quote weekly are
+        priced</td></tr>
+      <tr><td class="c">☐</td><td><b>11 · Workers</b> with hourly cost</td><td>Everybody on the payroll has
+        a record</td></tr>
+      <tr><td class="c">☐</td><td><b>12 · Users</b> invited, site workers linked to their worker
+        record</td><td>Everyone who needs to type has signed in once and reads <b>Activo</b></td></tr>
+      <tr><td class="c">☐</td><td><b>13 · Small lists</b> — sources, payment methods, wording</td><td>The
+        drop-downs read like your company</td></tr>
+      <tr><td class="c">☐</td><td><b>14 · The test document</b></td><td>A quote PDF looks right, and has
+        been deleted afterwards</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><b>Then, and only then, enter a real customer.</b> The first real quote is the true
+  test of this checklist: if anything above is wrong, it shows up there, on one document, before it has
+  been repeated fifty times.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">14</div>
+</section>
+
+<!-- ============ 11 · TROUBLESHOOTING ============ -->
+<section class="page" id="s11">
+  <div class="kicker">Section 11</div>
+  <h2 class="sec">When something looks wrong</h2>
+  <p class="lead">The five things new companies hit, and what each one actually means.</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:36%">What you see</th><th>What it means, and what to do</th></tr></thead>
+    <tbody>
+      <tr><td><b>A red band: «Sin estos datos no se puede emitir ninguna factura»</b></td>
+        <td>One of the four required fields is empty; the band names which. This is the system protecting
+        you from issuing an invoice that is not valid. Fill it in — section 3.</td></tr>
+      <tr><td><b>The demonstration data is still there</b></td>
+        <td>The workspace ships with two years of example records so you can look around. The profile menu
+        has <b>↻ Recargar datos de demostración</b>; on a live company register the reload is refused on
+        purpose. Ask your installer for a clean register rather than deleting records one by one.</td></tr>
+      <tr><td><b>A site worker signs in and sees no hours</b></td>
+        <td>Their login is not linked to a worker record. Configuración → Usuarios, edit the person, set
+        the link — section 8.</td></tr>
+      <tr><td><b>Somebody cannot sign in with the password you sent</b></td>
+        <td>Issuing a new invitation replaces the old temporary password, so an older email no longer
+        works. Re-issue from Configuración → Usuarios and send the newest one — section 8.</td></tr>
+      <tr><td><b>Nothing is arriving by email</b></td>
+        <td>Correct. The system never sends. Look in the <b>Drafts</b> folder of the company mailbox —
+        section 5.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Your data is yours</h3>
+  <p>The profile menu carries <b>⤓ Exportar datos</b>: a complete copy of your records, at any time,
+  without asking anybody. Take one when the setup in this guide is finished — it is a good day to have a
+  copy of.</p>
+
+  <h3>What to read next</h3>
+  <p>The <b>Operations Guide</b>, from the same profile menu. It picks up exactly where this one stops:
+  the first lead, the site visit, the quote, and the whole chain through to a paid invoice and a
+  five-star review.</p>
+
+  <div class="callout"><b>One last thing worth knowing.</b> Adding a second company, or changing what the
+  tax rules do, is <b>configuration</b> here — not re-programming. Legal rules carry the date they apply
+  from, and the reason a document was computed the way it was is stored on the document itself.</div>
+  <div class="brandfoot">Canei Subirats · Initial company setup</div><div class="pagenum">15</div>
+</section>
+
+<div class="noprint" style="position:fixed;right:18px;bottom:18px;z-index:50">
+  <a href="Canei-Subirats-ERP-Company-Setup-Guide.pdf" download
+     style="display:inline-block;background:linear-gradient(180deg,#6ba85a,#48733c);color:#fff;text-decoration:none;
+     font:600 14px Inter,Arial,sans-serif;padding:12px 20px;border-radius:12px;box-shadow:0 12px 26px -12px rgba(72,115,60,.7)">⤓ Download PDF</a>
+  <button onclick="window.print()"
+     style="background:#fff;border:1px solid #d8e0d1;color:#3f4339;font:600 14px Inter,Arial,sans-serif;padding:12px 18px;border-radius:12px;margin-left:8px;cursor:pointer">🖨 Print</button>
+</div>
+</body>
+</html>

@@ -50,6 +50,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ tenant: string 
     }
     return json({
       email,
+      // The name on the account, for the initials in the header. Empty for a
+      // bootstrap account that never had one — the workspace falls back to the
+      // address, which every account has.
+      name: u?.name ?? "",
       role: u?.role ?? "admin",
       bankRead: u ? roleMay(u.role, "party.bank.read") : true,
       workerId,

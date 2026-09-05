@@ -189,16 +189,28 @@ const HARVEST = `() => {
     out.push(s);
   };
   const skip = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 1 };
+  /* A LANGUAGE SWITCHER IS THE RULER, NOT THE THING BEING MEASURED.
+     It names each language in its own language — Català is Català in all three
+     renders — and its buttons are the codes ES/CA/EN. Identical across renders
+     by design, so counting them reports a translation gap that does not exist.
+
+     Read from \`translate="no"\`, the standard HTML opt-out, which
+     \`site/i18n.js\` already honours for exactly this. The exemption used to be
+     pinned to \`#canei-lang-pill\`, the floating switcher; when the choice moved
+     into the profile menu the exemption stayed behind on a dead id and this
+     audit went red on the three language names. An attribute both the runtime
+     and the measurement read cannot drift apart from the markup that way. */
+  const optedOut = (el) => !!(el && el.closest && el.closest('[translate="no"]'));
   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
   while ((n = w.nextNode())) {
     const p = n.parentElement;
     if (!p || skip[p.nodeName]) continue;
-    if (p.closest('#canei-lang-pill')) continue;
+    if (optedOut(p)) continue;
     push(n.nodeValue);
   }
   for (const el of document.querySelectorAll('[placeholder],[title],[aria-label],option,input[type=button],input[type=submit]')) {
-    if (el.closest('#canei-lang-pill')) continue;
+    if (optedOut(el)) continue;
     push(el.getAttribute('placeholder'));
     push(el.getAttribute('title'));
     push(el.getAttribute('aria-label'));

@@ -476,6 +476,29 @@ async function siteWorkerBoundary() {
     const link = body?.invitation?.link ?? "";
     const token = link ? new URL(link).searchParams.get("token") : null;
     check("the invitation carries a token", Boolean(token), link.slice(0, 80));
+
+    /* THE TEMPORARY PASSWORD, PROVED AGAINST A REAL DATABASE. This is the only
+       place it can be: the password is written to the account row at invitation
+       time, so a unit test can assert the string is generated but not that it
+       opens the door. What the operator asked for was "copy it, paste it, be
+       in" — so that is what is checked, before the link is used at all. */
+    const tempPw = body?.invitation?.tempPassword ?? "";
+    check(
+      "the invitation carries a temporary password",
+      typeof tempPw === "string" && tempPw.length >= 12,
+      JSON.stringify(tempPw).slice(0, 40),
+    );
+    const loginUrl = body?.invitation?.loginUrl ?? "";
+    check("…and the address of the page to type it on", /\/login$/.test(loginUrl), loginUrl);
+    if (tempPw) {
+      const tempCookie = await signIn(email, tempPw);
+      check(
+        "and it signs in on its own, without following any link",
+        Boolean(tempCookie),
+        tempCookie ? "cookie issued" : "no cookie",
+      );
+    }
+
     if (!token) return;
 
     const act = await fetch(`${BASE}/api/auth/activate`, {

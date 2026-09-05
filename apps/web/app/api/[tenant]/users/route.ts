@@ -50,7 +50,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ tenant: string
        container, and that is what the activation link used to say. */
     const origin = publicOrigin(req);
     const invitation = await issueInvitation(tenant, user.email, "activation", who, origin);
-    const draft = await draftInvitation(tenant, user.email, invitation.link, "activation");
+    const draft = await draftInvitation(tenant, {
+      to: user.email,
+      loginUrl: invitation.loginUrl,
+      tempPassword: invitation.tempPassword,
+      link: invitation.link,
+      purpose: "activation",
+      company: "",
+    });
 
     // The link comes back EITHER WAY. With a draft filed the admin rarely needs
     // it; without one it is the only way in, and saying so beats a green tick
