@@ -8483,3 +8483,36 @@ merge stops being reviewable.
 written when the word was a stage abbreviation on a dashboard that no longer
 exists. It is a column header on Comercial and a phase on the recorrido now,
 and both mean the visit itself.
+
+**S76 · Compras is now the only witness that the shared project bar works, and
+that is a thinner guard than it looks.** Taking the bar off Horas was right —
+a project filter narrows nothing on one day's sheet for one person, and it read
+as a control you had to set before you could type — but it was also the second
+of the last two screens carrying that bar, after PK9-S2 took it off Variaciones
+and PK4-A/PK4-B off PRY-01 and PRY-02.
+
+So the two checks that prove the bar is a chooser and nothing else (PK5-B: no
+summary strip, no money in it) and that a job chosen on PRY-01 survives a change
+of subsection now both read ADM-02 Compras. The claim of the second is intact —
+Compras is in Administración and PRY-01 in Proyectos, so it is still a
+cross-section reading — but the failure mode from here is silent: simplify
+Compras and both checks stop testing anything while the suite stays green.
+
+Not fixed here on purpose. The stronger version picks the witness from
+`PROJECT_SUBS` at run time, so the suite follows the bar wherever it survives;
+that changes how the suite chooses its subject, and doing it inside a fix for a
+red run is how a test file becomes something nobody trusts. Written down so the
+next person meets it as a note rather than as a green suite that guards nothing.
+
+**S77 · The translator crawl counts about one differently between here and CI,
+so its ceilings keep margin.** Measured on this tree: EN 33 locally, twice;
+CI reported 34 on the same content. The crawl opens modals, so what it manages
+to reach depends on timing, and a ceiling pinned to one observed value has no
+room for that.
+
+This is not theory — it is the mistake that turned `main` red earlier today.
+The ceilings went 37 → 33 and 97 → 94 on a single local reading of 33, against
+a number the parallel session had measured twice and argued in S75g, and CI
+failed with «34 … ceiling 33». Reverted in `f31a1c2`. The ceilings are 37 and
+97 and they are meant to have slack in them; anyone tidying that slack away
+should first measure twice, in both places.

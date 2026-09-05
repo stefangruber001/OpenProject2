@@ -5226,13 +5226,18 @@ async function testProjectTracking(browser, base) {
       ok("PRY-02: the list stands alone too — no PROYECTO bar, no centre panel");
     else bad("PRY-02: list screen", JSON.stringify(ecoListScreen));
 
-    /* The bar itself is checked on a screen that still has one. PK9-S2 took it
-       off `variations`, which used to be this suite's witness: that screen is
-       now a register over every obra and naming one job above it would choose
-       something the screen does not use. `purchasing` and `labour` keep the
-       bar, each being a single screen that has to be told which job it is
-       about, so the check moves to one of those rather than being dropped. */
-    await pg.evaluate(() => (location.hash = "labour"));
+    /* The bar itself is checked on a screen that still has one, and the list of
+       those keeps shrinking. PK9-S2 took it off `variations`; PK4-A/PK4-B off
+       PRY-01 and PRY-02; and S12 off `labour`, which was this witness until
+       Horas grew a scope strip of its own (`.hscope` — every project by
+       default, with its own period control) because a project filter narrows
+       nothing on ONE day's sheet.
+
+       `purchasing` is what is left: a single screen that has to be told which
+       job it is about. It is therefore the ONLY thing still proving the shared
+       bar behaves — see ASSUMPTIONS S76. Do not move this back to `labour`;
+       that screen has no bar on purpose. */
+    await pg.evaluate(() => (location.hash = "purchasing"));
     await pg.waitForTimeout(600);
     // PK5-B: the bar is a CHOOSER and nothing else. It used to carry a second
     // row of twelve summary figures — client, address, status, progress,
@@ -5369,16 +5374,19 @@ async function testProjectTracking(browser, base) {
     /* The context must survive a change of subsection — that is what makes it
        a section context rather than one screen's dropdown. PK4-A/PK4-B left
        neither PRY-01 nor PRY-02 with a dropdown to read, so the job opened on
-       PRY-01 is the reading; PK9-S2 then took the bar off PRY-03 as well, that
-       screen having become a register over every obra. ADM-04 Horas is the
-       nearest surviving bar, and it is a better witness anyway — a different
-       SECTION, so agreeing with it proves the context is not one section's. */
+       PRY-01 is the reading; PK9-S2 then took the bar off PRY-03 as well, and
+       S12 off ADM-04 Horas, which was the witness here until it grew its own
+       scope strip.
+
+       ADM-02 Compras carries the reading now, and the claim is unchanged: it is
+       a different SECTION from PRY-01 (admin, not projects), so agreeing with it
+       still proves the context is not one section's. */
     const chosen = await pg.evaluate(() => gProject);
     if (await pg.locator("#gBack").count()) {
       await pg.locator("#gBack").click();
       await pg.waitForTimeout(500);
     }
-    await pg.evaluate(() => (location.hash = "labour"));
+    await pg.evaluate(() => (location.hash = "purchasing"));
     await pg.waitForTimeout(600);
     const stillChosen = await pg.locator("#psel").inputValue();
     if (stillChosen === chosen)
