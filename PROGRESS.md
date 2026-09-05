@@ -2386,3 +2386,29 @@ set of pages per branch, so one local reading is not the number CI sees
 (ASSUMPTIONS S77h). `pnpm lint · check-types · test ·
 boundaries · build` green, nav manifest and ownership guard green. No
 capability changed, so the committed `site/erp-factory` bundle is byte-identical.
+
+## N · The App is ready for Apple, and two ways it would have failed quietly
+
+`main` carries the whole Apple path: `site/privacy.html` published,
+`ios/fastlane/metadata/` in `deliver`'s layout in both languages, the App Review
+notes written for a **Custom App** distributed through Apple Business Manager,
+the `release` lane that refuses to submit without a demo account, and
+`.github/workflows/ios-release.yml` behind one button. TestFlight run **#24** is
+green on `8830f42` and carries the current web work; nothing bundled into the
+shell has changed since, so no rebuild is owed. `docs/RELEASE-IOS.md` opens with
+the one question that decides whether tomorrow is possible at all — whether the
+company is already enrolled in Business Manager — and says plainly that
+enrolment takes days and that TestFlight keeps working meanwhile.
+
+Two defects found by checking the release path rather than the screens, both of
+the kind nothing goes red for:
+
+- **The ten screenshots were gitignored** and existed only in the container that
+  made them. The submission runs from a clean checkout, so the listing would
+  have gone to review with an empty gallery (ASSUMPTIONS S81).
+- **The App Review password was left in a tracked file** after the lane ran.
+  Harmless in CI, one `git add -A` from a committed secret on a real machine
+  (S82).
+
+Next, and only the operator can do it: the Business Manager Organization ID, the
+contact phone, and a working demo account.

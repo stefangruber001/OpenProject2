@@ -8683,3 +8683,35 @@ re-learned the hard way: a quoted phrase inside a comment is counted by
 string and makes the file a syntax error. Both are now stated in the comments
 where they happened, because knowing the rule in the abstract did not stop me
 writing an example name in quotes twice.
+
+**S81 · A release asset that CI must read has to be committed, and `.gitignore`
+will not tell you it is missing.** `ios/.gitignore` ignored
+`fastlane/screenshots/**/*.png`. That is the right rule while the folder is
+fastlane `snapshot`'s scratch output; it is the wrong rule once the folder holds
+the App Store listing. The ten captures for the submission existed only in the
+container that generated them: the commit that "added" them carried the
+generator and nothing else, git dropped the images without a word, `git status`
+came back clean, and the one-click submission would have uploaded the whole
+listing to review with an empty gallery. Nothing would have gone red — the
+`release` lane's own guard treats "no screenshots present" as
+`skip_screenshots: true`, which is the correct behaviour for a lane that must
+not crash and exactly the wrong signal here.
+
+They are committed now, 2.4 MB, with the reason written where the ignore rule
+was. The general form: **when a workflow reads a file from a clean checkout, the
+file is source, whatever folder it happens to live in.** The staged/ignored
+distinction is about how a file was made, not about who needs it.
+
+**S82 · A secret that has to reach a tool through a file is put back afterwards
+in an `ensure`.** `deliver` reads the App Review demo password from
+`fastlane/metadata/review_information/demo_password.txt`, a TRACKED file holding
+a `FILL-ME` placeholder, so `ASC_DEMO_PASSWORD` had to be written into the
+working copy. In CI that is harmless. On the operator's own machine it left a
+real password inside a tracked file, showing in `git status` as an ordinary
+modification and one `git add -A` away from being committed — against the
+mandate's "never commit secrets", which has to hold where a person is sitting
+and not only in a disposable container.
+
+`with_demo_password` restores the original contents in an `ensure`, so it also
+cleans up when the upload throws — which is precisely when nobody thinks to
+look. Verified across all four paths (variable set, unset, exception, restore).
