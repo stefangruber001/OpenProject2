@@ -101,6 +101,7 @@ window.CANEI_DICT.ca = {
     "Aquí aniran les dues pantalles pròpies de cada persona: apuntar les hores del dia i consultar les seves. Encara no estan construïdes; mentrestant, fes servir «Tots».",
   // PRY-04 · Recorrido del cliente.
   de: "de",
+  "Recorrido terminado": "Recorregut acabat",
   Completada: "Completada",
   Bloqueada: "Bloquejada",
   recorrido: "recorregut",

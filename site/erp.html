@@ -22831,9 +22831,37 @@
         return -1;
       }
       /** The name of the phase that comes next, or that there is none. */
-      function journeyNextLabel(next) {
-        if (next < 0) return "Recorrido completo";
-        return JOURNEY[next].lab;
+      /* WHAT TO DO NEXT IS A VERB, NOT THE NAME OF THE PHASE AGAIN.
+         The register showed «Fase: 4 · Envío al cliente» beside «Siguiente paso:
+         Envío al cliente» — the same words twice, and the second column earning
+         nothing. A phase almost always carries the one thing that moves it on, so
+         that is what the column says: «Enviar y congelar», «Registrar la
+         respuesta». Where a phase deliberately has no verb (Ejecución, Pagos a
+         proveedores — see their comments in `journeySteps`) the name is still the
+         truest thing there is to say. */
+      function journeyNextLabel(steps, next) {
+        /* «Recorrido terminado», not «Recorrido completo» — that phrase already
+           belongs to the nav link «▶️ Recorrido completo» and translates as an
+           invitation to walk something. Here it is a statement that there is
+           nothing left to do. */
+        if (next < 0) return "Recorrido terminado";
+        const act = steps && steps[next] && steps[next].act;
+        return (act && act.lab) || JOURNEY[next].lab;
+      }
+      /* THE THIRTEEN, SMALL ENOUGH FOR A ROW.
+         The operator asked to see the stage «in a graphical way like the timeline»
+         on the register too. The rail itself cannot go there — thirteen labelled
+         chips measure about a thousand pixels and a phone card is 340 — so the
+         phases keep their COLOURS and lose their words: one dot each, the current
+         one ringed, the same `s-*` classes `.jstep .n` wears so the two drawings
+         are painted by one rule and cannot drift apart.
+
+         `aria-hidden`, because the phase is named in words immediately beside it.
+         Thirteen dots read aloud are noise, not information. */
+      function journeyMini(states, at) {
+        return `<span class="jmini" aria-hidden="true">${states
+          .map((st, i) => `<i class="jdot s-${st}${i === at ? " on" : ""}"></i>`)
+          .join("")}</span>`;
       }
       function journeyPill(step) {
         const [lab, tone] = JOURNEY_STATE[step.state];
@@ -22890,6 +22918,11 @@
               const eco = c.project ? erp.projectEconomics(c.project.id) : null;
               return {
                 id: r.key,
+                /* The thirteen, kept rather than recomputed. `steps` is already in
+                   hand — the register used to reduce it to one number and throw the
+                   rest away, and the mini-timeline is exactly the rest. */
+                states: steps.map((x) => x.state),
+                nextLab: journeyNextLabel(steps, next),
                 code: c.project ? c.project.code : c.budget ? c.budget.number : "—",
                 party: c.party.name,
                 /* Ask the presupuesto first: that answer comes from the engine and
@@ -22905,7 +22938,21 @@
                 tone: JOURNEY_STATE[steps[at].state][1],
                 next,
                 done: next < 0,
-                amount: eco ? eco.currentRevenueCents : c.opp ? c.opp.expectedValue : 0,
+                /* An obra knows what it is worth; before there is one, the
+                   presupuesto does. Asking the lead first is why a job with a
+                   38.000 € quote on the screen showed «0 €» in this column —
+                   `expectedValue` is what somebody guessed on the phone, and it is
+                   the last word worth having, not the first. */
+                amount: eco
+                  ? eco.currentRevenueCents
+                  : c.budget
+                    ? erp.budgetTotals(
+                        c.budget.id,
+                        c.budget.acceptedVersionId || c.budget.currentVersionId,
+                      ).taxableCents
+                    : c.opp
+                      ? c.opp.expectedValue
+                      : 0,
                 when: r.when,
               };
             })
@@ -22946,7 +22993,7 @@
             <span class="tag">${journeyCount("Fase", at + 1)} · ${esc(JOURNEY[at].lab)}</span></div>
            <div class="daylist">
              <div class="it"><span>Siguiente paso</span><span style="flex:1"></span><b>${esc(
-               journeyNextLabel(nextIdx),
+               journeyNextLabel(steps, nextIdx),
              )}</b>${
                nextIdx < 0
                  ? ""
@@ -23168,19 +23215,20 @@
             { label: "Trabajo", get: (r) => r.work },
             {
               label: "Fase",
-              /* The tone is the PHASE's own, not a second opinion about it: the
-                 same pill the recorrido shows when you open it, so the register and
-                 the screen behind it can never disagree. Number and name are
-                 separate nodes for the reason `journeyCount` exists. */
+              /* The strip, then the name. The tone is the PHASE's own, not a second
+                 opinion about it: the same classes the recorrido shows when you open
+                 it, so the register and the screen behind it can never disagree.
+                 The name stays because a row of dots with no word is a puzzle, and
+                 because a cell with no text disappears on a phone
+                 (`table.cards td:empty`). Number and name are separate nodes for the
+                 reason `journeyCount` exists. */
               html: (r) =>
-                `<span class="pill ${r.tone}"><span>${r.at + 1}</span> · <span>${esc(
+                journeyMini(r.states, r.at) +
+                `<span class="jminil"><span>${r.at + 1}</span> · <span>${esc(
                   JOURNEY[r.at].lab,
                 )}</span></span>`,
             },
-            {
-              label: "Siguiente paso",
-              get: (r) => journeyNextLabel(r.next),
-            },
+            { label: "Siguiente paso", get: (r) => r.nextLab },
             { label: "Importe", html: (r) => `<span class="num">${eur0(r.amount)}</span>` },
           ],
           onRowClick: (id) => {

@@ -5879,6 +5879,7 @@ window.CANEI_DICT = {
     ["de", "of"],
     /* Two states this screen names that no entry covered. `Completada` is also
        what the subcontract register has been rendering untranslated. */
+    ["Recorrido terminado", "Journey complete"],
     ["Completada", "Completed"],
     ["Bloqueada", "Blocked"],
     ["recorrido", "journey"],
@@ -5899,7 +5900,9 @@ window.CANEI_DICT = {
        obra assigned. This is a different fact — a lead that has not become one
        yet — and it now says so. */
     ["Todavía sin obra", "Not a job yet"],
-    ["Envío al cliente", "Sent to the customer"],
+    /* A milestone, so a noun phrase — the past participle read as a sentence
+       fragment wherever the phase was named. */
+    ["Envío al cliente", "Quote sent"],
     ["Inicio de obra", "Works start"],
     ["Cierre y reseña", "Close and review"],
     ["Sin oportunidad registrada", "No lead on file"],

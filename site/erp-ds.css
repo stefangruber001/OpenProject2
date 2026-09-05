@@ -4963,23 +4963,28 @@ body.siteworker .rail {
 .jstep:hover .l {
   color: var(--ink);
 }
-.jstep.s-done .n {
+.jstep.s-done .n,
+.jdot.s-done {
   background: #ccfbf1;
   border-color: #99e6da;
   color: #0f766e;
 }
-.jstep.s-doing .n {
+.jstep.s-doing .n,
+.jdot.s-doing {
   background: #fef3c7;
   border-color: #f0d69a;
   color: #b45309;
 }
-.jstep.s-waiting .n {
+.jstep.s-waiting .n,
+.jdot.s-waiting {
   background: #dbeafe;
   border-color: #b3cdf7;
   color: #1d4ed8;
 }
 .jstep.s-blocked .n,
-.jstep.s-late .n {
+.jstep.s-late .n,
+.jdot.s-blocked,
+.jdot.s-late {
   background: #fee2e2;
   border-color: #f4bcbc;
   color: #b91c1c;
@@ -5004,5 +5009,58 @@ body.siteworker .rail {
   }
   .jstep .l {
     max-width: 68px;
+  }
+}
+
+/* --------------------------- 71 · the same thirteen phases, at row size
+   Operator, on the register: «show in a graphical way like the timeline at which
+   stage the project is». The rail from section 70 cannot go in a table row —
+   thirteen labelled chips measure about a thousand pixels and the phone card it
+   would sit in is 340 — so the phases keep the one thing that carries at this
+   size, their colour, and lose their words to the line underneath.
+
+   THE TONES ARE NOT REDECLARED. `.jdot` joins `.jstep .n`'s own selector list in
+   section 70 rather than restating six hex pairs here, because two lists of
+   colours for one meaning is how a register and the screen behind it come to
+   disagree about what amber means. */
+.jmini {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0 3px;
+}
+.jdot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+/* The current phase, marked by size and a ring — never by a seventh colour, for
+   the reason section 70 gives about one meaning per channel. */
+.jdot.on {
+  width: 9px;
+  height: 9px;
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 3px var(--accent);
+}
+.jminil {
+  display: block;
+  font: 600 11.5px var(--sans);
+  color: var(--body);
+}
+
+/* A phone lays every cell out as `label … value` on one line. This one is two
+   lines of its own — a strip over a name — so it opts out of that row and keeps
+   its label above it, the way a field does. */
+@media (max-width: 700px) {
+  table.cards td:has(.jmini) {
+    display: block;
+  }
+  table.cards td:has(.jmini):before {
+    display: block;
+    margin-bottom: 2px;
   }
 }
