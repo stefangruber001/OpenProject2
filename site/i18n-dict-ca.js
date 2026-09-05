@@ -74,6 +74,10 @@ window.CANEI_DICT.ca = {
   "Todos los proyectos": "Tots els projectes",
   "Mostrar sólo favoritos": "Mostrar només favorits",
   "Mostrar todos los proyectos": "Mostrar tots els projectes",
+  "Este servidor todavía no tiene buzón configurado.":
+    "Aquest servidor encara no té bústia configurada.",
+  "Este enlace no sale de este servidor": "Aquest enllaç no surt d'aquest servidor",
+  "Borrador en el buzón de la empresa": "Esborrany a la bústia de l'empresa",
   "Informe de horas": "Informe d'hores",
   "Horas totales": "Hores totals",
   "Coste total": "Cost total",

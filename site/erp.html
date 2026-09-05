@@ -23629,13 +23629,28 @@
          success message for a message nobody will receive. */
       function showInvitation(inv, email) {
         const db = openDrawer("Invitación para " + email);
+        /* THREE OUTCOMES, NOT TWO. The draft is filed, or it is not and we say
+           why; and separately the link either works outside this machine or it
+           does not. They were one boolean, so a server with a mailbox behind a
+           misconfigured proxy would have shown a green tick over a link nobody
+           could open. */
+        const state = inv.drafted
+          ? `<div class="pill g">Borrador en el buzón de la empresa${
+              inv.folder ? " · " + esc(inv.folder) : ""
+            }</div>
+            <p class="invnote">Está escrito y dirigido a ${esc(email)}, esperando en Borradores. Ábrelo en tu correo y dale a enviar cuando quieras. La persona elige su contraseña; tú no llegas a conocerla.</p>`
+          : `<div class="pill y">No se ha enviado ningún correo</div>
+            <p class="invnote">${esc(inv.reason || "Este servidor todavía no tiene buzón configurado.")} Hazle llegar este enlace a mano — por WhatsApp o en persona. La persona elige su contraseña; tú no llegas a conocerla.</p>`;
+        /* A link nobody outside this machine can open is worse than no link: it
+           looks like the answer. Said plainly, next to the link itself. */
+        const reach =
+          inv.linkReachable === false
+            ? `<div class="field full"><div class="pill r">Este enlace no sale de este servidor</div>
+              <p class="invnote">La dirección pública no está configurada, así que el enlace apunta a la máquina en vez de al dominio. Configura ERP_PUBLIC_URL en el servidor y vuelve a emitir la invitación.</p></div>`
+            : "";
         db.innerHTML = `<div class="form">
-         <div class="field full">${
-           inv.delivered
-             ? `<div class="pill g">Correo enviado a ${esc(email)}</div>`
-             : `<div class="pill y">No se ha enviado ningún correo</div>
-              <p style="font-size:12.5px;color:var(--body);margin:8px 0 0">Este servidor todavía no tiene correo configurado, así que hay que hacerle llegar este enlace a mano — por WhatsApp o en persona. La persona elige su contraseña; usted no llega a conocerla.</p>`
-         }</div>
+         <div class="field full">${state}</div>
+         ${reach}
          <div class="field full"><label>Enlace de activación (caduca ${fmtD(inv.expiresAt.slice(0, 10))})</label>
           <input id="uLink" value="${esc(inv.link)}" readonly style="font-family:ui-monospace,monospace;font-size:12px"></div>
          <div class="field full"><button class="btn primary" id="uCopy">Copiar enlace</button></div></div>`;

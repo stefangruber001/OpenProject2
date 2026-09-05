@@ -12,7 +12,8 @@ import { guarded, json } from "@/lib/api";
 import { tenantFor } from "@/lib/access";
 import { requireUser } from "@/lib/session";
 import { issueInvitation, require_, updateUser } from "@/lib/user-admin";
-import { sendInvitation } from "@/lib/invite-mail";
+import { draftInvitation } from "@/lib/invite-mail";
+import { originIsReachable, publicOrigin } from "@/lib/public-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +52,18 @@ export async function POST(
     const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
     const purpose = body.purpose === "reset" ? "reset" : "activation";
 
-    const invitation = await issueInvitation(tenant, target, purpose, who, new URL(req.url).origin);
-    const sent = await sendInvitation(target, invitation.link, purpose);
-    return json({ invitation: { ...invitation, delivered: sent } });
+    const origin = publicOrigin(req);
+    const invitation = await issueInvitation(tenant, target, purpose, who, origin);
+    const draft = await draftInvitation(tenant, target, invitation.link, purpose);
+    return json({
+      invitation: {
+        ...invitation,
+        delivered: draft.drafted,
+        drafted: draft.drafted,
+        folder: draft.folder,
+        reason: draft.reason,
+        linkReachable: originIsReachable(origin),
+      },
+    });
   });
 }

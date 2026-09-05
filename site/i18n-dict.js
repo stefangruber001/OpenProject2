@@ -6028,6 +6028,12 @@ window.CANEI_DICT = {
     ["Todos los proyectos", "All projects"],
     ["Mostrar sólo favoritos", "Show favourites only"],
     ["Mostrar todos los proyectos", "Show all projects"],
+    [
+      "Este servidor todavía no tiene buzón configurado.",
+      "This server has no mailbox connected yet.",
+    ],
+    ["Este enlace no sale de este servidor", "This link does not leave this server"],
+    ["Borrador en el buzón de la empresa", "Draft in the company mailbox"],
     ["Informe de horas", "Hours report"],
     ["Horas totales", "Total hours"],
     ["Coste total", "Total cost"],
