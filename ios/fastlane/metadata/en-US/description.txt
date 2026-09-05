@@ -23,4 +23,6 @@ WHAT ELSE IS IN IT
 
 Emails are never sent behind your back. The app writes the message, attaches the document and leaves it in your own Drafts folder — you read it and press send.
 
-An account is required. Canei Subirats is the private system of one company; access is issued by that company's administrator.
+Canei Subirats is distributed privately through Apple Business Manager to the
+company whose system it is. There is no public sign-up: accounts are issued by
+that company's own administrator, and the app is of no use without one.

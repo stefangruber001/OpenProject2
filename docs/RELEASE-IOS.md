@@ -1,103 +1,122 @@
-# Shipping the iOS app — what is ready, and what is yours
+# Shipping the iOS app as a Custom App (Apple Business Manager)
 
-Written 5 Sep 2026, at the operator's request: _"update all meta data for Apple
-so I can submit with one click"_.
+Written 5 Sep 2026. The operator chose the private route:
+_"adjust to the Apple private business manager concept"_.
 
-Everything Apple asks for that could be prepared from inside this repository is
-prepared. Three values could not be, because only you have them, and the release
-lane refuses to run until they are filled — that refusal is deliberate and is
-explained under **The three values** below.
-
----
-
-## Read this first: the App Store may not be the right door
-
-Canei Subirats is the **private system of one company**. It has no public
-sign-up, and it is of no use to anyone who does not work for Canei Subirats.
-Apple reviews against that: an app whose audience is a single organisation is
-routinely refused on the public App Store under **guideline 4.2 (minimum
-functionality)** or **4.3**, and the reviewer is told to use the private route
-instead.
-
-The private route is **Apple Business Manager → Custom Apps**. Same binary, same
-build, same submission — but distributed privately to your own organisation
-instead of listed publicly. It skips the "is this useful to the general public"
-question entirely, because the answer is no and it is not supposed to be yes.
-
-|                                | Public App Store    | Custom App (Business Manager)      |
-| ------------------------------ | ------------------- | ---------------------------------- |
-| Who can install                | anyone              | only people you name               |
-| Review                         | full, incl. 4.2/4.3 | lighter, no public-usefulness test |
-| Listing text, screenshots      | required            | required (same files)              |
-| Risk of rejection for this app | **real**            | low                                |
-
-Everything in this repository serves either route — the metadata, the
-screenshots and the lane are identical. The choice is made in App Store Connect
-(Pricing and Availability → Distribution), not here.
-
-**Recommendation:** submit as a Custom App unless there is a reason to be
-publicly listed. If you want the public listing anyway, submit it — a rejection
-costs a review cycle and tells you exactly what Apple wants changed, and the
-description already says plainly that access is issued by the company, which is
-the honest framing and the one most likely to pass.
+Canei Subirats is the working system of one company. It has no public sign-up
+and is of no use to anyone outside the company, so it is distributed **privately
+to that company** rather than listed on the App Store. Same binary, same
+metadata, same review — but the reviewer is not asking whether the general
+public would want it, which is the question a single-company ERP fails.
 
 ---
 
-## What is ready
+## Read this first: is Business Manager already set up?
 
-### The build
+This is the one thing that decides whether the private route is available
+**tomorrow** or **next week**, and it is worth checking before anything else.
+
+A Custom App is distributed to an organisation, and that organisation has to
+exist in **Apple Business Manager** with its own Organization ID.
+
+| If Canei Subirats…                                | Then                                                                                                                          |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **already has** an Apple Business Manager account | You can do the whole thing tomorrow. You need its **Organization ID** (Business Manager → Settings → Enrollment Information). |
+| **does not**                                      | Enrolment needs a **D-U-N-S number** and Apple verifies the company by phone. That is **days, not hours** — sometimes a week. |
+
+**If Business Manager is not in place, nothing is lost and nothing is blocked.**
+TestFlight already works, is already carrying the current build, and takes up to
+100 internal testers with no review at all. That is a perfectly good way to run
+the app inside the company while enrolment goes through — it is how the team has
+been using it already.
+
+Start the enrolment at <https://business.apple.com>; come back to this document
+when the Organization ID exists.
+
+---
+
+## What is ready in this repository
+
+### The build — done, and green
 
 `.github/workflows/ios-testflight.yml` — Actions → **iOS · TestFlight** → Run
-workflow. Builds, signs, increments the build number and uploads. This is what
-refreshes the app after web changes; the web content itself updates on its own,
-but anything bundled into the shell (the tab bar, the icon, permissions) needs a
-new build.
+workflow. Last run: **#24, success, on `8830f42`**, which carries the current web
+work. The build is in App Store Connect → TestFlight now.
 
-### The listing
+The web content updates by itself on every deploy; a new build is only needed
+when something bundled into the shell changes — the tab bar, the icon,
+permissions.
 
-`ios/fastlane/metadata/` in fastlane's `deliver` layout:
+### The listing — written, both languages
 
-| File                                                              | What it is                                                                             |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `en-US/`, `es-ES/`                                                | name, subtitle, description, keywords, promotional text, release notes, three URLs     |
-| `copyright.txt`, `primary_category.txt`, `secondary_category.txt` | Canei Subirats, S.L. · Business · Productivity                                         |
-| `review_information/notes.txt`                                    | what the reviewer should look at, in order, and how to switch the interface to English |
+`ios/fastlane/metadata/`, in fastlane's `deliver` layout. A Custom App still
+carries a full listing: the reviewer reads it, and the people installing from
+Business Manager see it. It is simply not publicly searchable.
 
-All fields are inside Apple's limits (name 14/30, subtitle 27/30, keywords
-94/100 and 97/100, promotional text ~107/170).
+| File                                                              | What it is                                                                                             |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `en-US/`, `es-ES/`                                                | name, subtitle, description, keywords, promotional text, release notes, three URLs                     |
+| `copyright.txt`, `primary_category.txt`, `secondary_category.txt` | Canei Subirats, S.L. · Business · Productivity                                                         |
+| `review_information/notes.txt`                                    | that this is a custom app for one company, what to look at, and how to switch the interface to English |
 
-### The privacy policy
+All fields are within Apple's limits.
 
-`site/privacy.html`, published at `/privacy.html`. **Apple will not accept a
-submission without a reachable privacy URL and there was none**, which is why it
-exists. It describes what the system actually does — no public sign-up, no
-advertising, no analytics, no IDFA, no third-party trackers, camera only when a
-photo is attached to a visit, email composed into your own Drafts and never
-sent. Every sentence was checked against the code.
+### The privacy policy — published
 
-It is **not a lawyer's information clause**, and it is logged as such in
-`LEGAL_REVIEW.md` §8 with `legally_verified: false`. Have the gestoría read it.
-The gap that matters most: no written data-processing agreement (contrato de
-encargado) is on file with the server, mail or banking providers, and the RGPD
-requires one.
+`site/privacy.html`, live at `/privacy.html`. Apple requires a reachable privacy
+URL for a Custom App exactly as for a public one. It describes what the system
+actually does, and every sentence was checked against the code.
 
-### The submission
+Logged in `LEGAL_REVIEW.md` §8 with `legally_verified: false`. Have the gestoría
+read it. The gap that matters most: no written data-processing agreement
+(contrato de encargado) with the server, mail and banking providers, which the
+RGPD requires whatever the distribution method.
+
+### The screenshots — taken
+
+`ios/fastlane/screenshots/{en-US,es-ES}/` — five screens each, at 1320 × 2868
+(the 6.9-inch iPhone, the one size Apple requires). Captured from the running
+workspace, which is the interface the app shows; they do not include the native
+tab bar the shell draws, because that belongs to the shell and not the page.
+Replace them with device captures from TestFlight if you prefer — same
+filenames, they sort in display order.
+
+### The submission — one click
 
 `.github/workflows/ios-release.yml` — Actions → **iOS · App Store submission** →
-Run workflow. Uploads the listing and submits the build **already in
-TestFlight** for review. Run it once with `submit: false` if you want to see the
-listing in App Store Connect before anything goes to review.
+Run workflow. Uploads the listing and submits the build **already in TestFlight**
+for review. It builds nothing: submitting a fresh binary would put a version
+nobody has run in front of a reviewer.
 
-It does not build a binary on purpose: submitting a freshly built one would put
-a version nobody has run in front of App Review.
+---
+
+## What you do in App Store Connect (once)
+
+Custom App distribution is a **setting on the app record**, not something
+fastlane can send. It is set once and then every future submission follows it.
+
+1. App Store Connect → the app → **Pricing and Availability**.
+2. Under distribution, choose the **private / custom app** option rather than
+   public App Store availability.
+3. Add **Canei Subirats** as the organisation allowed to install it, by its
+   Apple Business Manager **Organization ID**.
+4. Price: free (or a bulk price if the app is ever sold to another company —
+   not the case here).
+
+Apple's exact wording on that screen has changed more than once; if the labels
+do not match, look for _availability_, _distribution_ or _custom app_ on the
+Pricing and Availability page. The concept is stable even when the words move.
+
+After review, the app appears in **Apps and Books** in Business Manager, where
+you assign licences to people or devices. It never appears in App Store search.
 
 ---
 
 ## The three values only you have
 
 The `release` lane stops and names them rather than submitting without them.
-That is not pedantry — an app a reviewer cannot sign into is rejected under
-**guideline 2.1**, and a rejection costs days.
+That is not pedantry: an app a reviewer cannot sign into is rejected under
+**guideline 2.1**, and a rejection costs days. Custom apps are reviewed too.
 
 | Value              | Where                                       | Why                                             |
 | ------------------ | ------------------------------------------- | ----------------------------------------------- |
@@ -106,43 +125,37 @@ That is not pedantry — an app a reviewer cannot sign into is rejected under
 | the demo password  | secret `ASC_DEMO_PASSWORD`, **not** a file  | a password does not belong in git               |
 
 Make the demo account a **real account on the live system** with the
-`Administrador` permission, so the reviewer sees the whole app. Create it the
-normal way — Configuración → Usuarios → ＋ Nuevo usuario — and set a password you
-are willing to have written down in App Store Connect.
+`Administrador` permission, so the reviewer sees the whole app: Configuración →
+Usuarios → ＋ Nuevo usuario. Then add the secret at Settings → Secrets and
+variables → Actions → `ASC_DEMO_PASSWORD`.
 
-Add the secret at: Settings → Secrets and variables → Actions → New repository
-secret → `ASC_DEMO_PASSWORD`.
-
----
-
-## Screenshots
-
-`ios/fastlane/screenshots/en-US/` and `es-ES/`. Apple requires at least one
-6.9-inch iPhone set. These were captured from the running workspace at
-1320 × 2868, which is the same interface the app shows — the app is a shell
-around it — but they were taken in a browser rather than inside the shell, so
-they do not show the native tab bar at the bottom.
-
-That is a fair representation and Apple accepts screenshots that show the app's
-actual UI. If you would rather have true in-app captures, take them on a device
-from TestFlight and drop them in the same folders; the filenames sort in display
-order.
+You will also want the **Business Manager Organization ID** to hand for step 3
+above. It is not a file in this repository because nothing here sends it.
 
 ---
 
-## The order to do it in
+## Tomorrow morning, in order
 
-1. **Fill the three values** above.
-2. Actions → **iOS · TestFlight** → Run workflow. Wait for the build to appear
-   in App Store Connect → TestFlight (a few minutes of processing).
-3. Install it from TestFlight and open it once. Anything that looks wrong is
-   cheaper to find here than in review.
-4. Decide public listing or Custom App (see the top of this document).
-5. Actions → **iOS · App Store submission** → Run workflow, `submit: false`.
-   Read the listing in App Store Connect.
+1. **Check Business Manager.** Organization ID in hand → continue. Not enrolled
+   → start enrolment, keep using TestFlight, stop here.
+2. **Fill the three values** above.
+3. **Install the TestFlight build** (#24 is waiting) and open it once. Anything
+   wrong is cheaper to find here than in review.
+4. **Set custom-app distribution** in App Store Connect (the section above).
+5. Actions → **iOS · App Store submission** → Run workflow with
+   `submit: false`. Read the listing in App Store Connect.
 6. Run it again with `submit: true`.
 
-Apple's own answers — the age rating, the App Privacy questionnaire and export
-compliance — are asked once in App Store Connect and are not files. The lane
-declares the ones it can: no IDFA, no encryption beyond HTTPS, no third-party
+Apple's own questions — age rating, the App Privacy questionnaire, export
+compliance — are answered once in App Store Connect and are not files. The lane
+declares what it can: no IDFA, no encryption beyond HTTPS, no third-party
 content.
+
+---
+
+## What "one click" honestly means
+
+Steps 4, 5 and 6 are one click each. Steps 1 and 2 are yours because the values
+do not exist in this repository and cannot: an Organization ID belongs to your
+Business Manager account, and a working demo password must never be committed.
+Everything that could be automated from here is.

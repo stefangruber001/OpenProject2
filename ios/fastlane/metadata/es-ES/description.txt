@@ -23,4 +23,6 @@ QUÉ MÁS LLEVA
 
 Ningún correo sale a tus espaldas. El programa escribe el mensaje, adjunta el documento y lo deja en tu carpeta de Borradores: tú lo lees y le das a enviar.
 
-Hace falta una cuenta. Canei Subirats es el sistema privado de una empresa; el acceso lo da el administrador de esa empresa.
+Canei Subirats se distribuye de forma privada por Apple Business Manager a la
+empresa cuyo sistema es. No hay alta pública: las cuentas las da el
+administrador de esa empresa, y sin una la aplicación no sirve de nada.

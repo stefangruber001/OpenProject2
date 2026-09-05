@@ -2,10 +2,17 @@ name: iOS · App Store submission
 
 # ONE CLICK: Actions → "iOS · App Store submission" → Run workflow.
 #
-# It uploads the App Store listing — the text in both languages, the URLs, the
-# category, the screenshots and the App Review notes, all of them under
+# It uploads the listing — the text in both languages, the URLs, the category,
+# the screenshots and the App Review notes, all of them under
 # ios/fastlane/metadata — and then submits the build that is ALREADY in
 # TestFlight for review.
+#
+# THIS APP SHIPS AS A CUSTOM APP, distributed privately through Apple Business
+# Manager to the one company whose system it is. That changes nothing here: a
+# custom app carries the same listing and goes through the same review. What it
+# does change is a SETTING ON THE APP RECORD in App Store Connect (Pricing and
+# Availability → distribution), which is chosen once, by hand, and which nothing
+# in this repository can send. See docs/RELEASE-IOS.md.
 #
 # It deliberately does NOT build a binary. Submitting a freshly built one would
 # put a version nobody has run in front of App Review; the build being submitted
