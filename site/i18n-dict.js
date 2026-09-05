@@ -1163,7 +1163,10 @@ window.CANEI_DICT = {
     ["Pagos a proveedores", "Supplier payments"],
     ["Cierre · beneficio", "Close · profit"],
     ["Solicitud de reseña", "Review request"],
-    ["Visita", "Site"],
+    /* "Site" was this word's English while it labelled a stage abbreviation on a
+       dashboard that no longer exists. It is a column header on Comercial and a
+       phase on the recorrido now, and both of those mean the visit itself. */
+    ["Visita", "Visit"],
     ["Cierre", "Close"],
     ["Reseña", "Review"],
     ["No hay proyectos en «Contacto».", "No projects at “Lead”."],
@@ -5867,6 +5870,82 @@ window.CANEI_DICT = {
     ["Solados", "Floor finishes"],
     ["Ventanas y vidriería", "Windows and glazing"],
     ["Cocina y mobiliario", "Kitchen and furniture"],
+    /* «6 de 12 clientes», «Fase 4 de 13». The preposition is its OWN text node in
+       both — countTag has built counts that way since the lesson about sentences
+       with numbers in them — so an entry here reaches exactly those spans and
+       nothing else: `map` is keyed on a whole text node, and a node whose entire
+       content is the word "de" is one of those two counters. Identical in Catalan
+       by design. */
+    ["de", "of"],
+    /* Two states this screen names that no entry covered. `Completada` is also
+       what the subcontract register has been rendering untranslated. */
+    ["Completada", "Completed"],
+    ["Bloqueada", "Blocked"],
+    ["recorrido", "journey"],
+    ["recorridos", "journeys"],
+    /* PRY-04 · Recorrido del cliente. The screen is new; most of its vocabulary
+       is not — «Presupuesto», «Cobros», «Aceptada» and the rest are the words the
+       registers already use, and reusing them is what makes the recorrido read as
+       the same product rather than a second one. These are the ones it adds. */
+    [
+      "En qué fase está cada trabajo, qué falta para la siguiente y la pantalla real de cada paso.",
+      "Which phase each job is in, what the next one needs, and the real screen behind every step.",
+    ],
+    ["← Todos los recorridos", "← All journeys"],
+    ["Ningún recorrido coincide con la búsqueda.", "No journey matches the search."],
+    ["Abrir la pantalla completa ↗", "Open the full screen ↗"],
+    ["Ir a la fase", "Go to phase"],
+    /* Not «Sin obra», which the hours release already owns for an apunte with no
+       obra assigned. This is a different fact — a lead that has not become one
+       yet — and it now says so. */
+    ["Todavía sin obra", "Not a job yet"],
+    ["Envío al cliente", "Sent to the customer"],
+    ["Inicio de obra", "Works start"],
+    ["Cierre y reseña", "Close and review"],
+    ["Sin oportunidad registrada", "No lead on file"],
+    ["Visitas realizadas", "Visits completed"],
+    ["Última", "Last"],
+    ["Sin visita registrada", "No visit on file"],
+    ["Sin presupuesto", "No quote"],
+    ["Enviado y congelado", "Sent and frozen"],
+    ["Todavía sin enviar al cliente", "Not sent to the customer yet"],
+    ["Versión aceptada", "Version accepted"],
+    ["Sin contrato formal", "No formal contract"],
+    ["Pendiente de firma", "Awaiting signature"],
+    ["Obra creada, sin iniciar", "Job created, not started"],
+    ["Sin obra abierta", "No job open"],
+    ["Coste comprometido", "Committed cost"],
+    ["Sin pedidos de compra", "No purchase orders"],
+    ["Sin obra en ejecución", "No job under way"],
+    ["Sin facturas emitidas", "No invoices issued"],
+    ["Todo cobrado", "All collected"],
+    ["Nada que cobrar todavía", "Nothing to collect yet"],
+    ["Todo pagado", "All paid"],
+    ["Sin facturas de proveedor", "No supplier invoices"],
+    ["Sin reseña", "No review"],
+    ["Registrar la visita", "Record the visit"],
+    ["＋ Nuevo presupuesto", "＋ New quote"],
+    ["Enviar y congelar", "Send and freeze"],
+    ["Registrar la respuesta", "Record the reply"],
+    ["Iniciar la obra", "Start the works"],
+    ["Abrir la obra", "Open the job"],
+    ["＋ Nueva compra", "＋ New purchase"],
+    ["＋ Nuevo proveedor", "＋ New supplier"],
+    ["Registrar reseña", "Record a review"],
+    ["Cerrar la obra", "Close the job"],
+    ["Valoración", "Rating"],
+    ["Obra iniciada", "Works started"],
+    ["Obra creada", "Job created"],
+    ["Obra cerrada", "Job closed"],
+    ["Reseña registrada", "Review recorded"],
+    [
+      "Un adicional se une a su obra, no abre otra",
+      "A variation joins its job, it does not open another",
+    ],
+    ["⚠ Antes hace falta una oportunidad", "⚠ A lead is needed first"],
+    ["⚠ Antes hace falta un presupuesto", "⚠ A quote is needed first"],
+    ["⚠ Antes hace falta una obra", "⚠ A job is needed first"],
+    ["⚠ El presupuesto todavía no se ha enviado", "⚠ The quote has not been sent yet"],
     ["Limpieza y remates", "Cleaning and snagging"],
     [
       "Revisa el proyecto y la partida, corrige si hace falta y aprueba.",
@@ -6027,6 +6106,9 @@ window.CANEI_DICT = {
     [new RegExp("^(.+) · caja$"), "$1 · till"],
     [new RegExp("^(.+) · tarjeta$"), "$1 · card"],
     [new RegExp("^Documento · (.+)$"), "Document · $1"],
+    // openDrawer already splits a "phrase · record" title into two nodes and marks
+    // the record translate="no", so only the phrase needs a rule.
+    [new RegExp("^Reseña ·\\s*(.*)$"), "Review · $1"],
     [new RegExp("^Justificante · (.+)$"), "Receipt · $1"],
     [new RegExp("^Costes · (.+)$"), "Costs · $1"],
     [new RegExp("^Importar extracto · (.+)$"), "Import statement · $1"],

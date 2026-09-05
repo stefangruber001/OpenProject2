@@ -3911,9 +3911,9 @@ td.num.late {
    reasons it is not simply a third equal tile: it sits below Obras and Avance
    económico rather than beside one of them, which is the position asked for
    and also the honest one — it is the end of the list, not a peer half-way
-   down it; and it is a different KIND of entry, a page of its own rather than
-   a screen of this one, which the ↗ already says and the size now agrees
-   with. */
+   down it; and it is a different KIND of entry, the whole chain rather than
+   one link of it. It used to be a page of its own and wore the ↗ to say so;
+   the page is gone and so is the arrow, and the size is what remains. */
 #p2wide {
   display: grid;
   gap: 8px;
@@ -5007,4 +5007,122 @@ body.siteworker .gsearch,
 body.siteworker #p1,
 body.siteworker .rail {
   display: none !important;
+}
+
+/* ------------------------------- 70 · the recorrido: thirteen phases, in view
+   The flow strip in the sections panel is three chips over a rail and it is
+   the right drawing for three. Thirteen is a different problem: equal columns
+   would give each label about 45px, and a label nobody can read is a number
+   nobody can place. So the phases keep the chip — same node, same size, same
+   type, so the two strips read as one idea — and lay out as a row that
+   SCROLLS, with the label under each node at its natural width.
+
+   Colour carries the state, and it is the register's own: the same five tones
+   `.pill` uses, on the node rather than beside it, so a glance down the rail
+   answers «where is this job» without reading a word. `s-pending` is
+   deliberately the quietest thing on the screen — most of a young job is
+   pending, and thirteen grey nodes must not look like thirteen problems.
+
+   The current phase is marked by weight and a ring, never by colour: colour is
+   already saying something else here, and a second meaning on one channel is
+   how a legend stops working. */
+.jrail {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 14px 10px 10px;
+  min-width: min-content;
+}
+.jstep {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font: 600 10.5px var(--sans);
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  position: relative;
+  flex: 1 0 auto;
+  min-width: 74px;
+}
+/* The line that makes thirteen chips one path, drawn behind the nodes and
+   stopping half a chip short at each end so it never runs off the first or
+   past the last. */
+.jstep + .jstep::before {
+  content: "";
+  position: absolute;
+  right: 50%;
+  left: -50%;
+  top: 11px;
+  height: 1px;
+  background: var(--line);
+}
+.jstep .n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: 700 11px var(--sans);
+  position: relative;
+  z-index: 1;
+}
+.jstep .l {
+  max-width: 100px;
+  text-align: center;
+  line-height: 1.25;
+}
+.jstep:hover .l {
+  color: var(--ink);
+}
+.jstep.s-done .n {
+  background: #ccfbf1;
+  border-color: #99e6da;
+  color: #0f766e;
+}
+.jstep.s-doing .n {
+  background: #fef3c7;
+  border-color: #f0d69a;
+  color: #b45309;
+}
+.jstep.s-waiting .n {
+  background: #dbeafe;
+  border-color: #b3cdf7;
+  color: #1d4ed8;
+}
+.jstep.s-blocked .n,
+.jstep.s-late .n {
+  background: #fee2e2;
+  border-color: #f4bcbc;
+  color: #b91c1c;
+}
+.jstep.on .n {
+  box-shadow:
+    0 0 0 3px var(--paper),
+    0 0 0 4px var(--accent);
+}
+.jstep.on .l {
+  color: var(--ink);
+  font-weight: 700;
+}
+/* A phone reads the rail by scrolling it; the nodes stay the size a thumb can
+   hit rather than shrinking to fit a width they were never going to fit. */
+@media (max-width: 700px) {
+  .jrail {
+    padding: 14px 8px 10px;
+  }
+  .jstep {
+    min-width: 68px;
+  }
+  .jstep .l {
+    max-width: 68px;
+  }
 }

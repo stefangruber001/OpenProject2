@@ -2200,3 +2200,135 @@ rather than patched at speed on a deploy gate.
 is now also what the site worker's phone waits on: the screens themselves reach
 the existing build over the air, but `nav.json` is bundled, so the single-tab
 bar for that role needs a new build.
+
+## Package 14 — the recorrido stops being a second application (2026-09-04)
+
+The operator asked for four things on Proyectos → Recorrido del cliente: that
+every step look like the ERP screen that owns its data, that the explanations
+go, that the steps flow, and that picking any obra shows its real phase in
+colour, names the next step, and writes back — «if a new lead is entered in the
+customer journey then also in the leads this should be saved».
+
+All four are one change, and it is the one the repo has had on its own list
+since 07/08: **JOURNEY-AUDIT C1 / ASSUMPTIONS #48, Tier-1 item 1.**
+
+**What it was.** `journey.html` was two applications sharing a page. «Crear
+nuevo proyecto» was a 5,455-line narrated demo with its own `caneiJourney`
+IndexedDB, its own price book, its own tax-id validator and its own invoice
+numbering — so a customer was typed twice and the recorrido's factura was not
+the accountant's. «Proyecto existente», added in session 12, read the real
+database but was a stub: a status pill, one line of summary and a link that
+left the page. One write in the whole mode.
+
+**What it is.** `VIEWS.journey` in `erp.html`, route `#journey`, already
+declared in the menu as PRY-04. `journey.html` forwards to it, the way
+`index.html` forwards to the Torre, so the profile menu, both native shells and
+any bookmark keep working.
+
+Three of the four asks collapse into that one move. It IS the ERP, so `.fgrid`,
+`.field`, `.card`, `.pill` and `.drawer` apply natively — and «＋ Nuevo
+proveedor» on phase 8 opens `newPartyDrawer("supplier")`, the same form
+Maestros uses, with the same validation, the same duplicate warning and the
+same audit entry. Loading `erp-ds.css` into the old page had been tried and
+reverted (`7b52be4`) for the reason that made this necessary: the form CSS is
+not in the design layer, it is inline in `erp.html`, and so are the thirty
+globals every drawer reads.
+
+**And the write is only safe here.** Ids come from a counter inside the state
+document and a local save is a whole-document put with no version check; two
+pages holding two engine instances over one `caneiERP` mint colliding ids and
+erase each other. One shell, one instance, one persist path.
+
+**The two blockers in #48 dissolved rather than being solved.** The recorrido
+owns no data: every phase is a projection of records that already exist, and
+every action is an existing engine verb through `mutate()`. So there is no
+stage→record mapping to keep idempotent — a phase maps to nothing it wrote —
+and an abandoned recorrido leaves nothing behind, because nothing is created
+until the operator presses the ERP's own save button. `mutate()` re-renders, so
+the rail recolours itself: execute a step, and the phase that step belongs to
+changes colour with no wiring at all.
+
+**Thirteen phases, and what each one says.** Oportunidad · Visita · Presupuesto
+· Envío al cliente · Aceptación · Contrato · Inicio de obra · Compras ·
+Ejecución · Facturación · Cobros · Pagos a proveedores · Cierre y reseña. Five
+states in the registers' own pill tones, and **two reds** because they are two
+facts: `blocked` for a lead perdido or a presupuesto rechazado, `late` for
+money past its date — Facturación already writes «Vencida» on exactly that
+condition and one word for both would have the two screens disagreeing.
+«Enviado y congelado» is `v.frozen && v.issued`, which is the operator's own
+example.
+
+**Fase and Siguiente paso are different questions, and are answered
+separately.** The phase a job is IN is the furthest one under way — a
+renovation buys, builds, bills and chases at once — while the next step is the
+earliest phase that is stuck or overdue, and only failing that the earliest
+unfinished one at or after the current phase. Without the second half a closed
+obra with no pedidos reported «siguiente paso: Compras» for ever.
+
+**Two phases have no button, on purpose.** Ejecución does not, because progress
+is marked on the chart and a cost enters through Gastos with its document — the
+one door that made a cost with no paper was removed in package 13. Pagos a
+proveedores does not, because `payBills` lost its screen in package 12 for
+writing a payment nobody had made; what money left the company is answered by
+the bank.
+
+**Removed:** the `caneiJourney` database, the sample walkthrough, the second
+price book, the second tax-id validator and the generated demo PDF/e-mail/ZIP
+artifacts — about 5,400 lines. They are the explanations the operator asked to
+lose, and they are incompatible with mirroring the ERP: a screen cannot reflect
+the records and keep a private copy of the same nouns.
+
+**Gates.** Site E2E **702/702 unfiltered** — `testJourney` and
+`testJourneyRealMode` replaced by one suite of eighteen checks that drives the
+screen and proves the write-back both ways: a proveedor filed from phase 8
+appears in Maestros → Proveedores, a lead filed from the register appears in
+Comercial → Oportunidades, and neither leaves the screen. It takes its own
+browser context and runs last, because it is the only suite that creates
+records and `newPage` shares one IndexedDB with everything after it.
+
+Translation, all four gates re-measured: **workspace audit 0/0 in both
+languages** with `#journey` added to its route list — 52 new dictionary entries,
+and every composed string built as separate nodes for the reason `countTag`
+already carries. Source literals **205 → 162**, rendered pages **668/845 →
+91/67** and the miss ledger **41/101 → 34/96** (measured 31 and 93), all of them
+down, and mostly because a 5,455-line page left the lists rather than because
+anything was excused. The one string the recorrido itself contributed was the
+«de» that both this screen and `countTag` build a count around, and it was
+translated. `["Visita", "Site"]` became `["Visita", "Visit"]` on the way past:
+the old English was written when the word was a stage abbreviation on a
+dashboard that no longer exists.
+
+`pnpm lint · check-types · test · boundaries · build`, the nav manifest, the
+ownership guard and `tests/site-sync` 20/20 all green. No capability changed, so
+the committed `site/erp-factory` bundle is untouched.
+
+**Merged with the hours redesign, 05/09.** The two packages were written in
+parallel and met in nine files. Nothing was content-copied: `site/erp-ds.css`
+was rebuilt as main's file plus this branch's two edits, and every other
+conflict was resolved by keeping both sides — the workspace audit walks the six
+`#labour` routes AND `#journey`, and the numbered CSS section and the
+ASSUMPTIONS entries were renumbered behind the ones that landed first (69/S72–74
+theirs, 70/S75 ours). Three things the merge itself surfaced:
+
+- **«Sin obra» meant two different facts.** The hours release owns it for an
+  apunte with no obra assigned; the recorrido was using the same two words for a
+  lead that has not become one yet. Renamed to «Todavía sin obra», which is also
+  the truer sentence — the alternative was one screen saying "site" in the middle
+  of another that says "job" everywhere.
+- **`hashchange` did not carry the clamp `go()` does.** A site worker typing a
+  hash reached any screen; the state is redacted on the server, so what came up
+  was empty rather than somebody else's data, but a rule enforced on one of two
+  doors is the shape this workspace has been caught by before. One line, their
+  own rule.
+- **«Completada» and «Bloqueada» had no dictionary entry, and «Vencido» was the
+  wrong word.** The first two were caught by the translator crawl; «Completada»
+  turned out to be untranslated on the subcontract register too. The third is now
+  «Vencida» — feminine like every other state in the map, the word Facturación
+  already writes for an overdue invoice, and not the one that resolves to
+  "Expired".
+
+Re-measured on the merged tree, not carried over: **707/707 unfiltered**, site
+E2E; workspace audit **0/0** across eighteen screens; source literals
+**162/162**; rendered pages **91/67**; miss ledger **34/94** against ceilings
+37/97 — an EN raise against the hours release's 33, argued in ASSUMPTIONS S75g
+rather than adjusted quietly.

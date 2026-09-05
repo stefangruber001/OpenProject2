@@ -75,6 +75,10 @@ const ROUTES = [
     "#labour",
     "document.querySelector('[data-hgrp=\"mine\"]').click(); document.querySelector('[data-hmtab=\"mine\"]').click()",
   ],
+  // PRY-04. It used to be a page of its own and was measured by audit.mjs; it is
+  // a screen now, so it is measured here, where the screens are — and at the
+  // same zero.
+  ["journey", "#journey"],
 ];
 
 /* Same rules as audit.mjs: a shape wherever possible, never a word, because

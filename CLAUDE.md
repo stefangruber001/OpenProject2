@@ -87,7 +87,7 @@ CI rebuilds and diffs them, so never edit them by hand. See
 - `make bootstrap && make demo` — clean-machine path to tenant #1 artifacts
 - DB (when used): `pnpm db:migrate`, `pnpm db:studio` (root `.env`, see runbook)
 - `node tests/site-e2e/run.mjs [--only <suite>]` — the browser suite. The full
-  run is ~12 minutes; `--only presupuestador` runs one of the thirty-five and
+  run is ~12 minutes; `--only presupuestador` runs one of the forty-one and
   takes about four. Use it to DIAGNOSE, never to certify: only the unfiltered
   run may be called green, and CI passes no argument. Failures are printed
   again at the end of the report, because the report is ~450 lines and reading
