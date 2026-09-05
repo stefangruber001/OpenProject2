@@ -21730,10 +21730,25 @@
         const { opp, budget, contract, project } = c;
         const stage = budget ? erp.budgetStage(budget) : null;
         const versions = budget ? budget.versions || [] : [];
+        /* `createBudget` mints v1.0 with the record, so «has a version» is the same
+           statement as «has a presupuesto» and says nothing. What the phase is
+           about is whether the work has been priced, so it asks the current
+           version for line items — which is also the difference the register
+           shows as «Borrador». */
+        const curVer = budget ? versions.find((v) => v.id === budget.currentVersionId) : null;
+        const priced = !!(curVer && (curVer.chapters || []).some((c) => (c.lines || []).length));
         const issued = versions.filter((v) => v.issued);
         const last = issued[issued.length - 1];
-        const visits = opp ? erp.state.visits.filter((v) => v.opportunityId === opp.id) : [];
-        const doneVisits = visits.filter((v) => v.status === "done");
+        /* In date order, not in the order they were written down. «Última» and
+           «Programada» name ONE visit out of several, and a job with a revisit
+           has more than one — reading them off insertion order picks whichever
+           was typed last, which is not the same question. */
+        const byDate = (k) => (a, b) => String(a[k] || "").localeCompare(String(b[k] || ""));
+        const visits = opp
+          ? erp.state.visits.filter((v) => v.opportunityId === opp.id).sort(byDate("scheduledAt"))
+          : [];
+        const doneVisits = visits.filter((v) => v.status === "done").sort(byDate("completedAt"));
+        const dueVisits = visits.filter((v) => v.status !== "done");
         const eco = project ? erp.projectEconomics(project.id) : null;
         const purchases = project
           ? erp.state.purchases.filter((x) => x.projectId === project.id)
@@ -21778,10 +21793,10 @@
                 ["Visitas realizadas", String(doneVisits.length)],
                 ["Última", fmtD(doneVisits[doneVisits.length - 1].completedAt)],
               ])
-            : visits.length
-              ? S("waiting", [["Programada", fmtD(visits[0].scheduledAt)]], {
+            : dueVisits.length
+              ? S("waiting", [["Programada", fmtD(dueVisits[0].scheduledAt)]], {
                   lab: "Registrar la visita",
-                  run: () => completeVisitDrawer(visits[0].id),
+                  run: () => completeVisitDrawer(dueVisits[0].id),
                 })
               : S("pending", [["Estado", "Sin visita registrada"]], {
                   lab: "＋ Programar visita",
@@ -21793,7 +21808,7 @@
           /* 3 · Presupuesto */
           budget
             ? S(
-                versions.length ? "done" : "doing",
+                priced ? "done" : "doing",
                 [
                   ["Presupuesto", budget.number],
                   ["Versiones", String(versions.length)],
