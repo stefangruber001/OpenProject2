@@ -219,6 +219,17 @@ jobs:
       # With credentials present the suite signs in, creates a `site` account,
       # signs in as that account, and checks the four refusals and the redaction.
       #
+      # ERP_DEFAULT_TENANT matters more than it looks. Accounts and invitations
+      # belong to the DEPLOYMENT'S OWN company — `/api/auth/activate` has no
+      # tenant in its path on purpose, because the person following an
+      # invitation is not signed in yet, so it resolves `defaultTenant()`. Left
+      # unset that is "diorka", while the suite creates its account under
+      # `reformas-demo`: the invitation is filed in one company and looked up in
+      # another, and the activation answers 400. Naming the company the suite
+      # uses makes this container a coherent deployment rather than two halves
+      # of different ones. See ASSUMPTIONS.md S74 — the same mismatch is
+      # reachable by hand on a real server, and is its own change to fix.
+      #
       # The hash format is auth.ts's (`scrypt$N$r$p$salt$key`, base64). It is
       # duplicated here rather than shared because generating one needs a
       # terminal — hash-password.mjs refuses a non-TTY on purpose, so a password
@@ -238,6 +249,7 @@ jobs:
             -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
             -e SESSION_SECRET="smoke-$(openssl rand -hex 16)" \
             -e ERP_USERS="smoke-admin@example.com:$HASH" \
+            -e ERP_DEFAULT_TENANT="reformas-demo" \
             "$IMAGE_BASE/app:sha-${{ github.sha }}"
           for i in $(seq 1 40); do
             curl -fsS -o /dev/null http://127.0.0.1:3100/api/health 2>/dev/null && break

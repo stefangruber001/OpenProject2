@@ -183,7 +183,7 @@ async function main() {
   // traced into the standalone output and must be copied explicitly, and
   // without it the server hosts an API with no user interface.
   {
-    const res = await fetch(`${BASE}/workspace/erp.html`);
+    const res = await api("/workspace/erp.html");
     const html = await res.text();
     check("the workspace page is served", res.ok, `HTTP ${res.status}`);
     const marked = /<meta\s+name="erp-api"/.test(html);
@@ -192,7 +192,7 @@ async function main() {
       marked,
       marked ? "erp-api marker present" : "no erp-api marker — sync-workspace.mjs did not run",
     );
-    const engine = await fetch(`${BASE}/workspace/erp-engine.js`);
+    const engine = await api("/workspace/erp-engine.js");
     check("its scripts are served too", engine.ok, `erp-engine.js HTTP ${engine.status}`);
   }
 
@@ -326,7 +326,7 @@ async function main() {
         "trailer<</Root 1 0 R>>\n%%EOF\n",
       "utf8",
     );
-    const put = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`, {
+    const put = await api(`/api/${TENANT}/erp/blob/${key}`, {
       method: "PUT",
       headers: { "content-type": "application/pdf" },
       body: pdf,
@@ -338,7 +338,7 @@ async function main() {
       `HTTP ${put.status} ${JSON.stringify(putBody).slice(0, 140)}`,
     );
 
-    const got = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`);
+    const got = await api(`/api/${TENANT}/erp/blob/${key}`);
     const back = Buffer.from(await got.arrayBuffer());
     check(
       "and comes back byte for byte, as a PDF",
@@ -351,14 +351,14 @@ async function main() {
     // The allow-list is still a list. An SVG is a document that can carry
     // script, served from the company's own origin beside its session
     // cookie — widening the list for PDFs must not have widened it for that.
-    const svg = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}_svg`, {
+    const svg = await api(`/api/${TENANT}/erp/blob/${key}_svg`, {
       method: "PUT",
       headers: { "content-type": "image/svg+xml" },
       body: '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>',
     });
     check("an SVG is still refused", svg.status === 400, `HTTP ${svg.status}`);
 
-    await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`, { method: "DELETE" });
+    await api(`/api/${TENANT}/erp/blob/${key}`, { method: "DELETE" });
   }
 
   // --- business rules still belong to the engine --------------------------
@@ -385,9 +385,9 @@ async function main() {
 
   // --- moving an existing document onto the server ------------------------
   {
-    const importUrl = (q = "") => `${BASE}/api/${TENANT}/erp/import${q}`;
+    const importUrl = (q = "") => `/api/${TENANT}/erp/import${q}`;
     const post = (body, q = "") =>
-      fetch(importUrl(q), {
+      api(importUrl(q), {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify(body),
@@ -483,7 +483,15 @@ async function siteWorkerBoundary() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ token, password }),
     });
-    check("and the invited person can set a password", act.ok, `HTTP ${act.status}`);
+    /* The body, not just the status. This step failed once with a bare 400 and
+       the reason — the invitation was filed under one company and looked up in
+       another — was invisible until the message was printed. */
+    const actBody = await json(act);
+    check(
+      "and the invited person can set a password",
+      act.ok,
+      `HTTP ${act.status} ${JSON.stringify(actBody).slice(0, 160)}`,
+    );
   }
 
   // --- link the account to a worker, the way the workspace does ------------

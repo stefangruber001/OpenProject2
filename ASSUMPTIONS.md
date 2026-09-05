@@ -8360,3 +8360,24 @@ The one tab a site worker gets is generated into `nav.json` beside the six,
 from the same `SECTIONS` and the same dictionary, because a label written into
 a shell is a label that cannot translate — which is the whole reason that file
 exists.
+
+**S74 · An invitation issued for the wrong company produces an account that can
+never sign in.** Found by the new smoke step, which failed with a bare 400 on
+an activation link that had just been issued successfully.
+
+`POST /api/<tenant>/users` files the invitation under the tenant in the URL.
+`POST /api/auth/activate` has no tenant in its path — deliberately, because the
+person following the link is not signed in yet — so it resolves
+`defaultTenant()`. The two agree only when the URL named the deployment's own
+company, which is what `~` always does and what a hand-typed tenant name may
+not. When they disagree the link is refused as "no longer valid", and the
+account it belonged to sits there unable to set a password.
+
+Not fixed here, and deliberately so: the honest fix is for `createUser` /
+`issueInvitation` to refuse a tenant that is not the deployment's own, turning
+a silent trap into a loud one — a behaviour change to a live API that deserves
+its own change and its own verification, not a correction slipped into a deploy
+at three in the morning. What is done here is to make the smoke container a
+coherent deployment (`ERP_DEFAULT_TENANT` names the company the suite uses),
+and to make the check print the server's message rather than only its status —
+that missing message is the whole reason this cost a deploy cycle.
