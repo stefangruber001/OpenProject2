@@ -22378,7 +22378,11 @@
         waiting: ["Esperando", "b"],
         blocked: ["Bloqueada", "r"],
         late: ["Vencida", "r"],
-        pending: ["Pendiente", ""],
+        /* NOT «Pendiente»: that word is already the workspace's for money owed,
+           and its English is "Outstanding" — «Contrato · Outstanding» on a phase
+           nobody has started reads as a contract somebody has not paid for.
+           «Sin empezar» is the fact, and it already has its three entries. */
+        pending: ["Sin empezar", ""],
       };
       /* How a contract came to be signed. `signature.method` is an engine enum
          and there are only these two — a screen showed the raw «physical» to the
@@ -23328,12 +23332,17 @@
            a label that never promised to. A row may carry both a generated
            document and a filed copy of the signed original; they are different
            papers and both are shown. */
+        /* `val` is a LIST OF PARTS, never a sentence. «1.528 € · Transferencia»
+           welded into one string is one text node no dictionary can reach — the
+           lesson `countTag` already carries, and the reason a phase's `rows` are
+           pairs — so each part becomes its own node: the vocabulary among them
+           translates, and the numbers and codes stay as the record wrote them. */
         const add = (when, lab, val, doc, evidence, ref) => {
           if (!when) return;
           ev.push({
             when,
             lab,
-            val: val || "",
+            val: (Array.isArray(val) ? val : [val]).filter(Boolean).map(String),
             doc: doc || null,
             evidence: (evidence && evidence.storageKey && evidence) || null,
             ref:
@@ -23374,12 +23383,11 @@
               add(
                 (ver.sent || {}).date || ver.date,
                 ver.additional ? "Adicional enviado y congelado" : "Enviado al cliente",
-                ver.vNumber +
-                  " · " +
-                  eur0(t.grandCents) +
-                  ((ver.sent || {}).channel
-                    ? " · " + (SEND_CHANNEL[ver.sent.channel] || ver.sent.channel)
-                    : ""),
+                [
+                  ver.vNumber,
+                  eur0(t.grandCents),
+                  (ver.sent || {}).channel && (SEND_CHANNEL[ver.sent.channel] || ver.sent.channel),
+                ],
                 row,
               );
             const r = ver.customerResponse;
@@ -23387,7 +23395,7 @@
               add(
                 r.date,
                 r.accepted ? "Aceptado por el cliente" : "Rechazado por el cliente",
-                r.accepted ? ver.vNumber + " · " + eur0(t.grandCents) : r.reason || "",
+                r.accepted ? [ver.vNumber, eur0(t.grandCents)] : r.reason || "",
                 null,
                 r.evidence,
                 r.evidenceRef,
@@ -23405,7 +23413,7 @@
           add(
             contract.date,
             "Contrato redactado",
-            contract.number + " · " + eur0(contract.totalCents),
+            [contract.number, eur0(contract.totalCents)],
             row,
           );
           add(
@@ -23429,25 +23437,23 @@
           erp.state.purchases
             .filter((x) => x.projectId === project.id)
             .forEach((x) => {
-              add(
-                x.date,
-                "Pedido de compra",
-                x.number + " · " + erp.party(x.supplierId).name + " · " + eur0(x.totalCents),
-              );
+              add(x.date, "Pedido de compra", [
+                x.number,
+                erp.party(x.supplierId).name,
+                eur0(x.totalCents),
+              ]);
               (x.receipts || []).forEach((r) => add(r.date, "Material recibido", x.number));
             });
           erp.state.bills
             .filter((b) => (b.allocations || []).some((a) => a.projectId === project.id))
-            .forEach((b) =>
-              add(b.date, "Factura de proveedor", (b.number || "") + " · " + eur0(b.totalCents)),
-            );
+            .forEach((b) => add(b.date, "Factura de proveedor", [b.number, eur0(b.totalCents)]));
           erp.state.invoices
             .filter((i) => i.projectId === project.id)
             .forEach((i) =>
               add(
                 i.date,
                 i.kind === "creditNote" ? "Rectificativa emitida" : "Factura emitida",
-                i.number + " · " + eur0(i.totalCents),
+                [i.number, eur0(i.totalCents)],
                 {
                   id: i.id,
                   ref: i.number,
@@ -23461,11 +23467,10 @@
           );
           (erp.state.collections || []).forEach((col) => {
             if (!(col.allocations || []).some((a) => mine.has(a.invoiceId))) return;
-            add(
-              col.date,
-              "Cobro registrado",
-              eur0(col.amountCents) + " · " + erp.listLabel("paymentMethods", col.method),
-            );
+            add(col.date, "Cobro registrado", [
+              eur0(col.amountCents),
+              erp.listLabel("paymentMethods", col.method),
+            ]);
           });
           const billIds = new Set(
             erp.state.bills
@@ -23474,11 +23479,10 @@
           );
           (erp.state.payments || []).forEach((pay) => {
             if (!(pay.billAllocations || []).some((a) => billIds.has(a.billId))) return;
-            add(
-              pay.date,
-              "Pago a proveedor",
-              eur0(pay.amountCents) + " · " + erp.listLabel("paymentMethods", pay.method),
-            );
+            add(pay.date, "Pago a proveedor", [
+              eur0(pay.amountCents),
+              erp.listLabel("paymentMethods", pay.method),
+            ]);
           });
           erp.state.receipts
             .filter((r) => r.projectId === project.id)
@@ -23486,11 +23490,7 @@
               add(
                 r.date,
                 "Recibo entregado",
-                (r.number || "") +
-                  " · " +
-                  eur0(r.amountCents) +
-                  " · " +
-                  erp.listLabel("paymentMethods", r.method),
+                [r.number, eur0(r.amountCents), erp.listLabel("paymentMethods", r.method)],
                 {
                   id: r.id,
                   ref: r.number || r.id,
@@ -23512,11 +23512,7 @@
           (erp.state.feedback || [])
             .filter((f) => f.projectId === project.id)
             .forEach((f) =>
-              add(
-                f.date,
-                "Reseña del cliente",
-                (f.rating != null ? f.rating + "/5" : "") + (f.text ? " · " + f.text : ""),
-              ),
+              add(f.date, "Reseña del cliente", [f.rating != null ? f.rating + "/5" : "", f.text]),
             );
         }
 
@@ -23539,25 +23535,27 @@
             ])}</div></div>`;
         const rows = ev
           .map((e, n) => {
-            let ext = e.doc
-              ? `<button class="btn sm" data-led="pdf" data-row="${n}">⤓ PDF</button>
-                <button class="btn sm" data-led="docx" data-row="${n}">⤓ Word</button>`
-              : "";
+            /* The filed copy first, the generated document last, so the ⤓
+               buttons finish at the same edge on every row that has them. */
+            let ext = "";
             if (e.evidence)
-              ext += `<a href="#" class="tag" data-evidence="${esc(
+              ext = `<a href="#" class="tag" data-evidence="${esc(
                 JSON.stringify(e.evidence),
               )}">${esc(e.evidence.name || "Ver el documento")}</a>`;
-            else if (e.ref) ext += `<span class="tag">${esc(e.ref)}</span>`;
-            return `<div class="it" style="flex-wrap:wrap;gap:6px">
-              <span class="k" style="min-width:6rem">${fmtD(e.when)}</span>
-              <span style="min-width:11rem">${esc(e.lab)}</span>
-              <span style="flex:1;color:var(--muted);font-size:12.5px">${esc(e.val)}</span>
+            else if (e.ref) ext = `<span class="tag">${esc(e.ref)}</span>`;
+            if (e.doc)
+              ext += `<button class="btn sm" data-led="pdf" data-row="${n}">⤓ PDF</button>
+                <button class="btn sm" data-led="docx" data-row="${n}">⤓ Word</button>`;
+            return `<div class="it">
+              <span class="k d">${fmtD(e.when)}</span>
+              <span class="a">${esc(e.lab)}</span>
+              <span class="v">${e.val.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</span>
               ${ext}</div>`;
           })
           .join("");
         return `<div class="card"><div class="ch"><h3>Lo hecho hasta ahora</h3>
             <span class="tag"><span>${ev.length}</span> <span>anotaciones</span></span></div>
-          <div class="daylist" id="jLedger">${rows}</div></div>`;
+          <div class="daylist jled" id="jLedger">${rows}</div></div>`;
       }
 
       /** The ledger's download buttons, wired after it is in the DOM — the same

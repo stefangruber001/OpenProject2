@@ -5064,3 +5064,35 @@ body.siteworker .rail {
     margin-bottom: 2px;
   }
 }
+
+/* --------------------------- 72 · «Lo hecho hasta ahora»
+   The recorrido's ledger: what this job has been through, one row per event.
+   On a desktop the row reads across — date, action, what it was, the paperwork
+   right-aligned. On a phone the three columns do NOT fit: the action column's
+   `min-width` left the value about seventy pixels, so «FAC-2025-0002 · 1.528 €»
+   wrapped one word-fragment per line. Below 700px the value takes a line of its
+   own and the documents follow on the next, which is three short lines instead
+   of one tall column of debris. */
+.jled .it {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.jled .d {
+  min-width: 6rem;
+}
+.jled .a {
+  min-width: 11rem;
+}
+.jled .v {
+  flex: 1;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+@media (max-width: 700px) {
+  .jled .a {
+    min-width: 0;
+  }
+  .jled .v {
+    flex: 1 0 100%;
+  }
+}
