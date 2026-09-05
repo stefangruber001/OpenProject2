@@ -17646,7 +17646,7 @@
          customer is about to read, and if nobody says so here the difference is
          discovered by the customer. Blocking issues disable the button rather than
          hiding it, so the reason the presupuesto cannot go is visible. */
-      function sendBudgetDrawer(id) {
+      function sendBudgetDrawer(id, opts) {
         const b = erp.budget(id),
           vsel = b.currentVersionId,
           V = erp.version(id, vsel);
@@ -17833,9 +17833,12 @@
                        quote they just sent sits in «Enviados» — the locked builder
                        they used to land on left them unsure anything had happened.
                        The chapter filter dies with the send (A6): the next quote
-                       must not open pre-filtered to this partida. */
+                       must not open pre-filtered to this partida.
+                       Unless the caller asked to stay: sending is COMPLETE inside
+                       this drawer, so a caller that already shows the quote — the
+                       recorrido does — has nowhere better to be sent. */
               bChapter = null;
-              window.go("quotes"); // window.: `go` is the button in this scope
+              afterCreate(opts, erp.budget(id), "quotes");
             }, "Presupuesto enviado — versión congelada");
             // A real send — even the WhatsApp text prefill — is a browser
             // side effect, not a state mutation, so it happens once mutate()
@@ -22501,6 +22504,14 @@
         const feedback = project
           ? (erp.state.feedback || []).filter((f) => f.projectId === project.id)
           : [];
+        /* `act` is `{lab, run, block?}`. A VERB IS NEVER HIDDEN: when the engine
+           would refuse it, `block` carries the refusal in words and the button
+           renders disabled beside it. The operator photographed the opposite —
+           a Contrato phase with a status, no button and nothing to say why —
+           and read it as a screen that cannot do anything. The engine already
+           publishes these refusals as data where it matters most
+           (`validateBudget`, `previewInvoice(...).blocks`, `partyCompleteness`);
+           the rest are restated here, each one quoting the guard it mirrors. */
         const S = (state, rows, act) => ({ state, rows, act });
         const accepted = !!(budget && budget.acceptedVersionId);
         return [
@@ -22528,10 +22539,9 @@
                 })
               : S("pending", [["Estado", "Sin visita registrada"]], {
                   lab: "＋ Programar visita",
-                  run: () =>
-                    opp
-                      ? scheduleVisitDrawer(opp.id, { stay: true })
-                      : toast("⚠ Antes hace falta una oportunidad"),
+                  // `scheduleVisit`: "A visit needs an opportunity".
+                  block: opp ? null : "Antes hace falta una oportunidad",
+                  run: () => scheduleVisitDrawer(opp.id, { stay: true }),
                 }),
           /* 3 · Presupuesto */
           budget
@@ -22549,14 +22559,27 @@
               }),
           /* 4 · Envío al cliente. Congelada es un hecho del registro, y se ve. */
           last
-            ? S(stage === "expired" ? "blocked" : accepted ? "done" : "waiting", [
-                ["Enviado y congelado", fmtD((last.sent || {}).date || last.date)],
-                ["Versión", String(last.vNumber)],
-              ])
+            ? S(
+                stage === "expired" ? "blocked" : accepted ? "done" : "waiting",
+                [
+                  ["Enviado y congelado", fmtD((last.sent || {}).date || last.date)],
+                  ["Versión", String(last.vNumber)],
+                ],
+                /* A quote that has run out of validity is the one sent-and-frozen
+                   state with something left to do: sending again is what resets
+                   `validityDate`, and it is the same drawer. Accepted or still
+                   with the customer, there is nothing to press. */
+                stage === "expired"
+                  ? {
+                      lab: "Volver a enviar",
+                      run: () => sendBudgetDrawer(budget.id, { stay: true }),
+                    }
+                  : null,
+              )
             : S(budget ? "doing" : "pending", [["Estado", "Todavía sin enviar al cliente"]], {
                 lab: "Enviar y congelar",
-                run: () =>
-                  budget ? sendBudgetDrawer(budget.id) : toast("⚠ Antes hace falta un presupuesto"),
+                block: budget ? null : "Antes hace falta un presupuesto",
+                run: () => sendBudgetDrawer(budget.id, { stay: true }),
               }),
           /* 5 · Aceptación */
           accepted
@@ -22565,10 +22588,9 @@
               ? S("blocked", [["Estado", "Presupuesto rechazado"]])
               : S(issued.length ? "waiting" : "pending", [["Estado", "Sin respuesta"]], {
                   lab: "Registrar la respuesta",
-                  run: () =>
-                    last
-                      ? budgetResponseDrawer(budget.id, last.id)
-                      : toast("⚠ El presupuesto todavía no se ha enviado"),
+                  // `acceptVersion`: "Only an issued version can be accepted".
+                  block: last ? null : "El presupuesto todavía no se ha enviado",
+                  run: () => budgetResponseDrawer(budget.id, last.id),
                 }),
           /* 6 · Contrato */
           contract
@@ -22587,50 +22609,46 @@
                   ? null
                   : { lab: "Firmar", run: () => signContractDrawer(contract.id) },
               )
-            : S(
-                accepted ? "doing" : "pending",
-                [["Estado", "Sin contrato formal"]],
-                accepted
-                  ? {
-                      lab: "＋ Nuevo contrato",
-                      run: () => newContractDrawer({ budgetId: budget.id }),
-                    }
-                  : null,
-              ),
+            : S(accepted ? "doing" : "pending", [["Estado", "Sin contrato formal"]], {
+                lab: "＋ Nuevo contrato",
+                // `createContract`: "Contract requires an accepted budget version".
+                block: accepted ? null : "Hace falta un presupuesto aceptado",
+                run: () => newContractDrawer({ budgetId: budget.id }, { stay: true }),
+              }),
           /* 7 · Inicio de obra */
           project && project.dates.start
             ? S("done", [["Inicio", fmtD(project.dates.start)]])
             : project
               ? S("doing", [["Estado", "Obra creada, sin iniciar"]], {
                   lab: "Iniciar la obra",
+                  // `startWorks`: "Contract not signed — works blocked (CON-11)".
+                  block:
+                    contract && !contract.signature.customerSignedAt
+                      ? "El contrato no está firmado"
+                      : null,
                   run: () =>
                     mutate(() => erp.startWorks(project.id, "operations"), "Obra iniciada"),
                 })
-              : S(
-                  accepted ? "doing" : "pending",
-                  [["Estado", "Sin obra abierta"]],
-                  accepted
-                    ? {
-                        lab: "Abrir la obra",
-                        /* Accepting normally opens the obra by itself
-                           (`budgetResponseDrawer`), so this is the door for a
-                           presupuesto accepted before it did. The two guards are
-                           the ones that path already carries: an adicional joins
-                           its obra rather than opening a second, and a
-                           presupuesto that already has one must never open
-                           another. */
-                        run: () =>
-                          mutate(() => {
-                            if (budget.variationOf)
-                              throw new Error("Un adicional se une a su obra, no abre otra");
-                            const had = erp.state.projects.find((x) => x.budgetId === budget.id);
-                            const rec =
-                              had || erp.createProjectFromAcceptance(budget.id, "backoffice");
-                            journeySelect("prj:" + rec.id);
-                          }, "Obra creada"),
-                      }
-                    : null,
-                ),
+              : S(accepted ? "doing" : "pending", [["Estado", "Sin obra abierta"]], {
+                  lab: "Abrir la obra",
+                  // `createProjectFromAcceptance`: "Acceptance required before
+                  // project creation".
+                  block: accepted ? null : "Hace falta un presupuesto aceptado",
+                  /* Accepting normally opens the obra by itself
+                     (`budgetResponseDrawer`), so this is the door for a presupuesto
+                     accepted before it did. The two guards are the ones that path
+                     already carries: an adicional joins its obra rather than opening
+                     a second, and a presupuesto that already has one must never open
+                     another. */
+                  run: () =>
+                    mutate(() => {
+                      if (budget.variationOf)
+                        throw new Error("Un adicional se une a su obra, no abre otra");
+                      const had = erp.state.projects.find((x) => x.budgetId === budget.id);
+                      const rec = had || erp.createProjectFromAcceptance(budget.id, "backoffice");
+                      journeySelect("prj:" + rec.id);
+                    }, "Obra creada"),
+                }),
           /* 8 · Compras */
           {
             ...(purchases.length
@@ -22641,8 +22659,10 @@
               : S("pending", [["Estado", "Sin pedidos de compra"]])),
             act: {
               lab: "＋ Nueva compra",
-              run: () =>
-                project ? purchaseFormDrawer(project.id) : toast("⚠ Antes hace falta una obra"),
+              // A pedido is raised against an obra's partidas; there is nothing to
+              // charge it to before there is one.
+              block: project ? null : "Antes hace falta una obra",
+              run: () => purchaseFormDrawer(project.id),
             },
             /* The supplier picker on a purchase order lists what is on file and
                offers no way to add to it, so ordering from a supplier nobody has
@@ -22674,13 +22694,11 @@
                 ],
                 { lab: "＋ Nueva factura", run: () => newInvoiceDrawer(project.id) },
               )
-            : S(
-                "pending",
-                [["Estado", "Sin facturas emitidas"]],
-                project
-                  ? { lab: "＋ Nueva factura", run: () => newInvoiceDrawer(project.id) }
-                  : null,
-              ),
+            : S("pending", [["Estado", "Sin facturas emitidas"]], {
+                lab: "＋ Nueva factura",
+                block: project ? null : "Antes hace falta una obra",
+                run: () => newInvoiceDrawer(project.id),
+              }),
           /* 11 · Cobros — the oldest unpaid invoice, opened on its own drawer,
              which is where «Registrar cobro» already lives. */
           invoices.length
@@ -22863,6 +22881,71 @@
           .map((st, i) => `<i class="jdot s-${st}${i === at ? " on" : ""}"></i>`)
           .join("")}</span>`;
       }
+      /* THE PAPER, ON THE PHASE.
+         `sheetDocHtml` returns the finished customer document as a string — the
+         same one Presupuestos, Contratos and Facturación print — so the phase can
+         show it without navigating anywhere and without a second renderer. It
+         throws when a kind has no live record behind it, which is a normal state
+         here (a budget with no issued version, a draft invoice), so the call is
+         guarded: a phase with no document yet simply has none.
+
+         The `.cnsheet` cage is injected once, elsewhere, and scopes the sheet CSS
+         so an A4 document can sit inside a card without taking the page over. */
+      function journeyDoc(c, i) {
+        const k = JOURNEY[i].k;
+        try {
+          if ((k === "budget" || k === "sent" || k === "accepted") && c.budget) {
+            const b = c.budget;
+            const vId = b.acceptedVersionId || b.currentVersionId;
+            const ver = (b.versions || []).find((x) => x.id === vId);
+            if (!ver) return "";
+            return sheetDocHtml(
+              budgetDocKind(b, vId),
+              { budgetId: b.id, versionId: vId, lineText: (l) => lineDesc(l, b.language) },
+              b.language,
+            );
+          }
+          if (k === "contract" && c.contract) {
+            const d = erp.renderContractDoc(c.contract.id);
+            const lang = d.language || "es";
+            return sheetDocHtml(
+              "contrato",
+              { contractId: c.contract.id, lineText: (l) => lineDesc(l, lang) },
+              lang,
+            );
+          }
+          if ((k === "invoicing" || k === "collections") && c.project) {
+            const inv = erp.state.invoices
+              .filter((x) => x.projectId === c.project.id && x.kind !== "creditNote")
+              .slice(-1)[0];
+            if (!inv) return "";
+            const d = erp.renderInvoiceDoc(inv.number);
+            return sheetDocHtml(
+              d.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+              { invoiceId: inv.number },
+              d.language,
+            );
+          }
+        } catch (e) {
+          /* No live record behind this kind yet — the phase has no paper, which is
+             a fact about the job and not an error to report. */
+        }
+        return "";
+      }
+      /* The two screens that genuinely cannot come here. The presupuestador and the
+         carta Gantt take the whole page by design — three panes and a draggable
+         chart — and a copy of either inside a card would be a second, worse
+         implementation of the thing this screen exists to stop duplicating. So they
+         keep a way out, named after what it opens rather than after its own
+         mechanics. Every other phase does its work here. */
+      function journeyFull(c, i) {
+        const k = JOURNEY[i].k;
+        if (k === "budget" && c.budget)
+          return { lab: "Abrir el presupuesto completo ↗", run: () => openBuilder(c.budget.id) };
+        if (k === "execution" && c.project)
+          return { lab: "Abrir la carta Gantt ↗", run: () => go("progress", c.project.code) };
+        return null;
+      }
       function journeyPill(step) {
         const [lab, tone] = JOURNEY_STATE[step.state];
         return `<span class="pill ${tone}">${lab}</span>`;
@@ -22983,6 +23066,7 @@
         const step = steps[jStep];
         const meta = JOURNEY[jStep];
         const eco = c.project ? erp.projectEconomics(c.project.id) : null;
+        const full = journeyFull(c, jStep);
         $("#headact").innerHTML =
           `<button class="btn sm" id="jBack">← Todos los recorridos</button>`;
 
@@ -23023,16 +23107,24 @@
           ).join("")}</div></div></div>` +
           `<div class="card"><div class="ch"><h3>${esc(meta.lab)}</h3>${journeyPill(step)}
              <span class="tag">${journeyCount("Fase", jStep + 1)}</span></div>
-           <div class="daylist">${step.rows.map(journeyRow).join("")}</div>
+           <div class="daylist">${step.rows.map(journeyRow).join("")}
+             ${step.act && step.act.block ? journeyRow(["Falta", step.act.block]) : ""}</div>
            <div class="stepbar">
-             ${step.act ? `<button class="btn primary sm" id="jAct">${esc(step.act.lab)}</button>` : ""}
+             ${
+               step.act
+                 ? `<button class="btn primary sm" id="jAct"${
+                     step.act.block ? " disabled" : ""
+                   }>${esc(step.act.lab)}</button>`
+                 : ""
+             }
              ${step.act2 ? `<button class="btn sm" id="jAct2">${esc(step.act2.lab)}</button>` : ""}
-             <button class="btn sm" id="jOpen">Abrir la pantalla completa ↗</button>
+             ${full ? `<button class="btn sm" id="jOpen">${esc(full.lab)}</button>` : ""}
              <span style="flex:1"></span>
              <button class="btn sm" id="jPrev"${jStep === 0 ? " disabled" : ""}>‹ Anterior</button>
              <button class="btn sm" id="jFwd"${jStep === 12 ? " disabled" : ""}>Siguiente ›</button>
            </div>
-           ${journeyStepBody(c, jStep)}</div>`;
+           ${journeyStepBody(c, jStep)}
+           ${journeyDoc(c, jStep)}</div>`;
 
         $("#jBack").onclick = () => {
           jSubject = null;
@@ -23050,13 +23142,12 @@
             jStep = nextIdx;
             render();
           };
-        if ($("#jAct")) $("#jAct").onclick = () => step.act.run();
+        if ($("#jAct") && !step.act.block) $("#jAct").onclick = () => step.act.run();
         if ($("#jAct2")) $("#jAct2").onclick = () => step.act2.run();
         v.querySelectorAll("[data-inv]").forEach(
           (tr) => (tr.onclick = () => invoiceDrawer(tr.dataset.inv)),
         );
-        $("#jOpen").onclick = () =>
-          go(meta.route, c.project && meta.route === "progress" ? c.project.code : undefined);
+        if ($("#jOpen")) $("#jOpen").onclick = () => full.run();
         $("#jPrev").onclick = () => {
           jStep = Math.max(0, jStep - 1);
           render();
@@ -24578,7 +24669,7 @@
         let held = null;
         paint();
       }
-      function newContractDrawer(seed) {
+      function newContractDrawer(seed, opts) {
         const linkable = erp.state.budgets.filter(
           /* AN ADICIONAL IS NOT A NEW CONTRACT. It joins the one the job
                    already has, as an adenda — so it must not appear in a picker
@@ -24779,7 +24870,7 @@
               signed: signedOn,
             };
             toast("⚠ Faltan datos del cliente: " + comp.missing.join(", "));
-            editPartyDrawer(partyId, () => newContractDrawer(held));
+            editPartyDrawer(partyId, () => newContractDrawer(held, opts));
             return;
           }
           mutate(() => {
@@ -24812,7 +24903,12 @@
                 "backoffice",
               );
             closeDrawer();
-            conWork = { id: c.id, tab: "datos" };
+            /* The contract's own screen, unless the caller asked to stay. Opening
+               it is right when the operator came from Contratos and wants to fill
+               in hitos; it is wrong when they came from somewhere that already
+               shows the contract, because `conWork` takes over the whole page. */
+            if (opts && (opts.onCreated || opts.stay)) afterCreate(opts, c, "contracts");
+            else conWork = { id: c.id, tab: "datos" };
           }, "Contrato creado");
         };
         paint();
