@@ -8517,6 +8517,104 @@ failed with «34 … ceiling 33». Reverted in `f31a1c2`. The ceilings are 37 an
 97 and they are meant to have slack in them; anyone tidying that slack away
 should first measure twice, in both places.
 
+> **Two entries are numbered S77.** The one above — the crawl's ±1 between
+> here and CI — was written in this session; the section below was written in
+> the parallel one, and both landed on `main` in the same merge. Neither is
+> renumbered, because each is referenced by its own number elsewhere. Read
+> S77 as an ambiguous label and the following entries (S78–S80) as unique.
+
+## S77 · The recorrido as the operator uses it: a timeline, work in place, and a record (2026-09-05)
+
+Three requests and four defects, all of them from the operator's own
+screenshots of the live workspace on a phone.
+
+**S77a · The register draws the phase, and the drawing cannot drift from the
+rail's.** `journeyRows` already computed the thirteen states and threw them
+away; it keeps them now, and the «Fase» cell is a strip of thirteen dots above
+the phase name. The dots take the SAME `s-done|s-doing|s-waiting|s-blocked
+|s-late` classes the big rail takes, appended to its existing selector lists in
+`erp-ds.css` rather than restated as hex — two drawings of one fact that share
+their tone declarations cannot come to disagree, and the suite asserts the
+strip's tones equal `journeySteps(...).map(s => s.state)` for the same job. The
+name stays under the dots: `td:empty` hides a textless cell on a phone, and a
+row of dots with no word is a puzzle.
+
+**S77b · «Siguiente paso» names the work.** It returned the phase name, so both
+columns read `4 · Envío al cliente` / `Envío al cliente`. It returns the
+phase's VERB now («Enviar y congelar», «Registrar la respuesta»), falling back
+to the phase name where a phase has none — phases 9 and 12 have no verb on
+purpose. And the amount asks the accepted quote before falling back to the
+lead's expected value, which is why a job with a presupuesto showed `0 €`.
+
+**S77c · A VERB IS NEVER HIDDEN.** This is the operator's photograph: a
+Contrato phase with a status, no button and nothing to say why, which reads as
+a screen that cannot do anything. `act` takes a `block` now — the button
+renders disabled and the refusal appears beside it as a «Falta» row. Sixty-four
+blocked verbs across the seeded workspace, each quoting the engine guard it
+mirrors in a comment (`createContract`, `startWorks` CON-11, `scheduleVisit`,
+`acceptVersion`, `createProjectFromAcceptance`). The refusals are the engine's
+own words where it already publishes them as data; the rest are restated at the
+call site. A disabled verb writes nothing — asserted, not assumed.
+
+**S77d · The document is on the phase, and «Abrir la pantalla completa ↗»
+goes.** Phases 3–5 render the quote, 6 the contract, 10–11 the invoice, through
+`sheetDocHtml` — the same sheet the customer's PDF is printed from, so a change
+to the document shows here with no second implementation to update. **Deviation
+from the approved plan, taken rather than asked:** the plan also embedded
+`VIEWS._ganttBody` on phase 9 and `economicsPanel` on 13. Neither was built. The
+economics figures are already in the header band AND in `journeyStepBody`, so a
+third copy would be three renderings of one number; and the Gantt is a
+draggable chart that takes the page by design. Those two keep a way out, named
+after what it opens — «Abrir el presupuesto completo ↗», «Abrir la carta Gantt
+↗» — because a three-pane builder inside a phone card is not the same screen,
+it is a worse one. Every other phase does its work where it stands.
+
+**S77e · Only two drawers needed `opts`.** The plan named five.
+`sendBudgetDrawer` and `newContractDrawer` now end through `afterCreate`, which
+is what that function was written for; `newContractDrawer` additionally cleared
+`conWork`, which hijacks the page. The other three (`newBudgetDrawer`,
+`newInvoiceDrawer`, the Rectificar path) legitimately continue into a
+full-screen editor — that IS their completion, and routing them through
+`afterCreate` would have meant stopping them halfway.
+
+**S77f · The ledger's spine is the records, never the audit log.** Every record
+carries its own event date and a hard foreign key to the job; `state.audit`
+carries a free-form string ref, day granularity and no id. Matching a row to it
+is substring guesswork, and a history that occasionally attributes another
+customer's document to this job is worse than no history at all. Ordered by the
+record's own date with emission order as tiebreaker, because several of these
+dates are BACKDATABLE — `acceptVersion` takes one, a contract registered from
+paper was signed before anybody typed it in — so `audit.ts` is when it was
+typed, not when it happened. Newest first: the question the card answers on a
+phone is «qué acaba de pasar». 458 rows over the seeded workspace, 176 with a
+document, none malformed.
+
+**S77g · A reference is named, not offered.** The seed's acceptance evidence is
+`evidenceRef: "aceptacion-PRE-2024-0006.pdf"` — the name a paper document was
+filed under, with no stored file behind it. An uploaded file (`storageKey`) gets
+the viewer's chip; a bare reference gets a plain tag. A chip that opens nothing
+is worse than a label that never promised to.
+
+**S77h · Four engine guards quoted in comments tripped the source audit.** The
+scanner reads any double-quoted run as a candidate user string, so
+`// \`startWorks\`: "Contract not signed…"`counted as ten untranslated
+literals. They are «» now — the repo's own quote marks — and the six Spanish
+block reasons, which ARE user-visible, got entries. The audit is back to
+`main`'s 162 rather than carrying a raise.
+
+**The crawl ratchet is WITHDRAWN.** This branch measured 33 EN / 94 CA locally
+and lowered the ceilings to match. `f31a1c2` on main had already reverted
+exactly that change, made from exactly that reading, after CI failed with «34 …
+ceiling 33»: the crawl walks a set of pages that differs between branches, so a
+single local reading is not the number CI will see. The ceilings stay at 37 and
+97 — main's standing decision, and not something a merge gets to overturn
+quietly.
+
+**S77i · `histRows` had four wrong field names.** `b.createdAt`, `c.signedAt`,
+`p.startDate`, `i.issueDate` — not one of them exists on the record, so the
+Historial modal's date column has been blank since it was written. The fields
+are `budget.date`, `contract.signature.customerSignedAt`, `project.dates.start`
+and `invoice.date`. Found on the way past, fixed on the way past.
 **S78 · Removing «⚙️ Configuración» from the profile menu costs the phone its
 only route to that section, so the header grew a ⚙️ button.** The operator
 struck three entries off the menu — the beta guide, the recorrido and

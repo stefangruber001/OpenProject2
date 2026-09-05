@@ -357,7 +357,11 @@ async function openTab(pg, route, tab) {
 //    must stay the first-sorting 2026 obra because ~147 checks name it, and a
 //    suite that quietly adds a party is exactly how that stops being true.
 async function testJourney(browser, base) {
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const ctx = await browser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    // The ledger offers the paperwork; the suite proves one of them arrives.
+    acceptDownloads: true,
+  });
   const pg = await ctx.newPage();
   const errors = [];
   attachConsole(pg, errors);
@@ -388,6 +392,41 @@ async function testJourney(browser, base) {
     const blank = cells.filter((c) => !c.fase || !c.next);
     if (!blank.length) ok("recorrido: every row names its phase and its next step");
     else bad("recorrido: phase + next step per row", JSON.stringify(blank.slice(0, 3)));
+
+    // ── THE STRIP. Thirteen dots per row, the current one ringed, and its tones
+    //    read off the SAME `steps[i].state` the big rail reads — the two drawings
+    //    share their classes precisely so they cannot come to disagree.
+    const strips = await pg.evaluate(() =>
+      [...document.querySelectorAll("tr.click[data-id]")].map((tr) => ({
+        id: tr.dataset.id,
+        dots: tr.querySelectorAll(".jmini .jdot").length,
+        on: [...tr.querySelectorAll(".jmini .jdot")].filter((d) => d.classList.contains("on"))
+          .length,
+        tones: [...tr.querySelectorAll(".jmini .jdot")].map(
+          (d) => (d.className.match(/s-(\w+)/) || [, ""])[1],
+        ),
+        lab: tr.querySelector(".jminil")?.innerText.trim() || "",
+      })),
+    );
+    const badStrip = strips.filter((s) => s.dots !== 13 || s.on !== 1 || !s.lab);
+    if (strips.length && !badStrip.length)
+      ok(`recorrido: the register draws the phase as a timeline (${strips.length} × 13 dots)`);
+    else bad("recorrido: thirteen dots, one ringed, named", JSON.stringify(badStrip.slice(0, 2)));
+
+    const strip0 = strips[0];
+    const railTones = await pg.evaluate(
+      (id) => journeySteps(journeyContext(id)).map((s) => s.state),
+      strip0.id,
+    );
+    if (JSON.stringify(strip0.tones) === JSON.stringify(railTones))
+      ok("recorrido: the strip's tones are the phases' own states");
+    else bad("recorrido: strip tones = rail tones", `${strip0.tones} vs ${railTones}`);
+
+    // «Siguiente paso» must name the WORK, not repeat the phase — the two columns
+    // said the same words in the operator's screenshot.
+    const echo = cells.filter((c) => c.next && c.fase.includes(c.next));
+    if (!echo.length) ok("recorrido: the next step names the action, not the phase again");
+    else bad("recorrido: next step ≠ phase name", JSON.stringify(echo.slice(0, 3)));
 
     // Both kinds of subject are on the list — an obra, and a lead with no obra.
     const kinds = new Set(cells.map((c) => c.id.split(":")[0]));
@@ -530,6 +569,114 @@ async function testJourney(browser, base) {
     if ((await pg.locator("#view").innerText()).includes("Recorrido · reforma de cocina"))
       ok("recorrido: and it is on Comercial → Oportunidades");
     else bad("recorrido: lead on Comercial", "not listed");
+
+    // ── A VERB IS NEVER HIDDEN. The operator photographed a Contrato phase with
+    //    a status, no button and no explanation. It now carries the button,
+    //    disabled, with the engine's own precondition beside it.
+    const blocked = await pg.evaluate(() => {
+      const keys = [
+        ...erp.state.projects.map((p) => "prj:" + p.id),
+        ...erp.state.opportunities.map((o) => "opp:" + o.id),
+      ];
+      for (const k of keys) {
+        const c = journeyContext(k);
+        if (!c) continue;
+        const st = journeySteps(c);
+        if (st[5] && st[5].act && st[5].act.block) return { key: k, block: st[5].act.block };
+      }
+      return null;
+    });
+    if (blocked) {
+      await pg.evaluate((k) => journeyOpen(k), blocked.key);
+      await pg.waitForTimeout(500);
+      await pg.locator('[data-j="5"]').click();
+      await pg.waitForTimeout(350);
+      const con = await pg.evaluate(() => {
+        const b = document.querySelector("#jAct");
+        return {
+          verb: b ? b.innerText.trim() : null,
+          disabled: b ? b.disabled : null,
+          text: document.querySelector("#view").innerText,
+        };
+      });
+      const said = con.text.includes(blocked.block);
+      if (con.verb && con.disabled && said)
+        ok("recorrido: a phase the engine would refuse still shows its verb, and why");
+      else
+        bad(
+          "recorrido: blocked verb + reason",
+          JSON.stringify({ verb: con.verb, disabled: con.disabled, said }),
+        );
+      // And pressing it does nothing at all.
+      const n0 = await pg.evaluate(() => erp.state.contracts.length);
+      await pg.evaluate(() => document.querySelector("#jAct")?.click());
+      await pg.waitForTimeout(400);
+      const n1 = await pg.evaluate(() => erp.state.contracts.length);
+      if (n0 === n1) ok("recorrido: a disabled verb writes nothing");
+      else bad("recorrido: disabled verb is inert", `${n0} → ${n1}`);
+    } else bad("recorrido: a blocked Contrato phase exists to test", "none in the workspace");
+
+    // ── THE DOCUMENT IS ON THE PHASE. The real quote, rendered by `sheetDocHtml`
+    //    — the same sheet the customer's PDF is printed from — with no navigating.
+    const withDoc = await pg.evaluate(() => {
+      const p = erp.state.projects.find(
+        (x) => x.budgetId && erp.budget(x.budgetId).acceptedVersionId,
+      );
+      return p ? "prj:" + p.id : null;
+    });
+    await pg.evaluate((k) => journeyOpen(k), withDoc);
+    await pg.waitForTimeout(500);
+    await pg.locator('[data-j="2"]').click();
+    await pg.waitForTimeout(500);
+    const sheet = await pg.evaluate(() => {
+      const n = document.querySelector("#view .cnsheet");
+      return {
+        there: !!n,
+        text: n ? n.innerText.slice(0, 400) : "",
+        full: !!document.querySelector("#jOpen"),
+      };
+    });
+    if (sheet.there && /PRESUPUESTO|PRE-\d/.test(sheet.text))
+      ok("recorrido: the phase shows the real customer document, not a link to it");
+    else bad("recorrido: document embedded in the phase", JSON.stringify(sheet).slice(0, 200));
+    // The presupuestador is the one screen that legitimately keeps a way out,
+    // and it is named after what it opens.
+    const openLab = sheet.full ? await pg.locator("#jOpen").innerText() : "";
+    if (/presupuesto|quote|pressupost/i.test(openLab))
+      ok("recorrido: the full-screen editor keeps a link, named after the screen");
+    else bad("recorrido: named link to the presupuestador", openLab || "(no button)");
+
+    // ── LO HECHO HASTA AHORA. Every action performed and every document
+    //    produced, newest first, with the paperwork attached.
+    const led = await pg.evaluate(() => {
+      const h = document.querySelector("#jLedger");
+      if (!h) return { missing: true };
+      const its = [...h.querySelectorAll(".it")].map((n) =>
+        n.innerText.replace(/\s+/g, " ").trim(),
+      );
+      return {
+        rows: its.length,
+        pdf: h.querySelectorAll('[data-led="pdf"]').length,
+        docx: h.querySelectorAll('[data-led="docx"]').length,
+        quote: its.find((t) => /Presupuesto creado|Quote created/.test(t)) || "",
+        sent: its.some((t) => /Enviado al cliente|Sent to the customer/.test(t)),
+      };
+    });
+    if (led.rows > 5 && led.pdf > 0 && led.docx === led.pdf)
+      ok(`recorrido: the ledger lists what was done, with its documents (${led.rows} rows)`);
+    else bad("recorrido: ledger rows + documents", JSON.stringify(led).slice(0, 220));
+    // The operator's own example: the quote was created, its PDF is there, and
+    // the action that it was sent to the customer is recorded beside it.
+    if (/⤓ PDF/.test(led.quote) && led.sent)
+      ok("recorrido: «quote created — the PDF is there — and it was sent» reads off the ledger");
+    else bad("recorrido: quote row carries its PDF and its send", JSON.stringify(led.quote));
+    // And the button really produces the document.
+    const dl = pg.waitForEvent("download", { timeout: 20000 }).catch(() => null);
+    await pg.locator('#jLedger [data-led="docx"]').first().click();
+    const file = await dl;
+    if (file && /\.docx$/.test(file.suggestedFilename()))
+      ok(`recorrido: a document downloads from the ledger (${file.suggestedFilename()})`);
+    else bad("recorrido: ledger document downloads", file ? file.suggestedFilename() : "(none)");
 
     // ── Back to the register.
     await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
@@ -732,6 +879,9 @@ async function testMobile(browser, base) {
     "quotes",
     "leads",
     "items",
+    // The recorrido's register card-ifies like every other one, and its phase
+    // strip is the newest thing on it that a 390px column could push sideways.
+    "journey",
   ];
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });

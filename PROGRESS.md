@@ -2332,3 +2332,57 @@ E2E; workspace audit **0/0** across eighteen screens; source literals
 **162/162**; rendered pages **91/67**; miss ledger **34/94** against ceilings
 37/97 — an EN raise against the hours release's 33, argued in ASSUMPTIONS S75g
 rather than adjusted quietly.
+
+### PK14-S77 · The recorrido as the operator uses it (05/09)
+
+Three requests off two phone screenshots of the live workspace, plus four
+defects the screenshots showed without being mentioned.
+
+**The register reads as a process.** The «Fase» cell is a strip of thirteen
+dots above the phase name, in the same tones the big rail uses — `journeyRows`
+already computed the states and threw them away. The strip's tones are asserted
+equal to `journeySteps(...).map(s => s.state)` for the same job, so the two
+drawings of one fact cannot drift apart. ~130px on a 10px pitch: it fits the
+desktop column and a 390px card, where the full rail never could.
+
+**«Siguiente paso» names the work.** It repeated the phase name, so both
+columns said `4 · Envío al cliente`. It returns the phase's verb now. The
+amount asks the accepted quote before the lead's expected value — a job with a
+presupuesto was reporting `0 €`.
+
+**A verb is never hidden.** The operator photographed a Contrato phase with a
+status, no button and no reason, which reads as a screen that cannot do
+anything. A verb the engine would refuse renders disabled with its precondition
+beside it as a «Falta» row — 64 of them across the seeded workspace, each
+quoting the engine guard it mirrors. Pressing one writes nothing.
+
+**The work happens here.** «Abrir la pantalla completa ↗» is gone from every
+phase. The customer's real document — quote, contract, invoice — is drawn
+inside the phase by `sheetDocHtml`, the same sheet the PDF is printed from, so
+changing the document changes this screen too. Two screens keep a named way
+out, the presupuestador and the carta Gantt, because reproducing a three-pane
+builder in a card would be the second implementation this screen exists to
+avoid (ASSUMPTIONS S77d).
+
+**«Lo hecho hasta ahora».** A last card listing every action performed and
+every document produced, newest first, each with `⤓ PDF` / `⤓ Word` through
+`downloadHistoryDoc` — the Historial's own route, so the document offered is
+the one the customer already has. Built from the records, not the audit log,
+and ordered by each record's own date because several are backdatable
+(S77f). 458 rows over the workspace, 176 with a document. `project.diary` gets
+its first reader in the product.
+
+On the way past: `histRows` read four field names that do not exist on the
+record, so the Historial modal's date column had been blank since it was
+written (S77i).
+
+Gates, measured on this tree: site E2E **717/717 unfiltered** (the recorrido
+suite 18 → 28 checks); workspace audit **0/0**; source literals **162/162**,
+back to main's number after four engine guards quoted in comments were requoted
+and six block reasons given entries; rendered pages **91/67**; miss ledger
+**33/94** locally against ceilings that STAY at 37/97 — main reverted exactly
+this ratchet in `f31a1c2` after CI failed on it, and the crawl walks a different
+set of pages per branch, so one local reading is not the number CI sees
+(ASSUMPTIONS S77h). `pnpm lint · check-types · test ·
+boundaries · build` green, nav manifest and ownership guard green. No
+capability changed, so the committed `site/erp-factory` bundle is byte-identical.

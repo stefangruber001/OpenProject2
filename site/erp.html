@@ -10296,7 +10296,9 @@
     <div class="hseg">${H_RANGES.map(
       ([k, lab]) =>
         `<button class="sg${hRangeMode === k ? " on" : ""}" data-hrange="${k}">${lab}</button>`,
-    ).join("")}${hPickOpen ? rangePicker() : `<button class="lb" id="hPick">${esc(r.label)}</button>`}</div>
+    ).join(
+      "",
+    )}${hPickOpen ? rangePicker() : `<button class="lb" id="hPick">${esc(r.label)}</button>`}</div>
    </div>`;
         return `${scope}
    <div class="hband">
@@ -10483,10 +10485,10 @@
         push(["Personas", String(people.size)], 8);
         push(["Obras con horas", String(jobs.size)], 8);
         push(["Días con parte", String(days.size)], 8);
-        push([
-          "Horas por persona",
-          people.size ? h2(Math.round(totalMilli / people.size)) : "0",
-        ], 8);
+        push(
+          ["Horas por persona", people.size ? h2(Math.round(totalMilli / people.size)) : "0"],
+          8,
+        );
 
         /* ---- where the hours went ---- */
         section("Por obra");
@@ -10508,7 +10510,15 @@
           ]);
         }
         push(
-          ["TOTAL", "", h2(totalMilli), "100%", money(totalCost) + " €", "100%", money(perHour) + " €"],
+          [
+            "TOTAL",
+            "",
+            h2(totalMilli),
+            "100%",
+            money(totalCost) + " €",
+            "100%",
+            money(perHour) + " €",
+          ],
           10,
         );
 
@@ -10551,10 +10561,7 @@
         push(["Horas imputadas a obra", money(rec.bookedCents) + " €"]);
         push(["Nóminas pagadas por banco", money(rec.wagesCents) + " €"]);
         push(["Pagado en efectivo a trabajadores", money(cashPaid) + " €"]);
-        push(
-          ["Diferencia sin imputar", money(rec.unbookedCents) + " €"],
-          10,
-        );
+        push(["Diferencia sin imputar", money(rec.unbookedCents) + " €"], 10);
         blank();
         push(["Trabajador", "Imputado", "Pagado", "Diferencia"], 3);
         for (const w of cashRows)
@@ -10568,7 +10575,18 @@
         /* ---- and the entries the whole thing is built from ---- */
         section("Detalle de apuntes");
         push(
-          ["Fecha", "Trabajador", "Obra", "Partida", "Subpartida", "Tipo", "Horas", "€/hora", "Coste", "Estado"],
+          [
+            "Fecha",
+            "Trabajador",
+            "Obra",
+            "Partida",
+            "Subpartida",
+            "Tipo",
+            "Horas",
+            "€/hora",
+            "Coste",
+            "Estado",
+          ],
           3,
         );
         for (const l of entries.slice().sort((a, b) => a.date.localeCompare(b.date)))
@@ -10595,8 +10613,7 @@
           foot:
             [iss.legalName, iss.taxId, iss.registeredAddress || iss.address, iss.email]
               .filter(Boolean)
-              .join("  ·  ") +
-            "   |   Los importes son coste de trabajador, no precio facturado.",
+              .join("  ·  ") + "   |   Los importes son coste de trabajador, no precio facturado.",
         });
       }
 
@@ -10881,14 +10898,16 @@
         );
         /* Each button carries the week it is about, so approving row three does
            not sign off whatever week the day sheet happened to be showing. */
-        document.querySelectorAll("[data-approve][data-ws]").forEach(
-          (b) =>
-            (b.onclick = () =>
-              mutate(
-                () => erp.approveLabourWeek(b.dataset.approve, b.dataset.ws, "backoffice"),
-                "Semana aprobada",
-              )),
-        );
+        document
+          .querySelectorAll("[data-approve][data-ws]")
+          .forEach(
+            (b) =>
+              (b.onclick = () =>
+                mutate(
+                  () => erp.approveLabourWeek(b.dataset.approve, b.dataset.ws, "backoffice"),
+                  "Semana aprobada",
+                )),
+          );
         document
           .querySelectorAll("[data-unapprove][data-week]")
           .forEach(
@@ -18340,7 +18359,7 @@
          customer is about to read, and if nobody says so here the difference is
          discovered by the customer. Blocking issues disable the button rather than
          hiding it, so the reason the presupuesto cannot go is visible. */
-      function sendBudgetDrawer(id) {
+      function sendBudgetDrawer(id, opts) {
         const b = erp.budget(id),
           vsel = b.currentVersionId,
           V = erp.version(id, vsel);
@@ -18527,9 +18546,12 @@
                        quote they just sent sits in «Enviados» — the locked builder
                        they used to land on left them unsure anything had happened.
                        The chapter filter dies with the send (A6): the next quote
-                       must not open pre-filtered to this partida. */
+                       must not open pre-filtered to this partida.
+                       Unless the caller asked to stay: sending is COMPLETE inside
+                       this drawer, so a caller that already shows the quote — the
+                       recorrido does — has nowhere better to be sent. */
               bChapter = null;
-              window.go("quotes"); // window.: `go` is the button in this scope
+              afterCreate(opts, erp.budget(id), "quotes");
             }, "Presupuesto enviado — versión congelada");
             // A real send — even the WhatsApp text prefill — is a browser
             // side effect, not a state mutation, so it happens once mutate()
@@ -23069,7 +23091,23 @@
         waiting: ["Esperando", "b"],
         blocked: ["Bloqueada", "r"],
         late: ["Vencida", "r"],
-        pending: ["Pendiente", ""],
+        /* NOT «Pendiente»: that word is already the workspace's for money owed,
+           and its English is "Outstanding" — «Contrato · Outstanding» on a phase
+           nobody has started reads as a contract somebody has not paid for.
+           «Sin empezar» is the fact, and it already has its three entries. */
+        pending: ["Sin empezar", ""],
+      };
+      /* How a contract came to be signed. `signature.method` is an engine enum
+         and there are only these two — a screen showed the raw «physical» to the
+         operator, which is neither Spanish nor a word. */
+      const SIGN_METHOD = { physical: "En papel", digital: "Firma digital" };
+      /* The channel a presupuesto went out by, in the same words the send drawer
+         offers. `issueVersion` defaults to «email» and stores the enum. */
+      const SEND_CHANNEL = {
+        email: "Correo electrónico",
+        whatsapp: "WhatsApp",
+        sms: "SMS",
+        physical: "En mano",
       };
       // jSubject names the record picked, prefixed prj or opp. Never a record
       // of its own: this screen writes none.
@@ -23195,6 +23233,14 @@
         const feedback = project
           ? (erp.state.feedback || []).filter((f) => f.projectId === project.id)
           : [];
+        /* `act` is `{lab, run, block?}`. A VERB IS NEVER HIDDEN: when the engine
+           would refuse it, `block` carries the refusal in words and the button
+           renders disabled beside it. The operator photographed the opposite —
+           a Contrato phase with a status, no button and nothing to say why —
+           and read it as a screen that cannot do anything. The engine already
+           publishes these refusals as data where it matters most
+           (`validateBudget`, `previewInvoice(...).blocks`, `partyCompleteness`);
+           the rest are restated here, each one quoting the guard it mirrors. */
         const S = (state, rows, act) => ({ state, rows, act });
         const accepted = !!(budget && budget.acceptedVersionId);
         return [
@@ -23222,10 +23268,9 @@
                 })
               : S("pending", [["Estado", "Sin visita registrada"]], {
                   lab: "＋ Programar visita",
-                  run: () =>
-                    opp
-                      ? scheduleVisitDrawer(opp.id, { stay: true })
-                      : toast("⚠ Antes hace falta una oportunidad"),
+                  // `scheduleVisit`: «A visit needs an opportunity».
+                  block: opp ? null : "Antes hace falta una oportunidad",
+                  run: () => scheduleVisitDrawer(opp.id, { stay: true }),
                 }),
           /* 3 · Presupuesto */
           budget
@@ -23243,14 +23288,27 @@
               }),
           /* 4 · Envío al cliente. Congelada es un hecho del registro, y se ve. */
           last
-            ? S(stage === "expired" ? "blocked" : accepted ? "done" : "waiting", [
-                ["Enviado y congelado", fmtD((last.sent || {}).date || last.date)],
-                ["Versión", String(last.vNumber)],
-              ])
+            ? S(
+                stage === "expired" ? "blocked" : accepted ? "done" : "waiting",
+                [
+                  ["Enviado y congelado", fmtD((last.sent || {}).date || last.date)],
+                  ["Versión", String(last.vNumber)],
+                ],
+                /* A quote that has run out of validity is the one sent-and-frozen
+                   state with something left to do: sending again is what resets
+                   `validityDate`, and it is the same drawer. Accepted or still
+                   with the customer, there is nothing to press. */
+                stage === "expired"
+                  ? {
+                      lab: "Volver a enviar",
+                      run: () => sendBudgetDrawer(budget.id, { stay: true }),
+                    }
+                  : null,
+              )
             : S(budget ? "doing" : "pending", [["Estado", "Todavía sin enviar al cliente"]], {
                 lab: "Enviar y congelar",
-                run: () =>
-                  budget ? sendBudgetDrawer(budget.id) : toast("⚠ Antes hace falta un presupuesto"),
+                block: budget ? null : "Antes hace falta un presupuesto",
+                run: () => sendBudgetDrawer(budget.id, { stay: true }),
               }),
           /* 5 · Aceptación */
           accepted
@@ -23259,10 +23317,9 @@
               ? S("blocked", [["Estado", "Presupuesto rechazado"]])
               : S(issued.length ? "waiting" : "pending", [["Estado", "Sin respuesta"]], {
                   lab: "Registrar la respuesta",
-                  run: () =>
-                    last
-                      ? budgetResponseDrawer(budget.id, last.id)
-                      : toast("⚠ El presupuesto todavía no se ha enviado"),
+                  // `acceptVersion`: «Only an issued version can be accepted».
+                  block: last ? null : "El presupuesto todavía no se ha enviado",
+                  run: () => budgetResponseDrawer(budget.id, last.id),
                 }),
           /* 6 · Contrato */
           contract
@@ -23281,50 +23338,46 @@
                   ? null
                   : { lab: "Firmar", run: () => signContractDrawer(contract.id) },
               )
-            : S(
-                accepted ? "doing" : "pending",
-                [["Estado", "Sin contrato formal"]],
-                accepted
-                  ? {
-                      lab: "＋ Nuevo contrato",
-                      run: () => newContractDrawer({ budgetId: budget.id }),
-                    }
-                  : null,
-              ),
+            : S(accepted ? "doing" : "pending", [["Estado", "Sin contrato formal"]], {
+                lab: "＋ Nuevo contrato",
+                // `createContract`: «Contract requires an accepted budget version».
+                block: accepted ? null : "Hace falta un presupuesto aceptado",
+                run: () => newContractDrawer({ budgetId: budget.id }, { stay: true }),
+              }),
           /* 7 · Inicio de obra */
           project && project.dates.start
             ? S("done", [["Inicio", fmtD(project.dates.start)]])
             : project
               ? S("doing", [["Estado", "Obra creada, sin iniciar"]], {
                   lab: "Iniciar la obra",
+                  // `startWorks`: «Contract not signed — works blocked (CON-11)».
+                  block:
+                    contract && !contract.signature.customerSignedAt
+                      ? "El contrato no está firmado"
+                      : null,
                   run: () =>
                     mutate(() => erp.startWorks(project.id, "operations"), "Obra iniciada"),
                 })
-              : S(
-                  accepted ? "doing" : "pending",
-                  [["Estado", "Sin obra abierta"]],
-                  accepted
-                    ? {
-                        lab: "Abrir la obra",
-                        /* Accepting normally opens the obra by itself
-                           (`budgetResponseDrawer`), so this is the door for a
-                           presupuesto accepted before it did. The two guards are
-                           the ones that path already carries: an adicional joins
-                           its obra rather than opening a second, and a
-                           presupuesto that already has one must never open
-                           another. */
-                        run: () =>
-                          mutate(() => {
-                            if (budget.variationOf)
-                              throw new Error("Un adicional se une a su obra, no abre otra");
-                            const had = erp.state.projects.find((x) => x.budgetId === budget.id);
-                            const rec =
-                              had || erp.createProjectFromAcceptance(budget.id, "backoffice");
-                            journeySelect("prj:" + rec.id);
-                          }, "Obra creada"),
-                      }
-                    : null,
-                ),
+              : S(accepted ? "doing" : "pending", [["Estado", "Sin obra abierta"]], {
+                  lab: "Abrir la obra",
+                  // `createProjectFromAcceptance`: "Acceptance required before
+                  // project creation".
+                  block: accepted ? null : "Hace falta un presupuesto aceptado",
+                  /* Accepting normally opens the obra by itself
+                     (`budgetResponseDrawer`), so this is the door for a presupuesto
+                     accepted before it did. The two guards are the ones that path
+                     already carries: an adicional joins its obra rather than opening
+                     a second, and a presupuesto that already has one must never open
+                     another. */
+                  run: () =>
+                    mutate(() => {
+                      if (budget.variationOf)
+                        throw new Error("Un adicional se une a su obra, no abre otra");
+                      const had = erp.state.projects.find((x) => x.budgetId === budget.id);
+                      const rec = had || erp.createProjectFromAcceptance(budget.id, "backoffice");
+                      journeySelect("prj:" + rec.id);
+                    }, "Obra creada"),
+                }),
           /* 8 · Compras */
           {
             ...(purchases.length
@@ -23335,8 +23388,10 @@
               : S("pending", [["Estado", "Sin pedidos de compra"]])),
             act: {
               lab: "＋ Nueva compra",
-              run: () =>
-                project ? purchaseFormDrawer(project.id) : toast("⚠ Antes hace falta una obra"),
+              // A pedido is raised against an obra's partidas; there is nothing to
+              // charge it to before there is one.
+              block: project ? null : "Antes hace falta una obra",
+              run: () => purchaseFormDrawer(project.id),
             },
             /* The supplier picker on a purchase order lists what is on file and
                offers no way to add to it, so ordering from a supplier nobody has
@@ -23368,13 +23423,11 @@
                 ],
                 { lab: "＋ Nueva factura", run: () => newInvoiceDrawer(project.id) },
               )
-            : S(
-                "pending",
-                [["Estado", "Sin facturas emitidas"]],
-                project
-                  ? { lab: "＋ Nueva factura", run: () => newInvoiceDrawer(project.id) }
-                  : null,
-              ),
+            : S("pending", [["Estado", "Sin facturas emitidas"]], {
+                lab: "＋ Nueva factura",
+                block: project ? null : "Antes hace falta una obra",
+                run: () => newInvoiceDrawer(project.id),
+              }),
           /* 11 · Cobros — the oldest unpaid invoice, opened on its own drawer,
              which is where «Registrar cobro» already lives. */
           invoices.length
@@ -23525,9 +23578,102 @@
         return -1;
       }
       /** The name of the phase that comes next, or that there is none. */
-      function journeyNextLabel(next) {
-        if (next < 0) return "Recorrido completo";
-        return JOURNEY[next].lab;
+      /* WHAT TO DO NEXT IS A VERB, NOT THE NAME OF THE PHASE AGAIN.
+         The register showed «Fase: 4 · Envío al cliente» beside «Siguiente paso:
+         Envío al cliente» — the same words twice, and the second column earning
+         nothing. A phase almost always carries the one thing that moves it on, so
+         that is what the column says: «Enviar y congelar», «Registrar la
+         respuesta». Where a phase deliberately has no verb (Ejecución, Pagos a
+         proveedores — see their comments in `journeySteps`) the name is still the
+         truest thing there is to say. */
+      function journeyNextLabel(steps, next) {
+        /* «Recorrido terminado», not «Recorrido completo» — that phrase already
+           belongs to the nav link «▶️ Recorrido completo» and translates as an
+           invitation to walk something. Here it is a statement that there is
+           nothing left to do. */
+        if (next < 0) return "Recorrido terminado";
+        const act = steps && steps[next] && steps[next].act;
+        return (act && act.lab) || JOURNEY[next].lab;
+      }
+      /* THE THIRTEEN, SMALL ENOUGH FOR A ROW.
+         The operator asked to see the stage «in a graphical way like the timeline»
+         on the register too. The rail itself cannot go there — thirteen labelled
+         chips measure about a thousand pixels and a phone card is 340 — so the
+         phases keep their COLOURS and lose their words: one dot each, the current
+         one ringed, the same `s-*` classes `.jstep .n` wears so the two drawings
+         are painted by one rule and cannot drift apart.
+
+         `aria-hidden`, because the phase is named in words immediately beside it.
+         Thirteen dots read aloud are noise, not information. */
+      function journeyMini(states, at) {
+        return `<span class="jmini" aria-hidden="true">${states
+          .map((st, i) => `<i class="jdot s-${st}${i === at ? " on" : ""}"></i>`)
+          .join("")}</span>`;
+      }
+      /* THE PAPER, ON THE PHASE.
+         `sheetDocHtml` returns the finished customer document as a string — the
+         same one Presupuestos, Contratos and Facturación print — so the phase can
+         show it without navigating anywhere and without a second renderer. It
+         throws when a kind has no live record behind it, which is a normal state
+         here (a budget with no issued version, a draft invoice), so the call is
+         guarded: a phase with no document yet simply has none.
+
+         The `.cnsheet` cage is injected once, elsewhere, and scopes the sheet CSS
+         so an A4 document can sit inside a card without taking the page over. */
+      function journeyDoc(c, i) {
+        const k = JOURNEY[i].k;
+        try {
+          if ((k === "budget" || k === "sent" || k === "accepted") && c.budget) {
+            const b = c.budget;
+            const vId = b.acceptedVersionId || b.currentVersionId;
+            const ver = (b.versions || []).find((x) => x.id === vId);
+            if (!ver) return "";
+            return sheetDocHtml(
+              budgetDocKind(b, vId),
+              { budgetId: b.id, versionId: vId, lineText: (l) => lineDesc(l, b.language) },
+              b.language,
+            );
+          }
+          if (k === "contract" && c.contract) {
+            const d = erp.renderContractDoc(c.contract.id);
+            const lang = d.language || "es";
+            return sheetDocHtml(
+              "contrato",
+              { contractId: c.contract.id, lineText: (l) => lineDesc(l, lang) },
+              lang,
+            );
+          }
+          if ((k === "invoicing" || k === "collections") && c.project) {
+            const inv = erp.state.invoices
+              .filter((x) => x.projectId === c.project.id && x.kind !== "creditNote")
+              .slice(-1)[0];
+            if (!inv) return "";
+            const d = erp.renderInvoiceDoc(inv.number);
+            return sheetDocHtml(
+              d.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+              { invoiceId: inv.number },
+              d.language,
+            );
+          }
+        } catch (e) {
+          /* No live record behind this kind yet — the phase has no paper, which is
+             a fact about the job and not an error to report. */
+        }
+        return "";
+      }
+      /* The two screens that genuinely cannot come here. The presupuestador and the
+         carta Gantt take the whole page by design — three panes and a draggable
+         chart — and a copy of either inside a card would be a second, worse
+         implementation of the thing this screen exists to stop duplicating. So they
+         keep a way out, named after what it opens rather than after its own
+         mechanics. Every other phase does its work here. */
+      function journeyFull(c, i) {
+        const k = JOURNEY[i].k;
+        if (k === "budget" && c.budget)
+          return { lab: "Abrir el presupuesto completo ↗", run: () => openBuilder(c.budget.id) };
+        if (k === "execution" && c.project)
+          return { lab: "Abrir la carta Gantt ↗", run: () => go("progress", c.project.code) };
+        return null;
       }
       function journeyPill(step) {
         const [lab, tone] = JOURNEY_STATE[step.state];
@@ -23584,6 +23730,11 @@
               const eco = c.project ? erp.projectEconomics(c.project.id) : null;
               return {
                 id: r.key,
+                /* The thirteen, kept rather than recomputed. `steps` is already in
+                   hand — the register used to reduce it to one number and throw the
+                   rest away, and the mini-timeline is exactly the rest. */
+                states: steps.map((x) => x.state),
+                nextLab: journeyNextLabel(steps, next),
                 code: c.project ? c.project.code : c.budget ? c.budget.number : "—",
                 party: c.party.name,
                 /* Ask the presupuesto first: that answer comes from the engine and
@@ -23599,7 +23750,21 @@
                 tone: JOURNEY_STATE[steps[at].state][1],
                 next,
                 done: next < 0,
-                amount: eco ? eco.currentRevenueCents : c.opp ? c.opp.expectedValue : 0,
+                /* An obra knows what it is worth; before there is one, the
+                   presupuesto does. Asking the lead first is why a job with a
+                   38.000 € quote on the screen showed «0 €» in this column —
+                   `expectedValue` is what somebody guessed on the phone, and it is
+                   the last word worth having, not the first. */
+                amount: eco
+                  ? eco.currentRevenueCents
+                  : c.budget
+                    ? erp.budgetTotals(
+                        c.budget.id,
+                        c.budget.acceptedVersionId || c.budget.currentVersionId,
+                      ).taxableCents
+                    : c.opp
+                      ? c.opp.expectedValue
+                      : 0,
                 when: r.when,
               };
             })
@@ -23630,6 +23795,7 @@
         const step = steps[jStep];
         const meta = JOURNEY[jStep];
         const eco = c.project ? erp.projectEconomics(c.project.id) : null;
+        const full = journeyFull(c, jStep);
         $("#headact").innerHTML =
           `<button class="btn sm" id="jBack">← Todos los recorridos</button>`;
 
@@ -23640,7 +23806,7 @@
             <span class="tag">${journeyCount("Fase", at + 1)} · ${esc(JOURNEY[at].lab)}</span></div>
            <div class="daylist">
              <div class="it"><span>Siguiente paso</span><span style="flex:1"></span><b>${esc(
-               journeyNextLabel(nextIdx),
+               journeyNextLabel(steps, nextIdx),
              )}</b>${
                nextIdx < 0
                  ? ""
@@ -23670,16 +23836,25 @@
           ).join("")}</div></div></div>` +
           `<div class="card"><div class="ch"><h3>${esc(meta.lab)}</h3>${journeyPill(step)}
              <span class="tag">${journeyCount("Fase", jStep + 1)}</span></div>
-           <div class="daylist">${step.rows.map(journeyRow).join("")}</div>
+           <div class="daylist">${step.rows.map(journeyRow).join("")}
+             ${step.act && step.act.block ? journeyRow(["Falta", step.act.block]) : ""}</div>
            <div class="stepbar">
-             ${step.act ? `<button class="btn primary sm" id="jAct">${esc(step.act.lab)}</button>` : ""}
+             ${
+               step.act
+                 ? `<button class="btn primary sm" id="jAct"${
+                     step.act.block ? " disabled" : ""
+                   }>${esc(step.act.lab)}</button>`
+                 : ""
+             }
              ${step.act2 ? `<button class="btn sm" id="jAct2">${esc(step.act2.lab)}</button>` : ""}
-             <button class="btn sm" id="jOpen">Abrir la pantalla completa ↗</button>
+             ${full ? `<button class="btn sm" id="jOpen">${esc(full.lab)}</button>` : ""}
              <span style="flex:1"></span>
              <button class="btn sm" id="jPrev"${jStep === 0 ? " disabled" : ""}>‹ Anterior</button>
              <button class="btn sm" id="jFwd"${jStep === 12 ? " disabled" : ""}>Siguiente ›</button>
            </div>
-           ${journeyStepBody(c, jStep)}</div>`;
+           ${journeyStepBody(c, jStep)}
+           ${journeyDoc(c, jStep)}</div>` +
+          journeyLedger(c);
 
         $("#jBack").onclick = () => {
           jSubject = null;
@@ -23697,13 +23872,13 @@
             jStep = nextIdx;
             render();
           };
-        if ($("#jAct")) $("#jAct").onclick = () => step.act.run();
+        if ($("#jAct") && !step.act.block) $("#jAct").onclick = () => step.act.run();
         if ($("#jAct2")) $("#jAct2").onclick = () => step.act2.run();
         v.querySelectorAll("[data-inv]").forEach(
           (tr) => (tr.onclick = () => invoiceDrawer(tr.dataset.inv)),
         );
-        $("#jOpen").onclick = () =>
-          go(meta.route, c.project && meta.route === "progress" ? c.project.code : undefined);
+        if ($("#jOpen")) $("#jOpen").onclick = () => full.run();
+        journeyLedgerWire(v, c);
         $("#jPrev").onclick = () => {
           jStep = Math.max(0, jStep - 1);
           render();
@@ -23841,6 +24016,280 @@
         return "";
       }
 
+      /* ======================= WHAT THIS JOB HAS BEEN THROUGH =======================
+         The last card of the recorrido: every action already performed and every
+         document already produced, in one time-ordered list, each with its paper
+         attached. «Quote was created — the PDF is there — and the action is
+         completed, it was sent to the customer», in the operator's words.
+
+         BUILT FROM THE RECORDS, NOT FROM THE AUDIT LOG. Every record here carries
+         its own event date and a hard foreign key to this job; `state.audit`
+         carries a free-form string reference, day granularity and no id, so
+         matching a row to it is substring guesswork — and a history that
+         occasionally attributes somebody else's document to this job is worse than
+         no history. The audit is asked for one thing only: WHO, and only where the
+         record does not say (`by`, below).
+
+         Ordered by the record's own date, with the emission order as tiebreaker,
+         because several of these dates are BACKDATABLE — a contract registered from
+         paper was signed before anybody typed it in, and `acceptVersion` takes a
+         date. `audit.ts` is when it was typed; the row wants when it happened. */
+      function journeyLedgerRows(c) {
+        const ev = [];
+        /** @param doc a row `downloadHistoryDoc` understands — the same descriptor
+         *             the Historial modal passes it, so the buttons here are the
+         *             ERP's own document route and not a second one. */
+        /* `evidence` is the FILE ITSELF when somebody uploaded one — the viewer
+           opens it. `ref` is only the name a paper document was filed under, so
+           it is stated and not offered: a chip that opens nothing is worse than
+           a label that never promised to. A row may carry both a generated
+           document and a filed copy of the signed original; they are different
+           papers and both are shown. */
+        /* `val` is a LIST OF PARTS, never a sentence. «1.528 € · Transferencia»
+           welded into one string is one text node no dictionary can reach — the
+           lesson `countTag` already carries, and the reason a phase's `rows` are
+           pairs — so each part becomes its own node: the vocabulary among them
+           translates, and the numbers and codes stay as the record wrote them. */
+        const add = (when, lab, val, doc, evidence, ref) => {
+          if (!when) return;
+          ev.push({
+            when,
+            lab,
+            val: (Array.isArray(val) ? val : [val]).filter(Boolean).map(String),
+            doc: doc || null,
+            evidence: (evidence && evidence.storageKey && evidence) || null,
+            ref:
+              ref || (evidence && !evidence.storageKey && (evidence.ref || evidence.name)) || null,
+            i: ev.length,
+          });
+        };
+        const { opp, budget, contract, project } = c;
+
+        if (opp) add(opp.date, "Oportunidad abierta", opp.requestedWork || "—");
+        if (opp)
+          erp.state.visits
+            .filter((v) => v.opportunityId === opp.id)
+            .forEach((v) => {
+              add(
+                v.scheduledAt,
+                "Visita programada",
+                v.owner === "operations" ? "Obra" : "Oficina",
+              );
+              /* No «2 med.» here: a count welded to a word is one text node no
+                 dictionary can reach — `countTag`'s lesson. What the visit
+                 measured is on the Visita phase, in a table. */
+              add(v.completedAt, "Visita realizada", v.owner === "operations" ? "Obra" : "Oficina");
+            });
+
+        if (budget) {
+          const row = {
+            id: budget.id,
+            ref: budget.number,
+            doc: "presupuesto",
+            budgetId: budget.id,
+            excel: true,
+          };
+          add(budget.date, "Presupuesto creado", budget.number, row);
+          (budget.versions || []).forEach((ver) => {
+            const t = erp.budgetTotals(budget.id, ver.id);
+            if (ver.issued)
+              add(
+                (ver.sent || {}).date || ver.date,
+                ver.additional ? "Adicional enviado y congelado" : "Enviado al cliente",
+                [
+                  ver.vNumber,
+                  eur0(t.grandCents),
+                  (ver.sent || {}).channel && (SEND_CHANNEL[ver.sent.channel] || ver.sent.channel),
+                ],
+                row,
+              );
+            const r = ver.customerResponse;
+            if (r)
+              add(
+                r.date,
+                r.accepted ? "Aceptado por el cliente" : "Rechazado por el cliente",
+                r.accepted ? [ver.vNumber, eur0(t.grandCents)] : r.reason || "",
+                null,
+                r.evidence,
+                r.evidenceRef,
+              );
+          });
+        }
+
+        if (contract) {
+          const row = {
+            id: contract.id,
+            ref: contract.number,
+            doc: "contrato",
+            contractId: contract.id,
+          };
+          add(
+            contract.date,
+            "Contrato redactado",
+            [contract.number, eur0(contract.totalCents)],
+            row,
+          );
+          add(
+            contract.signature.customerSignedAt,
+            "Contrato firmado",
+            SIGN_METHOD[contract.signature.method] || contract.signature.method || "",
+            row,
+            contract.signature.document,
+            (contract.signature.document || {}).ref,
+          );
+        }
+
+        if (project) {
+          const row = {
+            id: project.id,
+            ref: project.code,
+            doc: "fichaProyecto",
+            projectId: project.id,
+          };
+          add(project.dates.start, "Obra iniciada", project.code, row);
+          erp.state.purchases
+            .filter((x) => x.projectId === project.id)
+            .forEach((x) => {
+              add(x.date, "Pedido de compra", [
+                x.number,
+                erp.party(x.supplierId).name,
+                eur0(x.totalCents),
+              ]);
+              (x.receipts || []).forEach((r) => add(r.date, "Material recibido", x.number));
+            });
+          erp.state.bills
+            .filter((b) => (b.allocations || []).some((a) => a.projectId === project.id))
+            .forEach((b) => add(b.date, "Factura de proveedor", [b.number, eur0(b.totalCents)]));
+          erp.state.invoices
+            .filter((i) => i.projectId === project.id)
+            .forEach((i) =>
+              add(
+                i.date,
+                i.kind === "creditNote" ? "Rectificativa emitida" : "Factura emitida",
+                [i.number, eur0(i.totalCents)],
+                {
+                  id: i.id,
+                  ref: i.number,
+                  doc: i.kind === "creditNote" ? "rectificativa" : "factura",
+                  invoiceId: i.number,
+                },
+              ),
+            );
+          const mine = new Set(
+            erp.state.invoices.filter((i) => i.projectId === project.id).map((i) => i.id),
+          );
+          (erp.state.collections || []).forEach((col) => {
+            if (!(col.allocations || []).some((a) => mine.has(a.invoiceId))) return;
+            add(col.date, "Cobro registrado", [
+              eur0(col.amountCents),
+              erp.listLabel("paymentMethods", col.method),
+            ]);
+          });
+          const billIds = new Set(
+            erp.state.bills
+              .filter((b) => (b.allocations || []).some((a) => a.projectId === project.id))
+              .map((b) => b.id),
+          );
+          (erp.state.payments || []).forEach((pay) => {
+            if (!(pay.billAllocations || []).some((a) => billIds.has(a.billId))) return;
+            add(pay.date, "Pago a proveedor", [
+              eur0(pay.amountCents),
+              erp.listLabel("paymentMethods", pay.method),
+            ]);
+          });
+          erp.state.receipts
+            .filter((r) => r.projectId === project.id)
+            .forEach((r) =>
+              add(
+                r.date,
+                "Recibo entregado",
+                [r.number, eur0(r.amountCents), erp.listLabel("paymentMethods", r.method)],
+                {
+                  id: r.id,
+                  ref: r.number || r.id,
+                  doc: "recibo",
+                  receiptId: r.id,
+                },
+              ),
+            );
+          /* `project.diary` is written by `addDiaryEntry` and, until this card,
+             was rendered on no screen in the product. */
+          (project.diary || []).forEach((d) =>
+            add(
+              d.date,
+              d.incident ? "Incidencia en obra" : d.delivery ? "Entrega en obra" : "Parte de obra",
+              d.note || d.workDone || "",
+            ),
+          );
+          add(project.dates.actualEnd, "Obra cerrada", project.code);
+          (erp.state.feedback || [])
+            .filter((f) => f.projectId === project.id)
+            .forEach((f) =>
+              add(f.date, "Reseña del cliente", [f.rating != null ? f.rating + "/5" : "", f.text]),
+            );
+        }
+
+        ev.sort((a, b) => String(a.when).localeCompare(String(b.when)) || a.i - b.i);
+        /* Newest first: the question this card answers on a phone is «qué acaba
+           de pasar», and the whole history is one scroll below it. */
+        return ev.reverse();
+      }
+
+      /** The ledger as a card. `journeyLedgerRows` is pure, so the download
+       *  handlers below recompute it rather than closing over a descriptor that
+       *  a re-render would have made stale. */
+      function journeyLedger(c) {
+        const ev = journeyLedgerRows(c);
+        if (!ev.length)
+          return `<div class="card"><div class="ch"><h3>Lo hecho hasta ahora</h3></div>
+            <div class="daylist">${journeyRow([
+              "Estado",
+              "Todavía no se ha hecho nada en este recorrido",
+            ])}</div></div>`;
+        const rows = ev
+          .map((e, n) => {
+            /* The filed copy first, the generated document last, so the ⤓
+               buttons finish at the same edge on every row that has them. */
+            let ext = "";
+            if (e.evidence)
+              ext = `<a href="#" class="tag" data-evidence="${esc(
+                JSON.stringify(e.evidence),
+              )}">${esc(e.evidence.name || "Ver el documento")}</a>`;
+            else if (e.ref) ext = `<span class="tag">${esc(e.ref)}</span>`;
+            if (e.doc)
+              ext += `<button class="btn sm" data-led="pdf" data-row="${n}">⤓ PDF</button>
+                <button class="btn sm" data-led="docx" data-row="${n}">⤓ Word</button>`;
+            return `<div class="it">
+              <span class="k d">${fmtD(e.when)}</span>
+              <span class="a">${esc(e.lab)}</span>
+              <span class="v">${e.val.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</span>
+              ${ext}</div>`;
+          })
+          .join("");
+        return `<div class="card"><div class="ch"><h3>Lo hecho hasta ahora</h3>
+            <span class="tag"><span>${ev.length}</span> <span>anotaciones</span></span></div>
+          <div class="daylist jled" id="jLedger">${rows}</div></div>`;
+      }
+
+      /** The ledger's download buttons, wired after it is in the DOM — the same
+       *  route `downloadHistoryDoc` gives the Historial modal, so the document
+       *  offered here is the one the customer already has. */
+      function journeyLedgerWire(v, c) {
+        v.querySelectorAll("[data-led]").forEach((btn) => {
+          btn.onclick = async () => {
+            const row = journeyLedgerRows(c)[Number(btn.dataset.row)];
+            if (!row || !row.doc) return;
+            btn.disabled = true;
+            try {
+              await downloadHistoryDoc(row.doc, btn.dataset.led);
+            } catch (e) {
+              toast("⚠ No se pudo generar el documento: " + ((e && e.message) || e));
+            }
+            btn.disabled = false;
+          };
+        });
+      }
+
       function journeyPicker(v) {
         $("#headact").innerHTML = "";
         renderMasterList(v, {
@@ -23862,19 +24311,20 @@
             { label: "Trabajo", get: (r) => r.work },
             {
               label: "Fase",
-              /* The tone is the PHASE's own, not a second opinion about it: the
-                 same pill the recorrido shows when you open it, so the register and
-                 the screen behind it can never disagree. Number and name are
-                 separate nodes for the reason `journeyCount` exists. */
+              /* The strip, then the name. The tone is the PHASE's own, not a second
+                 opinion about it: the same classes the recorrido shows when you open
+                 it, so the register and the screen behind it can never disagree.
+                 The name stays because a row of dots with no word is a puzzle, and
+                 because a cell with no text disappears on a phone
+                 (`table.cards td:empty`). Number and name are separate nodes for the
+                 reason `journeyCount` exists. */
               html: (r) =>
-                `<span class="pill ${r.tone}"><span>${r.at + 1}</span> · <span>${esc(
+                journeyMini(r.states, r.at) +
+                `<span class="jminil"><span>${r.at + 1}</span> · <span>${esc(
                   JOURNEY[r.at].lab,
                 )}</span></span>`,
             },
-            {
-              label: "Siguiente paso",
-              get: (r) => journeyNextLabel(r.next),
-            },
+            { label: "Siguiente paso", get: (r) => r.nextLab },
             { label: "Importe", html: (r) => `<span class="num">${eur0(r.amount)}</span>` },
           ],
           onRowClick: (id) => {
@@ -24197,7 +24647,7 @@
             return h.budgets.map((b) => ({
               id: b.id,
               ref: b.number,
-              when: b.createdAt,
+              when: b.date,
               note: erp.budgetStage ? erp.budgetStage(b) : "",
               doc: "presupuesto",
               budgetId: b.id,
@@ -24207,7 +24657,7 @@
             return h.contracts.map((c) => ({
               id: c.id,
               ref: c.number,
-              when: c.signedAt || c.createdAt,
+              when: c.signature.customerSignedAt || c.date,
               note: c.origin === "external" ? "externo" : "",
               doc: c.origin === "external" ? null : "contrato",
               contractId: c.id,
@@ -24216,7 +24666,7 @@
             return h.projects.map((p) => ({
               id: p.id,
               ref: p.code,
-              when: p.startDate || p.createdAt,
+              when: p.dates.start || p.dates.targetEnd,
               note: p.name || "",
               doc: "fichaProyecto",
               projectId: p.id,
@@ -24225,7 +24675,7 @@
             return h.invoices.map((i) => ({
               id: i.id,
               ref: i.number,
-              when: i.issueDate || i.createdAt,
+              when: i.date,
               note: money(i.totalCents || 0),
               doc: i.kind === "creditNote" ? "rectificativa" : "factura",
               invoiceId: i.number,
@@ -24243,7 +24693,7 @@
             return h.bills.map((b) => ({
               id: b.id,
               ref: b.number || b.id,
-              when: b.issueDate || b.date,
+              when: b.date,
               note: money(b.totalCents || 0),
               // A supplier's own invoice is THEIR document, not ours: this
               // system files it, it does not print it. Offering to generate
@@ -25270,7 +25720,7 @@
         let held = null;
         paint();
       }
-      function newContractDrawer(seed) {
+      function newContractDrawer(seed, opts) {
         const linkable = erp.state.budgets.filter(
           /* AN ADICIONAL IS NOT A NEW CONTRACT. It joins the one the job
                    already has, as an adenda — so it must not appear in a picker
@@ -25471,7 +25921,7 @@
               signed: signedOn,
             };
             toast("⚠ Faltan datos del cliente: " + comp.missing.join(", "));
-            editPartyDrawer(partyId, () => newContractDrawer(held));
+            editPartyDrawer(partyId, () => newContractDrawer(held, opts));
             return;
           }
           mutate(() => {
@@ -25504,7 +25954,12 @@
                 "backoffice",
               );
             closeDrawer();
-            conWork = { id: c.id, tab: "datos" };
+            /* The contract's own screen, unless the caller asked to stay. Opening
+               it is right when the operator came from Contratos and wants to fill
+               in hitos; it is wrong when they came from somewhere that already
+               shows the contract, because `conWork` takes over the whole page. */
+            if (opts && (opts.onCreated || opts.stay)) afterCreate(opts, c, "contracts");
+            else conWork = { id: c.id, tab: "datos" };
           }, "Contrato creado");
         };
         paint();
