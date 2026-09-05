@@ -9252,7 +9252,10 @@ async function testProcurement(browser, base) {
     if (
       sheetShape.cal === 7 &&
       sheetShape.groups === 2 &&
-      sheetShape.tabs.join() === "sheet,summary,register" &&
+      /* Review sits BETWEEN entry and the summary now — the order of the work,
+         left to right: the crew types, the office reviews and approves, and only
+         then does the summary mean anything. */
+      sheetShape.tabs.join() === "sheet,register,summary" &&
       !sheetShape.registerUnderTheDay &&
       sheetShape.dock
     )
@@ -9262,256 +9265,295 @@ async function testProcurement(browser, base) {
       ok(`ADM-04: the day sheet is ${sheetShape.height} px, not a scroll through last April`);
     else bad("ADM-04: day sheet length", `${sheetShape.height} px`);
 
-    await pg.click("#hAssign");
-    await pg.waitForTimeout(300);
-    await pg.selectOption("#as_w", { index: 0 });
-    await pg.click("#as_save");
-    await pg.waitForTimeout(500);
-    const hin = pg.locator(".wcard input.hin").first();
-    if ((await hin.count()) === 0) {
-      bad("ADM-04: the day sheet offers an editable row after assigning", "no input.hin");
-    } else {
-      // The calendar cell counts the whole day across every job, so the check
-      // is the DELTA — reading "6 h" would only pass on a day nobody worked.
-      const hoursOnDay = () =>
-        pg.evaluate(
-          () =>
-            erp.state.labour.filter((l) => l.date === hDay).reduce((s, l) => s + l.hoursMilli, 0) /
-            1000,
-        );
-      /* Point the row at a job that is still open.
-         `recordHours` refuses hours against a closed project, and the demo file
-         has closed ones — so whether this passed used to depend on which job
-         happened to be first for the day the sheet opened on. Choosing openly
-         is what the operator does with the row's own selector, and it stops the
-         check reporting a calendar bug when the engine had refused upstream. */
-      await pg.evaluate(() => {
-        const open = erp.state.projects.find((p) => !p.closed);
-        if (!open) return;
-        document.querySelectorAll("[data-newproj]").forEach((s) => {
-          if ([...s.options].some((o) => o.value === open.id)) {
-            s.value = open.id;
-            s.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-        });
-      });
-      await pg.waitForTimeout(200);
-      const beforeH = await hoursOnDay();
-      // The first row may already carry hours, in which case typing 6 CORRECTS
-      // it rather than adding to the day. Either way the arithmetic is known.
-      const prev = Number((await hin.inputValue()).replace(",", ".")) || 0;
-      await hin.fill("6");
-      await hin.blur();
-      await pg.waitForTimeout(600);
-      const afterH = await hoursOnDay();
-      const dayTotal = await pg.locator(".weekbar .hday.on .h").innerText();
-      const shown = Number(dayTotal.replace(/[^\d,.]/g, "").replace(",", "."));
-      if (afterH === beforeH - prev + 6 && shown === afterH)
-        ok("ADM-04: hours entered on the sheet show in the day's calendar cell");
-      else {
-        // The engine refuses some entries (a closed project, no project chosen)
-        // and says so in a toast. Reporting the arithmetic alone left the last
-        // failure looking like a calendar bug when it was a refusal upstream.
-        const why = await pg.evaluate(() => {
-          const t = document.querySelector(".toast, #toast, .toasts");
-          return {
-            toast: t ? t.textContent.trim().slice(0, 120) : "",
-            day: typeof hDay === "string" ? hDay : null,
-            rows: document.querySelectorAll(".wcard .wrow").length,
-            projSel: document.querySelector("[data-newproj]")?.value ?? null,
-          };
-        });
-        bad(
-          "ADM-04: calendar total after entry",
-          `${beforeH}-${prev}+6 → ${afterH}, shown ${dayTotal} · ${JSON.stringify(why)}`,
-        );
-      }
+    /* ENTRY GOES THROUGH THE DRAWER NOW, and the sheet is the record of what
+       came out. The card used to carry five live controls per line — a job, two
+       for the partida, the kind and a number — which is five decisions on the
+       screen whose only question is what this person did today. The drawer asks
+       once, with labels, and validates in one place.
 
-      /* APPROVING MOVED, AND THAT IS THE POINT OF THIS PAIR. The day sheet is
+       So this drives the real path: open «Añadir línea», fill it, and check the
+       day's calendar cell moved by exactly what was typed. The delta is what is
+       asserted, not the total, because the cell counts every job on the day. */
+    const hoursOnDay = () =>
+      pg.evaluate(
+        () =>
+          erp.state.labour.filter((l) => l.date === hDay).reduce((s, l) => s + l.hoursMilli, 0) /
+          1000,
+      );
+    const beforeH = await hoursOnDay();
+    await pg.click("#hAdd");
+    await pg.waitForTimeout(400);
+    /* An OPEN job: `recordHours` refuses hours against a closed one — rightly,
+       a closed job's cost is settled — and the demo file carries closed jobs,
+       so picking blind made this pass or fail on whichever sorted first. */
+    const picked = await pg.evaluate(() => {
+      const sel = document.querySelector("#nh_p");
+      const open = erp.state.projects.find(
+        (p) => !p.closed && [...sel.options].some((o) => o.value === p.id),
+      );
+      if (!open) return null;
+      sel.value = open.id;
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+      return open.id;
+    });
+    if (!picked) bad("ADM-04: the drawer offers an open job", "none in the list");
+    await pg.waitForTimeout(300);
+    /* The subpartida field is ALWAYS on the form now — disabled when the partida
+       has none — so a form that never grows or shrinks under the thumb. */
+    const subShape = await pg.evaluate(() => {
+      const l = document.querySelector("#nh_l");
+      const wrap = document.querySelector("#nh_lwrap");
+      return {
+        present: !!l,
+        visible: !!wrap && getComputedStyle(wrap).display !== "none",
+        disabled: !!l && l.disabled,
+        options: l ? l.options.length : 0,
+      };
+    });
+    if (subShape.present && subShape.visible)
+      ok("ADM-04: the drawer always shows the sub-line field, enabled or not");
+    else bad("ADM-04: drawer sub-line field", JSON.stringify(subShape));
+    await pg.evaluate(() => {
+      const l = document.querySelector("#nh_l");
+      if (l && !l.disabled && l.options.length > 1) l.selectedIndex = 1;
+    });
+    await pg.fill("#nh_h", "6");
+    await pg.click("#nh_go");
+    await pg.waitForTimeout(800);
+    const afterH = await hoursOnDay();
+    const dayTotal = await pg.locator(".weekbar .hday.on .h").innerText();
+    const shown = Number(dayTotal.replace(/[^\d,.]/g, "").replace(",", "."));
+    if (afterH === beforeH + 6 && shown === afterH)
+      ok("ADM-04: hours added in the drawer show in the day's calendar cell");
+    else {
+      const why = await pg.evaluate(() => {
+        const t = document.querySelector(".toast, #toast, .toasts");
+        return {
+          toast: t ? t.textContent.trim().slice(0, 140) : "",
+          day: typeof hDay === "string" ? hDay : null,
+          rows: document.querySelectorAll(".wcard .wrow").length,
+        };
+      });
+      bad(
+        "ADM-04: calendar total after entry",
+        `${beforeH}+6 → ${afterH}, shown ${dayTotal} · ${JSON.stringify(why)}`,
+      );
+    }
+
+    /* AND THE CARD SHOWS, IT DOES NOT ASK. The whole point of moving entry into
+       the drawer is that the sheet stops being a form; a select creeping back
+       onto it would undo that quietly. */
+    const cardControls = await pg.evaluate(() => ({
+      inputs: document.querySelectorAll(".wcard input").length,
+      selects: document.querySelectorAll(".wcard select").length,
+      subFields: [...document.querySelectorAll(".wcard .wf label")].filter((l) =>
+        /subpartida|sub-line|subpartida/i.test(l.textContent),
+      ).length,
+    }));
+    if (cardControls.inputs === 0 && cardControls.selects === 0)
+      ok("ADM-04: the day sheet card renders values, not controls");
+    else bad("ADM-04: controls back on the day sheet", JSON.stringify(cardControls));
+    if (cardControls.subFields > 0)
+      ok("ADM-04: and the sub-line item has a field of its own on the card");
+    else bad("ADM-04: no sub-line field on the card", JSON.stringify(cardControls));
+
+    /* APPROVING MOVED, AND THAT IS THE POINT OF THIS PAIR. The day sheet is
        where the crew's hours are typed; a button that locks a whole week has no
        business on it, one mis-tap from a week nobody can correct. So: it must
        be absent there, and it must work from Revisión — where the office signs
        off on what it has just read. */
-      const approveOnSheet = await pg.evaluate(
-        () => document.querySelectorAll(".wcard [data-approve]").length,
+    const approveOnSheet = await pg.evaluate(
+      () => document.querySelectorAll(".wcard [data-approve]").length,
+    );
+    if (approveOnSheet === 0) ok("ADM-04: the day sheet offers no way to lock a week");
+    else bad("ADM-04: approve still on the day sheet", `${approveOnSheet} buttons`);
+
+    await pg.locator('[data-htab="register"]').click();
+    await pg.waitForTimeout(700);
+    const clicked = await pg.evaluate(() => {
+      const ws = labourWeekAll(hDay).weekStart;
+      const b = [...document.querySelectorAll("[data-approve][data-ws]")].find(
+        (x) => x.dataset.ws === ws,
       );
-      if (approveOnSheet === 0) ok("ADM-04: the day sheet offers no way to lock a week");
-      else bad("ADM-04: approve still on the day sheet", `${approveOnSheet} buttons`);
+      if (!b) return null;
+      b.click();
+      return ws;
+    });
+    if (clicked) ok("ADM-04: Revisión lists the week waiting for approval, and approves it");
+    else bad("ADM-04: no pending week in Revisión for the day just entered", "none");
+    await pg.waitForTimeout(700);
+    await pg.locator('[data-htab="sheet"]').click();
+    await pg.waitForTimeout(700);
+    const lockedRows = await pg.evaluate(
+      () =>
+        [...document.querySelectorAll(".wcard")].filter(
+          (c) => c.classList.contains("locked") && c.querySelector(".pill.g"),
+        ).length,
+    );
+    if (lockedRows > 0) ok("ADM-04: approving the week turns its card into a locked figure");
+    else bad("ADM-04: approve locks the row", `locked=${lockedRows}`);
 
-      await pg.locator('[data-htab="register"]').click();
-      await pg.waitForTimeout(700);
-      const clicked = await pg.evaluate(() => {
-        const ws = labourWeekAll(hDay).weekStart;
-        const b = [...document.querySelectorAll("[data-approve][data-ws]")].find(
-          (x) => x.dataset.ws === ws,
-        );
-        if (!b) return null;
-        b.click();
-        return ws;
-      });
-      if (clicked) ok("ADM-04: Revisión lists the week waiting for approval, and approves it");
-      else bad("ADM-04: no pending week in Revisión for the day just entered", "none");
-      await pg.waitForTimeout(700);
-      await pg.locator('[data-htab="sheet"]').click();
-      await pg.waitForTimeout(700);
-      const lockedRows = await pg.evaluate(
-        () =>
-          [...document.querySelectorAll(".wcard")].filter(
-            (c) => !c.querySelector("input.hin") && c.querySelector(".pill"),
-          ).length,
+    // ── Block 3: the labour asks from the client review, on the real screen.
+    //    An overtime hour priced from its own band; hours naming a partida;
+    //    the by-worker table and the per-worker cash reconciliation, both
+    //    RENDERED with geometry, not merely computed.
+    const b3 = await pg.evaluate(() => {
+      const w = erp.state.workers.find((x) => x.active !== false);
+      erp.addWorkerRate(
+        w.id,
+        { from: erp.state.today, rateCentsPerHour: 2000, extraRateCentsPerHour: 2600 },
+        "bo",
       );
-      if (lockedRows > 0) ok("ADM-04: approving the week turns its card into a locked figure");
-      else bad("ADM-04: approve locks the row", `locked=${lockedRows}`);
+      const p = erp.state.projects.find(
+        (x) =>
+          x.budgetId &&
+          x.acceptedVersionId &&
+          !x.closed &&
+          erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
+      );
+      const v = p && erp.version(p.budgetId, p.acceptedVersionId);
+      const chp = v && v.chapters.find((c) => c.lines.length);
+      const rec = erp.recordHours(
+        {
+          workerId: w.id,
+          projectId: p.id,
+          lineId: chp.lines[0].id,
+          kind: "extra",
+          hoursMilli: 2000,
+          date: erp.state.today,
+        },
+        "op",
+      );
+      const till =
+        erp.state.bankAccounts.find((a) => a.name === "Efectivo E2E") ||
+        erp.addBankAccount({ name: "Efectivo E2E", kind: "bank" }, "bo");
+      erp.recordCashMovement(
+        till.id,
+        {
+          concept: "Pago semana",
+          amountCents: -5000,
+          workerId: w.id,
+          supportingDocRef: "recibo",
+        },
+        "bo",
+      );
+      return {
+        rate: rec.rateCents,
+        chapterFilled: rec.chapterNum === String(chp.num),
+        lineId: !!rec.lineId,
+      };
+    });
+    if (b3.rate === 2600 && b3.chapterFilled && b3.lineId)
+      ok("block 3: an extra hour prices from its own band, and hours land on the partida");
+    else bad("block 3: overtime + partida", JSON.stringify(b3));
 
-      // ── Block 3: the labour asks from the client review, on the real screen.
-      //    An overtime hour priced from its own band; hours naming a partida;
-      //    the by-worker table and the per-worker cash reconciliation, both
-      //    RENDERED with geometry, not merely computed.
-      const b3 = await pg.evaluate(() => {
-        const w = erp.state.workers.find((x) => x.active !== false);
-        erp.addWorkerRate(
-          w.id,
-          { from: erp.state.today, rateCentsPerHour: 2000, extraRateCentsPerHour: 2600 },
-          "bo",
-        );
-        const p = erp.state.projects.find(
-          (x) =>
-            x.budgetId &&
-            x.acceptedVersionId &&
-            !x.closed &&
-            erp.version(x.budgetId, x.acceptedVersionId).chapters.some((c) => c.lines.length),
-        );
-        const v = p && erp.version(p.budgetId, p.acceptedVersionId);
-        const chp = v && v.chapters.find((c) => c.lines.length);
-        const rec = erp.recordHours(
-          {
-            workerId: w.id,
-            projectId: p.id,
-            lineId: chp.lines[0].id,
-            kind: "extra",
-            hoursMilli: 2000,
-            date: erp.state.today,
-          },
-          "op",
-        );
-        const till =
-          erp.state.bankAccounts.find((a) => a.name === "Efectivo E2E") ||
-          erp.addBankAccount({ name: "Efectivo E2E", kind: "bank" }, "bo");
-        erp.recordCashMovement(
-          till.id,
-          {
-            concept: "Pago semana",
-            amountCents: -5000,
-            workerId: w.id,
-            supportingDocRef: "recibo",
-          },
-          "bo",
-        );
-        return {
-          rate: rec.rateCents,
-          chapterFilled: rec.chapterNum === String(chp.num),
-          lineId: !!rec.lineId,
-        };
-      });
-      if (b3.rate === 2600 && b3.chapterFilled && b3.lineId)
-        ok("block 3: an extra hour prices from its own band, and hours land on the partida");
-      else bad("block 3: overtime + partida", JSON.stringify(b3));
-
-      /* The sheet must SAY which kind of hour each line is. It priced overtime
+    /* The sheet must SAY which kind of hour each line is. It priced overtime
          correctly all along and showed the worker's contract type instead, so
          a normal hour and an overtime hour were the same row with a different
          number in it — the operator's words: "ensure you see in the tile what
          hours are it, normal or overtime". */
-      await pg.evaluate(() => {
-        hDay = erp.state.today;
-        location.hash = "labour";
-        render();
-      });
-      await pg.waitForTimeout(700);
-      const kindShown = await pg.evaluate(() => {
-        /* S10 · the kind stopped being a column and became a chip on the row,
-           which is a stronger claim than the old one: a column head can say
-           «Tipo de hora» while the cell under it is empty. Assert the control
-           itself, one per row that has an entry. */
-        const sels = [...document.querySelectorAll(".wcard [data-hkind]")];
-        return {
-          hasColumn: sels.length > 0,
-          controls: sels.length,
-          values: sels.map((s) => s.value),
-          // A control nobody can see is not a thing the tile shows.
-          visible: sels.filter((s) => s.getBoundingClientRect().width > 20).length,
-        };
-      });
-      if (kindShown.hasColumn && kindShown.visible > 0 && kindShown.values.includes("extra"))
-        ok("block 3: the day sheet names each line's hour kind, extra included");
-      else bad("block 3: hour kind on the sheet", JSON.stringify(kindShown));
+    await pg.evaluate(() => {
+      hDay = erp.state.today;
+      location.hash = "labour";
+      render();
+    });
+    await pg.waitForTimeout(700);
+    const kindShown = await pg.evaluate(() => {
+      /* S12 · the kind is a VALUE on the card now, not a select. The claim is
+           the same one the operator made — you must see in the tile whether an
+           hour is normal or overtime — and reading it as text is the stronger
+           form of it: a select can show a label while the entry says otherwise,
+           a rendered value cannot. */
+      const rows = [...document.querySelectorAll(".wcard .wrow")];
+      const labels = [...document.querySelectorAll(".wcard .wf label")].map((l) =>
+        l.textContent.trim().toLowerCase(),
+      );
+      const vals = [...document.querySelectorAll(".wcard .wend .val")].map((v) =>
+        v.textContent.trim(),
+      );
+      return {
+        rows: rows.length,
+        hasColumn: labels.some((l) => /tipo de hora|hour type|tipus d/i.test(l)),
+        values: vals,
+        extra: vals.some((v) => /extra/i.test(v)),
+      };
+    });
+    if (kindShown.hasColumn && kindShown.rows > 0 && kindShown.extra)
+      ok("block 3: the day sheet names each line's hour kind, extra included");
+    else bad("block 3: hour kind on the sheet", JSON.stringify(kindShown));
 
-      // …and changing it there is a correction, not a relabel: correctHours
-      // re-reads the rate band, so the entry's cost has to move with it.
-      const repriced = await pg.evaluate(async () => {
-        const sel = [...document.querySelectorAll(".wcard [data-hkind]")].find(
-          (s) => s.value === "extra",
-        );
-        if (!sel) return { skipped: true };
-        const id = sel.dataset.hkind;
-        const before = erp.state.labour.find((l) => l.id === id).rateCents;
-        sel.value = "normal";
-        sel.dispatchEvent(new Event("change", { bubbles: true }));
-        await new Promise((r) => setTimeout(r, 400));
-        const after = erp.state.labour.find((l) => l.id === id);
-        return { before, after: after.rateCents, kind: after.kind };
-      });
-      if (repriced.before === 2600 && repriced.after === 2000 && repriced.kind === "normal")
-        ok("block 3: correcting the kind on the sheet re-prices the entry from the other band");
-      else bad("block 3: kind correction re-prices", JSON.stringify(repriced));
+    // …and correcting it is a correction, not a relabel: correctHours re-reads
+    // the rate band, so the entry's cost has to move with it. That correction
+    // lives in Revisión now, which is where this drives it.
+    const repriced = await pg.evaluate(async () => {
+      const target = erp.state.labour.find((l) => l.kind === "extra" && !l.locked);
+      if (!target) return { skipped: true };
+      const before = target.rateCents;
+      hTab = "register";
+      hRegFilter = "open";
+      hEditId = target.id;
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const k = document.querySelector("#re_k");
+      const save = document.querySelector(`[data-resave="${target.id}"]`);
+      if (!k || !save) return { noPanel: true, before };
+      k.value = "normal";
+      save.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const after = erp.state.labour.find((l) => l.id === target.id);
+      return { before, after: after.rateCents, kind: after.kind };
+    });
+    if (repriced.before === 2600 && repriced.after === 2000 && repriced.kind === "normal")
+      ok("block 3: correcting the kind in Revisión re-prices the entry from the other band");
+    else bad("block 3: kind correction re-prices", JSON.stringify(repriced));
 
-      await pg.evaluate(() => {
-        document.querySelector("#view .tabstrip [data-tab]") && null;
-        location.hash = "labour";
-      });
-      // Resumen tab renders the two new tables.
-      await pg.evaluate(() => {
-        const t = [...document.querySelectorAll(".tabstrip .tab")].find((x) =>
-          /Resumen/.test(x.textContent),
-        );
-        if (t) t.click();
-      });
-      await pg.waitForTimeout(700);
-      /* S10 · the two tables became a ranked list and a drill-down inside the
+    await pg.evaluate(() => {
+      document.querySelector("#view .tabstrip [data-tab]") && null;
+      location.hash = "labour";
+    });
+    // Resumen tab renders the two new tables.
+    await pg.evaluate(() => {
+      const t = [...document.querySelectorAll(".tabstrip .tab")].find((x) =>
+        /Resumen/.test(x.textContent),
+      );
+      if (t) t.click();
+    });
+    await pg.waitForTimeout(700);
+    /* S10 · the two tables became a ranked list and a drill-down inside the
          month's reconciliation, because the cash comparison IS that
          reconciliation per person. The claim is unchanged — both render, with
          rows — but the cash side now has to be opened, and asserting that it
          opens is a check the old shape could not make. */
-      const tables = await pg.evaluate(async () => {
-        const rows = (sel) => document.querySelectorAll(sel).length;
-        const byW = rows(".hworker");
-        const drill = document.querySelector("#hRecMore");
-        const closed = rows(".hcash .cw");
-        if (drill) drill.click();
-        await new Promise((r) => setTimeout(r, 500));
-        return {
-          byW,
-          closed,
-          opened: rows(".hcash .cw"),
-          w: Math.round(document.querySelector(".hrank")?.getBoundingClientRect().width || 0),
-        };
-      });
-      if (tables.byW > 0 && tables.w > 400)
-        ok(`block 3: the by-worker list renders with rows (${tables.byW})`);
-      else bad("block 3: by-worker list", JSON.stringify(tables));
-      if (tables.closed === 0 && tables.opened > 0)
-        ok(`block 3: the cash comparison opens inside the reconciliation (${tables.opened} rows)`);
-      else bad("block 3: worker cash reconciliation", JSON.stringify(tables));
-      // Back to the day sheet — the checks below this block belong to it.
-      await pg.evaluate(() => {
-        const t = [...document.querySelectorAll(".tabstrip .tab")].find((x) =>
-          /Parte diario/.test(x.textContent),
-        );
-        if (t) t.click();
-      });
-      await pg.waitForTimeout(600);
+    const tables = await pg.evaluate(async () => {
+      const rows = (sel) => document.querySelectorAll(sel).length;
+      const byW = rows(".hworker");
+      const drill = document.querySelector("#hRecMore");
+      const closed = rows(".hcash .cw");
+      if (drill) drill.click();
+      await new Promise((r) => setTimeout(r, 500));
+      return {
+        byW,
+        closed,
+        opened: rows(".hcash .cw"),
+        w: Math.round(document.querySelector(".hrank")?.getBoundingClientRect().width || 0),
+      };
+    });
+    if (tables.byW > 0 && tables.w > 400)
+      ok(`block 3: the by-worker list renders with rows (${tables.byW})`);
+    else bad("block 3: by-worker list", JSON.stringify(tables));
+    if (tables.closed === 0 && tables.opened > 0)
+      ok(`block 3: the cash comparison opens inside the reconciliation (${tables.opened} rows)`);
+    else bad("block 3: worker cash reconciliation", JSON.stringify(tables));
+    // Back to the day sheet — the checks below this block belong to it.
+    await pg.evaluate(() => {
+      const t = [...document.querySelectorAll(".tabstrip .tab")].find((x) =>
+        /Parte diario/.test(x.textContent),
+      );
+      if (t) t.click();
+    });
+    await pg.waitForTimeout(600);
 
-      /* Repeat copies the PREVIOUS day, so move on one day first — otherwise
+    /* Repeat copies the PREVIOUS day, so move on one day first — otherwise
          the button is being asked to copy a day that has nothing on it.
          Advanced by DATE rather than by clicking the next calendar cell: the
          sheet opens on the real date now, and when that is a Sunday there is no
@@ -9519,20 +9561,19 @@ async function testProcurement(browser, base) {
          The check then failed for a reason that had nothing to do with
          repeating a day, which is the kind of failure that gets a real one
          dismissed. */
-      await pg.evaluate(() => {
-        const d = new Date(hDay + "T00:00:00");
-        d.setDate(d.getDate() + 1);
-        const p = (n) => String(n).padStart(2, "0");
-        hDay = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-        render();
-      });
-      await pg.waitForTimeout(500);
-      await pg.click("#hRepeat");
-      await pg.waitForTimeout(600);
-      const repeatToast = await pg.locator("#toast").innerText();
-      if (/repetid/i.test(repeatToast)) ok("ADM-04: repeating the previous day reports success");
-      else bad("ADM-04: repeat day", repeatToast);
-    }
+    await pg.evaluate(() => {
+      const d = new Date(hDay + "T00:00:00");
+      d.setDate(d.getDate() + 1);
+      const p = (n) => String(n).padStart(2, "0");
+      hDay = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+      render();
+    });
+    await pg.waitForTimeout(500);
+    await pg.click("#hRepeat");
+    await pg.waitForTimeout(600);
+    const repeatToast = await pg.locator("#toast").innerText();
+    if (/repetid/i.test(repeatToast)) ok("ADM-04: repeating the previous day reports success");
+    else bad("ADM-04: repeat day", repeatToast);
 
     // The Resumen tab: per project and chapter, and the month's reconciliation.
     await pg.locator('[data-htab="summary"]').click();

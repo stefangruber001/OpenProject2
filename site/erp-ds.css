@@ -1882,6 +1882,19 @@ td.k,
   border-color: var(--accent);
   color: #fff;
 }
+/* Something waiting on a person is not something finished. Green is the colour
+   this workspace uses for «approved and settled», so the button that says how
+   many hours are STILL open had been reading as good news. */
+.btn.warn {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #3d2f00;
+  font-weight: 700;
+}
+.btn.warn:hover:not([disabled]):not(:disabled) {
+  background: #e2b420;
+  border-color: #e2b420;
+}
 .secitem .lb {
   font: 600 10.5px var(--sans);
   letter-spacing: 0.01em;
@@ -4272,8 +4285,14 @@ td.num.late {
   display: grid;
   gap: 8px;
 }
-/* Hour type and hours share a line: both are short answers, and putting them
-   side by side keeps a six-line day to a screen and a half instead of four. */
+/* Partida and subpartida share a line, as hour type and hours do below: four
+   stacked fields per entry made a three-line day scroll like a form. */
+.wcard .wpair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
 .wcard .wend {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 104px;
@@ -4295,6 +4314,34 @@ td.num.late {
 }
 .wcard .whrs > label {
   text-align: center;
+}
+/* A VALUE, NOT A CONTROL. Same box a select occupied, so a card of three
+   entries lines up down one edge and every row is the same height — which is
+   what a select could never give, because its height came from the browser. */
+.wcard .wf .val {
+  font-size: 13px;
+  color: var(--ink);
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wcard .wf .val.strong {
+  font-weight: 600;
+}
+.wcard .wrow.empty2 {
+  padding: 12px 11px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.wcard .wch .tot {
+  font: 700 13px var(--sans);
+  color: var(--greenDeep);
+  white-space: nowrap;
 }
 .wcard .wproj {
   font-weight: 600;
@@ -4334,12 +4381,18 @@ td.num.late {
   font: 700 15px var(--sans);
   padding: 7px 4px;
 }
+/* The hours box keeps the height and the border the input had, so a row of
+   values still reads as the row that collects them. */
 .wcard .whrs .ro {
-  display: block;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  background: var(--paper);
   font: 700 15px var(--sans);
-  color: var(--muted);
-  padding: 7px 4px;
+  color: var(--ink);
+  padding: 5px 4px;
 }
 .wcard .wcf {
   display: flex;
@@ -4382,6 +4435,220 @@ td.num.late {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---- the summary's own scope: which job, over what stretch ---- */
+.hscope {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hscope .hstop,
+.hscope .hsbot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.hscope .plbl {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.hscope input,
+.hscope select {
+  font: 12.5px var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 6px 9px;
+  outline: 0;
+  min-width: 0;
+}
+.hscope select {
+  font-weight: 600;
+}
+.hscope .hstop input {
+  flex: 1;
+}
+.hscope .hsbot select {
+  flex: 1;
+}
+.hscope .fav {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 2px;
+  color: var(--faint);
+  flex: 0 0 auto;
+}
+.hscope .fav.on {
+  color: var(--gold);
+}
+.hscope .fav[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* One segmented control for the stretch of time. Equal cells, one filled — the
+   same shape the language switch and the Mine/Everyone group already use, so
+   the workspace has one way of saying "pick one of these". */
+.hscope .hseg {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--line);
+}
+.hscope .hseg .sg {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font: 600 12px var(--sans);
+  padding: 7px 4px;
+  cursor: pointer;
+  min-width: 0;
+}
+.hscope .hseg .sg.on {
+  background: var(--accent);
+  color: #fff;
+}
+.hscope .hseg .lb {
+  padding: 0 10px;
+  font: 700 11px var(--sans);
+  color: var(--greenDeep);
+  white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .hscope .hseg {
+    flex-wrap: wrap;
+  }
+  .hscope .hseg .lb {
+    flex: 1 0 100%;
+    padding: 6px 8px;
+    border-top: 1px solid var(--line);
+    text-align: center;
+  }
+}
+/* Given room, the three stacked rows become one toolbar. Stretched to 1440px
+   the search box was a third of a metre wide and each period cell the size of a
+   button nobody needs that large — width the layout was given rather than
+   width it wanted. */
+@media (min-width: 900px) {
+  .hscope {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+  }
+  .hscope .hstop,
+  .hscope .hsbot {
+    flex: 0 1 auto;
+  }
+  .hscope .hstop input {
+    flex: 0 0 auto;
+    width: 220px;
+  }
+  .hscope .hsbot select {
+    flex: 0 0 auto;
+    width: 340px;
+    max-width: 40vw;
+  }
+  .hscope .hseg {
+    margin-left: auto;
+  }
+  .hscope .hseg .sg {
+    flex: 0 0 auto;
+    padding: 7px 16px;
+  }
+}
+
+/* ---- who worked: three numbers, one column each ---- */
+.hwlist {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.hwlist .hwh,
+.hwlist .hworker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px 62px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 11px;
+}
+.hwlist .hwh {
+  background: var(--accentPale);
+  border-bottom: 1px solid var(--line);
+  font: 700 9px var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.hwlist .hwh .n {
+  text-align: right;
+}
+.hwlist .hworker {
+  border-bottom: 1px solid var(--hair);
+}
+.hwlist .hworker:last-child {
+  border-bottom: 0;
+}
+.hwlist .who {
+  min-width: 0;
+}
+.hwlist .nm {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwlist .r {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwlist .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.hwlist .hh {
+  font-weight: 700;
+}
+.hwlist .ot {
+  color: var(--gold);
+  font-weight: 600;
+}
+.hwlist .ot.zero {
+  color: var(--faint);
+  font-weight: 400;
+}
+.hwlist .cc {
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .hwlist .hwh,
+  .hwlist .hworker {
+    grid-template-columns: minmax(0, 1fr) 48px 48px 74px;
+    gap: 6px;
+    padding: 8px 9px;
+  }
+  .hwlist .n {
+    font-size: 12px;
+  }
 }
 
 /* ---- the office's sign-off, at the head of the review ----

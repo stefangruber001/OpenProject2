@@ -6025,6 +6025,14 @@ window.CANEI_DICT = {
     ["Añadir línea", "Add hours line"],
     ["Aprobar semana", "Approve week"],
     ["Reabrir semana", "Reopen week"],
+    ["Todos los proyectos", "All projects"],
+    ["Día", "Day"],
+    ["Pagado en efectivo a trabajadores", "Paid to workers in cash"],
+    ["Sin horas apuntadas todavía.", "No hours entered yet."],
+    [
+      "Este parte muestra lo apuntado. Para añadir horas usa «Añadir línea»; para corregir o aprobar, ve a Revisión.",
+      "This sheet shows what was entered. Use «Add hours line» to add hours; to correct or approve, go to Review.",
+    ],
     ["Partida y subpartida", "Line item and sub-line item"],
     ["todo aprobado", "all approved"],
     [
@@ -6069,6 +6077,8 @@ window.CANEI_DICT = {
     [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Week $1 – $2"],
     [new RegExp("^mes (\\d{4}-\\d{2})$"), "month $1"],
     [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Review $1 not approved"],
+    [new RegExp("^Revisar ([\\d.,]+) h sin aprobar$"), "Review $1 h not approved"],
+    [new RegExp("^＋ Añadir horas para (.+)$"), "＋ Add hours for $1"],
     [new RegExp("^([\\d.,]+ h) · (\\d+)% del coste del periodo$"), "$1 · $2% of the period's cost"],
     [new RegExp("^(\\d+) de (\\d+) apuntes$"), "$1 of $2 entries"],
     [new RegExp("^(\\d+) de (\\d+) apunte$"), "$1 of $2 entry"],

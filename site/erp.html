@@ -9132,10 +9132,13 @@
           <button class="hg${hGroup === "mine" ? " on" : ""}" data-hgrp="mine"><i>Mías</i>Mis horas</button>
           <button class="hg${hGroup === "all" ? " on" : ""}" data-hgrp="all"><i>Oficina</i>Todos</button></div>`
             : "";
+        /* REVIEW SITS BEFORE THE SUMMARY because it is the step between them:
+           the crew types, the office reviews and approves, and only then does the
+           summary mean anything. Left-to-right is the order of the work. */
         const tabs = `<div class="tabstrip">
           <button class="tab${hTab === "sheet" ? " on" : ""}" data-htab="sheet">Parte diario</button>
-          <button class="tab${hTab === "summary" ? " on" : ""}" data-htab="summary">Resumen</button>
-          <button class="tab${hTab === "register" ? " on" : ""}" data-htab="register">Revisión</button></div>`;
+          <button class="tab${hTab === "register" ? " on" : ""}" data-htab="register">Revisión</button>
+          <button class="tab${hTab === "summary" ? " on" : ""}" data-htab="summary">Resumen</button></div>`;
         const body =
           hGroup === "mine"
             ? horasMine()
@@ -9601,44 +9604,53 @@
         }
         const sent = dayRows.filter((r) => entryCameFromWorker(r.entry)).length;
         const dayMilli = dayRows.reduce((s2, r) => s2 + r.hoursMilli, 0);
-        function projectCell(r) {
-          if (r.entry) return `<div class="wproj">${esc(r.projectCode || "—")}</div>`;
-          const opts = jobs
-            .map((p) => `<option value="${p.id}">${esc(projectPickLabel(p))}</option>`)
-            .join("");
-          return `<div class="wsel"><select class="inline" data-newproj="${r.workerId}">${opts}</select></div>`;
-        }
+        /* THE CARD SHOWS, IT DOES NOT ASK. Every field on it used to be a live
+           control — a project select, two more for the partida, one for the kind
+           and a number box — which is five decisions per line on the screen whose
+           only job is «what did this person do today». Hours are entered in the
+           drawer, where the fields are labelled, ordered and validated once; the
+           card is the record of what came out. That also makes the rows the same
+           height as each other, which no arrangement of selects ever managed. */
+        const chapterLabel = (l) => {
+          if (!l || !l.chapterNum) return "—";
+          try {
+            for (const { chapter } of erp.projectChapters(l.projectId))
+              if (String(chapter.num) === String(l.chapterNum))
+                return `${chapter.num}. ${chapter.name || ""}`.trim();
+          } catch (e) {}
+          return String(l.chapterNum);
+        };
+        const row = (r) => {
+          if (!r.entry)
+            return `<div class="wrow empty2"><span>Sin horas apuntadas todavía.</span></div>`;
+          const sub = hourLineLabel(r.entry);
+          return `<div class="wrow">
+           <div class="wf"><label>Obra</label><div class="val strong">${esc(r.projectCode || "—")}</div></div>
+           <div class="wpair">
+             <div class="wf"><label>Partida</label><div class="val">${esc(chapterLabel(r.entry))}</div></div>
+             <div class="wf"><label>Subpartida</label><div class="val">${sub ? esc(sub) : "—"}</div></div></div>
+           <div class="wend">
+             <div class="wf"><label>Tipo de hora</label>
+               <div class="val">${esc(HOUR_KINDS[r.entry.kind || "normal"] || r.entry.kind)}</div></div>
+             <div class="whrs"><label>Horas</label><span class="ro">${h(r.hoursMilli)}</span></div></div>
+          </div>`;
+        };
         const card = (g) => {
           const locked = g.rows.some((r) => r.locked);
           const fromWorker = g.rows.some((r) => entryCameFromWorker(r.entry));
+          const total = g.rows.reduce((s2, r) => s2 + r.hoursMilli, 0);
           return `<div class="wcard${locked ? " locked" : ""}">
            <div class="wch"><span class="nm">${esc(g.name)}</span>
              <span class="role">${esc(WORKER_KINDS[g.kind] || g.kind)}</span>
              ${fromWorker ? '<span class="src">enviado</span>' : ""}
              <span style="flex:1"></span>
-             ${locked ? '<span class="pill g">Aprobada</span>' : ""}</div>
-           ${g.rows
-             .map(
-               (r) => `<div class="wrow">
-             <div class="wwhere">
-               <div class="wf"><label>Obra</label>${projectCell(r)}</div>
-               <div class="wf"><label>Partida y subpartida</label>
-                 <div class="wline">${hourWhereCell(r, jobs, chaptersOf)}</div></div></div>
-             <div class="wend">
-               <div class="wf"><label>Tipo de hora</label>
-                 <div class="wkind">${hourKindCell(r)}</div></div>
-             <div class="whrs"><label>Horas</label>${
-               r.locked
-                 ? `<span class="ro">${h(r.hoursMilli)}</span>`
-                 : `<input class="inline hin" type="number" step="0.25" min="0" placeholder="0"
-                    data-entry="${r.entry ? r.entry.id : ""}" data-worker="${r.workerId}" value="${r.hoursMilli ? h(r.hoursMilli) : ""}">`
-             }</div></div></div>`,
-             )
-             .join("")}
+             ${locked ? '<span class="pill g">Aprobada</span>' : ""}
+             <span class="tot">${h(total)} h</span></div>
+           ${g.rows.map(row).join("")}
            <div class="wcf">${
              locked
                ? ""
-               : `<button class="lnk" data-hmore="${g.workerId}">＋ Añadir otro trabajo para ${esc(personOf(g.name))}</button>`
+               : `<button class="lnk" data-hmore="${g.workerId}">＋ Añadir horas para ${esc(personOf(g.name))}</button>`
            }<span style="flex:1"></span>
              <button class="lnk quiet" data-workerdoc="${g.workerId}">Ficha del trabajador ›</button></div>
           </div>`;
@@ -9670,15 +9682,14 @@
            <span class="v">${h(dayMilli)} h · ${dayRows.length} línea${dayRows.length === 1 ? "" : "s"}</span></div>
          <div class="hdock">
           <button class="btn" id="hRepeat" title="Copia las horas del día anterior al día seleccionado">Copiar ayer</button>
-          <button class="btn" id="hAssign">Añadir trabajador</button>
           <button class="btn primary" id="hAdd">Añadir línea</button>
          </div>
          ${
            byWorker.map(card).join("") ||
            '<div class="card"><div class="empty">Nadie tiene horas ni asignación para este día.</div></div>'
          }
-         <p class="rnote">Este parte es para apuntar lo trabajado. Aprobar la semana
-         se hace en Revisión, cuando la oficina ya ha comprobado las imputaciones.</p>`;
+         <p class="rnote">Este parte muestra lo apuntado. Para añadir horas usa
+         «Añadir línea»; para corregir o aprobar, ve a Revisión.</p>`;
       }
 
       /** Rows for one day: every entry, plus a blank row per assigned worker with none. */
@@ -9764,98 +9775,11 @@
             if (!pids.length) throw new Error("El día anterior no tiene horas que repetir");
             pids.forEach((pid) => erp.repeatDay(pid, prev, hDay, "operations"));
           }, "Jornada repetida desde el día anterior");
-        // The first OPEN job, not simply the first. `recordHours` refuses hours
-        // against a closed project — correctly, since a closed job's cost is
-        // settled — so defaulting the assignment to one meant the sheet offered
-        // a row that could never be filled in, and said so only after the
-        // operator had typed the hours.
-        $("#hAssign").onclick = () =>
-          assignWorkerDrawer(
-            gProject ||
-              (erp.state.projects.find((p) => !p.closed) || erp.state.projects[0] || {}).id,
-          );
         $("#hAdd").onclick = () => newHoursDrawer(hDay);
-        /* The two selects are one answer, so they stay in step: choosing a
-                 different partida refills the subpartidas under it, and choosing a
-                 different job refills both. Without this the sheet would offer the
-                 first job's subpartidas against whatever else was picked — a
-                 destination that looks chosen and belongs to another obra. */
-        const refillWhere = (wid) => {
-          const proj = document.querySelector(`[data-newproj="${wid}"]`);
-          const chap = document.querySelector(`[data-newchap="${wid}"]`);
-          const line = document.querySelector(`[data-newline="${wid}"]`);
-          if (!proj || !chap) return;
-          const p = erp.state.projects.find((x) => x.id === proj.value);
-          const chapters = (p && p.baseline && p.baseline.chapters) || [];
-          chap.innerHTML =
-            chapters
-              .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
-              .join("") || '<option value="">—</option>';
-          if (line) line.innerHTML = lineOptionsFor(proj.value, chap.value, "") || "";
-        };
-        document
-          .querySelectorAll("[data-newproj]")
-          .forEach((el) => (el.onchange = () => refillWhere(el.dataset.newproj)));
-        document.querySelectorAll("[data-newchap]").forEach(
-          (el) =>
-            (el.onchange = () => {
-              const line = document.querySelector(`[data-newline="${el.dataset.newchap}"]`);
-              const proj = document.querySelector(`[data-newproj="${el.dataset.newchap}"]`);
-              if (line && proj) line.innerHTML = lineOptionsFor(proj.value, el.value, "") || "";
-            }),
-        );
-        document.querySelectorAll(".wcard input.hin").forEach(
-          (inp) =>
-            (inp.onchange = () => {
-              const val = +inp.value || 0,
-                id = inp.dataset.entry;
-              mutate(() => {
-                if (id) {
-                  if (val <= 0) erp.deleteHours(id, "operations");
-                  else erp.correctHours(id, { hoursMilli: Math.round(val * 1000) }, "operations");
-                  return;
-                }
-                if (val <= 0) return;
-                const wid = inp.dataset.worker;
-                const proj = document.querySelector(`[data-newproj="${wid}"]`);
-                const chap = document.querySelector(`[data-newchap="${wid}"]`);
-                const line = document.querySelector(`[data-newline="${wid}"]`);
-                const knd = document.querySelector(`[data-newkind="${wid}"]`);
-                if (!proj || !proj.value) throw new Error("Selecciona el proyecto");
-                // Refused here, in the operator's language, before the engine
-                // says the same thing in English on a Spanish screen.
-                if (line && !line.value)
-                  throw new Error("Las horas de obra necesitan partida y subpartida");
-                erp.recordHours(
-                  {
-                    workerId: wid,
-                    projectId: proj.value,
-                    lineId: (line && line.value) || null,
-                    chapterNum: (chap && chap.value) || null,
-                    // The kind chosen on the row prices the entry from its own
-                    // rate band; without it every inline entry was a normal
-                    // hour whatever the sheet said.
-                    kind: (knd && knd.value) || "normal",
-                    hoursMilli: Math.round(val * 1000),
-                    date: hDay,
-                  },
-                  "operations",
-                );
-              }, "Horas actualizadas");
-            }),
-        );
-        // Correcting the kind re-prices the entry — correctHours reads the rate
-        // band for the new kind — so this is a real correction, not a relabel.
-        document
-          .querySelectorAll("[data-hkind]")
-          .forEach(
-            (sel) =>
-              (sel.onchange = () =>
-                mutate(
-                  () => erp.correctHours(sel.dataset.hkind, { kind: sel.value }, "operations"),
-                  "Tipo de hora actualizado",
-                )),
-          );
+        /* No inline handlers on the card any more: it renders values, not
+           controls. Adding goes through the drawer (`#hAdd`, `data-hmore`) and
+           correcting through Revisión, each of which validates once, in one
+           place, instead of five selects validating each other on a phone. */
         /* No approval handlers here any more: approving a week is the office's
            sign-off and lives in Revisión, next to the entries being reviewed.
            See labourRegisterAll. */
@@ -9878,7 +9802,7 @@
          <div class="field full"><label>Trabajador *</label><select id="nh_w">${erp.state.workers.map((w) => `<option value="${w.id}">${esc(w.name)}</option>`).join("")}</select></div>
          <div class="field"><label>Proyecto *</label><select id="nh_p">${jobs.map((p) => `<option value="${p.id}">${esc(p.code)} · ${esc(p.name)}</option>`).join("")}</select></div>
          <div class="field"><label>Partida</label><select id="nh_c"></select></div>
-         <div class="field" id="nh_lwrap" style="display:none"><label>Subpartida</label><select id="nh_l"></select></div>
+         <div class="field" id="nh_lwrap"><label>Subpartida</label><select id="nh_l"></select></div>
          <div class="field"><label>Tipo</label><select id="nh_k"><option value="normal">Normal</option><option value="extra">Extra</option><option value="festivo">Festivo</option></select></div>
          <div class="field"><label>Horas *</label><input id="nh_h" type="number" step="0.25" min="0"></div>
          <div class="field"><label>Fecha</label><input id="nh_d" type="date" value="${day}"></div>
@@ -9886,10 +9810,16 @@
         // A9 · the action is pinned under the form, visible without scrolling
         // — the operator's photo showed it clipped off the bottom of a phone.
         drawerFoot('<button class="btn primary" id="nh_go" style="flex:1">Registrar</button>');
+        /* THE FIELD IS ALWAYS THERE. It used to appear and disappear as the
+           partida changed, so the form grew and shrank under the thumb and the
+           person filling it in could not tell whether a subpartida had been
+           forgotten or was never asked for. It stays, and says «—» when the
+           partida has none. */
+        const NO_SUBLINE = '<option value="">—</option>';
         const fillLines = () => {
           const opts = lineOptionsFor($("#nh_p").value, $("#nh_c").value, "");
-          $("#nh_lwrap").style.display = opts ? "" : "none";
-          if (opts) $("#nh_l").innerHTML = '<option value="">—</option>' + opts;
+          $("#nh_l").innerHTML = NO_SUBLINE + (opts || "");
+          $("#nh_l").disabled = !opts;
         };
         const fillChaps = () => {
           $("#nh_c").innerHTML =
@@ -9908,14 +9838,14 @@
           mutate(() => {
             const hrs = Number(String($("#nh_h").value).replace(",", "."));
             if (!(hrs > 0)) throw new Error("Indica las horas");
-            if ($("#nh_lwrap").style.display !== "none" && !$("#nh_l").value)
+            if (!$("#nh_l").disabled && !$("#nh_l").value)
               throw new Error("Las horas de obra necesitan partida y subpartida");
             erp.recordHours(
               {
                 workerId: $("#nh_w").value,
                 projectId: $("#nh_p").value,
                 chapterNum: $("#nh_c").value || null,
-                lineId: $("#nh_lwrap").style.display !== "none" ? $("#nh_l").value || null : null,
+                lineId: $("#nh_l").disabled ? null : $("#nh_l").value || null,
                 kind: $("#nh_k").value,
                 hoursMilli: Math.round(hrs * 1000),
                 date: $("#nh_d").value || day,
@@ -9953,21 +9883,123 @@
         }
       }
 
+      /* THE SUMMARY IS THE SCREEN ABOUT TOTALS — so it owns the two questions
+         that scope it: over what stretch of time, and for which job. Both used
+         to come from elsewhere: the period from the header control every screen
+         shares, the job from a bar that could not say «all». A screen whose
+         numbers change when you set a filter for a different screen is a screen
+         that cannot be trusted, so these are local, and «Todos» is the default
+         because the company total is the thing you open this for. */
+      let hRangeMode = "month";
+      let hProj = "all";
+      function hoursRange() {
+        const d = hDay || erp.today;
+        const Y = +d.slice(0, 4);
+        const M = +d.slice(5, 7);
+        if (hRangeMode === "day") return { from: d, to: d, label: fmtD(d) };
+        if (hRangeMode === "week") {
+          const w = labourWeekAll(d);
+          return {
+            from: w.days[0],
+            to: w.days[6],
+            label: `${fmtD(w.days[0]).slice(0, 5)} – ${fmtD(w.days[6]).slice(0, 5)}`,
+          };
+        }
+        if (hRangeMode === "year")
+          return { from: `${Y}-01-01`, to: `${Y}-12-31`, label: String(Y) };
+        return { from: `${Y}-${pad2(M)}-01`, to: lastDay(Y, M), label: `${MONTHS[M - 1]} ${Y}` };
+      }
+      const H_RANGES = [
+        ["day", "Día"],
+        ["week", "Semana"],
+        ["month", "Mes"],
+        ["year", "Año"],
+      ];
+
       function horasSummary() {
-        const r = periodRange();
-        const s = erp.hoursSummary(r.from, r.to, null);
+        const r = hoursRange();
+        const pid = hProj === "all" ? null : hProj;
+        const s = erp.hoursSummary(r.from, r.to, pid);
         const rec = erp.labourReconciliation();
         const h = (m) => (m / 1000).toLocaleString("es-ES");
         const off = rec.unbookedCents;
+        /* The same figure the per-person drill-down below adds up, carried to the
+           top of the block. It was only ever visible once the operator opened the
+           drill — so the line that reconciles the month was missing the half of
+           it that leaves the till. */
+        const cashPaidCents = erp
+          .workerMonthlyReconciliation(rec.month)
+          .reduce((a, w) => a + w.paidCents, 0);
         const maxCost = Math.max(1, ...s.projects.map((p) => p.costCents));
-        const byWorker = erp.hoursByWorker(r.from, r.to);
+        /* The filter has to reach every block, not only the first, and it has to
+           reach the FIGURES and not merely the rows: a person kept because they
+           touched the chosen job, still showing the hours they worked on three
+           others, is a wrong number wearing a filter's clothes. */
+        const byWorker = erp
+          .hoursByWorker(r.from, r.to)
+          .filter((w) => !pid || w.projects.some((pj) => pj.projectId === pid))
+          .map((w) => {
+            if (!pid) return w;
+            const only = w.projects.filter((pj) => pj.projectId === pid);
+            const hoursMilli = only.reduce((a, pj) => a + pj.hoursMilli, 0);
+            return {
+              ...w,
+              projects: only,
+              hoursMilli,
+              costCents: only.reduce((a, pj) => a + pj.costCents, 0),
+              /* Overtime is not broken down per project by the projection, so it
+                 is scaled by this job's share of the person's hours rather than
+                 invented. Stated here because a derived number that looks
+                 measured is the kind of thing that gets quoted back later. */
+              extraHoursMilli: w.hoursMilli
+                ? Math.round((w.extraHoursMilli * hoursMilli) / w.hoursMilli)
+                : 0,
+            };
+          })
+          .sort((a, b) => b.costCents - a.costCents);
         /* A project with no hours keeps its row. An absent row and a zero row mean
            different things — «nobody worked there» is an answer, and leaving it out
            makes the reader go and look it up. */
         const zeros = erp.state.projects
           .filter((p) => p.status !== "archived" && !s.projects.some((x) => x.code === p.code))
           .slice(0, 3);
-        return `
+        const fav = hProj !== "all" && projFavs.includes(hProj);
+        let opts = projectOptions();
+        if (hProj !== "all" && !opts.some((p) => p.id === hProj)) {
+          const active = erp.state.projects.find((p) => p.id === hProj);
+          if (active) opts = [active, ...opts];
+        }
+        /* The star moves to the LEFT of the job. On the right it pushed the
+           select in from the edge, so the widest field on the strip was the only
+           one not aligned with the row above it. */
+        const scope = `<div class="hscope">
+    <div class="hstop"><span class="plbl">Proyecto</span>
+      <input id="hqf" placeholder="Buscar…" value="${esc(projFilter)}">
+      <select id="hst">${[
+        ["open", "Abiertos"],
+        ["all", "Todos"],
+        ["closed", "Cerrados"],
+        ["fav", "Favoritos"],
+      ]
+        .map(
+          ([v, l]) => `<option value="${v}"${projStatus === v ? " selected" : ""}>${l}</option>`,
+        )
+        .join("")}</select></div>
+    <div class="hsbot"><button class="fav${fav ? " on" : ""}" id="hfav"${
+      hProj === "all" ? " disabled" : ""
+    }>${fav ? "★" : "☆"}</button>
+      <select id="hprj"><option value="all"${hProj === "all" ? " selected" : ""}>Todos los proyectos</option>${opts
+        .map(
+          (p) =>
+            `<option value="${p.id}"${p.id === hProj ? " selected" : ""}>${p.code} — ${esc(erp.party(p.partyId).name)}</option>`,
+        )
+        .join("")}</select></div>
+    <div class="hseg">${H_RANGES.map(
+      ([k, lab]) =>
+        `<button class="sg${hRangeMode === k ? " on" : ""}" data-hrange="${k}">${lab}</button>`,
+    ).join("")}<span class="lb">${esc(r.label)}</span></div>
+   </div>`;
+        return `${scope}
    <div class="hband">
     <div class="c"><div class="k">Horas</div><div class="v">${h(s.totalHoursMilli)}</div>
       <div class="s">${s.projects.length} proyecto${s.projects.length === 1 ? "" : "s"}</div></div>
@@ -9977,11 +10009,11 @@
       <div class="s">${rec.month}</div></div>
    </div>
    <div class="hacts">
-    <button class="btn primary" id="hGoOpen">Revisar ${h(rec.openHoursMilli)} sin aprobar</button>
+    <button class="btn warn" id="hGoOpen">Revisar ${h(rec.openHoursMilli)} h sin aprobar</button>
     <button class="btn" id="hXls">Exportar a Excel</button>
    </div>
 
-   <h4 class="hsec">A dónde han ido las horas <span>${fmtD(r.from)} – ${fmtD(r.to)}</span></h4>
+   <h4 class="hsec">A dónde han ido las horas <span>${esc(r.label)}</span></h4>
    <div class="hrank">
     ${
       s.projects
@@ -10021,16 +10053,19 @@
     }
    </div>
 
-   <h4 class="hsec">Quién ha trabajado <span>horas · extra · coste</span></h4>
-   <div class="hrank">
+   <h4 class="hsec">Quién ha trabajado</h4>
+   <div class="hwlist">
+    <div class="hwh"><span class="who">Trabajador</span><span class="n">Horas</span>
+      <span class="n">Extra</span><span class="n">Coste</span></div>
     ${
       byWorker
         .map(
           (w) => `<div class="hworker"><div class="who">
         <div class="nm">${esc(w.name)}</div>
         <div class="r">${w.projects.map((pj) => esc(pj.code || "—")).join(" · ") || "sin obras en el periodo"}</div></div>
-      <div class="hh">${h(w.hoursMilli)} h${w.extraHoursMilli ? `<span class="ot">${h(w.extraHoursMilli)} extra</span>` : ""}</div>
-      <div class="cc">${eur(w.costCents)}</div></div>`,
+      <div class="n hh">${h(w.hoursMilli)}</div>
+      <div class="n ot${w.extraHoursMilli ? "" : " zero"}">${w.extraHoursMilli ? h(w.extraHoursMilli) : "—"}</div>
+      <div class="n cc">${eur(w.costCents)}</div></div>`,
         )
         .join("") || '<div class="empty">Sin horas registradas en el periodo.</div>'
     }
@@ -10040,6 +10075,7 @@
    <div class="hrec">
     <div class="rr"><span>Horas imputadas a obra</span><span style="flex:1"></span><b>${eur(rec.bookedCents)}</b></div>
     <div class="rr"><span>Nóminas pagadas por banco</span><span style="flex:1"></span><b>${eur(rec.wagesCents)}</b></div>
+    <div class="rr"><span>Pagado en efectivo a trabajadores</span><span style="flex:1"></span><b>${eur(cashPaidCents)}</b></div>
     <div class="rr tot"><span>Diferencia sin imputar</span><span style="flex:1"></span>
       <b style="color:${off < 0 ? "var(--danger)" : "var(--ink)"}">${eur(off)}</b>
       <span class="pct${off < 0 ? " r" : ""}">${(rec.unbookedPctBp / 100).toFixed(1)}%</span></div>
@@ -10069,6 +10105,46 @@
       }
 
       function wireHorasSummary() {
+        document.querySelectorAll("[data-hrange]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hRangeMode = b.dataset.hrange;
+              render();
+            }),
+        );
+        const psel = $("#hprj");
+        if (psel)
+          psel.onchange = () => {
+            hProj = psel.value;
+            render();
+          };
+        const pst = $("#hst");
+        if (pst)
+          pst.onchange = () => {
+            projStatus = pst.value;
+            render();
+          };
+        const pqf = $("#hqf");
+        if (pqf)
+          pqf.oninput = () => {
+            projFilter = pqf.value;
+            render();
+            const n = $("#hqf");
+            if (n) {
+              n.focus();
+              n.setSelectionRange(n.value.length, n.value.length);
+            }
+          };
+        const hfav = $("#hfav");
+        if (hfav)
+          hfav.onclick = () => {
+            if (hProj === "all") return;
+            projFavs = projFavs.includes(hProj)
+              ? projFavs.filter((x) => x !== hProj)
+              : [...projFavs, hProj];
+            saveProjPrefs();
+            render();
+          };
         const more = $("#hRecMore");
         if (more)
           more.onclick = () => {
@@ -10085,14 +10161,22 @@
               .filter((l) => !l.locked)
               .sort((a, b) => a.date.localeCompare(b.date))[0];
             if (!first) return toast("No hay horas sin aprobar");
+            /* Revisión, not the day sheet. The button names hours waiting to be
+               approved, and approving is what Revisión is for; landing on the
+               sheet meant reading the sentence, tapping it, and arriving
+               somewhere with no approve on it. */
             hDay = first.date;
-            hTab = "sheet";
+            hTab = "register";
+            hRegFilter = "open";
+            hEditId = null;
             render();
+            const list = document.querySelector(".rcount");
+            if (list) list.scrollIntoView({ behavior: "smooth", block: "start" });
           };
         const xls = $("#hXls");
         if (xls)
           xls.onclick = () => {
-            const r = periodRange();
+            const r = hoursRange();
             const rows = [
               ["Fecha", "Trabajador", "Proyecto", "Partida", "Horas", "Coste", "Estado"],
             ];
@@ -10208,7 +10292,7 @@
                ? ""
                : open
                  ? ""
-                 : `<button class="btn sm" data-redit="${l.id}">Editar apunte</button><button class="btn sm danger" data-del="${l.id}">Eliminar</button>`
+                 : `<button class="btn sm" data-redit="${l.id}">Editar</button><button class="btn sm danger" data-del="${l.id}">Eliminar</button>`
            }</div>
            ${open ? editor(l) : ""}
            ${
@@ -13753,9 +13837,17 @@
         // already carry the figures the bar would repeat. The other three
         // project screens keep the bar; each of them is a single screen that
         // needs to be told which job it is about.
+        /* HOURS CARRIES ITS OWN FILTER, AND ONLY WHERE ONE HELPS. The day sheet
+           is for typing what was worked on ONE day; a project filter above it
+           narrows nothing the screen shows and reads as a control the operator
+           must set before entering hours. The summary is the screen about
+           totals, so that one keeps a filter, and keeps it in its own strip so
+           the default can be every project without every other screen having to
+           cope with a job that is not chosen. */
         if (
           cur === "progress" ||
           cur === "economics" ||
+          cur === "labour" ||
           !PROJECT_SUBS.includes(cur) ||
           !erp.state.projects.length
         ) {

@@ -71,6 +71,12 @@ window.CANEI_DICT.ca = {
   "Añadir línea": "Afegir línia",
   "Aprobar semana": "Aprovar setmana",
   "Reabrir semana": "Reobrir setmana",
+  "Todos los proyectos": "Tots els projectes",
+  Día: "Dia",
+  "Pagado en efectivo a trabajadores": "Pagat en efectiu a treballadors",
+  "Sin horas apuntadas todavía.": "Encara no hi ha hores apuntades.",
+  "Este parte muestra lo apuntado. Para añadir horas usa «Añadir línea»; para corregir o aprobar, ve a Revisión.":
+    "Aquest part mostra el que s'ha apuntat. Per afegir hores fes servir «Afegir línia»; per corregir o aprovar, ves a Revisió.",
   "Partida y subpartida": "Partida i subpartida",
   "todo aprobado": "tot aprovat",
   "Este parte es para apuntar lo trabajado. Aprobar la semana se hace en Revisión, cuando la oficina ya ha comprobado las imputaciones.":
@@ -4834,6 +4840,8 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Setmana $1 – $2"],
   [new RegExp("^mes (\\d{4}-\\d{2})$"), "mes $1"],
   [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Revisar $1 sense aprovar"],
+  [new RegExp("^Revisar ([\\d.,]+) h sin aprobar$"), "Revisar $1 h sense aprovar"],
+  [new RegExp("^＋ Añadir horas para (.+)$"), "＋ Afegir hores per a $1"],
   [new RegExp("^([\\d.,]+ h) · (\\d+)% del coste del periodo$"), "$1 · $2% del cost del període"],
   [new RegExp("^(\\d+) de (\\d+) apuntes$"), "$1 de $2 apunts"],
   [new RegExp("^(\\d+) de (\\d+) apunte$"), "$1 de $2 apunt"],
