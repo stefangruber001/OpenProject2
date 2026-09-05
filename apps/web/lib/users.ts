@@ -83,11 +83,22 @@ export function isRole(v: unknown): v is UserRole {
  */
 const GRANTS: Record<UserRole, string[]> = {
   admin: ["*"],
-  backoffice: ["erp.read", "erp.write", "money.read", "margin.read", "export", "party.bank.read"],
-  // Site: records what happened on the job. No money, and nothing about margin.
+  backoffice: [
+    "erp.read",
+    "erp.read.all",
+    "erp.write",
+    "money.read",
+    "margin.read",
+    "export",
+    "party.bank.read",
+  ],
+  /* Site worker: records what happened on the job, and only their own. No
+     money, nothing about margin — and, since this became a boundary rather
+     than a label, no `erp.read.all` either: the document they are sent holds
+     their own hours and the jobs they are assigned to, and nothing else. */
   site: ["erp.read", "erp.write.site", "photo.capture"],
   // Read-and-export only, and explicitly not margin.read or party.bank.read.
-  gestoria: ["erp.read", "money.read", "export"],
+  gestoria: ["erp.read", "erp.read.all", "money.read", "export"],
 };
 
 export function permissionsOf(role: UserRole): string[] {

@@ -8309,9 +8309,82 @@ sits at `top: 64, bottom: 800` — gap 0 — at the top of the page AND scrolled
 the bottom; and horizontal overflow is still 0 across five screens at 390 and
 1440, plus the suite's own overflow checks at four widths.
 
-## S72 · The recorrido stops being a second application (2026-09-04)
+**S72 · The site worker's boundary is the server's, and the screens only agree
+with it.** Operator: «this user should then see only the simple entry field and
+an overview of his hours only. Not to see other staff what is not related to
+the worker.»
 
-**S72 · #48 is closed, and neither of its two blockers needed answering.**
+The `site` role existed and named a set of permissions. Nothing consulted them.
+`POST /erp/command` had no permission check at all, and `PUT /erp/state` took a
+whole client-computed document from anybody who was signed in — so an account
+meant to type its own hours could rewrite the invoice register, and its state
+response carried every bank line and everybody's pay. Hiding tabs over that
+would have been a curtain, and a curtain that reads as a wall is worse than no
+curtain: it invites the operator to hand the login to a subcontractor.
+
+So the enforcement is on the wire: `runCommand` requires the permission its
+command declares; the six hours commands are the only ones an `erp.write.site`
+account may reach, and each is checked for ownership, for the site being one
+they are assigned to, and for the week being unapproved; `PUT /erp/state` needs
+`erp.write` outright; and `GET /erp/state` is BUILT for a worker rather than
+filtered — a redaction that lists what to keep cannot leak a field somebody
+adds next year, which a redaction that lists what to remove certainly can.
+
+Four decisions taken without asking, per the autonomy contract:
+
+- **Online only.** No offline queue on the phone. A queue means a second store
+  and a conflict policy for a person with no way to resolve one; the screen
+  needs a connection and says so.
+- **A worker may book only to sites he is assigned to.** If the crew moves and
+  nobody updated the assignment, the office fixes it in Corrections — a wrong
+  booking the office can see beats a right one nobody recorded.
+- **An account with no matching worker record simply has no «Mine».** The link
+  is by email, case-insensitively, with no migration. An administrator who is
+  not also on the payroll therefore sees the office view alone, which is what
+  they want.
+- **On a local copy the first worker on file is attached.** There is no server
+  to ask who is signed in, and a switch with one destination is not a switch —
+  so the personal view would otherwise be unreachable on a demo machine and
+  invisible to the gates. Everything on a local copy is already fully visible.
+
+**S73 · The phone's tab bar follows the role a launch late, on purpose.** The
+shell builds its tab bar before the first request completes — deliberately, so
+the bar is never empty for a second — which means it cannot know the role in
+time. The web layer posts it over the existing `native` bridge; the shell keeps
+it and uses it at the next launch. The same trade-off `uiLanguage` already
+makes, and safe here for a specific reason: a tab is a URL into the web app,
+which resolves every route to the hours screen for a site worker, and the
+server refuses what the account may not do. A stale bar is untidy, not open.
+
+The one tab a site worker gets is generated into `nav.json` beside the six,
+from the same `SECTIONS` and the same dictionary, because a label written into
+a shell is a label that cannot translate — which is the whole reason that file
+exists.
+
+**S74 · An invitation issued for the wrong company produces an account that can
+never sign in.** Found by the new smoke step, which failed with a bare 400 on
+an activation link that had just been issued successfully.
+
+`POST /api/<tenant>/users` files the invitation under the tenant in the URL.
+`POST /api/auth/activate` has no tenant in its path — deliberately, because the
+person following the link is not signed in yet — so it resolves
+`defaultTenant()`. The two agree only when the URL named the deployment's own
+company, which is what `~` always does and what a hand-typed tenant name may
+not. When they disagree the link is refused as "no longer valid", and the
+account it belonged to sits there unable to set a password.
+
+Not fixed here, and deliberately so: the honest fix is for `createUser` /
+`issueInvitation` to refuse a tenant that is not the deployment's own, turning
+a silent trap into a loud one — a behaviour change to a live API that deserves
+its own change and its own verification, not a correction slipped into a deploy
+at three in the morning. What is done here is to make the smoke container a
+coherent deployment (`ERP_DEFAULT_TENANT` names the company the suite uses),
+and to make the check print the server's message rather than only its status —
+that missing message is the whole reason this cost a deploy cycle.
+
+## S75 · The recorrido stops being a second application (2026-09-04)
+
+**S75 · #48 is closed, and neither of its two blockers needed answering.**
 Operator, on Proyectos → Recorrido del cliente: make every step look like the
 ERP screen that owns its data, take out the explanations, make the steps flow,
 and let any obra be picked so its real phase shows in colour and «if a new lead
@@ -8348,7 +8421,7 @@ to the Torre, so the profile menu, both native shells and every bookmark keep
 working. Most reversible: no engine change, no schema step, and not one stored
 record is restated.
 
-**S72b · The demo walkthrough is removed, not demoted.** «Crear nuevo
+**S75b · The demo walkthrough is removed, not demoted.** «Crear nuevo
 proyecto» was a complete second product — its own `caneiJourney` IndexedDB, its
 own price book, its own tax-id validator (which disagreed with the engine's,
 #50), its own invoice numbering and thirteen stages of editing UI, 5,455 lines.
@@ -8359,7 +8432,7 @@ already exists in the workspace through `CaneiSheet`, `erp-doctypes.js` and the
 mailbox, over records that are real. What is lost is a scripted demo; what is
 gained is that the same thirteen steps can be walked on an actual job.
 
-**S72c · Two phases have no button, and that is the honest answer.** Ejecución
+**S75c · Two phases have no button, and that is the honest answer.** Ejecución
 offers none because progress is marked on the chart and a cost enters through
 Gastos with its document — the one door that made a cost with no paper behind
 it was removed in package 13 (S8) and is not coming back through this screen.
@@ -8369,13 +8442,16 @@ answered by the bank, on Consolidación bancaria. Both phases still report, in
 colour, with their rows — a screen that shows a red phase and no button is
 telling the truth about where the verb lives.
 
-**S72d · Two reds, not one.** `blocked` for a lead perdido or a presupuesto
+**S75d · Two reds, not one.** `blocked` for a lead perdido or a presupuesto
 rechazado, where the phase cannot proceed; `late` for money past its due date,
 which proceeds perfectly well and needs chasing. Facturación already writes
 «Vencida» on exactly that condition, and one word for both would have the two
-screens disagreeing about the same invoice.
+screens disagreeing about the same invoice. The state carries that word and not
+«Vencido»: every state in the map is feminine because it describes una fase, and
+the masculine form is already spoken for by a price or a guarantee running out,
+which is what its English says («Expired»).
 
-**S72e · «En qué fase está» and «cuál es el siguiente paso» are different
+**S75e · «En qué fase está» and «cuál es el siguiente paso» are different
 questions.** A renovation buys, builds, bills and chases at once, so the phase
 a job is IN is the furthest one under way, while the next step is the earliest
 phase that is stuck or overdue — and only failing that, the earliest unfinished
@@ -8384,7 +8460,26 @@ phase still `pending` BEHIND the last completed one never happened (a repair
 has no pedidos, a walk-in has no lead), and without that a closed obra from
 2024 reported «Fase 1 · Oportunidad · siguiente paso: Oportunidad».
 
-**S72f · `["Visita", "Site"]` became `["Visita", "Visit"]`.** The English was
+**S75g · The EN crawl ceiling goes UP at the merge, and why that is not the
+ratchet failing.** The hours release set it to 33 and the recorrido branch to 34
+(from 41); merged, the tree measures 34 EN and 94 CA, so the ceilings are 37 and 97. Both earlier numbers were measured against a crawl that walked a different
+SET of pages — the hours release added six `#labour` routes, the recorrido took
+`journey.html` out of STATIC_PAGES and put `#journey` into DISCOVER_ROUTES — and
+the merged crawl drives 64 pages, seeing more than either measurement did. What
+the recorrido itself contributed was two strings and both were translated, not
+budgeted: the «de» that this screen and `countTag` build a count around, and
+«Completada», which the crawl caught here and which turned out to be
+untranslated on the subcontract register as well. **Three of what remains are
+the hours release's own** and are named here so the next ratchet has somewhere
+to start: the role description on Usuarios («— Apunta sus propias horas y ve
+sólo las suyas…»), which is a plain sentence needing an entry, and two composed
+`select` options on `#labour` of the shape `P-2024-0004 · cliente · calle`,
+which want a ledger rule like the one `(cerrada)` already has rather than an
+entry each. Left alone deliberately: they are another release's screens, and
+inventing a data-excusing rule for somebody else's list inside a merge is how a
+merge stops being reviewable.
+
+**S75f · `["Visita", "Site"]` became `["Visita", "Visit"]`.** The English was
 written when the word was a stage abbreviation on a dashboard that no longer
 exists. It is a column header on Comercial and a phase on the recorrido now,
 and both mean the visit itself.

@@ -4046,7 +4046,850 @@ td.num.late {
   }
 }
 
-/* ------------------------------- 69 · the recorrido: thirteen phases, in view
+/* ------------------------------- 69 · the hours screen, rebuilt round its jobs
+   ------------------------------------------------------------------------
+   Two levels of navigation, because the screen answers two questions that are
+   not the same shape: WHOSE hours (the group) and WHICH question about them
+   (the tab). Then the day's work as one card per person instead of a table
+   whose sixth column was a pair of icons.
+
+   The register is no longer printed under the day. It has its own tab, which
+   is what takes the day sheet from eighteen thousand pixels to one screen: on
+   a day with no hours at all, the sixty past entries below it were the page. */
+
+.hgrp {
+  display: flex;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  margin: 0 0 10px;
+}
+.hgrp .hg {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font: 600 13px var(--sans);
+  padding: 7px 4px;
+  cursor: pointer;
+  text-align: center;
+}
+.hgrp .hg:last-child {
+  border-right: 0;
+}
+.hgrp .hg i {
+  display: block;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.hgrp .hg.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---- the week strip: navigation AND completeness in one control ---- */
+.weekbar {
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.weekbar .wnav {
+  width: 38px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  cursor: pointer;
+}
+.weekbar .wnav .cv {
+  font-size: 14px;
+  line-height: 1;
+}
+.weekbar .wnav .lb {
+  font: 700 8px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.weekbar .days {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.weekbar .hday {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 5px 0 6px;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  min-width: 0;
+}
+.weekbar .hday .d {
+  display: block;
+  font: 700 9px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.weekbar .hday .n {
+  display: block;
+  font: 700 13px var(--sans);
+  margin-top: 1px;
+}
+.weekbar .hday .h {
+  display: block;
+  font: 600 10px var(--sans);
+  color: var(--accentDeep);
+  margin-top: 2px;
+}
+.weekbar .hday .h.zero {
+  color: var(--faint);
+}
+.weekbar .hday.wknd {
+  background: var(--hair);
+}
+.weekbar .hday.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.weekbar .hday.on .d,
+.weekbar .hday.on .n,
+.weekbar .hday.on .h {
+  color: #fff;
+}
+
+.wtot,
+.wday {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 2px;
+  margin-bottom: 8px;
+}
+.wtot .k,
+.wday .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  flex: 1;
+}
+.wtot .v,
+.wday .v {
+  font: 700 14px var(--sans);
+}
+.wday {
+  margin-top: 12px;
+}
+
+.wsent {
+  border-left: 3px solid var(--gold);
+  background: #fdf9ec;
+  color: #5c4a12;
+  padding: 7px 11px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.wsent b {
+  font-weight: 700;
+}
+
+/* ---- one card per person; everything about that person is inside it ---- */
+.wcard {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.wcard.locked {
+  opacity: 0.72;
+}
+.wcard .wch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+}
+.wcard .wch .nm {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--greenDeep);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wcard .wch .role {
+  font-size: 10.5px;
+  color: var(--muted);
+  background: var(--paper);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.wcard .wch .src {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #fdf3d6;
+  color: #7a5c05;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.wcard .wrow {
+  display: grid;
+  grid-template-columns: 1fr 72px;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.wcard .wwhere {
+  min-width: 0;
+}
+.wcard .wproj {
+  font-weight: 600;
+  font-size: 13px;
+}
+.wcard .wline,
+.wcard .wkind,
+.wcard .wsel {
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.wcard .wline .sub {
+  color: var(--muted);
+}
+.wcard .wwhere select.inline {
+  max-width: 100%;
+}
+.wcard .whrs input.hin {
+  width: 100%;
+  text-align: center;
+  font: 700 15px var(--sans);
+  padding: 7px 4px;
+}
+.wcard .whrs .ro {
+  display: block;
+  text-align: center;
+  font: 700 15px var(--sans);
+  color: var(--muted);
+}
+.wcard .wcf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 11px;
+  border-top: 1px dashed var(--line);
+  background: var(--accentPale);
+}
+.wcard .lnk {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--accentDeep);
+  text-align: left;
+}
+.wcard .lnk.quiet {
+  color: var(--muted);
+}
+
+/* ---- one bar of actions, at the end of the day's work ---- */
+.hdock {
+  display: flex;
+  gap: 7px;
+  margin: 12px 0 4px;
+}
+.hdock .btn {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 10px 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- corrections: the register as a list of entries, each editable ---- */
+.rfilters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.rfilters .rf {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font: 600 12px var(--sans);
+  padding: 6px 0;
+  cursor: pointer;
+}
+.rfilters .rf.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.rcount {
+  display: flex;
+  align-items: baseline;
+  padding: 0 2px;
+  margin-bottom: 7px;
+}
+.rcount .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.rcount .v {
+  font: 700 13px var(--sans);
+}
+.rlist {
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.rentry {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.rentry:last-child {
+  border-bottom: 0;
+}
+.rentry.open {
+  background: var(--accentPale);
+}
+.rentry .r1,
+.rentry .r2,
+.rentry .r3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rentry .r3 {
+  align-items: center;
+  margin-top: 6px;
+}
+.rentry .r1 .nm {
+  font-weight: 700;
+  font-size: 13px;
+}
+.rentry .r1 .dt {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.rentry .r1 .hh {
+  font: 700 13px var(--sans);
+}
+.rentry .r2 {
+  margin-top: 1px;
+}
+.rentry .r2 .w {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rentry .r2 .cc {
+  font: 600 12px var(--sans);
+  color: var(--accentDeep);
+  white-space: nowrap;
+}
+.rentry .rreopen {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: 7px;
+  border: 0;
+  border-top: 1px dashed var(--line);
+  background: none;
+  padding: 7px 0 0;
+  cursor: pointer;
+  font: 600 11.5px var(--sans);
+  color: var(--accentDeep);
+}
+.redit {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.redit .eh {
+  font: 700 12px var(--sans);
+  color: var(--accentDeep);
+  margin-bottom: 7px;
+}
+.redit .ef {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.redit .ef label {
+  font: 600 9.5px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1.2;
+}
+.redit .ef input,
+.redit .ef select {
+  width: 100%;
+  min-width: 0;
+}
+.redit .ef.hn input {
+  font: 700 16px var(--sans);
+  text-align: center;
+  color: var(--accentDeep);
+}
+.redit .eact {
+  display: flex;
+  gap: 6px;
+  margin-top: 9px;
+}
+.redit .eact .btn {
+  flex: 1;
+  text-align: center;
+}
+.rnote {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 9px 2px 0;
+}
+.rmore {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--accentPale);
+  color: var(--accentDeep);
+  font: 600 12.5px var(--sans);
+  padding: 10px;
+  cursor: pointer;
+}
+
+/* ---- the overview: four questions, in the order they are asked ---- */
+.hband {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  margin-bottom: 8px;
+}
+.hband .c {
+  padding: 10px 9px;
+  border-right: 1px solid var(--hair);
+  min-width: 0;
+}
+.hband .c:last-child {
+  border-right: 0;
+}
+.hband .k {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.hband .v {
+  font: 700 19px var(--sans);
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+.hband .s {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.hband .c.warn {
+  background: #fdf9ec;
+}
+.hband .c.warn .v {
+  color: #7a5c05;
+}
+.hacts {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+.hacts .btn.primary {
+  flex: 1.4 1 0;
+}
+.hacts .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+h4.hsec {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 16px 0 7px;
+}
+h4.hsec span {
+  margin-left: auto;
+  font: 500 10.5px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.hrank,
+.hrec {
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.hitem {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.hitem:last-child {
+  border-bottom: 0;
+}
+.hitem .ih {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.hitem .ih .nm {
+  font-weight: 600;
+  font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hitem .ih .amt {
+  font: 700 12.5px var(--sans);
+  white-space: nowrap;
+}
+.hitem .meta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.hitem .bar {
+  height: 5px;
+  background: var(--hair);
+  margin-top: 5px;
+}
+.hitem .bar i {
+  display: block;
+  height: 5px;
+  background: var(--accent);
+}
+.hitem .sublist {
+  margin-top: 6px;
+  padding-left: 9px;
+  border-left: 2px solid var(--accentSoft);
+}
+.hitem .sub2 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 1px 0;
+}
+.hitem .sub2 b {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hworker {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.hworker:last-child {
+  border-bottom: 0;
+}
+.hworker .who {
+  min-width: 0;
+}
+.hworker .nm {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.hworker .r {
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hworker .hh {
+  font: 700 12.5px var(--sans);
+  text-align: right;
+  white-space: nowrap;
+}
+.hworker .ot {
+  display: inline-block;
+  font: 700 9.5px var(--sans);
+  background: #fdf3d6;
+  color: #7a5c05;
+  padding: 1px 5px;
+  margin-left: 5px;
+}
+.hworker .cc {
+  font: 700 12.5px var(--sans);
+  text-align: right;
+  color: var(--accentDeep);
+  white-space: nowrap;
+}
+.hrec .rr {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12.5px;
+}
+.hrec .rr b {
+  font-weight: 700;
+  font-size: 13px;
+}
+.hrec .rr.tot {
+  background: var(--accentPale);
+}
+.hrec .pct {
+  font: 700 9.5px var(--sans);
+  background: var(--accentSoft);
+  color: var(--greenDeep);
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+.hrec .pct.r {
+  background: #f7dedb;
+  color: var(--danger);
+}
+.hrec .rnote2 {
+  padding: 8px 11px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  border-bottom: 1px solid var(--hair);
+}
+.hrec .hdrill {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 11px;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--accentDeep);
+}
+.hcash {
+  border-top: 1px solid var(--hair);
+  background: var(--accentPale);
+}
+.hcash .cw {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 11px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12px;
+}
+.hcash .cw .nm {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hcash .a {
+  min-width: 62px;
+  text-align: right;
+  white-space: nowrap;
+}
+.hcash .a.d {
+  font-weight: 700;
+}
+.hcash .ch3 {
+  display: flex;
+  gap: 8px;
+  padding: 4px 11px 7px;
+  font: 700 9px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.hcash .ch3 span {
+  min-width: 62px;
+  text-align: right;
+}
+
+/* ---- a person's own two screens: hours, never money ---- */
+.mform .mfh {
+  padding: 9px 12px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+  font: 700 13px var(--sans);
+  color: var(--greenDeep);
+}
+.mform .mf {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--hair);
+}
+.mform .mf label {
+  font: 600 9.5px var(--sans);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1.2;
+}
+.mform .mf select,
+.mform .mf input {
+  width: 100%;
+  min-width: 0;
+}
+.mform .mf.hn input {
+  font: 700 20px var(--sans);
+  text-align: center;
+  color: var(--accentDeep);
+  background: var(--accentPale);
+  border-color: var(--accent);
+}
+.mform .mhint {
+  padding: 8px 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--accentPale);
+  border-top: 1px dashed var(--line);
+  line-height: 1.4;
+}
+.rlist .meblk {
+  border-bottom: 1px solid var(--hair);
+}
+.rlist .meblk:last-child {
+  border-bottom: 0;
+}
+.rlist .me {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px 0;
+}
+.rlist .me .w {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.rlist .me .l {
+  font-size: 11px;
+  color: var(--muted);
+}
+.rlist .me .hh {
+  font: 700 13px var(--sans);
+  white-space: nowrap;
+}
+.rlist .me2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 9px;
+}
+.rlist .me2 .mnote {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.rlist .mini {
+  font: 600 10.5px var(--sans);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rlist .mini.dz {
+  color: var(--danger);
+  border-color: #e6cfcd;
+}
+.rlist .mday {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12.5px;
+}
+.rlist .mday:last-child {
+  border-bottom: 0;
+}
+.rlist .mday .dt {
+  font-weight: 600;
+}
+.rlist .mday .hh {
+  font: 700 12.5px var(--sans);
+  white-space: nowrap;
+}
+.keepnote {
+  border-left: 3px solid var(--accent);
+  background: var(--accentPale);
+  padding: 8px 11px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ---- a site worker's shell: what is not theirs is not drawn ---- */
+body.siteworker .fab,
+body.siteworker #btnCreate,
+body.siteworker .bell,
+body.siteworker #btnCal,
+body.siteworker .search,
+body.siteworker #p1,
+body.siteworker .rail {
+  display: none !important;
+}
+
+/* ---- a site worker's shell: what is not theirs is not drawn ---- */
+body.siteworker #btnCreate,
+body.siteworker #btnBell,
+body.siteworker .gsearch,
+body.siteworker #p1,
+body.siteworker .rail {
+  display: none !important;
+}
+
+/* ------------------------------- 70 · the recorrido: thirteen phases, in view
    The flow strip in the sections panel is three chips over a rail and it is
    the right drawing for three. Thirteen is a different problem: equal columns
    would give each label about 45px, and a label nobody can read is a number

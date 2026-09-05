@@ -214,6 +214,14 @@ final class WebViewStore: NSObject, ObservableObject {
             case "soft":    Haptics.soft()
             default:        Haptics.light()
             }
+        case "role":
+            // Who the web layer is signed in as. Stored, not acted on: the tab
+            // bar is built at launch (see Config.tabs), so this takes effect on
+            // the next one. A missing or unknown value simply leaves the last
+            // one in place, and the full bar is the default.
+            if let role = dict["role"] as? String, !role.isEmpty {
+                UserDefaults.standard.set(role, forKey: "canei_role")
+            }
         case "share":
             if let s = dict["url"] as? String, let u = URL(string: s) {
                 onShare(u)

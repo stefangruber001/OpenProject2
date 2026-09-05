@@ -5877,6 +5877,10 @@ window.CANEI_DICT = {
        content is the word "de" is one of those two counters. Identical in Catalan
        by design. */
     ["de", "of"],
+    /* Two states this screen names that no entry covered. `Completada` is also
+       what the subcontract register has been rendering untranslated. */
+    ["Completada", "Completed"],
+    ["Bloqueada", "Blocked"],
     ["recorrido", "journey"],
     ["recorridos", "journeys"],
     /* PRY-04 · Recorrido del cliente. The screen is new; most of its vocabulary
@@ -5891,7 +5895,10 @@ window.CANEI_DICT = {
     ["Ningún recorrido coincide con la búsqueda.", "No journey matches the search."],
     ["Abrir la pantalla completa ↗", "Open the full screen ↗"],
     ["Ir a la fase", "Go to phase"],
-    ["Sin obra", "No job"],
+    /* Not «Sin obra», which the hours release already owns for an apunte with no
+       obra assigned. This is a different fact — a lead that has not become one
+       yet — and it now says so. */
+    ["Todavía sin obra", "Not a job yet"],
     ["Envío al cliente", "Sent to the customer"],
     ["Inicio de obra", "Works start"],
     ["Cierre y reseña", "Close and review"],
@@ -5940,8 +5947,146 @@ window.CANEI_DICT = {
     ["⚠ Antes hace falta una obra", "⚠ A job is needed first"],
     ["⚠ El presupuesto todavía no se ha enviado", "⚠ The quote has not been sent yet"],
     ["Limpieza y remates", "Cleaning and snagging"],
+    [
+      "Revisa el proyecto y la partida, corrige si hace falta y aprueba.",
+      "Check the project and the line item, change if wrong, then approve.",
+    ],
+    ["Apunte movido a otro día", "Entry moved to another day"],
+    ["Trabajador de obra", "Site worker"],
+    [
+      "Apunta sus propias horas y ve sólo las suyas. Ni importes, ni el resto del ERP.",
+      "Records their own hours and sees only their own. No amounts, and none of the rest of the ERP.",
+    ],
+    [
+      "Esta cuenta no está enlazada con ninguna ficha de trabajador, así que no tiene horas propias. La oficina puede enlazarla poniendo el mismo correo en la ficha.",
+      "This account is not linked to any worker record, so it has no hours of its own. The office can link it by putting the same e-mail on the record.",
+    ],
+    ["Apuntar horas", "Enter hours"],
+    ["Esperando aprobación", "Waiting for approval"],
+    ["Aprobada", "Approved"],
+    ["Esperando", "Waiting"],
+    ["Cambiar", "Change"],
+    ["Aprobada — pídeselo a la oficina", "Approved — ask the office"],
+    ["Guardar estas horas", "Save these hours"],
+    ["Horas guardadas", "Hours saved"],
+    ["Cambiar las horas", "Change the hours"],
+    ["Deja 0 para borrar el apunte.", "Leave 0 to delete the entry."],
+    ["De ellas extra", "Of that overtime"],
+    ["Sin obra", "No site"],
+    ["Elige la obra", "Choose the site"],
+    ["horas extra", "overtime hours"],
+    ["sin aprobar todavía", "not approved yet"],
+    ["A dónde han ido mis horas", "Where my hours went"],
+    ["Sin horas en el periodo.", "No hours in the period."],
+    [
+      "Todavía no has apuntado nada para este día.",
+      "You have not entered anything for this day yet.",
+    ],
+    [
+      "Esta semana ya está aprobada. Pide a la oficina que la reabra si falta algo.",
+      "This week is already approved. Ask the office to reopen it if something is missing.",
+    ],
+    [
+      "La obra y la partida de ayer vienen puestas — cámbialas sólo si te has movido. Si la partida no tiene subpartidas, elige «— ninguna —».",
+      "Yesterday's site and line item are filled in already — change them only if you moved. If the line item has no sub-line items, choose «— none —».",
+    ],
+    [
+      "No estás asignado a ninguna obra abierta este día. Díselo a la oficina.",
+      "You are not assigned to any open site on this day. Tell the office.",
+    ],
+    [
+      "Sólo ves tus horas, y nunca un importe. La oficina revisa las imputaciones y aprueba la semana.",
+      "You see only your own hours, and never an amount. The office checks the bookings and approves the week.",
+    ],
+    [
+      "Aquí no se ve nada que no sea tuyo: ni las horas de otras personas, ni ningún importe.",
+      "Nothing here is anybody else's: not other people's hours, and not any amount.",
+    ],
+    // ── S10 · the hours screen, rebuilt round its two audiences. The screen was
+    //    missing from the workspace audit's route list, so none of its Spanish
+    //    was ever seen by a gate whose ceiling is zero; the route is in the list
+    //    now, and it walks all three tabs.
+    [
+      "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y partida con la conciliación del mes.",
+      "The day sheet per worker with the week beside it; and the summary by project and line item with the month's reconciliation.",
+    ],
+    ["Mías", "Mine"],
+    ["Mis horas", "My hours"],
+    ["Correcciones", "Corrections"],
+    ["Ant.", "Prev"],
+    ["Sig.", "Next"],
+    ["Lun", "Mon"],
+    ["Mar", "Tue"],
+    ["Jue", "Thu"],
+    ["Vie", "Fri"],
+    ["Dom", "Sun"],
+    ["Copiar ayer", "Copy yesterday"],
+    ["Añadir trabajador", "Add worker"],
+    ["Añadir línea", "Add hours line"],
+    ["Aprobar semana", "Approve week"],
+    ["Reabrir semana", "Reopen week"],
+    ["Ficha del trabajador ›", "Worker file ›"],
+    ["enviado", "submitted"],
+    ["Exportar a Excel", "Export to Excel"],
+    ["A dónde han ido las horas", "Where the hours went"],
+    ["Quién ha trabajado", "Who worked"],
+    ["horas · extra · coste", "hours · overtime · cost"],
+    ["sin horas imputadas en el periodo", "no hours booked in the period"],
+    ["Comparar con lo pagado en efectivo por trabajador ›", "Compare with cash paid per worker ›"],
+    ["Ocultar lo pagado en efectivo por trabajador ▴", "Hide cash paid per worker ▴"],
+    ["imputado", "booked"],
+    ["pagado", "paid"],
+    ["diferencia", "difference"],
+    ["Abiertas", "Still open"],
+    ["Aprobadas", "Approved"],
+    ["Mostrando", "Showing"],
+    ["Editar apunte", "Edit entry"],
+    ["Aprobada y bloqueada", "Approved & locked"],
+    [
+      "Editando este apunte — cualquier campo puede cambiar",
+      "Editing this entry — every field can change",
+    ],
+    ["— ninguna —", "— none —"],
+    [
+      "Cambiar la fecha mueve el apunte a otro día — la lista dirá a dónde ha ido. Un apunte no puede moverse a una semana ya aprobada.",
+      "Changing the date moves the entry to another day — the list will say where it went. An entry cannot be moved into a week that is already approved.",
+    ],
+    ["Apunte corregido", "Entry corrected"],
+    ["Apunte eliminado", "Entry deleted"],
+    ["No hay horas sin aprobar", "There are no unapproved hours"],
+    [
+      "Aquí irán las dos pantallas propias de cada persona: apuntar las horas del día y consultar las suyas. Todavía no están construidas; mientras tanto, usa «Todos».",
+      "This is where each person's own two screens will go: enter the day's hours and look at their own. They are not built yet; use «All» in the meantime.",
+    ],
   ],
   rxEs2En: [
+    [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Week $1 – $2"],
+    [new RegExp("^mes (\\d{4}-\\d{2})$"), "month $1"],
+    [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Review $1 not approved"],
+    [new RegExp("^([\\d.,]+ h) · (\\d+)% del coste del periodo$"), "$1 · $2% of the period's cost"],
+    [new RegExp("^(\\d+) de (\\d+) apuntes$"), "$1 of $2 entries"],
+    [new RegExp("^(\\d+) de (\\d+) apunte$"), "$1 of $2 entry"],
+    [new RegExp("^Ver los (\\d+) apuntes$"), "Show all $1 entries"],
+    [new RegExp("^(\\d+) apuntes enviados para el (\\S+)$"), "$1 entries submitted for $2"],
+    [new RegExp("^(\\d+) apunte enviado para el (\\S+)$"), "$1 entry submitted for $2"],
+    [new RegExp("^Semana (\\S+) – (\\S+)$"), "Week $1 – $2"],
+    [new RegExp("^＋ Añadir otro trabajo para (.+)$"), "＋ Add another job for $1"],
+    [
+      new RegExp("^Reabrir la semana de (.+) para poder editarlo ›$"),
+      "Reopen $1's week to edit this ›",
+    ],
+    [new RegExp("^Apunte movido al (\\S+)$"), "Entry moved to $1"],
+    [new RegExp("^([\\d.,]+) h · ([\\d.,]+) línea$"), "$1 h · $2 line"],
+    [new RegExp("^([\\d.,]+) h · ([\\d.,]+) líneas$"), "$1 h · $2 lines"],
+    [new RegExp("^([\\d.,]+) extra$"), "$1 overtime"],
+
+    /* The site worker's own screens compose a date or a count into a sentence.
+       The number and the date are data; the words round them are not. */
+    [new RegExp("^¿Dónde has trabajado el (\\S+)\\?$"), "Where did you work on $1?"],
+    [new RegExp("^Ya apuntado el (\\S+)$"), "Already entered for $1"],
+    [new RegExp("^(\\d+) días trabajados$"), "$1 days worked"],
+    [new RegExp("^(\\d+) día trabajado$"), "$1 day worked"],
+
     /* The project picker composes CODE · customer · street, all data, and
        appends the one translatable word when the job is closed. Data passes
        through; the suffix translates. Same shape for the Email line a party

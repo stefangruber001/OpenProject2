@@ -9234,26 +9234,40 @@ async function testProcurement(browser, base) {
     // ---- ADM-04 Horas (S12): day sheet + week calendar, then the Resumen ----
     await pg.evaluate(() => (location.hash = "labour"));
     await pg.waitForTimeout(700);
-    // The four widths §3.2 fixes for the day sheet, and the calendar beside it.
-    const sheetShape = await pg.evaluate(() => {
-      const cal = document.querySelectorAll(".hcal .hday").length;
-      const zone = document.querySelector(".inbox2");
-      const w = zone ? getComputedStyle(zone).gridTemplateColumns.split(" ")[0] : null;
-      const th = [...document.querySelectorAll(".hsheet thead th")].map((x) =>
-        Math.round(x.getBoundingClientRect().width),
-      );
-      return { cal, w, th };
-    });
-    if (sheetShape.cal === 7 && sheetShape.w === "372px")
-      ok("ADM-04: seven day cells in a 372 calendar beside the day sheet");
+    /* S10 · the day sheet is one card per person under a week strip, and the
+       correction register has moved to a tab of its own. The old shape check
+       measured a two-column table beside a calendar; what matters now is that
+       the week still offers seven days, that the group and the three tabs are
+       both present, and that the register is NOT printed under the day — that
+       last one is the whole reason the screen was eighteen thousand pixels
+       long on a day with no hours at all. */
+    const sheetShape = await pg.evaluate(() => ({
+      cal: document.querySelectorAll(".weekbar .hday").length,
+      groups: document.querySelectorAll(".hgrp .hg").length,
+      tabs: [...document.querySelectorAll("[data-htab]")].map((t) => t.dataset.htab),
+      registerUnderTheDay: !!document.querySelector(".rlist"),
+      dock: !!document.querySelector(".hdock #hAdd"),
+      height: document.body.scrollHeight,
+    }));
+    if (
+      sheetShape.cal === 7 &&
+      sheetShape.groups === 2 &&
+      sheetShape.tabs.join() === "sheet,summary,register" &&
+      !sheetShape.registerUnderTheDay &&
+      sheetShape.dock
+    )
+      ok("ADM-04: seven day cells, two groups, three tabs, and no register under the day");
     else bad("ADM-04: day sheet shape", JSON.stringify(sheetShape));
+    if (sheetShape.height < 4000)
+      ok(`ADM-04: the day sheet is ${sheetShape.height} px, not a scroll through last April`);
+    else bad("ADM-04: day sheet length", `${sheetShape.height} px`);
 
     await pg.click("#hAssign");
     await pg.waitForTimeout(300);
     await pg.selectOption("#as_w", { index: 0 });
     await pg.click("#as_save");
     await pg.waitForTimeout(500);
-    const hin = pg.locator(".hsheet input.hin").first();
+    const hin = pg.locator(".wcard input.hin").first();
     if ((await hin.count()) === 0) {
       bad("ADM-04: the day sheet offers an editable row after assigning", "no input.hin");
     } else {
@@ -9290,7 +9304,7 @@ async function testProcurement(browser, base) {
       await hin.blur();
       await pg.waitForTimeout(600);
       const afterH = await hoursOnDay();
-      const dayTotal = await pg.locator(".hcal .hday.on .h").innerText();
+      const dayTotal = await pg.locator(".weekbar .hday.on .h").innerText();
       const shown = Number(dayTotal.replace(/[^\d,.]/g, "").replace(",", "."));
       if (afterH === beforeH - prev + 6 && shown === afterH)
         ok("ADM-04: hours entered on the sheet show in the day's calendar cell");
@@ -9303,7 +9317,7 @@ async function testProcurement(browser, base) {
           return {
             toast: t ? t.textContent.trim().slice(0, 120) : "",
             day: typeof hDay === "string" ? hDay : null,
-            rows: document.querySelectorAll(".hsheet tbody tr").length,
+            rows: document.querySelectorAll(".wcard .wrow").length,
             projSel: document.querySelector("[data-newproj]")?.value ?? null,
           };
         });
@@ -9317,11 +9331,11 @@ async function testProcurement(browser, base) {
       await pg.waitForTimeout(600);
       const lockedRows = await pg.evaluate(
         () =>
-          [...document.querySelectorAll(".hsheet tbody tr")].filter(
-            (tr) => tr.querySelector("[data-unapprove]") && !tr.querySelector("input.hin"),
+          [...document.querySelectorAll(".wcard")].filter(
+            (c) => c.querySelector("[data-unapprove]") && !c.querySelector("input.hin"),
           ).length,
       );
-      if (lockedRows > 0) ok("ADM-04: approving the week turns its row into a locked figure");
+      if (lockedRows > 0) ok("ADM-04: approving the week turns its card into a locked figure");
       else bad("ADM-04: approve locks the row", `locked=${lockedRows}`);
 
       // ── Block 3: the labour asks from the client review, on the real screen.
@@ -9390,12 +9404,13 @@ async function testProcurement(browser, base) {
       });
       await pg.waitForTimeout(700);
       const kindShown = await pg.evaluate(() => {
-        const heads = [...document.querySelectorAll(".hsheet thead th")].map((t) =>
-          t.textContent.trim(),
-        );
-        const sels = [...document.querySelectorAll(".hsheet [data-hkind]")];
+        /* S10 · the kind stopped being a column and became a chip on the row,
+           which is a stronger claim than the old one: a column head can say
+           «Tipo de hora» while the cell under it is empty. Assert the control
+           itself, one per row that has an entry. */
+        const sels = [...document.querySelectorAll(".wcard [data-hkind]")];
         return {
-          hasColumn: heads.includes("Tipo de hora"),
+          hasColumn: sels.length > 0,
           controls: sels.length,
           values: sels.map((s) => s.value),
           // A control nobody can see is not a thing the tile shows.
@@ -9409,7 +9424,7 @@ async function testProcurement(browser, base) {
       // …and changing it there is a correction, not a relabel: correctHours
       // re-reads the rate band, so the entry's cost has to move with it.
       const repriced = await pg.evaluate(async () => {
-        const sel = [...document.querySelectorAll(".hsheet [data-hkind]")].find(
+        const sel = [...document.querySelectorAll(".wcard [data-hkind]")].find(
           (s) => s.value === "extra",
         );
         if (!sel) return { skipped: true };
@@ -9437,20 +9452,30 @@ async function testProcurement(browser, base) {
         if (t) t.click();
       });
       await pg.waitForTimeout(700);
-      const tables = await pg.evaluate(() => {
-        const g = (id) => {
-          const t = document.getElementById(id);
-          if (!t) return null;
-          const r = t.getBoundingClientRect();
-          return { rows: t.querySelectorAll("tbody tr").length, w: Math.round(r.width) };
+      /* S10 · the two tables became a ranked list and a drill-down inside the
+         month's reconciliation, because the cash comparison IS that
+         reconciliation per person. The claim is unchanged — both render, with
+         rows — but the cash side now has to be opened, and asserting that it
+         opens is a check the old shape could not make. */
+      const tables = await pg.evaluate(async () => {
+        const rows = (sel) => document.querySelectorAll(sel).length;
+        const byW = rows(".hworker");
+        const drill = document.querySelector("#hRecMore");
+        const closed = rows(".hcash .cw");
+        if (drill) drill.click();
+        await new Promise((r) => setTimeout(r, 500));
+        return {
+          byW,
+          closed,
+          opened: rows(".hcash .cw"),
+          w: Math.round(document.querySelector(".hrank")?.getBoundingClientRect().width || 0),
         };
-        return { byW: g("hByW"), wRec: g("hWRec") };
       });
-      if (tables.byW && tables.byW.rows > 0 && tables.byW.w > 400)
-        ok(`block 3: the by-worker table renders with rows (${tables.byW.rows})`);
-      else bad("block 3: by-worker table", JSON.stringify(tables));
-      if (tables.wRec && tables.wRec.rows > 0)
-        ok(`block 3: the per-worker cash reconciliation renders (${tables.wRec.rows} rows)`);
+      if (tables.byW > 0 && tables.w > 400)
+        ok(`block 3: the by-worker list renders with rows (${tables.byW})`);
+      else bad("block 3: by-worker list", JSON.stringify(tables));
+      if (tables.closed === 0 && tables.opened > 0)
+        ok(`block 3: the cash comparison opens inside the reconciliation (${tables.opened} rows)`);
       else bad("block 3: worker cash reconciliation", JSON.stringify(tables));
       // Back to the day sheet — the checks below this block belong to it.
       await pg.evaluate(() => {
@@ -9490,15 +9515,69 @@ async function testProcurement(browser, base) {
     const summary = await pg.evaluate(() => {
       const rec = erp.labourReconciliation();
       return {
-        table: !!document.querySelector("#hSum"),
-        recBlock: !!document.querySelector("#hRec"),
+        table: document.querySelectorAll(".hrank .hitem").length > 0,
+        recBlock: !!document.querySelector(".hrec"),
+        band: document.querySelectorAll(".hband .c").length,
         text: document.querySelector("#view").innerText,
         agrees: rec.wagesCents - rec.bookedCents === rec.unbookedCents,
       };
     });
-    if (summary.table && summary.recBlock && summary.agrees && /Conciliación/.test(summary.text))
+    if (
+      summary.table &&
+      summary.recBlock &&
+      summary.band === 3 &&
+      summary.agrees &&
+      /* Case-insensitive, like its Catalan sibling below: the section heading is
+         uppercased in CSS now, and `innerText` returns what is RENDERED. A test
+         that reads the case of a heading is testing the stylesheet. */
+      /conciliación/i.test(summary.text)
+    )
       ok("ADM-04: the Resumen tab rolls up per chapter and reconciles the month");
     else bad("ADM-04: resumen tab", JSON.stringify(summary).slice(0, 200));
+
+    /* S11 · THE OTHER AUDIENCE. The «Mías» group is what a site worker sees —
+       the only screens he sees. Reached here as the office, because the office
+       is also a person with hours; the difference between the two is what the
+       SERVER sends and refuses, which is checked in tests/server-e2e. What is
+       checked HERE is that the screens exist, draw, and never print a euro.
+
+       The euro assertion is the one worth having. Everything else about this
+       release is a permission; this is the promise the operator actually made
+       to the crew — «he sees only his hours, and no amounts» — and it is the
+       one a later change could break by accident, by reusing a row component
+       that happens to render a cost. */
+    await pg.locator('[data-hgrp="mine"]').click();
+    await pg.waitForTimeout(600);
+    const mineEntry = await pg.evaluate(() => ({
+      tabs: [...document.querySelectorAll("[data-hmtab]")].map((t) => t.dataset.hmtab),
+      week: document.querySelectorAll(".weekbar .hday").length,
+      form: !!document.querySelector(".mform #me_p") || !!document.querySelector(".mform"),
+      approved: !!document.querySelector(".card .empty"),
+      text: document.querySelector("#view").innerText,
+    }));
+    if (
+      mineEntry.tabs.join() === "enter,mine" &&
+      mineEntry.week === 7 &&
+      (mineEntry.form || mineEntry.approved)
+    )
+      ok("ADM-04: the worker's own screen offers a week and one place to type");
+    else bad("ADM-04: worker entry screen", JSON.stringify(mineEntry).slice(0, 200));
+    if (!/€/.test(mineEntry.text)) ok("ADM-04: and not one euro sign on it");
+    else bad("ADM-04: the worker's entry screen shows money", mineEntry.text.slice(0, 160));
+
+    await pg.locator('[data-hmtab="mine"]').click();
+    await pg.waitForTimeout(600);
+    const mineHours = await pg.evaluate(() => ({
+      band: document.querySelectorAll(".hband .c").length,
+      days: document.querySelectorAll(".mday").length,
+      keep: !!document.querySelector(".keepnote"),
+      text: document.querySelector("#view").innerText,
+    }));
+    if (mineHours.band === 3 && mineHours.days === 7 && mineHours.keep)
+      ok("ADM-04: his own totals, his week, and the note saying what is not here");
+    else bad("ADM-04: worker hours screen", JSON.stringify(mineHours).slice(0, 200));
+    if (!/€/.test(mineHours.text)) ok("ADM-04: his hours screen carries no amount either");
+    else bad("ADM-04: the worker's hours screen shows money", mineHours.text.slice(0, 160));
 
     if (errs.length === 0) ok("procurement: no console errors");
     else bad("procurement: no console errors", errs.slice(0, 3).join(" | "));

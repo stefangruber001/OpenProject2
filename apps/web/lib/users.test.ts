@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { hashPassword } from "./auth";
 import {
   authenticateAgainst,
@@ -169,5 +169,59 @@ describe("ending somebody's sessions", () => {
     expect(0 < validFrom(u)).toBe(false);
     const u2 = base({ sessionsValidFrom: new Date(5000) });
     expect(0 < validFrom(u2)).toBe(true);
+  });
+});
+
+/**
+ * THE LOCKOUT THIS PINS.
+ *
+ * A single-seat deployment names one person in `ERP_OPERATOR` and configures no
+ * accounts at all; `requireUser` returns that name so every record is
+ * attributable. They have no row and no environment account, so `findUser`
+ * answered null — harmless while nothing consulted a permission, and a total
+ * lockout the moment the command runner started to. It shipped as far as the
+ * smoke job, which refused a plain `addParty` with "you do not have permission
+ * to erp.write" on a server that belonged entirely to the person asking.
+ *
+ * The rule is narrow on purpose, and both halves are worth holding: the lone
+ * operator IS the administrator, and the moment real sign-in exists the
+ * synthetic record must disappear — otherwise a name in an environment
+ * variable would outrank the accounts.
+ */
+describe("the single-seat operator", () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  const findUser = async (email: string) => {
+    const { findUser: f } = await import("./user-admin");
+    return f("reformas-demo", email);
+  };
+
+  it("is an administrator of their own server", async () => {
+    process.env.ERP_OPERATOR = "Stefan Gruber";
+    delete process.env.ERP_USERS;
+    delete process.env.ERP_ACCESS_PASSWORD;
+    delete process.env.SESSION_SECRET;
+    const u = await findUser("stefan gruber");
+    expect(u?.role).toBe("admin");
+    expect(u?.state).toBe("active");
+    expect(roleMay(u!.role, "erp.write")).toBe(true);
+    expect(roleMay(u!.role, "erp.read.all")).toBe(true);
+  });
+
+  it("is nobody once real sign-in is configured", async () => {
+    process.env.ERP_OPERATOR = "Stefan Gruber";
+    process.env.ERP_USERS = "ana@example.com:scrypt$16384$8$1$c2FsdA==$aGFzaA==";
+    process.env.SESSION_SECRET = "s".repeat(32);
+    expect(await findUser("stefan gruber")).toBeNull();
+  });
+
+  it("does not exist when nobody was named", async () => {
+    delete process.env.ERP_OPERATOR;
+    delete process.env.ERP_USERS;
+    delete process.env.SESSION_SECRET;
+    expect(await findUser("anybody")).toBeNull();
   });
 });

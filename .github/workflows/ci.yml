@@ -293,19 +293,30 @@ jobs:
       # separately by `Translation completeness (dictionary)` above, which has
       # no variance because it reads files rather than driving a browser.
       #
-      # 41/101 → 34/96 (2026-09-04). The crawl now walks 64 pages rather than the
-      # set it walked before: `journey.html` left STATIC_PAGES when the recorrido
-      # stopped being a page, and `#journey` joined DISCOVER_ROUTES because the
-      # menu entry no longer carries `href`. Measured at 31 and 93 — the one
-      # string the recorrido itself contributed was the «de» that both this
-      # screen and `countTag` build a count around, and it was translated rather
-      # than budgeted for. The three strings of slack above are kept for the
-      # reason the paragraph above them gives.
+      # 41/101 → 37/97 (2026-09-05), and the EN half of that is a RAISE against the
+      # 33 the hours release set hours earlier. Said plainly, because a ratchet
+      # that goes up quietly is not a ratchet:
+      #
+      # The two branches changed the crawl SET, not just its contents. The hours
+      # release added six `#labour` routes; the recorrido took `journey.html` out
+      # of STATIC_PAGES and put `#journey` into DISCOVER_ROUTES. Merged, the crawl
+      # drives 64 pages and measures 34 EN / 94 CA — it is seeing more screens
+      # than either 33 or 31 was measured against, so the numbers are not
+      # comparable and the merged one is the only one that describes this tree.
+      #
+      # Nothing here is budgeted debt of the recorrido's own. It contributed two
+      # strings and both were TRANSLATED rather than excused: the «de» that this
+      # screen and `countTag` both build a count around, and «Completada», which
+      # turned out to be untranslated on the subcontract register too. Three of
+      # what remains belong to the hours release — the role description on
+      # Usuarios and two composed `select` options on `#labour` — and are noted in
+      # ASSUMPTIONS S75g for whoever ratchets next. The three strings of slack are
+      # the crawl's own variance, for the reason the paragraph above gives.
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
-          node tests/i18n/miss-crawl.mjs --lang en --max 34
-          node tests/i18n/miss-crawl.mjs --lang ca --max 96
+          node tests/i18n/miss-crawl.mjs --lang en --max 37
+          node tests/i18n/miss-crawl.mjs --lang ca --max 97
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)

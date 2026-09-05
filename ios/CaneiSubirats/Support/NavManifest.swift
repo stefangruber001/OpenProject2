@@ -10,6 +10,9 @@ enum NavManifest {
     private struct Root: Decodable {
         let version: Int
         let tabs: [Tab]
+        /// The bar a particular role gets instead, keyed by role. Optional so a
+        /// manifest written before role bars existed still decodes.
+        let roleTabs: [String: [Tab]]?
     }
 
     private struct Tab: Decodable {
@@ -19,7 +22,7 @@ enum NavManifest {
         let label: [String: String]
     }
 
-    /// The bundled manifest, in `Config.uiLanguage`.
+    /// The bundled manifest, in `Config.uiLanguage`, for a role.
     ///
     /// Falls back to the previous hardcoded set if the file is missing or
     /// unreadable. That fallback is deliberate and is NOT a second source of
@@ -27,7 +30,14 @@ enum NavManifest {
     /// packaging mistake, which should degrade to the last known-good layout
     /// rather than to a blank screen. `navManifestLoaded` records which path
     /// was taken so a packaging mistake is visible rather than silent.
-    static func load() -> [WebTab] {
+    ///
+    /// `role` is what the web layer last told us this account is — see
+    /// `Config.erpRole`. A role with its own bar gets it; everybody else, and a
+    /// role we have never heard of, gets the full one. Erring towards the full
+    /// bar is safe in the direction that matters: the tab bar is a list of URLs
+    /// into the web app, which resolves every route to the hours screen for an
+    /// account that may only see its hours, and the server refuses the rest.
+    static func load(role: String? = nil) -> [WebTab] {
         guard
             let url = Bundle.main.url(forResource: "nav", withExtension: "json"),
             let data = try? Data(contentsOf: url),
@@ -41,7 +51,9 @@ enum NavManifest {
 
         let lang = Config.uiLanguage
         navManifestLoaded = true
-        return root.tabs.map { tab in
+        let chosen = role.flatMap { root.roleTabs?[$0] }.flatMap { $0.isEmpty ? nil : $0 }
+            ?? root.tabs
+        return chosen.map { tab in
             WebTab(
                 id: tab.id,
                 // Spanish is the hub everywhere else in this product, so it is

@@ -2166,8 +2166,40 @@ was a picker choosing whichever supplier came first for a document that matched
 nobody. A tax id compared to a tax id is the identifier the law uses to say two
 records are one company.
 
+**S10 · The hours screen becomes two screens, for two audiences.** The day
+sheet measured 18,361 px on a day with NO hours: the correction register was
+printed underneath it, sixty entries deep. It is a tab of its own now, the
+office gets a card per person under a week strip with every field editable in
+Corrections, and the day fits on a screen.
+
+**S11 · The site worker, and the boundary that was only a label.** The `site`
+role named a set of permissions and nothing consulted them: `POST /erp/command`
+checked none, and `PUT /erp/state` accepted a whole client-computed document
+from anybody signed in. An account meant to type its own hours could rewrite
+the invoice register, and its state response carried every bank line.
+
+The enforcement is on the wire now — per-command permissions, ownership and
+assigned-site checks on the six hours commands, `erp.write` required to save a
+whole document, and a read that is BUILT for the worker rather than filtered.
+On top of that, and only in agreement with it, the two worker screens: type
+your hours, see your own totals, no amount and nobody else. `tests/server-e2e`
+now signs in as a real account, and the deploy's smoke job runs a second copy
+of the same image behind a real login to check the four refusals and the
+redaction against Postgres before anything is promoted.
+
+Two things that gate caught before production, both mine: the new permission
+check locked a single-seat deployment's only operator out of their own ERP
+(`ERP_OPERATOR` has no account row for `may()` to read), and five calls in the
+suite carried no session cookie. Both fixed and pinned. A third — an invitation
+issued for a tenant that is not the deployment's own leaves an account that can
+never sign in — is real, is not mine, and is written down as ASSUMPTIONS.md S74
+rather than patched at speed on a deploy gate.
+
 **Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
-("Forget about this for the moment") and still the oldest unanswered item.
+("Forget about this for the moment") and still the oldest unanswered item. It
+is now also what the site worker's phone waits on: the screens themselves reach
+the existing build over the air, but `nav.json` is bundled, so the single-tab
+bar for that role needs a new build.
 
 ## Package 14 — the recorrido stops being a second application (2026-09-04)
 
@@ -2269,3 +2301,34 @@ dashboard that no longer exists.
 `pnpm lint · check-types · test · boundaries · build`, the nav manifest, the
 ownership guard and `tests/site-sync` 20/20 all green. No capability changed, so
 the committed `site/erp-factory` bundle is untouched.
+
+**Merged with the hours redesign, 05/09.** The two packages were written in
+parallel and met in nine files. Nothing was content-copied: `site/erp-ds.css`
+was rebuilt as main's file plus this branch's two edits, and every other
+conflict was resolved by keeping both sides — the workspace audit walks the six
+`#labour` routes AND `#journey`, and the numbered CSS section and the
+ASSUMPTIONS entries were renumbered behind the ones that landed first (69/S72–74
+theirs, 70/S75 ours). Three things the merge itself surfaced:
+
+- **«Sin obra» meant two different facts.** The hours release owns it for an
+  apunte with no obra assigned; the recorrido was using the same two words for a
+  lead that has not become one yet. Renamed to «Todavía sin obra», which is also
+  the truer sentence — the alternative was one screen saying "site" in the middle
+  of another that says "job" everywhere.
+- **`hashchange` did not carry the clamp `go()` does.** A site worker typing a
+  hash reached any screen; the state is redacted on the server, so what came up
+  was empty rather than somebody else's data, but a rule enforced on one of two
+  doors is the shape this workspace has been caught by before. One line, their
+  own rule.
+- **«Completada» and «Bloqueada» had no dictionary entry, and «Vencido» was the
+  wrong word.** The first two were caught by the translator crawl; «Completada»
+  turned out to be untranslated on the subcontract register too. The third is now
+  «Vencida» — feminine like every other state in the map, the word Facturación
+  already writes for an overdue invoice, and not the one that resolves to
+  "Expired".
+
+Re-measured on the merged tree, not carried over: **707/707 unfiltered**, site
+E2E; workspace audit **0/0** across eighteen screens; source literals
+**162/162**; rendered pages **91/67**; miss ledger **34/94** against ceilings
+37/97 — an EN raise against the hours release's 33, argued in ASSUMPTIONS S75g
+rather than adjusted quietly.

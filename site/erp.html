@@ -5290,7 +5290,7 @@
          not shown a field it could never save anyway. Defaults permissive because
          local IndexedDB mode has no server-side identity to ask in the first
          place — everything on that single machine is already fully visible. */
-      let SESSION = { email: "", role: "admin", bankRead: true };
+      let SESSION = { email: "", role: "admin", bankRead: true, workerId: null };
       /**
        * A brand-new workspace, price book included.
        *
@@ -5491,6 +5491,26 @@
           } catch (e) {
             /* keep the permissive default — masking only, see SESSION above */
           }
+        }
+        /* Tell the phone shell who this is, so its native tab bar can be the one
+           this account needs. The shell builds that bar at launch, so this lands
+           on the NEXT one — the same honest limitation the language switch has,
+           and harmless: every route resolves to the hours screen for a site
+           worker anyway, and the server refuses the rest. No shell, no handler,
+           nothing happens. */
+        try {
+          const bridge = window.webkit?.messageHandlers?.native;
+          if (bridge && SESSION.role) bridge.postMessage({ action: "role", role: SESSION.role });
+        } catch (e) {
+          /* a shell that does not want to be told is not an error */
+        }
+        if (!ErpStore.isRemote() && !SESSION.workerId) {
+          /* No server means no identity to ask for, and a switch with a single
+             destination is not a switch — the personal view would be
+             unreachable on this machine. Attach the first person on file so it
+             exists here too. Everything on a local copy is visible anyway. */
+          const w0 = erp.state.workers[0];
+          if (w0) SESSION = { ...SESSION, workerId: w0.id };
         }
         measureTopbar();
         buildPeriodControls();
@@ -5832,9 +5852,17 @@
                alone, so the day a section moves there is one line to change. */
       const FLOW = ["sales", "projects", "admin"];
       let openSec = null; // section whose panel 2 is out
+      /* A SITE WORKER HAS ONE DESTINATION, so the shell around it collapses to
+         match. This is masking and says so — the boundary is the server's, and
+         it refuses the same things whether or not a button was drawn. What it
+         buys is a screen with nothing on it to misunderstand. */
+      function isSiteWorker() {
+        return SESSION.role === "site";
+      }
       function buildSections() {
         const p1 = $("#p1");
         p1.innerHTML = "";
+        if (isSiteWorker()) return;
         const curSec = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         let critical = 0;
         try {
@@ -5850,6 +5878,7 @@
         });
       }
       function visibleSubs(s) {
+        if (isSiteWorker()) return s.subs.filter((x) => x.k === "labour");
         return s.subs.filter((x) => !HIDDEN_SUBS.has(x.k));
       }
       function buildSubs(secKey) {
@@ -6050,6 +6079,9 @@
 
       function go(k, arg) {
         k = resolveRoute(k);
+        /* One route, whichever hash was typed. A screen this account may not see
+           is not a screen it should be shown asking to be let in. */
+        if (isSiteWorker()) k = "labour";
         const s = SUBMAP[k];
         if (s && s.href) {
           location.href = s.href;
@@ -6625,6 +6657,12 @@
       });
 
       function renderCreateMenu() {
+        document.body.classList.toggle("siteworker", isSiteWorker());
+        if (isSiteWorker()) {
+          const c = $("#mCreate");
+          if (c) c.innerHTML = "";
+          return;
+        }
         const secKey = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         const items = CREATE[secKey] || [];
         const m = $("#mCreate");
@@ -6674,6 +6712,7 @@
         else go("tower");
       }
       function renderBell() {
+        if (isSiteWorker()) return;
         let list = [];
         try {
           list = erp.managedAlerts();
@@ -9028,7 +9067,13 @@
       let hWeekRef = null,
         hChapter = null,
         hDay = null,
-        hTab = "sheet";
+        hTab = "sheet",
+        /* Whose hours the screen is showing. "all" is the consolidated view the
+           office works in; "mine" is the pair of screens a person uses for their
+           own hours. The switch exists from the first release so the shape of the
+           screen does not change under the operator when "mine" gains its two
+           tabs — it is the group, not the tab, that answers «whose». */
+        hGroup = "all";
       const DOW = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
       const WORKER_KINDS = { employee: "Empleado", selfEmployed: "Autónomo" };
       /* What KIND of hour, which is a different question from what kind of
@@ -9043,10 +9088,44 @@
         if (!erp.state.projects.length) return noProjectsCard(v);
         if (!hDay) hDay = erp.today;
         hWeekRef = hDay;
+        if (!["sheet", "summary", "register"].includes(hTab)) hTab = "sheet";
+        /* TWO LEVELS, NOT ONE. The group says whose hours these are; the tabs say
+           which question about them is on screen. Flattening the two into one strip
+           was what made «Registro» look like a peer of «Parte diario» while
+           actually being printed underneath it. */
+        /* An account with nobody attached has no «mine» to switch to, and an
+           account that may only see its own hours has no «everyone». Either way
+           the switch would be a control with one destination. */
+        const canSeeAll = SESSION.role !== "site";
+        const hasMine = !!SESSION.workerId;
+        if (!canSeeAll) hGroup = "mine";
+        else if (!hasMine) hGroup = "all";
+        const group =
+          canSeeAll && hasMine
+            ? `<div class="hgrp">
+          <button class="hg${hGroup === "mine" ? " on" : ""}" data-hgrp="mine"><i>Mías</i>Mis horas</button>
+          <button class="hg${hGroup === "all" ? " on" : ""}" data-hgrp="all"><i>Oficina</i>Todos</button></div>`
+            : "";
         const tabs = `<div class="tabstrip">
           <button class="tab${hTab === "sheet" ? " on" : ""}" data-htab="sheet">Parte diario</button>
-          <button class="tab${hTab === "summary" ? " on" : ""}" data-htab="summary">Resumen</button></div>`;
-        v.innerHTML = tabs + (hTab === "sheet" ? horasSheet() : horasSummary());
+          <button class="tab${hTab === "summary" ? " on" : ""}" data-htab="summary">Resumen</button>
+          <button class="tab${hTab === "register" ? " on" : ""}" data-htab="register">Correcciones</button></div>`;
+        const body =
+          hGroup === "mine"
+            ? horasMine()
+            : hTab === "sheet"
+              ? horasSheet()
+              : hTab === "summary"
+                ? horasSummary()
+                : labourRegisterAll();
+        v.innerHTML = group + (hGroup === "mine" ? "" : tabs) + body;
+        v.querySelectorAll("[data-hgrp]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hGroup = b.dataset.hgrp;
+              render();
+            }),
+        );
         v.querySelectorAll("[data-htab]").forEach(
           (b) =>
             (b.onclick = () => {
@@ -9054,8 +9133,326 @@
               render();
             }),
         );
+        if (hGroup === "mine") return wireHorasMine();
         if (hTab === "sheet") wireHorasSheet();
+        else if (hTab === "register") wireLabourRegisterAll();
         else wireHorasSummary();
+      }
+
+      /* THE PERSON THIS ACCOUNT IS. The server answers it by matching the e-mail
+         on the session to the one on the worker record; on a single machine with
+         no server there is nobody to ask, so it stays null and the screen says so
+         rather than guessing whose hours to show. */
+      let hMineTab = "enter";
+      function myWorkerId() {
+        return SESSION.workerId || null;
+      }
+      function myWorker() {
+        const id = myWorkerId();
+        return (id && erp.state.workers.find((w) => w.id === id)) || null;
+      }
+      /** The jobs this person is assigned to on a given day — and only those. */
+      function mySites(day) {
+        const id = myWorkerId();
+        if (!id) return [];
+        const ids = new Set(
+          (erp.state.assignments || [])
+            .filter(
+              (a) => a.workerId === id && (!a.from || a.from <= day) && (!a.to || a.to >= day),
+            )
+            .map((a) => a.projectId),
+        );
+        return erp.state.projects.filter((p) => ids.has(p.id) && !p.closed);
+      }
+      function myHours(from, to) {
+        const id = myWorkerId();
+        if (!id) return [];
+        return erp.state.labour.filter(
+          (l) => l.workerId === id && (!from || l.date >= from) && (!to || l.date <= to),
+        );
+      }
+
+      /** The «mine» half: two screens, and nothing that is not this person's. */
+      function horasMine() {
+        const w = myWorker();
+        if (!w)
+          return `<div class="card"><div class="ch"><h3>Mis horas</h3></div>
+   <div class="empty">Esta cuenta no está enlazada con ninguna ficha de trabajador,
+   así que no tiene horas propias. La oficina puede enlazarla poniendo el mismo
+   correo en la ficha.</div></div>`;
+        const tabs = `<div class="tabstrip">
+          <button class="tab${hMineTab === "enter" ? " on" : ""}" data-hmtab="enter">Apuntar horas</button>
+          <button class="tab${hMineTab === "mine" ? " on" : ""}" data-hmtab="mine">Mis horas</button></div>`;
+        return tabs + (hMineTab === "enter" ? myEntryScreen(w) : myHoursScreen(w));
+      }
+
+      function myEntryScreen(w) {
+        const week = labourWeekAll(hDay);
+        const id = w.id;
+        const h = (m) => (m / 1000).toLocaleString("es-ES");
+        const mineByDay = (d) => myHours(d, d);
+        const totals = week.days.map((d) => mineByDay(d).reduce((s2, l) => s2 + l.hoursMilli, 0));
+        const sites = mySites(hDay);
+        const today = mineByDay(hDay);
+        const chaps = ((sites[0] || {}).baseline || {}).chapters || [];
+        const weekLocked = myHours(week.days[0], week.days[6]).some((l) => l.locked);
+        const entryRow = (l) => {
+          const site = l.projectId ? erp.project(l.projectId).code : "—";
+          const line = hourLineLabel(l);
+          const where = line ? `${site} · ${esc(l.chapterNum || "")}. ${esc(line)}` : esc(site);
+          return `<div class="meblk">
+           <div class="me"><div><div class="w">${where}</div>
+             <div class="l">${esc(HOUR_KINDS[l.kind] || l.kind)}</div></div>
+             <span style="flex:1"></span><div class="hh">${h(l.hoursMilli)} h</div>
+             <span class="pill ${l.locked ? "g" : "y"}">${l.locked ? "Aprobada" : "Esperando aprobación"}</span></div>
+           <div class="me2"><span style="flex:1"></span>${
+             l.locked
+               ? '<span class="mnote">Aprobada — pídeselo a la oficina</span>'
+               : `<button class="mini" data-mefix="${l.id}">Cambiar</button><button class="mini dz" data-medel="${l.id}">Eliminar</button>`
+           }</div></div>`;
+        };
+        const form = weekLocked
+          ? `<div class="card"><div class="empty">Esta semana ya está aprobada. Pide a la oficina que la reabra si falta algo.</div></div>`
+          : `<div class="card mform">
+           <div class="mfh">¿Dónde has trabajado el ${fmtD(hDay)}?</div>
+           <div class="mf"><label>Obra</label><select id="me_p">${
+             sites
+               .map((p) => `<option value="${p.id}">${esc(projectPickLabel(p))}</option>`)
+               .join("") || '<option value="">—</option>'
+           }</select></div>
+           <div class="mf"><label>Partida</label><select id="me_c">${
+             chaps
+               .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+               .join("") || '<option value="">—</option>'
+           }</select></div>
+           <div class="mf" id="me_lwrap"><label>Subpartida</label><select id="me_l"></select></div>
+           <div class="mf"><label>Tipo de hora</label><select id="me_k">${Object.keys(HOUR_KINDS)
+             .map((k) => `<option value="${k}">${HOUR_KINDS[k]}</option>`)
+             .join("")}</select></div>
+           <div class="mf hn"><label>Horas</label><input id="me_h" type="number" step="0.25" min="0" value="8"></div>
+           <div class="mhint">${
+             sites.length
+               ? "La obra y la partida de ayer vienen puestas — cámbialas sólo si te has movido. Si la partida no tiene subpartidas, elige «— ninguna —»."
+               : "No estás asignado a ninguna obra abierta este día. Díselo a la oficina."
+           }</div>
+          </div>`;
+        return `
+         <div class="weekbar">
+          <button class="wnav" id="hPrev"><span class="cv">‹</span><span class="lb">Ant.</span></button>
+          <div class="days">${week.days
+            .map(
+              (
+                d,
+                i,
+              ) => `<button class="hday${d === hDay ? " on" : ""}${i >= 5 ? " wknd" : ""}" data-hday="${d}">
+             <span class="d">${DOW[i]}</span><span class="n">${fmtD(d).slice(0, 2)}</span>
+             <span class="h${totals[i] ? "" : " zero"}">${totals[i] ? h(totals[i]) + " h" : "—"}</span></button>`,
+            )
+            .join("")}</div>
+          <button class="wnav" id="hNext"><span class="cv">›</span><span class="lb">Sig.</span></button>
+         </div>
+         ${form}
+         <h4 class="hsec">Ya apuntado el ${fmtD(hDay)}</h4>
+         <div class="rlist">${
+           today.map(entryRow).join("") ||
+           '<div class="empty">Todavía no has apuntado nada para este día.</div>'
+         }</div>
+         <p class="rnote">Sólo ves tus horas, y nunca un importe. La oficina revisa
+         las imputaciones y aprueba la semana.</p>
+         ${
+           weekLocked || !sites.length
+             ? ""
+             : `<div class="hdock"><button class="btn primary" id="me_save">Guardar estas horas</button></div>`
+         }`;
+      }
+
+      function myHoursScreen(w) {
+        const r = periodRange();
+        const h = (m) => (m / 1000).toLocaleString("es-ES");
+        const mine = myHours(r.from, r.to);
+        const total = mine.reduce((s2, l) => s2 + l.hoursMilli, 0);
+        const extra = mine
+          .filter((l) => l.kind === "extra")
+          .reduce((s2, l) => s2 + l.hoursMilli, 0);
+        const waiting = mine.filter((l) => !l.locked).reduce((s2, l) => s2 + l.hoursMilli, 0);
+        const days = new Set(mine.map((l) => l.date)).size;
+        const byProject = [];
+        for (const l of mine) {
+          const code = l.projectId ? erp.project(l.projectId).code : "Sin obra";
+          let g = byProject.find((x) => x.code === code);
+          if (!g) byProject.push((g = { code, hoursMilli: 0, lines: [] }));
+          g.hoursMilli += l.hoursMilli;
+          const lab = hourLineLabel(l) || (l.chapterNum ? String(l.chapterNum) : "Sin partida");
+          let ln = g.lines.find((x) => x.lab === lab);
+          if (!ln) g.lines.push((ln = { lab, hoursMilli: 0 }));
+          ln.hoursMilli += l.hoursMilli;
+        }
+        byProject.sort((a, b) => b.hoursMilli - a.hoursMilli);
+        const max = Math.max(1, ...byProject.map((p) => p.hoursMilli));
+        const week = labourWeekAll(hDay);
+        return `
+         <div class="hband">
+          <div class="c"><div class="k">Mis horas</div><div class="v">${h(total)}</div>
+            <div class="s">${days} día${days === 1 ? "" : "s"} trabajados</div></div>
+          <div class="c"><div class="k">De ellas extra</div><div class="v">${h(extra)}</div>
+            <div class="s">horas extra</div></div>
+          <div class="c warn"><div class="k">Esperando</div><div class="v">${h(waiting)}</div>
+            <div class="s">sin aprobar todavía</div></div>
+         </div>
+         <h4 class="hsec">A dónde han ido mis horas <span>${fmtD(r.from)} – ${fmtD(r.to)}</span></h4>
+         <div class="hrank">${
+           byProject
+             .map(
+               (p) => `<div class="hitem">
+            <div class="ih"><span class="nm">${esc(p.code)}</span><span class="amt">${h(p.hoursMilli)} h</span></div>
+            <div class="bar"><i style="width:${Math.round((p.hoursMilli / max) * 100)}%"></i></div>
+            <div class="sublist">${p.lines
+              .map(
+                (ln) =>
+                  `<div class="sub2"><span>${esc(ln.lab)}</span><b>${h(ln.hoursMilli)} h</b></div>`,
+              )
+              .join("")}</div></div>`,
+             )
+             .join("") || '<div class="empty">Sin horas en el periodo.</div>'
+         }</div>
+         <h4 class="hsec">Esta semana <span>${fmtD(week.days[0]).slice(0, 5)} – ${fmtD(week.days[6]).slice(0, 5)}</span></h4>
+         <div class="rlist">${week.days
+           .map((d, i) => {
+             const ls = myHours(d, d);
+             const t = ls.reduce((s2, l) => s2 + l.hoursMilli, 0);
+             const dayLocked = ls.length > 0 && ls.every((l) => l.locked);
+             const st = !ls.length
+               ? ""
+               : `<span class="pill ${dayLocked ? "g" : "y"}">${dayLocked ? "Aprobada" : "Esperando"}</span>`;
+             /* The day name is vocabulary and the date is data, so they are two
+                nodes — one string carrying both translates in neither language.
+                Same split as the week strip above. */
+             return `<div class="mday"><span class="dt"><span class="dw">${DOW[i]}</span> ${fmtD(d).slice(0, 5)}</span>
+              <span style="flex:1"></span>${st}<span class="hh">${t ? h(t) + " h" : "—"}</span></div>`;
+           })
+           .join("")}</div>
+         <div class="keepnote">Aquí no se ve nada que no sea tuyo: ni las horas de
+         otras personas, ni ningún importe.</div>`;
+      }
+
+      function wireHorasMine() {
+        document.querySelectorAll("[data-hmtab]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hMineTab = b.dataset.hmtab;
+              render();
+            }),
+        );
+        document.querySelectorAll("[data-hday]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hDay = b.dataset.hday;
+              render();
+            }),
+        );
+        const prev = $("#hPrev"),
+          next = $("#hNext");
+        if (prev)
+          prev.onclick = () => {
+            hDay = isoAdd(hDay, -7);
+            render();
+          };
+        if (next)
+          next.onclick = () => {
+            hDay = isoAdd(hDay, 7);
+            render();
+          };
+        const wrap = $("#me_lwrap");
+        if (wrap) {
+          const fillLines = () => {
+            /* Nobody assigned to an open site that day has no site to ask the
+               line items of, and asking anyway is how this screen used to
+               throw. Empty select, same as an empty site. */
+            const opts = $("#me_p").value
+              ? lineOptionsFor($("#me_p").value, $("#me_c").value, "")
+              : "";
+            wrap.style.display = opts ? "" : "none";
+            $("#me_l").innerHTML = opts ? '<option value="">— ninguna —</option>' + opts : "";
+          };
+          const fillChaps = () => {
+            const p = erp.state.projects.find((x) => x.id === $("#me_p").value);
+            const chaps = (p && p.baseline && p.baseline.chapters) || [];
+            $("#me_c").innerHTML =
+              chaps
+                .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+                .join("") || '<option value="">—</option>';
+            fillLines();
+          };
+          fillChaps();
+          $("#me_p").onchange = fillChaps;
+          $("#me_c").onchange = fillLines;
+        }
+        const save = $("#me_save");
+        if (save)
+          save.onclick = () => {
+            const hrs = Number(String($("#me_h").value).replace(",", "."));
+            if (!(hrs > 0)) return toast("Indica las horas");
+            if (!$("#me_p").value) return toast("Elige la obra");
+            if ($("#me_lwrap").style.display !== "none" && !$("#me_l").value)
+              return toast("Las horas de obra necesitan partida y subpartida");
+            mutate(
+              () =>
+                erp.recordHours(
+                  {
+                    workerId: myWorkerId(),
+                    projectId: $("#me_p").value,
+                    chapterNum: $("#me_c").value || null,
+                    lineId:
+                      $("#me_lwrap").style.display !== "none" ? $("#me_l").value || null : null,
+                    kind: $("#me_k").value,
+                    hoursMilli: Math.round(hrs * 1000),
+                    date: hDay,
+                  },
+                  SESSION.email || "site",
+                ),
+              "Horas guardadas",
+            );
+          };
+        document
+          .querySelectorAll("[data-medel]")
+          .forEach(
+            (b) =>
+              (b.onclick = () =>
+                mutate(
+                  () => erp.deleteHours(b.dataset.medel, SESSION.email || "site"),
+                  "Apunte eliminado",
+                )),
+          );
+        document.querySelectorAll("[data-mefix]").forEach(
+          (b) =>
+            (b.onclick = async () => {
+              const l = erp.state.labour.find((x) => x.id === b.dataset.mefix);
+              if (!l) return;
+              const r = await ask(
+                "Cambiar las horas",
+                [
+                  {
+                    key: "h",
+                    label: "Horas",
+                    value: String(l.hoursMilli / 1000),
+                    hint: "Deja 0 para borrar el apunte.",
+                  },
+                ],
+                { okLabel: "Guardar" },
+              );
+              if (r === null) return;
+              const hrs = Number(String(r.h).replace(",", "."));
+              mutate(() => {
+                if (!(hrs > 0)) erp.deleteHours(l.id, SESSION.email || "site");
+                else
+                  erp.correctHours(
+                    l.id,
+                    { hoursMilli: Math.round(hrs * 1000) },
+                    SESSION.email || "site",
+                  );
+              }, "Apunte corregido");
+            }),
+        );
       }
 
       /** The seven day cells and the day's grid. */
@@ -9124,6 +9521,36 @@
         const chap = esc(r.entry.chapterNum || "—");
         return line ? `${chap} <span class="sub">· ${esc(line)}</span>` : chap;
       }
+      /* WHO SENT IT. There is no column on a labour entry saying whether the
+         office typed it or the person who did the work did, and adding one is a
+         migration this release does not need: the audit log already records the
+         acting user of every mutation, so the answer is derivable. `recordHours`
+         logs under the acting user, and the office books hours as "backoffice";
+         anything else recorded an entry from outside the office. */
+      const OFFICE_ACTORS = ["backoffice", "operations", "admin"];
+      const SENT_HINT = "Revisa el proyecto y la partida, corrige si hace falta y aprueba.";
+      function sentHeadline(n, day) {
+        return n === 1
+          ? `${n} apunte enviado para el ${fmtD(day)}`
+          : `${n} apuntes enviados para el ${fmtD(day)}`;
+      }
+      /* Worker names in this register are written as a role, a dash and a person,
+         so the first word is the role and not the human — addressing somebody by
+         their grade is worse than not addressing them at all. Take what follows
+         the dash when there is one. */
+      function personOf(name) {
+        const parts = String(name || "").split("—");
+        return (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim() || String(name || "");
+      }
+      function entryCameFromWorker(entry) {
+        if (!entry) return false;
+        const log = (erp.state.audit || []).filter(
+          (a) => a.action === "recordHours" && a.ref === entry.id,
+        );
+        if (!log.length) return false;
+        return !OFFICE_ACTORS.includes(String(log[0].user || "").toLowerCase());
+      }
+
       function horasSheet() {
         const week = labourWeekAll(hDay);
         const dayRows = labourDayRows(hDay);
@@ -9133,67 +9560,97 @@
           return (p && p.baseline && p.baseline.chapters) || [];
         };
         const h = (m) => (m / 1000).toLocaleString("es-ES");
-        return `
-         <div class="stepbar">
-          <button class="btn sm" id="hPrev">← Semana anterior</button>
-          <span class="pill">${fmtD(week.days[0])} – ${fmtD(week.days[6])}</span>
-          <button class="btn sm" id="hNext">Semana siguiente →</button>
-          <span style="flex:1"></span>
-          <button class="btn sm" id="hRepeat" title="Copia las horas del día anterior al día seleccionado">↻ Repetir día anterior</button>
-          <button class="btn sm" id="hAssign">＋ Asignar trabajador</button>
-          <button class="btn primary sm" id="hAdd">＋ Línea</button>
-         </div>
-         <div class="inbox2">
-          <div class="inbox hcal"><div class="ih"><h3>Semana</h3>
-            <span style="flex:1"></span><span class="tag">${h(week.totalMilli)} h</span></div>
-            ${week.days
-              .map(
-                (
-                  d,
-                  i,
-                ) => `<button class="hday${d === hDay ? " on" : ""}${i >= 5 ? " wknd" : ""}" data-hday="${d}">
-              <span class="d">${DOW[i]} ${fmtD(d).slice(0, 5)}</span>
-              <span class="h${week.totalsByDayMilli[i] ? "" : " zero"}">${week.totalsByDayMilli[i] ? h(week.totalsByDayMilli[i]) + " h" : "—"}</span></button>`,
-              )
-              .join("")}
-          </div>
-          <div class="card"><div class="ch"><h3>Parte del ${fmtD(hDay)}</h3>
-            <span class="tag">${h(dayRows.reduce((s, r) => s + r.hoursMilli, 0))} h · ${dayRows.length} línea${dayRows.length === 1 ? "" : "s"}</span></div>
-           <div class="scroll"><table class="hsheet"><thead><tr>
-             <th class="cw">Trabajador</th><th class="cp">Proyecto</th>
-             <th class="ch2 num">Horas</th><th class="ck">Tipo de hora</th>
-             <th>Partida</th><th></th></tr></thead><tbody>
-           ${
-             dayRows
-               .map(
-                 (r) => `<tr${r.locked ? ' class="locked"' : ""}>
-             <td class="cw k">${esc(r.workerName)} <span class="sub">${esc(WORKER_KINDS[r.kind] || r.kind)}</span></td>
-             <td class="cp">${
-               r.entry
-                 ? esc(r.projectCode || "—")
-                 : `<select class="inline" data-newproj="${r.workerId}">${jobs.map((p) => `<option value="${p.id}">${esc(projectPickLabel(p))}</option>`).join("")}</select>`
-             }</td>
-             <td class="ch2 num">${
+        /* ONE CARD PER PERSON, not one row per entry. `labourDayRows` returns a
+           row per entry plus a blank row for anybody assigned who has none, so the
+           grouping happens here rather than there — the projection stays the one
+           the week totals and the tests already use. */
+        const byWorker = [];
+        for (const r of dayRows) {
+          let g = byWorker.find((x) => x.workerId === r.workerId);
+          if (!g)
+            byWorker.push(
+              (g = { workerId: r.workerId, name: r.workerName, kind: r.kind, rows: [] }),
+            );
+          g.rows.push(r);
+        }
+        const sent = dayRows.filter((r) => entryCameFromWorker(r.entry)).length;
+        const dayMilli = dayRows.reduce((s2, r) => s2 + r.hoursMilli, 0);
+        function projectCell(r) {
+          if (r.entry) return `<div class="wproj">${esc(r.projectCode || "—")}</div>`;
+          const opts = jobs
+            .map((p) => `<option value="${p.id}">${esc(projectPickLabel(p))}</option>`)
+            .join("");
+          return `<div class="wsel"><select class="inline" data-newproj="${r.workerId}">${opts}</select></div>`;
+        }
+        const card = (g) => {
+          const locked = g.rows.some((r) => r.locked);
+          const fromWorker = g.rows.some((r) => entryCameFromWorker(r.entry));
+          return `<div class="wcard${locked ? " locked" : ""}">
+           <div class="wch"><span class="nm">${esc(g.name)}</span>
+             <span class="role">${esc(WORKER_KINDS[g.kind] || g.kind)}</span>
+             ${fromWorker ? '<span class="src">enviado</span>' : ""}
+             <span style="flex:1"></span>
+             ${
+               locked
+                 ? `<button class="btn sm" data-unapprove="${g.workerId}">Reabrir semana</button>`
+                 : `<button class="btn sm" data-approve="${g.workerId}">Aprobar semana</button>`
+             }</div>
+           ${g.rows
+             .map(
+               (r) => `<div class="wrow">
+             <div class="wwhere">${projectCell(r)}
+               <div class="wline">${hourWhereCell(r, jobs, chaptersOf)}</div>
+               <div class="wkind">${hourKindCell(r)}</div></div>
+             <div class="whrs">${
                r.locked
-                 ? h(r.hoursMilli)
-                 : `<input class="inline hin" type="number" step="0.25" min="0" style="width:70px"
+                 ? `<span class="ro">${h(r.hoursMilli)}</span>`
+                 : `<input class="inline hin" type="number" step="0.25" min="0"
                     data-entry="${r.entry ? r.entry.id : ""}" data-worker="${r.workerId}" value="${r.hoursMilli ? h(r.hoursMilli) : ""}">`
-             }</td>
-             <td class="ck">${hourKindCell(r)}</td>
-             <td>${hourWhereCell(r, jobs, chaptersOf)}</td>
-             <td>${
-               r.locked
-                 ? `<button class="btn sm" data-unapprove="${r.workerId}">🔓 Reabrir semana</button>`
-                 : `<button class="btn sm" data-approve="${r.workerId}">🔒 Aprobar semana</button>`
-             }
-                <button class="btn sm" data-workerdoc="${r.workerId}">🪪</button></td></tr>`,
-               )
-               .join("") ||
-             '<tr><td colspan="6"><div class="empty">Nadie tiene horas ni asignación para este día.</div></td></tr>'
-           }
-           </tbody></table></div></div>
+             }</div></div>`,
+             )
+             .join("")}
+           <div class="wcf">${
+             locked
+               ? ""
+               : `<button class="lnk" data-hmore="${g.workerId}">＋ Añadir otro trabajo para ${esc(personOf(g.name))}</button>`
+           }<span style="flex:1"></span>
+             <button class="lnk quiet" data-workerdoc="${g.workerId}">Ficha del trabajador ›</button></div>
+          </div>`;
+        };
+        return `
+         <div class="weekbar">
+          <button class="wnav" id="hPrev"><span class="cv">‹</span><span class="lb">Ant.</span></button>
+          <div class="days">${week.days
+            .map(
+              (
+                d,
+                i,
+              ) => `<button class="hday${d === hDay ? " on" : ""}${i >= 5 ? " wknd" : ""}" data-hday="${d}">
+             <span class="d">${DOW[i]}</span><span class="n">${fmtD(d).slice(0, 2)}</span>
+             <span class="h${week.totalsByDayMilli[i] ? "" : " zero"}">${week.totalsByDayMilli[i] ? h(week.totalsByDayMilli[i]) + " h" : "—"}</span></button>`,
+            )
+            .join("")}</div>
+          <button class="wnav" id="hNext"><span class="cv">›</span><span class="lb">Sig.</span></button>
          </div>
-         ${labourRegisterAll()}`;
+         <div class="wtot"><span class="k">Semana ${fmtD(week.days[0]).slice(0, 5)} – ${fmtD(week.days[6]).slice(0, 5)}</span>
+           <span class="v">${h(week.totalMilli)} h</span></div>
+         ${
+           sent
+             ? `<div class="wsent"><b>${sentHeadline(sent, hDay)}</b>
+                <span>${SENT_HINT}</span></div>`
+             : ""
+         }
+         <div class="wday"><span class="k">Parte del ${fmtD(hDay)}</span>
+           <span class="v">${h(dayMilli)} h · ${dayRows.length} línea${dayRows.length === 1 ? "" : "s"}</span></div>
+         ${
+           byWorker.map(card).join("") ||
+           '<div class="card"><div class="empty">Nadie tiene horas ni asignación para este día.</div></div>'
+         }
+         <div class="hdock">
+          <button class="btn" id="hRepeat" title="Copia las horas del día anterior al día seleccionado">Copiar ayer</button>
+          <button class="btn" id="hAssign">Añadir trabajador</button>
+          <button class="btn primary" id="hAdd">Añadir línea</button>
+         </div>`;
       }
 
       /** Rows for one day: every entry, plus a blank row per assigned worker with none. */
@@ -9319,7 +9776,7 @@
               if (line && proj) line.innerHTML = lineOptionsFor(proj.value, el.value, "") || "";
             }),
         );
-        document.querySelectorAll(".hsheet input.hin").forEach(
+        document.querySelectorAll(".wcard input.hin").forEach(
           (inp) =>
             (inp.onchange = () => {
               const val = +inp.value || 0,
@@ -9394,10 +9851,12 @@
         document
           .querySelectorAll("[data-workerdoc]")
           .forEach((b) => (b.onclick = () => workerDocDrawer(b.dataset.workerdoc)));
-        wireLabourRegisterAll();
+        document
+          .querySelectorAll("[data-hmore]")
+          .forEach((b) => (b.onclick = () => newHoursDrawer(hDay, b.dataset.hmore)));
       }
 
-      function newHoursDrawer(day) {
+      function newHoursDrawer(day, workerId) {
         const db = openDrawer("Añadir horas · " + fmtD(day));
         const jobs = erp.state.projects.filter((p) => p.status !== "archived");
         const chapsFor = (pid) => {
@@ -9429,6 +9888,9 @@
           fillLines();
         };
         fillChaps();
+        /* Opened from a person's card, the person is already known — asking for
+           them again is a question the screen can answer itself. */
+        if (workerId) $("#nh_w").value = workerId;
         $("#nh_p").onchange = fillChaps;
         $("#nh_c").onchange = fillLines;
         $("#nh_go").onclick = () =>
@@ -9454,166 +9916,421 @@
       }
 
       /** Resumen: per project and chapter, then the month's reconciliation. */
+      /* Whether the per-person cash comparison is open. It is the SAME
+         reconciliation as the block above it, broken down by person, so it lives
+         inside that block instead of standing alone as a fourth card nobody
+         connected to the third. */
+      let hRecOpen = false;
+      /* One whole sentence per state, assembled here rather than spliced around a
+         conditional inside the template: a literal that starts or ends mid-phrase
+         is not translatable, and the source audit is right to say so. */
+      function cashDrillLabel(open) {
+        return open
+          ? "Ocultar lo pagado en efectivo por trabajador ▴"
+          : "Comparar con lo pagado en efectivo por trabajador ›";
+      }
+      /* The hours projection names a project by its code and, when the budget gave
+         it one, by its own name. Most jobs here carry the client instead, so fall
+         back to that rather than printing a code with a dangling separator. */
+      function projectTitleFor(p) {
+        if (p.name) return p.name;
+        const prj = erp.state.projects.find((x) => x.code === p.code);
+        try {
+          return prj ? erp.party(prj.partyId).name : "";
+        } catch (e) {
+          return "";
+        }
+      }
+
       function horasSummary() {
         const r = periodRange();
         const s = erp.hoursSummary(r.from, r.to, null);
         const rec = erp.labourReconciliation();
         const h = (m) => (m / 1000).toLocaleString("es-ES");
         const off = rec.unbookedCents;
+        const maxCost = Math.max(1, ...s.projects.map((p) => p.costCents));
+        const byWorker = erp.hoursByWorker(r.from, r.to);
+        /* A project with no hours keeps its row. An absent row and a zero row mean
+           different things — «nobody worked there» is an answer, and leaving it out
+           makes the reader go and look it up. */
+        const zeros = erp.state.projects
+          .filter((p) => p.status !== "archived" && !s.projects.some((x) => x.code === p.code))
+          .slice(0, 3);
         return `
-         <div class="counters" style="--cw:240px">
-          <div class="counter"><div class="lab">Horas del periodo</div><div class="val">${h(s.totalHoursMilli)}</div>
-            <div class="sub">${s.projects.length} proyecto${s.projects.length === 1 ? "" : "s"}</div></div>
-          <div class="counter"><div class="lab">Coste de esas horas</div><div class="val">${eur0(s.totalCostCents)}</div>
-            <div class="sub">a coste de trabajador</div></div>
-          <div class="counter"><div class="lab">Sin aprobar</div><div class="val">${h(rec.openHoursMilli)}</div>
-            <div class="sub">del mes ${rec.month}</div></div>
-         </div>
-         <div class="card"><div class="ch"><h3>Por proyecto y partida</h3><span class="tag">${fmtD(r.from)} – ${fmtD(r.to)}</span></div>
-          <div class="scroll"><table id="hSum"><thead><tr><th>Proyecto</th><th>Partida</th>
-            <th class="num">Horas</th><th class="num">Coste</th></tr></thead><tbody>
-          ${
-            s.projects
+   <div class="hband">
+    <div class="c"><div class="k">Horas</div><div class="v">${h(s.totalHoursMilli)}</div>
+      <div class="s">${s.projects.length} proyecto${s.projects.length === 1 ? "" : "s"}</div></div>
+    <div class="c"><div class="k">Coste</div><div class="v">${eur0(s.totalCostCents)}</div>
+      <div class="s">a coste de trabajador</div></div>
+    <div class="c warn"><div class="k">Sin aprobar</div><div class="v">${h(rec.openHoursMilli)}</div>
+      <div class="s">${rec.month}</div></div>
+   </div>
+   <div class="hacts">
+    <button class="btn primary" id="hGoOpen">Revisar ${h(rec.openHoursMilli)} sin aprobar</button>
+    <button class="btn" id="hXls">Exportar a Excel</button>
+   </div>
+
+   <h4 class="hsec">A dónde han ido las horas <span>${fmtD(r.from)} – ${fmtD(r.to)}</span></h4>
+   <div class="hrank">
+    ${
+      s.projects
+        .map(
+          (p) => `<div class="hitem">
+      <div class="ih"><span class="nm">${esc(p.code || "Sin proyecto")}${
+        projectTitleFor(p) ? " · " + esc(projectTitleFor(p)) : ""
+      }</span>
+        <span class="amt">${eur(p.costCents)}</span></div>
+      <div class="meta">${h(p.hoursMilli)} h · ${Math.round((p.costCents / Math.max(1, s.totalCostCents)) * 100)}% del coste del periodo</div>
+      <div class="bar"><i style="width:${Math.round((p.costCents / maxCost) * 100)}%"></i></div>
+      ${
+        p.chapters.length
+          ? `<div class="sublist">${p.chapters
               .map(
-                (p) => `
-            <tr class="tot"><td class="k">${esc(p.code || "Sin proyecto")}</td><td>${esc(p.name || "")}</td>
-              <td class="num k">${h(p.hoursMilli)}</td><td class="num k">${eur(p.costCents)}</td></tr>
-            ${p.chapters
-              .map(
-                (
-                  c,
-                ) => `<tr><td></td><td>${c.chapterNum ? esc(c.chapterNum + ". " + (c.name || "")) : '<span class="pill y">Sin partida</span>'}</td>
-              <td class="num">${h(c.hoursMilli)}</td><td class="num">${eur(c.costCents)}</td></tr>`,
+                (c) =>
+                  `<div class="sub2"><span>${
+                    c.chapterNum ? esc(c.chapterNum + ". " + (c.name || "")) : "Sin partida"
+                  }</span><b>${h(c.hoursMilli)} h · ${eur(c.costCents)}</b></div>`,
               )
-              .join("")}`,
-              )
-              .join("") ||
-            '<tr><td colspan="4"><div class="empty">Sin horas registradas en el periodo.</div></td></tr>'
-          }
-          </tbody></table></div></div>
-         <div class="card"><div class="ch"><h3>Por trabajador</h3><span class="tag">${fmtD(r.from)} – ${fmtD(r.to)}</span></div>
-          <div class="scroll"><table id="hByW"><thead><tr><th>Trabajador</th><th>Obras</th>
-            <th class="num">Horas</th><th class="num">De ellas, extra</th><th class="num">Coste</th></tr></thead><tbody>
-          ${
-            erp
-              .hoursByWorker(r.from, r.to)
-              .map(
-                (w) => `<tr><td class="k">${esc(w.name)}</td>
-              <td>${w.projects.map((pj) => esc(pj.code || "—")).join(" · ")}</td>
-              <td class="num">${h(w.hoursMilli)}</td><td class="num">${w.extraHoursMilli ? h(w.extraHoursMilli) : "—"}</td>
-              <td class="num k">${eur(w.costCents)}</td></tr>`,
-              )
-              .join("") ||
-            '<tr><td colspan="5"><div class="empty">Sin horas registradas en el periodo.</div></td></tr>'
-          }
-          </tbody></table></div></div>
-         <div class="card"><div class="ch"><h3>Pagos en efectivo por trabajador</h3><span class="tag" id="hWRecTag"></span></div>
-          <div class="scroll"><table id="hWRec"><thead><tr><th>Trabajador</th>
-            <th class="num">Horas del mes (coste)</th><th class="num">Pagado a su nombre</th><th class="num">Diferencia</th></tr></thead><tbody>
-          ${
+              .join("")}</div>`
+          : ""
+      }
+     </div>`,
+        )
+        .join("") +
+        zeros
+          .map(
+            (
+              p,
+            ) => `<div class="hitem"><div class="ih"><span class="nm">${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</span>
+        <span class="amt">${eur(0)}</span></div>
+      <div class="meta">sin horas imputadas en el periodo</div>
+      <div class="bar"><i style="width:0"></i></div></div>`,
+          )
+          .join("") || '<div class="empty">Sin horas registradas en el periodo.</div>'
+    }
+   </div>
+
+   <h4 class="hsec">Quién ha trabajado <span>horas · extra · coste</span></h4>
+   <div class="hrank">
+    ${
+      byWorker
+        .map(
+          (w) => `<div class="hworker"><div class="who">
+        <div class="nm">${esc(w.name)}</div>
+        <div class="r">${w.projects.map((pj) => esc(pj.code || "—")).join(" · ") || "sin obras en el periodo"}</div></div>
+      <div class="hh">${h(w.hoursMilli)} h${w.extraHoursMilli ? `<span class="ot">${h(w.extraHoursMilli)} extra</span>` : ""}</div>
+      <div class="cc">${eur(w.costCents)}</div></div>`,
+        )
+        .join("") || '<div class="empty">Sin horas registradas en el periodo.</div>'
+    }
+   </div>
+
+   <h4 class="hsec">Conciliación del mes <span>${rec.month}</span></h4>
+   <div class="hrec">
+    <div class="rr"><span>Horas imputadas a obra</span><span style="flex:1"></span><b>${eur(rec.bookedCents)}</b></div>
+    <div class="rr"><span>Nóminas pagadas por banco</span><span style="flex:1"></span><b>${eur(rec.wagesCents)}</b></div>
+    <div class="rr tot"><span>Diferencia sin imputar</span><span style="flex:1"></span>
+      <b style="color:${off < 0 ? "var(--danger)" : "var(--ink)"}">${eur(off)}</b>
+      <span class="pct${off < 0 ? " r" : ""}">${(rec.unbookedPctBp / 100).toFixed(1)}%</span></div>
+    <div class="rnote2">${
+      off < 0
+        ? "Hay más horas imputadas que nóminas pagadas: falta cargar una nómina del mes, o hay horas fechadas en el mes equivocado."
+        : "La diferencia es normal: vacaciones, bajas, oficina y el tiempo que nadie apuntó. Lo que importa es su tamaño y su tendencia, no que sea cero."
+    }</div>
+    <button class="hdrill" id="hRecMore">${cashDrillLabel(hRecOpen)}</button>
+    ${
+      hRecOpen
+        ? `<div class="hcash">${
             erp
               .workerMonthlyReconciliation(rec.month)
               .map(
-                (w) => `<tr><td class="k">${esc(w.name)}</td>
-              <td class="num">${eur(w.bookedCents)}</td><td class="num">${eur(w.paidCents)}</td>
-              <td class="num" style="color:${w.diffCents < 0 ? "var(--danger)" : "var(--ink)"}">${eur(w.diffCents)}</td></tr>`,
+                (
+                  w,
+                ) => `<div class="cw"><span class="nm">${esc(w.name)}</span><span style="flex:1"></span>
+          <span class="a">${eur(w.bookedCents)}</span><span class="a">${eur(w.paidCents)}</span>
+          <span class="a d" style="color:${w.diffCents < 0 ? "var(--danger)" : "var(--ink)"}">${eur(w.diffCents)}</span></div>`,
               )
-              .join("") ||
-            '<tr><td colspan="4"><div class="empty">Sin horas ni pagos nominales este mes.</div></td></tr>'
-          }
-          </tbody></table></div></div>
-         <div class="card"><div class="ch"><h3>Conciliación del mes</h3><span class="tag">${rec.month}</span></div>
-          <div class="daylist" id="hRec">
-           <div class="it"><span>Horas imputadas a obra</span><span style="flex:1"></span><b>${eur(rec.bookedCents)}</b></div>
-           <div class="it"><span>Nóminas pagadas por banco</span><span style="flex:1"></span><b>${eur(rec.wagesCents)}</b></div>
-           <div class="it"><span>Diferencia sin imputar</span><span style="flex:1"></span>
-             <b style="color:${off < 0 ? "var(--danger)" : "var(--ink)"}">${eur(off)}</b>
-             <span class="pill${off < 0 ? " r" : ""}" style="margin-left:8px">${(rec.unbookedPctBp / 100).toFixed(1)}%</span></div>
-           <div class="it" style="color:var(--muted)">${
-             off < 0
-               ? "Hay más horas imputadas que nóminas pagadas: falta cargar una nómina del mes, o hay horas fechadas en el mes equivocado."
-               : "La diferencia es normal: vacaciones, bajas, oficina y el tiempo que nadie apuntó. Lo que importa es su tamaño y su tendencia, no que sea cero."
-           }</div>
-          </div></div>`;
+              .join("") || '<div class="empty">Sin horas ni pagos nominales este mes.</div>'
+          }<div class="ch3"><span style="flex:1"></span><span>imputado</span><span>pagado</span><span>diferencia</span></div></div>`
+        : ""
+    }
+   </div>`;
       }
-      function wireHorasSummary() {}
+
+      function wireHorasSummary() {
+        const more = $("#hRecMore");
+        if (more)
+          more.onclick = () => {
+            hRecOpen = !hRecOpen;
+            render();
+          };
+        /* «Revisar» takes you to them; it does not approve them. A single tap that
+           approved several hundred hours across weeks and people would be the one
+           button on this screen you could not take back. */
+        const go = $("#hGoOpen");
+        if (go)
+          go.onclick = () => {
+            const first = erp.state.labour
+              .filter((l) => !l.locked)
+              .sort((a, b) => a.date.localeCompare(b.date))[0];
+            if (!first) return toast("No hay horas sin aprobar");
+            hDay = first.date;
+            hTab = "sheet";
+            render();
+          };
+        const xls = $("#hXls");
+        if (xls)
+          xls.onclick = () => {
+            const r = periodRange();
+            const rows = [
+              ["Fecha", "Trabajador", "Proyecto", "Partida", "Horas", "Coste", "Estado"],
+            ];
+            for (const l of erp.state.labour.filter((x) => x.date >= r.from && x.date <= r.to))
+              rows.push([
+                l.date,
+                (erp.state.workers.find((w) => w.id === l.workerId) || { name: "?" }).name,
+                l.projectId ? erp.project(l.projectId).code : "",
+                l.chapterNum || "",
+                l.hoursMilli / 1000,
+                l.costCents / 100,
+                l.locked ? "Aprobada" : "Abierta",
+              ]);
+            downloadBlob(
+              xlsxBlob("Horas", rows, { subtitle: `Horas · ${fmtD(r.from)} – ${fmtD(r.to)}` }),
+              `horas-${erp.today}.xlsx`,
+            );
+            toast("Exportado a Excel");
+          };
+      }
 
       /** The correction register, now spanning every project like the day sheet. */
+      /* WHICH ENTRY IS ON THE BENCH. One at a time: opening a second edit closes
+         the first, because two half-finished corrections on one screen is how you
+         save the wrong one. */
+      let hEditId = null,
+        hRegAll = false,
+        hRegFilter = "open";
+
       function labourRegisterAll() {
-        const lab = erp.state.labour.filter((l) => inPeriod(l.date));
-        return `<div class="card"><div class="ch"><h3>Registro</h3><span class="tag">reasigna o corrige una entrada</span></div>
-         <div class="scroll"><table><thead><tr><th>Fecha</th><th>Trabajador</th><th>Proyecto</th><th>Partida</th><th class="num">Horas</th><th class="num">Coste</th><th>Estado</th><th></th></tr></thead><tbody>
-         ${
-           lab
-             .slice()
-             .reverse()
-             .slice(0, 60)
+        const all = erp.state.labour.filter((l) => inPeriod(l.date));
+        const shown = all
+          .slice()
+          .reverse()
+          .filter((l) =>
+            hRegFilter === "all" ? true : hRegFilter === "open" ? !l.locked : !!l.locked,
+          );
+        /* A page, not the whole ledger. Sixty entries printed at once is what the
+           day sheet used to do underneath the day's work; the tab exists so the
+           list can be as long as it likes, but it still opens on a screenful. */
+        const list = shown.slice(0, hRegAll ? 200 : 12);
+        const h = (m) => (m / 1000).toLocaleString("es-ES");
+        const nameOf = (id) => (erp.state.workers.find((w) => w.id === id) || { name: "?" }).name;
+        const jobs = erp.state.projects.filter((p) => p.status !== "archived");
+        const chapsFor = (pid) => {
+          const p = erp.state.projects.find((x) => x.id === pid);
+          return (p && p.baseline && p.baseline.chapters) || [];
+        };
+        const filters = `<div class="rfilters">
+          ${[
+            ["open", "Abiertas"],
+            ["locked", "Aprobadas"],
+            ["all", "Todas"],
+          ]
+            .map(
+              ([k, lab]) =>
+                `<button class="rf${hRegFilter === k ? " on" : ""}" data-rfilter="${k}">${lab}</button>`,
+            )
+            .join("")}</div>`;
+        /* EVERY FIELD, INCLUDING THE DATE. The engine's `correctHours` has always
+           accepted date, project, partida, subpartida, hours and kind; the screen
+           only ever offered two of them, so a wrong date meant deleting the entry
+           and typing it again somewhere else. */
+        const editor = (l) => {
+          const chaps = chapsFor(l.projectId);
+          return `<div class="redit">
+           <div class="eh">Editando este apunte — cualquier campo puede cambiar</div>
+           <div class="ef"><label>Fecha</label><input type="date" id="re_d" value="${esc(l.date)}"></div>
+           <div class="ef"><label>Proyecto</label><select id="re_p">${jobs
              .map(
-               (l) => `<tr><td>${fmtD(l.date)}</td>
-          <td>${esc((erp.state.workers.find((w) => w.id === l.workerId) || { name: "?" }).name)}</td>
-          <td>${esc(l.projectId ? erp.project(l.projectId).code : "—")}</td>
-          <td>${l.chapterNum || "—"}</td><td class="num">${(l.hoursMilli / 1000).toLocaleString("es-ES")}</td><td class="num">${eur(l.costCents)}</td>
-          <td>${l.locked ? '<span class="pill g">Aprobada</span>' : '<span class="pill y">Abierta</span>'}</td>
-          <td>${l.locked ? "" : `<button class="btn sm" data-reassign="${l.id}">Reasignar</button><button class="btn sm danger" data-del="${l.id}">✕</button>`}</td></tr>`,
+               (p) =>
+                 `<option value="${p.id}"${p.id === l.projectId ? " selected" : ""}>${esc(projectPickLabel(p))}</option>`,
              )
-             .join("") ||
-           '<tr><td colspan="8"><div class="empty">Sin horas en el periodo seleccionado.</div></td></tr>'
-         }
-         </tbody></table></div></div>`;
+             .join("")}</select></div>
+           <div class="ef"><label>Partida</label><select id="re_c">${
+             chaps
+               .map(
+                 (c) =>
+                   `<option value="${c.num}"${String(c.num) === String(l.chapterNum) ? " selected" : ""}>${c.num}. ${esc(c.name)}</option>`,
+               )
+               .join("") || '<option value="">—</option>'
+           }</select></div>
+           <div class="ef" id="re_lwrap"><label>Subpartida</label><select id="re_l"></select></div>
+           <div class="ef"><label>Tipo</label><select id="re_k">${Object.keys(HOUR_KINDS)
+             .map(
+               (k) =>
+                 `<option value="${k}"${k === (l.kind || "normal") ? " selected" : ""}>${HOUR_KINDS[k]}</option>`,
+             )
+             .join("")}</select></div>
+           <div class="ef hn"><label>Horas</label><input type="number" step="0.25" min="0" id="re_h" value="${h(l.hoursMilli)}"></div>
+           <div class="eact"><button class="btn sm" data-recancel="1">Cancelar</button>
+             <button class="btn primary sm" data-resave="${l.id}">Guardar cambios</button>
+             <button class="btn sm danger" data-del="${l.id}">Eliminar</button></div>
+          </div>`;
+        };
+        const row = (l) => {
+          const open = hEditId === l.id;
+          return `<div class="rentry${open ? " open" : ""}">
+           <div class="r1"><span class="nm">${esc(nameOf(l.workerId))}</span>
+             <span class="dt">${fmtD(l.date)}</span><span style="flex:1"></span>
+             <span class="hh">${h(l.hoursMilli)} h</span></div>
+           <div class="r2"><span class="w">${esc(l.projectId ? erp.project(l.projectId).code : "—")} · ${esc(
+             l.chapterNum
+               ? l.chapterNum + (hourLineLabel(l) ? ". " + hourLineLabel(l) : "")
+               : "sin partida",
+           )}</span><span style="flex:1"></span><span class="cc">${eur(l.costCents)}</span></div>
+           <div class="r3">${
+             l.locked
+               ? '<span class="pill g">Aprobada y bloqueada</span>'
+               : '<span class="pill y">Abierta</span>'
+           }<span style="flex:1"></span>${
+             l.locked
+               ? ""
+               : open
+                 ? ""
+                 : `<button class="btn sm" data-redit="${l.id}">Editar apunte</button><button class="btn sm danger" data-del="${l.id}">Eliminar</button>`
+           }</div>
+           ${open ? editor(l) : ""}
+           ${
+             l.locked
+               ? `<button class="rreopen" data-unapprove="${l.workerId}" data-week="${l.date}">Reabrir la semana de ${esc(personOf(nameOf(l.workerId)))} para poder editarlo ›</button>`
+               : ""
+           }
+          </div>`;
+        };
+        const moreBtn =
+          shown.length > list.length
+            ? `<button class="rmore" data-rall="1">Ver los ${shown.length} apuntes</button>`
+            : "";
+        return `${filters}
+         <div class="rcount"><span class="k">Mostrando</span><span style="flex:1"></span>
+           <span class="v">${list.length} de ${all.length} apunte${all.length === 1 ? "" : "s"}</span></div>
+         <div class="rlist">${
+           list.map(row).join("") ||
+           '<div class="empty">Sin horas en el periodo seleccionado.</div>'
+         }${moreBtn}</div>
+         <p class="rnote">Cambiar la fecha mueve el apunte a otro día — la lista dirá a dónde ha ido.
+         Un apunte no puede moverse a una semana ya aprobada.</p>`;
       }
+
       function wireLabourRegisterAll() {
-        document.querySelectorAll("[data-reassign]").forEach(
+        document.querySelectorAll("[data-rfilter]").forEach(
           (b) =>
-            (b.onclick = async () => {
-              const l = erp.state.labour.find((x) => x.id === b.dataset.reassign);
-              // Both questions at once, and the project as a list rather than a
-              // code typed from memory — "Proyecto no encontrado: P-2026-0001 "
-              // was only ever a typo the screen refused to help with.
-              const r = await ask(
-                "Reasignar el parte",
-                [
-                  {
-                    key: "code",
-                    label: "Proyecto",
-                    type: "select",
-                    value: erp.project(l.projectId).code,
-                    options: erp.state.projects.map((p) => ({
-                      value: p.code,
-                      label: p.code + " — " + erp.party(p.partyId).name,
-                    })),
-                  },
-                  {
-                    key: "chap",
-                    label: "Partida",
-                    value: l.chapterNum || "",
-                    placeholder: "Sin partida",
-                    hint: "Déjalo en blanco para dejar el parte sin partida asignada.",
-                  },
-                ],
-                { okLabel: "Reasignar" },
-              );
-              if (r === null) return;
-              const code = r.code,
-                chap = r.chap;
-              mutate(() => {
-                const patch = { chapterNum: chap || null };
-                if (code && code !== erp.project(l.projectId).code) {
-                  const np = erp.state.projects.find((x) => x.code === code);
-                  if (!np) throw new Error("Proyecto no encontrado: " + code);
-                  patch.projectId = np.id;
-                }
-                erp.correctHours(l.id, patch, "backoffice");
-              }, "Horas reasignadas");
+            (b.onclick = () => {
+              hRegFilter = b.dataset.rfilter;
+              hEditId = null;
+              hRegAll = false;
+              render();
+            }),
+        );
+        document.querySelectorAll("[data-rall]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hRegAll = true;
+              render();
+            }),
+        );
+        document.querySelectorAll("[data-redit]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hEditId = b.dataset.redit;
+              render();
+            }),
+        );
+        document.querySelectorAll("[data-recancel]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hEditId = null;
+              render();
             }),
         );
         document
-          .querySelectorAll("[data-del]")
+          .querySelectorAll("[data-unapprove][data-week]")
           .forEach(
             (b) =>
               (b.onclick = () =>
-                mutate(() => erp.deleteHours(b.dataset.del, "backoffice"), "Entrada eliminada")),
+                mutate(
+                  () =>
+                    erp.unapproveLabourWeek(
+                      b.dataset.unapprove,
+                      labourWeekAll(b.dataset.week).weekStart,
+                      "backoffice",
+                    ),
+                  "Semana reabierta",
+                )),
           );
+        const lwrap = $("#re_lwrap");
+        if (lwrap) {
+          const cur = erp.state.labour.find((x) => x.id === hEditId) || {};
+          const fillLines = (keep) => {
+            const opts = lineOptionsFor($("#re_p").value, $("#re_c").value, keep || "");
+            lwrap.style.display = opts ? "" : "none";
+            $("#re_l").innerHTML = opts ? '<option value="">— ninguna —</option>' + opts : "";
+          };
+          const fillChaps = (keepChap, keepLine) => {
+            const p = erp.state.projects.find((x) => x.id === $("#re_p").value);
+            const chaps = (p && p.baseline && p.baseline.chapters) || [];
+            $("#re_c").innerHTML =
+              chaps
+                .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+                .join("") || '<option value="">—</option>';
+            if (keepChap) $("#re_c").value = keepChap;
+            fillLines(keepLine);
+          };
+          fillChaps(cur.chapterNum, cur.lineId);
+          $("#re_p").onchange = () => fillChaps();
+          $("#re_c").onchange = () => fillLines();
+        }
+        document.querySelectorAll("[data-resave]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              const id = b.dataset.resave;
+              const l = erp.state.labour.find((x) => x.id === id);
+              if (!l) return;
+              const date = $("#re_d").value;
+              const hrs = Number(String($("#re_h").value).replace(",", "."));
+              if (!(hrs > 0)) return toast("Indica las horas");
+              const moved = date !== l.date;
+              mutate(
+                () => {
+                  erp.correctHours(
+                    id,
+                    {
+                      date,
+                      projectId: $("#re_p").value,
+                      chapterNum: $("#re_c").value || null,
+                      lineId:
+                        $("#re_lwrap").style.display !== "none" ? $("#re_l").value || null : null,
+                      kind: $("#re_k").value,
+                      hoursMilli: Math.round(hrs * 1000),
+                    },
+                    "backoffice",
+                  );
+                  hEditId = null;
+                },
+                moved ? "Apunte movido a otro día" : "Apunte corregido",
+              );
+            }),
+        );
+        document.querySelectorAll("[data-del]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(() => {
+                erp.deleteHours(b.dataset.del, "backoffice");
+                hEditId = null;
+              }, "Apunte eliminado")),
+        );
       }
+
       function assignWorkerDrawer(pid) {
         const db = openDrawer("Asignar trabajador");
         db.innerHTML = `<div class="fgrid">
@@ -12960,6 +13677,10 @@
          below names its client already. */
       function renderProjectBar() {
         const host = $("#projbar");
+        if (isSiteWorker()) {
+          host.innerHTML = "";
+          return;
+        }
         // PK4-A/PK4-B: PRY-01 and PRY-02 have no bar at all. Each is two
         // screens — the list of jobs, and one job's full-screen surface — so
         // the job is chosen by clicking a row, not by a dropdown above a list
@@ -21058,7 +21779,14 @@
       const USER_ROLES = [
         ["admin", "Administrador", "Todo, incluida esta pantalla."],
         ["backoffice", "Oficina", "Presupuestos, facturas, cobros y pagos. No gestiona usuarios."],
-        ["site", "Obra", "Registrar avance, partes y fotos. Sin importes ni márgenes."],
+        /* «Obra» named the construction site and the person on it with one word,
+           so a foreman reading it in a user list could not tell which was meant.
+           The stored key is unchanged — this is what the account is CALLED. */
+        [
+          "site",
+          "Trabajador de obra",
+          "Apunta sus propias horas y ve sólo las suyas. Ni importes, ni el resto del ERP.",
+        ],
         [
           "gestoria",
           "Gestoría",
@@ -21637,7 +22365,7 @@
 
          Two reds, because they are two different facts and the registers already
          distinguish them: a lead perdido or a presupuesto rechazado is BLOCKED —
-         the phase cannot proceed — while an invoice past its due date is VENCIDO,
+         the phase cannot proceed — while an invoice past its due date is VENCIDA,
          which proceeds perfectly well and simply needs chasing. Facturación writes
          «Vencida» on exactly that condition, and one word for both would have this
          screen disagreeing with that one. */
@@ -21646,7 +22374,7 @@
         doing: ["En curso", "y"],
         waiting: ["Esperando", "b"],
         blocked: ["Bloqueada", "r"],
-        late: ["Vencido", "r"],
+        late: ["Vencida", "r"],
         pending: ["Pendiente", ""],
       };
       // jSubject names the record picked, prefixed prj or opp. Never a record
@@ -22213,7 +22941,7 @@
 
         v.innerHTML =
           `<div class="card"><div class="ch"><h3>${esc(c.party.name)}</h3>
-            <span class="pill">${esc(c.project ? c.project.code : c.budget ? c.budget.number : "Sin obra")}</span>
+            <span class="pill">${esc(c.project ? c.project.code : c.budget ? c.budget.number : "Todavía sin obra")}</span>
             ${journeyPill(steps[at])}
             <span class="tag">${journeyCount("Fase", at + 1)} · ${esc(JOURNEY[at].lab)}</span></div>
            <div class="daylist">
@@ -27293,6 +28021,16 @@
         const raw = location.hash.slice(1),
           k = resolveRoute(raw);
         if (!k || !SUBMAP[k]) return;
+        /* The same clamp `go()` carries, on the other door. `go()` refuses to send
+           a site worker anywhere but their hours; typing a hash into the address
+           bar reached `cur = k` directly and did not. The state is redacted on the
+           server either way, so what came up was an empty screen rather than
+           somebody else's data — but a rule enforced on one of two paths is the
+           shape of rule this workspace has been caught by before. */
+        if (isSiteWorker() && k !== "labour") {
+          go("labour");
+          return;
+        }
         if (SUBMAP[k].href) {
           location.href = SUBMAP[k].href;
           return;

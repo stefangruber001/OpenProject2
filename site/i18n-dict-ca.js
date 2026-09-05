@@ -18,8 +18,91 @@
  */
 window.CANEI_DICT = window.CANEI_DICT || {};
 window.CANEI_DICT.ca = {
+  "Trabajador de obra": "Treballador d'obra",
+  "Apunta sus propias horas y ve sólo las suyas. Ni importes, ni el resto del ERP.":
+    "Apunta les seves pròpies hores i només veu les seves. Ni imports, ni la resta de l'ERP.",
+  "Esta cuenta no está enlazada con ninguna ficha de trabajador, así que no tiene horas propias. La oficina puede enlazarla poniendo el mismo correo en la ficha.":
+    "Aquest compte no està enllaçat amb cap fitxa de treballador, així que no té hores pròpies. L'oficina pot enllaçar-lo posant el mateix correu a la fitxa.",
+  "Apuntar horas": "Apuntar hores",
+  "Esperando aprobación": "Esperant aprovació",
+  Aprobada: "Aprovada",
+  Esperando: "Esperant",
+  Cambiar: "Canviar",
+  "Aprobada — pídeselo a la oficina": "Aprovada — demana-ho a l'oficina",
+  "Guardar estas horas": "Desar aquestes hores",
+  "Horas guardadas": "Hores desades",
+  "Cambiar las horas": "Canviar les hores",
+  "Deja 0 para borrar el apunte.": "Deixa 0 per esborrar l'apunt.",
+  "De ellas extra": "D'aquestes, extra",
+  "Sin obra": "Sense obra",
+  "Elige la obra": "Tria l'obra",
+  "horas extra": "hores extra",
+  "sin aprobar todavía": "sense aprovar encara",
+  "A dónde han ido mis horas": "On han anat les meves hores",
+  "Sin horas en el periodo.": "Sense hores en el període.",
+  "Todavía no has apuntado nada para este día.": "Encara no has apuntat res per a aquest dia.",
+  "Esta semana ya está aprobada. Pide a la oficina que la reabra si falta algo.":
+    "Aquesta setmana ja està aprovada. Demana a l'oficina que la reobri si falta res.",
+  "La obra y la partida de ayer vienen puestas — cámbialas sólo si te has movido. Si la partida no tiene subpartidas, elige «— ninguna —».":
+    "L'obra i la partida d'ahir vénen posades — canvia-les només si t'has mogut. Si la partida no té subpartides, tria «— cap —».",
+  "No estás asignado a ninguna obra abierta este día. Díselo a la oficina.":
+    "No estàs assignat a cap obra oberta aquest dia. Digues-ho a l'oficina.",
+  "Sólo ves tus horas, y nunca un importe. La oficina revisa las imputaciones y aprueba la semana.":
+    "Només veus les teves hores, i mai un import. L'oficina revisa les imputacions i aprova la setmana.",
+  "Aquí no se ve nada que no sea tuyo: ni las horas de otras personas, ni ningún importe.":
+    "Aquí no es veu res que no sigui teu: ni les hores d'altres persones, ni cap import.",
+  "Revisa el proyecto y la partida, corrige si hace falta y aprueba.":
+    "Revisa el projecte i la partida, corregeix si cal i aprova.",
+  "Apunte movido a otro día": "Apunt mogut a un altre dia",
+  "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y partida con la conciliación del mes.":
+    "El part diari per treballador amb la setmana al costat; i el resum per projecte i partida amb la conciliació del mes.",
+  Mías: "Meves",
+  "Mis horas": "Les meves hores",
+  Correcciones: "Correccions",
+  "Ant.": "Ant.",
+  "Sig.": "Seg.",
+  Lun: "Dl",
+  Mar: "Dt",
+  Jue: "Dj",
+  Vie: "Dv",
+  Dom: "Dg",
+  "Copiar ayer": "Copiar ahir",
+  "Añadir trabajador": "Afegir treballador",
+  "Añadir línea": "Afegir línia",
+  "Aprobar semana": "Aprovar setmana",
+  "Reabrir semana": "Reobrir setmana",
+  "Ficha del trabajador ›": "Fitxa del treballador ›",
+  enviado: "enviat",
+  "Exportar a Excel": "Exportar a Excel",
+  "A dónde han ido las horas": "On han anat les hores",
+  "Quién ha trabajado": "Qui ha treballat",
+  "horas · extra · coste": "hores · extra · cost",
+  "sin horas imputadas en el periodo": "sense hores imputades en el període",
+  "Comparar con lo pagado en efectivo por trabajador ›":
+    "Comparar amb el pagat en efectiu per treballador ›",
+  "Ocultar lo pagado en efectivo por trabajador ▴": "Amagar el pagat en efectiu per treballador ▴",
+  imputado: "imputat",
+  pagado: "pagat",
+  diferencia: "diferència",
+  Abiertas: "Obertes",
+  Aprobadas: "Aprovades",
+  Mostrando: "Mostrant",
+  "Editar apunte": "Editar apunt",
+  "Aprobada y bloqueada": "Aprovada i bloquejada",
+  "Editando este apunte — cualquier campo puede cambiar":
+    "Editant aquest apunt — qualsevol camp pot canviar",
+  "— ninguna —": "— cap —",
+  "Cambiar la fecha mueve el apunte a otro día — la lista dirá a dónde ha ido. Un apunte no puede moverse a una semana ya aprobada.":
+    "Canviar la data mou l'apunt a un altre dia — la llista dirà on ha anat. Un apunt no es pot moure a una setmana ja aprovada.",
+  "Apunte corregido": "Apunt corregit",
+  "Apunte eliminado": "Apunt eliminat",
+  "No hay horas sin aprobar": "No hi ha hores sense aprovar",
+  "Aquí irán las dos pantallas propias de cada persona: apuntar las horas del día y consultar las suyas. Todavía no están construidas; mientras tanto, usa «Todos».":
+    "Aquí aniran les dues pantalles pròpies de cada persona: apuntar les hores del dia i consultar les seves. Encara no estan construïdes; mentrestant, fes servir «Tots».",
   // PRY-04 · Recorrido del cliente.
   de: "de",
+  Completada: "Completada",
+  Bloqueada: "Bloquejada",
   recorrido: "recorregut",
   recorridos: "recorreguts",
   "En qué fase está cada trabajo, qué falta para la siguiente y la pantalla real de cada paso.":
@@ -28,7 +111,7 @@ window.CANEI_DICT.ca = {
   "Ningún recorrido coincide con la búsqueda.": "Cap recorregut coincideix amb la cerca.",
   "Abrir la pantalla completa ↗": "Obrir la pantalla completa ↗",
   "Ir a la fase": "Anar a la fase",
-  "Sin obra": "Sense obra",
+  "Todavía sin obra": "Encara sense obra",
   "Envío al cliente": "Enviament al client",
   "Inicio de obra": "Inici d'obra",
   "Cierre y reseña": "Tancament i ressenya",
@@ -74,7 +157,6 @@ window.CANEI_DICT.ca = {
   "⚠ Antes hace falta un presupuesto": "⚠ Abans cal un pressupost",
   "⚠ Antes hace falta una obra": "⚠ Abans cal una obra",
   "⚠ El presupuesto todavía no se ha enviado": "⚠ El pressupost encara no s'ha enviat",
-
   "Elige una obra: venta, coste y margen partida a partida, y el coste que ha llegado sin partida asignada.":
     "Tria una obra: venda, cost i marge partida a partida, i el cost que ha arribat sense partida assignata.",
   "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.":
@@ -4745,6 +4827,32 @@ window.CANEI_DICT.ca = {
   "Mampara de vidrio templado · 480 €/ud": "Mampara de vidre trempat · 480 €/ud",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Setmana $1 – $2"],
+  [new RegExp("^mes (\\d{4}-\\d{2})$"), "mes $1"],
+  [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Revisar $1 sense aprovar"],
+  [new RegExp("^([\\d.,]+ h) · (\\d+)% del coste del periodo$"), "$1 · $2% del cost del període"],
+  [new RegExp("^(\\d+) de (\\d+) apuntes$"), "$1 de $2 apunts"],
+  [new RegExp("^(\\d+) de (\\d+) apunte$"), "$1 de $2 apunt"],
+  [new RegExp("^Ver los (\\d+) apuntes$"), "Veure els $1 apunts"],
+  [new RegExp("^(\\d+) apuntes enviados para el (\\S+)$"), "$1 apunts enviats per al $2"],
+  [new RegExp("^(\\d+) apunte enviado para el (\\S+)$"), "$1 apunt enviat per al $2"],
+  [new RegExp("^Semana (\\S+) – (\\S+)$"), "Setmana $1 – $2"],
+  [new RegExp("^＋ Añadir otro trabajo para (.+)$"), "＋ Afegir una altra feina per a $1"],
+  [
+    new RegExp("^Reabrir la semana de (.+) para poder editarlo ›$"),
+    "Reobrir la setmana de $1 per poder editar-ho ›",
+  ],
+  [new RegExp("^Apunte movido al (\\S+)$"), "Apunt mogut al $1"],
+  [new RegExp("^([\\d.,]+) h · ([\\d.,]+) línea$"), "$1 h · $2 línia"],
+  [new RegExp("^([\\d.,]+) h · ([\\d.,]+) líneas$"), "$1 h · $2 línies"],
+  [new RegExp("^([\\d.,]+) extra$"), "$1 extra"],
+
+  /* Same shape as the English rules: the worker's own screens compose a date or
+     a count into a sentence, and only the words round it translate. */
+  [new RegExp("^¿Dónde has trabajado el (\\S+)\\?$"), "On has treballat el $1?"],
+  [new RegExp("^Ya apuntado el (\\S+)$"), "Ja apuntat el $1"],
+  [new RegExp("^(\\d+) días trabajados$"), "$1 dies treballats"],
+  [new RegExp("^(\\d+) día trabajado$"), "$1 dia treballat"],
   // openDrawer splits a "phrase · record" title into two nodes and marks the
   // record translate="no", so only the phrase needs a rule.
   [new RegExp("^Reseña ·\\s*(.*)$"), "Ressenya · $1"],
