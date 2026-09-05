@@ -53,9 +53,34 @@ async function loadChromium() {
 /* The five screens that say what the product is, in the order somebody meets
    them: what the owner sees, where a job stands, the work itself, the hours,
    and the money. Numbered because `deliver` uploads them in filename order. */
+/* THE FURTHEST-ALONG JOB, NOT THE FIRST ONE.
+   The register is sorted by code, and the first row happened to be an enquiry
+   with nothing in it yet — so the screenshot said "Not a job yet", "No visit on
+   file", "1 entries". True, and the worst possible advertisement: a listing
+   picture should show the product doing its job, and this one showed the empty
+   state. Picking the row whose phase number is highest lands on a job that has
+   been quoted, contracted, built and invoiced, which is what the thirteen
+   stages are for. */
+const openBestJourney = async (pg) => {
+  const best = await pg.evaluate(() => {
+    const rows = [...document.querySelectorAll("tr.click[data-id]")];
+    let at = -1;
+    let id = null;
+    for (const tr of rows) {
+      const n = Number((tr.querySelector(".jminil span") || {}).textContent || 0);
+      if (n > at) {
+        at = n;
+        id = tr.dataset.id;
+      }
+    }
+    return id;
+  });
+  if (best) await pg.locator(`tr.click[data-id="${best}"]`).click();
+};
+
 const SHOTS = [
   ["01-tower", "tower", null],
-  ["02-journey", "journey", async (pg) => pg.locator("tr.click[data-id]").first().click()],
+  ["02-journey", "journey", openBestJourney],
   ["03-progress", "progress", null],
   ["04-hours", "labour", null],
   ["05-invoicing", "invoicing", null],
@@ -113,6 +138,11 @@ for (const [locale, lang] of LANGS) {
         /* A screen whose sample data does not offer the row this wanted still
            makes a perfectly good screenshot of that screen. */
       }
+      /* Back to the top. Opening a row keeps the scroll position of the list it
+         was clicked in, which put the capture halfway down the page — a picture
+         that starts mid-row reads as a broken screen, whatever is in it. */
+      await pg.evaluate(() => window.scrollTo(0, 0));
+      await pg.waitForTimeout(500);
     }
     await pg.screenshot({ path: join(dir, `${name}.png`) });
     console.log(`${locale}/${name}.png`);
