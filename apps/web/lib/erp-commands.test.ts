@@ -55,17 +55,50 @@ describe("the command whitelist", () => {
         "addTask",
         "allocateMovementToProject",
         "approveChange",
+        "approveLabourWeek",
         "completeTask",
+        "correctHours",
         "deactivateParty",
+        "deleteHours",
         "deleteParty",
         "markProgress",
         "payBills",
         "quarterlyPackage",
         "recordCollection",
+        "recordHours",
+        "repeatDay",
+        "unapproveLabourWeek",
         "updateParty",
         "updateTask",
       ].sort(),
     );
+  });
+
+  /* THE LIST SAYS WHAT MAY BE CALLED; THIS SAYS BY WHOM. Both halves are
+     needed: a closed whitelist that everybody may use is closed to nobody, and
+     that is what it was until the hours commands arrived and made the question
+     unavoidable — a site worker holds `erp.write.site` and nothing else. */
+  it("asks for erp.write unless the command says otherwise", () => {
+    for (const name of commandNames()) {
+      const spec = COMMANDS[name as keyof typeof COMMANDS] as { permission?: string };
+      expect(spec.permission ?? "erp.write").toMatch(/^erp\.write(\.site)?$/);
+    }
+  });
+
+  it("lets a worker record, correct and delete their own hours, and nothing else", () => {
+    const bySite = commandNames().filter(
+      (n) =>
+        (COMMANDS[n as keyof typeof COMMANDS] as { permission?: string }).permission ===
+        "erp.write.site",
+    );
+    expect(bySite.sort()).toEqual(["correctHours", "deleteHours", "recordHours"]);
+  });
+
+  it("keeps approving somebody else's week out of a worker's reach", () => {
+    for (const n of ["approveLabourWeek", "unapproveLabourWeek", "repeatDay"]) {
+      const spec = COMMANDS[n as keyof typeof COMMANDS] as { permission?: string };
+      expect(spec.permission ?? "erp.write").toBe("erp.write");
+    }
   });
 });
 

@@ -16,10 +16,18 @@
  * person can use this at all.
  */
 import { FactoryError } from "@repo/kernel";
-import { COMMANDS, commandNames, isCommandName, type CommandName } from "./erp-commands";
+import {
+  COMMANDS,
+  commandNames,
+  isCommandName,
+  type CommandName,
+  type CommandSpec,
+} from "./erp-commands";
 import { ERP, Migrations } from "./erp-engine";
 import { listTenants } from "./tenant-runtime";
 import type { ErpInstance, ErpMethodBag, ErpState } from "./erp-types";
+import { may, require_ } from "./user-admin";
+import { workerIdIn } from "./erp-scope";
 
 /** Documents live under one key per tenant; the column is there for later. */
 const STATE_KEY = "state";
@@ -364,6 +372,86 @@ export interface CommandOutcome {
  * on every mutation, so this is what makes the audit trail name a person
  * instead of a hardcoded string like the browser build does.
  */
+/**
+ * The three things a site-worker account may not do with its own permission.
+ *
+ * Read them as one sentence: hours you book are YOURS, on a job you are ON, in
+ * a week nobody has closed. Each is checked against the document rather than
+ * against what the request claims, because the request is the thing being
+ * doubted.
+ */
+async function refuseOutsideOwnHours(
+  tenantId: string,
+  user: string,
+  command: CommandName,
+  args: unknown[],
+  erp: ErpInstance,
+): Promise<void> {
+  const state = erp.toJSON() as {
+    labour?: { id?: string; workerId?: string; projectId?: string; date?: string }[];
+    assignments?: { workerId?: string; projectId?: string; from?: string; to?: string }[];
+    workers?: { id?: string; email?: string }[];
+  };
+  const me = workerIdIn(state, user);
+  const deny = (why: string) => {
+    throw new FactoryError("UNAUTHENTICATED", why);
+  };
+  if (!me) deny("This account is not linked to a worker, so it has no hours of its own to record.");
+
+  const entryOf = (id: unknown) => (state.labour ?? []).find((l) => l.id === String(id));
+  const assignedTo = (projectId: unknown, on: string) =>
+    (state.assignments ?? []).some(
+      (a) =>
+        a.workerId === me &&
+        a.projectId === String(projectId) &&
+        (!a.from || a.from <= on) &&
+        (!a.to || a.to >= on),
+    );
+  const weekApproved = (date: string) => {
+    const start = mondayOf(date);
+    return (state.labour ?? []).some(
+      (l) =>
+        l.workerId === me &&
+        (l as { locked?: boolean }).locked &&
+        l.date &&
+        mondayOf(l.date) === start,
+    );
+  };
+
+  if (command === "recordHours") {
+    const p = (args[0] ?? {}) as { workerId?: string; projectId?: string; date?: string };
+    if (p.workerId !== me) deny("You may only record your own hours.");
+    const on = String(p.date ?? "");
+    if (!p.projectId || !assignedTo(p.projectId, on))
+      deny("You may only record hours on a site you are assigned to.");
+    if (weekApproved(on)) deny("That week is already approved. Ask the office to reopen it.");
+    return;
+  }
+  const target = entryOf(args[0]);
+  if (!target) deny("That hours entry does not exist.");
+  if (target!.workerId !== me) deny("You may only change your own hours.");
+  if (target!.date && weekApproved(target!.date))
+    deny("That week is already approved. Ask the office to reopen it.");
+  if (command === "correctHours") {
+    const patch = (args[1] ?? {}) as { workerId?: string; projectId?: string; date?: string };
+    if (patch.workerId && patch.workerId !== me) deny("You may only change your own hours.");
+    const on = String(patch.date ?? target!.date ?? "");
+    if (patch.date && weekApproved(on))
+      deny("That week is already approved. Ask the office to reopen it.");
+    if (patch.projectId && !assignedTo(patch.projectId, on))
+      deny("You may only move hours to a site you are assigned to.");
+  }
+}
+
+/** The Monday of the week a date falls in, as an ISO day. */
+function mondayOf(dateIso: string): string {
+  const d = new Date(dateIso + "T00:00:00Z");
+  if (Number.isNaN(d.getTime())) return dateIso;
+  const shift = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - shift);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function runCommand(
   tenantId: string,
   req: CommandRequest,
@@ -401,6 +489,16 @@ export async function runCommand(
     throw new FactoryError("BAD_REQUEST", "No acting user — every mutation must be attributable.");
   }
 
+  /* WHO, not just WHAT. The whitelist above decides which engine methods the
+     API is allowed to reach; until this check existed nothing decided which
+     accounts were allowed to reach them, so the closed list was closed to
+     nobody. `require_` throws UNAUTHENTICATED with the permission named. */
+  const need = (spec as CommandSpec).permission ?? "erp.write";
+  await require_(tenantId, user, need);
+  /* An account that may only write ITS OWN hours is narrowed further, against
+     the document as it stands, before the engine is touched. */
+  const siteOnly = need === "erp.write.site" && !(await may(tenantId, user, "erp.write"));
+
   const store = await stateStore(tenantId);
   const { state, version } = await store.load<ErpState>();
 
@@ -422,6 +520,8 @@ export async function runCommand(
   } else {
     erp = new ERP();
   }
+
+  if (siteOnly) await refuseOutsideOwnHours(tenantId, user, req.command, args, erp);
 
   // The one deliberate hole in the typing, taken only after the name has passed
   // the closed whitelist above. Everything that makes this safe is in
