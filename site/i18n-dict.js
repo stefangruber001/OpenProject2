@@ -5946,6 +5946,12 @@ window.CANEI_DICT = {
     ["Añadir línea", "Add hours line"],
     ["Aprobar semana", "Approve week"],
     ["Reabrir semana", "Reopen week"],
+    ["Partida y subpartida", "Line item and sub-line item"],
+    ["todo aprobado", "all approved"],
+    [
+      "Este parte es para apuntar lo trabajado. Aprobar la semana se hace en Revisión, cuando la oficina ya ha comprobado las imputaciones.",
+      "This sheet is for entering what was worked. Approving the week happens in Review, once the office has checked the bookings.",
+    ],
     ["Ficha del trabajador ›", "Worker file ›"],
     ["enviado", "submitted"],
     ["Exportar a Excel", "Export to Excel"],
@@ -6007,6 +6013,7 @@ window.CANEI_DICT = {
     [new RegExp("^Ya apuntado el (\\S+)$"), "Already entered for $1"],
     [new RegExp("^(\\d+) días trabajados$"), "$1 days worked"],
     [new RegExp("^(\\d+) día trabajado$"), "$1 day worked"],
+    [new RegExp("^(\\d+) sin aprobar$"), "$1 not approved"],
 
     /* The project picker composes CODE · customer · street, all data, and
        appends the one translatable word when the job is closed. Data passes

@@ -4160,6 +4160,12 @@ td.num.late {
 .weekbar .hday.wknd {
   background: var(--hair);
 }
+/* Saturday and Sunday keep a grey number. The ink colour is what the eye reads
+   as "a day with work in it", and a weekend printed in the same blue as a
+   Tuesday makes the strip say something the week does not. */
+.weekbar .hday.wknd .n {
+  color: var(--faint);
+}
 .weekbar .hday.on {
   background: var(--accent);
   border-color: var(--accent);
@@ -4249,36 +4255,81 @@ td.num.late {
   padding: 2px 6px;
   white-space: nowrap;
 }
+/* EVERY FIELD SAYS WHAT IT IS. The row used to be three unlabelled dropdowns
+   stacked under each other with an unexplained box floating to their right, and
+   the only way to learn that the box wanted hours was to try it. Now each
+   control sits under its own caption, every control is the same width as its
+   neighbours, and the hours field is the last field of the same list rather
+   than a separate column — so the eye runs down one edge instead of hunting. */
 .wcard .wrow {
   display: grid;
-  grid-template-columns: 1fr 72px;
-  gap: 9px;
-  align-items: center;
-  padding: 9px 11px;
+  gap: 8px;
+  padding: 10px 11px;
   border-bottom: 1px solid var(--hair);
 }
 .wcard .wwhere {
   min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+/* Hour type and hours share a line: both are short answers, and putting them
+   side by side keeps a six-line day to a screen and a half instead of four. */
+.wcard .wend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+}
+.wcard .wf {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.wcard .wf > label,
+.wcard .whrs > label {
+  font: 700 9px var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.wcard .whrs > label {
+  text-align: center;
 }
 .wcard .wproj {
   font-weight: 600;
   font-size: 13px;
+  padding: 6px 0;
 }
 .wcard .wline,
 .wcard .wkind,
 .wcard .wsel {
-  margin-top: 3px;
   font-size: 11.5px;
   color: var(--muted);
+  min-width: 0;
 }
 .wcard .wline .sub {
   color: var(--muted);
 }
-.wcard .wwhere select.inline {
-  max-width: 100%;
+/* The selects a blank row offers are the widest thing in the card, and a
+   `max-width` on them was what let one sit at half the width of the next. */
+.wcard .wwhere select.inline,
+.wcard .wend select.inline {
+  width: 100%;
+  max-width: none;
 }
+.wcard .wline select.inline + select.inline {
+  margin-top: 5px;
+}
+.wcard .whrs {
+  display: grid;
+  gap: 3px;
+}
+/* `input.inline` caps itself at 130px, which is right for a field in a table
+   row and wrong for the one field this row exists to collect. */
 .wcard .whrs input.hin {
   width: 100%;
+  max-width: none;
   text-align: center;
   font: 700 15px var(--sans);
   padding: 7px 4px;
@@ -4288,6 +4339,7 @@ td.num.late {
   text-align: center;
   font: 700 15px var(--sans);
   color: var(--muted);
+  padding: 7px 4px;
 }
 .wcard .wcf {
   display: flex;
@@ -4311,11 +4363,15 @@ td.num.late {
   color: var(--muted);
 }
 
-/* ---- one bar of actions, at the end of the day's work ---- */
+/* ---- one bar of actions, ABOVE the day's work ----
+   It used to sit at the end, which is fine on a day with three lines and wrong
+   on a day with thirty: adding a line meant scrolling past every line already
+   there to reach the button that adds one. The actions are about the day, so
+   they belong where the day starts. */
 .hdock {
   display: flex;
   gap: 7px;
-  margin: 12px 0 4px;
+  margin: 4px 0 12px;
 }
 .hdock .btn {
   flex: 1;
@@ -4328,7 +4384,71 @@ td.num.late {
   text-overflow: ellipsis;
 }
 
-/* ---- corrections: the register as a list of entries, each editable ---- */
+/* ---- the office's sign-off, at the head of the review ----
+   Deliberately the first thing on this tab and deliberately NOT on the day
+   sheet: approving locks a week, and a lock is not something to place on the
+   screen the crew's hours are typed into. */
+.happ {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.happ .haph {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+}
+.happ .haph .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--greenDeep);
+}
+.happ .haph .n {
+  font: 700 11px var(--sans);
+  color: var(--paper);
+  background: var(--accentDeep);
+  padding: 1px 7px;
+}
+.happ .haprow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.happ .haprow:last-child {
+  border-bottom: 0;
+}
+.happ .haprow .who {
+  min-width: 0;
+}
+.happ .haprow .nm {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.happ .haprow .sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.happ .haprow .sub b {
+  color: var(--ink);
+  font-weight: 700;
+}
+.happ .empty {
+  padding: 12px;
+}
+
+/* ---- review: the register as a list of entries, each editable ---- */
 .rfilters {
   display: flex;
   gap: 6px;

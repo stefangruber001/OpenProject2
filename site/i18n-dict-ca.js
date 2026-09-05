@@ -71,6 +71,10 @@ window.CANEI_DICT.ca = {
   "Añadir línea": "Afegir línia",
   "Aprobar semana": "Aprovar setmana",
   "Reabrir semana": "Reobrir setmana",
+  "Partida y subpartida": "Partida i subpartida",
+  "todo aprobado": "tot aprovat",
+  "Este parte es para apuntar lo trabajado. Aprobar la semana se hace en Revisión, cuando la oficina ya ha comprobado las imputaciones.":
+    "Aquest part és per apuntar el treballat. Aprovar la setmana es fa a Revisió, quan l'oficina ja ha comprovat les imputacions.",
   "Ficha del trabajador ›": "Fitxa del treballador ›",
   enviado: "enviat",
   "Exportar a Excel": "Exportar a Excel",
@@ -4795,6 +4799,7 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^Ya apuntado el (\\S+)$"), "Ja apuntat el $1"],
   [new RegExp("^(\\d+) días trabajados$"), "$1 dies treballats"],
   [new RegExp("^(\\d+) día trabajado$"), "$1 dia treballat"],
+  [new RegExp("^(\\d+) sin aprobar$"), "$1 sense aprovar"],
   [new RegExp("^(P-[\\w-]+ · .+) \\(cerrada\\)$"), "$1 (tancada)"],
   [new RegExp("^Email: (\\S+@\\S+)$"), "Email: $1"],
   [new RegExp("^(.+) · caja$"), "$1 · caixa"],

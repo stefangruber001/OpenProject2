@@ -9316,12 +9316,37 @@ async function testProcurement(browser, base) {
         );
       }
 
-      await pg.locator("[data-approve]").first().click();
-      await pg.waitForTimeout(600);
+      /* APPROVING MOVED, AND THAT IS THE POINT OF THIS PAIR. The day sheet is
+       where the crew's hours are typed; a button that locks a whole week has no
+       business on it, one mis-tap from a week nobody can correct. So: it must
+       be absent there, and it must work from Revisión — where the office signs
+       off on what it has just read. */
+      const approveOnSheet = await pg.evaluate(
+        () => document.querySelectorAll(".wcard [data-approve]").length,
+      );
+      if (approveOnSheet === 0) ok("ADM-04: the day sheet offers no way to lock a week");
+      else bad("ADM-04: approve still on the day sheet", `${approveOnSheet} buttons`);
+
+      await pg.locator('[data-htab="register"]').click();
+      await pg.waitForTimeout(700);
+      const clicked = await pg.evaluate(() => {
+        const ws = labourWeekAll(hDay).weekStart;
+        const b = [...document.querySelectorAll("[data-approve][data-ws]")].find(
+          (x) => x.dataset.ws === ws,
+        );
+        if (!b) return null;
+        b.click();
+        return ws;
+      });
+      if (clicked) ok("ADM-04: Revisión lists the week waiting for approval, and approves it");
+      else bad("ADM-04: no pending week in Revisión for the day just entered", "none");
+      await pg.waitForTimeout(700);
+      await pg.locator('[data-htab="sheet"]').click();
+      await pg.waitForTimeout(700);
       const lockedRows = await pg.evaluate(
         () =>
           [...document.querySelectorAll(".wcard")].filter(
-            (c) => c.querySelector("[data-unapprove]") && !c.querySelector("input.hin"),
+            (c) => !c.querySelector("input.hin") && c.querySelector(".pill"),
           ).length,
       );
       if (lockedRows > 0) ok("ADM-04: approving the week turns its card into a locked figure");
