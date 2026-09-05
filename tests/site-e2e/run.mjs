@@ -670,6 +670,34 @@ async function testJourney(browser, base) {
     if (/⤓ PDF/.test(led.quote) && led.sent)
       ok("recorrido: «quote created — the PDF is there — and it was sent» reads off the ledger");
     else bad("recorrido: quote row carries its PDF and its send", JSON.stringify(led.quote));
+    // ── AND THE LINE OPENS. The operator asked to see a step's detail by
+    //    touching it. Assert the panel is CLOSED first, then open on the tap:
+    //    a detail that was always visible would pass a "the panel exists" check
+    //    while being exactly the wall of text this replaced.
+    const det = await pg.evaluate(() => {
+      const first = document.querySelector("#jLedger .it");
+      const panel = first && first.querySelector(".jld");
+      return { has: !!panel, hiddenAtRest: !!panel && panel.hidden };
+    });
+    if (det.has && det.hiddenAtRest) ok("recorrido: every ledger line carries a detail, put away");
+    else bad("recorrido: ledger detail at rest", JSON.stringify(det));
+
+    await pg.locator("#jLedger [data-jlx]").first().click();
+    await pg.waitForTimeout(250);
+    const ledOpen = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#jLedger .it")];
+      const open = rows.filter((r) => r.querySelector(".jld") && !r.querySelector(".jld").hidden);
+      return {
+        open: open.length,
+        text: open[0] ? open[0].querySelector(".jld").innerText.trim().slice(0, 60) : "",
+        marked: open[0] ? open[0].classList.contains("on") : false,
+      };
+    });
+    // Exactly one — a ledger of twenty rows all standing open is the wall again.
+    if (ledOpen.open === 1 && ledOpen.text && ledOpen.marked)
+      ok(`recorrido: tapping a line opens its detail, one at a time (${ledOpen.text})`);
+    else bad("recorrido: ledger detail opens", JSON.stringify(ledOpen));
+
     // And the button really produces the document.
     const dl = pg.waitForEvent("download", { timeout: 20000 }).catch(() => null);
     await pg.locator('#jLedger [data-led="docx"]').first().click();
@@ -5541,6 +5569,43 @@ async function testProjectTracking(browser, base) {
       ok("PRY-01: a row opens the chart itself — Gantt, Curva S, Avance, Desviaciones, «← Obras»");
     else bad("PRY-01: job opens the chart", JSON.stringify(landed));
 
+    // A SECTION TAB MUST GET YOU OUT OF A FULL-SCREEN SURFACE.
+    //
+    // `body.fs` hides `.rail`, and the subsection panel lives inside it — so
+    // from the chart a tap on a section tab opened a panel that was
+    // `display:none` and the app appeared to ignore it. On the phone that is the
+    // whole navigation.
+    //
+    // Driven through `toggleSection`, which is what BOTH bars call: the web
+    // rail directly, and the native tab bar through `caneiToggleSection` (a
+    // one-line wrapper installed only under the app's user agent, so it does not
+    // exist on this page). Asserted on leaving the chart rather than on the
+    // panel's class — the panel being marked open while still invisible is
+    // precisely the bug.
+    const stuck = await pg.evaluate(() => {
+      const fsBefore = document.body.classList.contains("fs");
+      toggleSection("projects");
+      return { fsBefore };
+    });
+    await pg.waitForTimeout(700);
+    const escaped = await pg.evaluate(() => ({
+      fs: document.body.classList.contains("fs"),
+      chart: !!document.querySelector("#gSvg"),
+      list: !!document.querySelector("#prgQ"),
+      panelVisible: (() => {
+        const p = document.querySelector("#p2");
+        return !!p && p.classList.contains("on") && p.getBoundingClientRect().height > 0;
+      })(),
+    }));
+    if (stuck.fsBefore && !escaped.fs && !escaped.chart && escaped.list && escaped.panelVisible)
+      ok("PRY-01: a section tab leaves the chart for the section's own screen and its panel");
+    else bad("PRY-01: section tab escapes full screen", JSON.stringify({ ...stuck, ...escaped }));
+    await pg.evaluate(() => document.querySelector("#subscrim")?.click());
+    await pg.waitForTimeout(300);
+
+    // Back to the chart, to check the labelled way back still works.
+    await openJobWithChapters(pg, "prgQ");
+    await pg.waitForTimeout(600);
     await pg.locator("#gBack").click();
     await pg.waitForTimeout(600);
     if ((await pg.locator("#prgQ").count()) === 1 && (await pg.locator("#gSvg").count()) === 0)

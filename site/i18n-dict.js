@@ -4957,6 +4957,8 @@ window.CANEI_DICT = {
     ["Entrada añadida", "Entry added"],
     ["Enlace copiado", "Link copied"],
     ["Seleccionado — copie con Ctrl+C", "Selected — copy with Ctrl+C"],
+    ["Copia archivada", "Filed copy"],
+    ["Sin más detalle", "Nothing further recorded"],
     ["Página de acceso", "Sign-in page"],
     ["Contraseña temporal", "Temporary password"],
     ["Copiar contraseña", "Copy password"],

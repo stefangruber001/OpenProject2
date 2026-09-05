@@ -2854,6 +2854,8 @@ window.CANEI_DICT.ca = {
   "Entrada añadida": "Entrada afegida",
   "Enlace copiado": "Enllaç copiat",
   "Seleccionado — copie con Ctrl+C": "Seleccionat — copieu amb Ctrl+C",
+  "Copia archivada": "Còpia arxivada",
+  "Sin más detalle": "Sense més detall",
   "Página de acceso": "Pàgina d'accés",
   "Contraseña temporal": "Contrasenya temporal",
   "Copiar contraseña": "Copiar contrasenya",

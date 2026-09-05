@@ -6152,10 +6152,46 @@
           .querySelectorAll(".secitem")
           .forEach((b) => b.classList.toggle("on", b.dataset.sec === secKey));
       }
+      /* A TAB TAP HAS TO GET YOU OUT OF A FULL-SCREEN SURFACE.
+         Seven screens step outside the shell (`body.fs`): the Gantt, the job's
+         Avance económico, the presupuestador, an order, an invoice, a contract,
+         the OCR capture. `body.fs` hides `.rail` — and `#p2` lives INSIDE the
+         rail — so from any of them a tap on a section tab opened the panel
+         behind a `display:none` and nothing happened at all. On the phone that
+         is the whole navigation: the operator was in a job's chart, tapped
+         Proyectos, and the app sat there.
+
+         Leaving is two halves. `go()` already drops the surfaces that belong to
+         another route, so moving to the section's first screen sheds those by
+         itself; what it deliberately does NOT drop is the surface on the route
+         you are already on — `ganttFull` when you tap Proyectos from the chart —
+         because the guard is written as "leaving progress closes it". So those
+         two are cleared here, by name, and then the landing screen is the thing
+         that opens. Which is what was asked for: the section's main screen,
+         whatever sub-level you were on.
+
+         The OCR capture is deliberately NOT cleared. It holds a file somebody
+         has just photographed and not yet filed, and a mistaken tab tap must not
+         be what throws that away. */
       function toggleSection(secKey) {
         if (openSec === secKey) {
           closeSection();
           return;
+        }
+        if (document.body.classList.contains("fs")) {
+          ganttFull = false;
+          ecoFull = false;
+          puWork = null;
+          invWork = null;
+          conWork = null;
+          const sec = SECTIONS.find((x) => x.k === secKey);
+          const landing = sec && visibleSubs(sec)[0];
+          if (landing) {
+            closeSection();
+            go(landing.k);
+            if (visibleSubs(sec).length > 1) openSection(secKey);
+            return;
+          }
         }
         /* A SECTION WITH ONE SCREEN OPENS THE SCREEN.
                  The Torre has a single page, so its panel was a menu of one: a tap
@@ -7011,7 +7047,9 @@
         const SHORT = { es: "ES", ca: "CA", en: "EN" };
         const langRow = i18n
           ? `<div class="msec"><span class="ml"><i>🌐</i>Idioma</span>
-             <span class="mseg" role="group" aria-label="Idioma">${(i18n.LANGS || ["es", "ca", "en"])
+             <span class="mseg" role="group" aria-label="Idioma">${(
+               i18n.LANGS || ["es", "ca", "en"]
+             )
                .map(
                  (k) =>
                    `<button class="ms${k === curLang ? " on" : ""}" data-menulang="${k}" translate="no" title="${esc((i18n.NAMES || {})[k] || k)}"${k === curLang ? ' aria-current="true"' : ""}>${SHORT[k] || k.toUpperCase()}</button>`,
@@ -24259,11 +24297,50 @@
             if (e.doc)
               ext += `<button class="btn sm" data-led="pdf" data-row="${n}">⤓ PDF</button>
                 <button class="btn sm" data-led="docx" data-row="${n}">⤓ Word</button>`;
-            return `<div class="it">
-              <span class="k d">${fmtD(e.when)}</span>
-              <span class="a">${esc(e.lab)}</span>
-              <span class="v">${e.val.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</span>
-              ${ext}</div>`;
+            /* WHAT THE LINE OPENS INTO. The operator asked to see the detail of
+               a step by touching it, and the row itself cannot carry it: the
+               values are a list of parts whose length varies from one word to a
+               reference, a channel and an amount, so putting all of it on the
+               line is what made the card look like debris in the first place.
+
+               The panel states each part on its own line — which is also the
+               only place a long one is readable on a phone — and names the two
+               papers separately, because they are different things: the
+               document this system generates on demand, and the copy of the
+               signed original somebody filed. */
+            /* Built with statements, not with conditionals spliced between
+               template literals. `a ? \`…\` : "", b ? \`…\` : ""` reads to
+               `source-audit.mjs` as one string running from the end of the first
+               literal to the start of the next — the scanner cannot see the
+               expression between them — so each such splice is counted as a
+               user-visible string that no dictionary will ever contain. Two of
+               them here put the audit over its ceiling. Plain `if`s cost a line
+               each and are the shape that measures correctly. */
+            const parts = e.val.map((x) => `<div class="jldl"><span>${esc(x)}</span></div>`);
+            const detRow = (label, value) =>
+              `<div class="jldl"><label>${label}</label><span>${esc(value)}</span></div>`;
+            if (e.doc && e.doc.ref) parts.push(detRow("Documento", e.doc.ref));
+            const filed = (e.evidence && (e.evidence.name || e.evidence.ref)) || e.ref || "";
+            if (filed) parts.push(detRow("Copia archivada", filed));
+            const det = parts.join("");
+            /* The spine's node takes the tone of the row that HAPPENED — every
+               ledger entry is a thing already done, so `s-done`. The rail is
+               drawn by CSS between the nodes, not by a node per gap, so a row
+               added or removed cannot leave a rail hanging in the air. */
+            return `<div class="it" data-jli="${n}">
+              <span class="jlsp" aria-hidden="true"><i class="jldot"></i></span>
+              <button class="jlh" type="button" data-jlx="${n}" aria-expanded="false"
+                      aria-controls="jld-${n}">
+                <span class="k d">${fmtD(e.when)}</span>
+                <span class="jlm">
+                  <span class="a">${esc(e.lab)}</span>
+                  <span class="v">${e.val.map((x) => `<span>${esc(x)}</span>`).join(" · ")}</span>
+                </span>
+                <span class="jlc" aria-hidden="true">›</span>
+              </button>
+              ${ext ? `<span class="jlx">${ext}</span>` : ""}
+              <div class="jld" id="jld-${n}" hidden>${det || `<div class="jldl"><span>Sin más detalle</span></div>`}</div>
+            </div>`;
           })
           .join("");
         return `<div class="card"><div class="ch"><h3>Lo hecho hasta ahora</h3>
@@ -24275,6 +24352,28 @@
        *  route `downloadHistoryDoc` gives the Historial modal, so the document
        *  offered here is the one the customer already has. */
       function journeyLedgerWire(v, c) {
+        /* ONE OPEN AT A TIME. A ledger runs to twenty rows on a finished job;
+           letting them all stand open turns the card back into the wall of text
+           this replaced. Opening one closes the last, which is also what makes a
+           second tap on the same row read as "put it away". */
+        v.querySelectorAll("[data-jlx]").forEach((btn) => {
+          btn.onclick = () => {
+            const row = btn.closest(".it");
+            const det = row && row.querySelector(".jld");
+            if (!det) return;
+            const open = det.hidden;
+            v.querySelectorAll(".jled .jld").forEach((d) => (d.hidden = true));
+            v.querySelectorAll("[data-jlx]").forEach((b) => {
+              b.setAttribute("aria-expanded", "false");
+              b.closest(".it").classList.remove("on");
+            });
+            if (open) {
+              det.hidden = false;
+              btn.setAttribute("aria-expanded", "true");
+              row.classList.add("on");
+            }
+          };
+        });
         v.querySelectorAll("[data-led]").forEach((btn) => {
           btn.onclick = async () => {
             const row = journeyLedgerRows(c)[Number(btn.dataset.row)];

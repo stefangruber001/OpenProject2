@@ -5457,15 +5457,40 @@ body.siteworker .rail {
    section 70 rather than restating six hex pairs here, because two lists of
    colours for one meaning is how a register and the screen behind it come to
    disagree about what amber means. */
+/* THE STRIP TAKES THE WHOLE WIDTH, because at six pixels in the corner of a
+   value cell it was a decoration rather than a reading. Operator: «use full
+   broad size to make graphic timeline more visible».
+
+   So it spreads the thirteen dots across the card and draws the rail they sit
+   on. Two consequences worth stating: `justify-content: space-between` means
+   the spacing is the CARD's, not a fixed gap, so the strip reads the same on a
+   340px phone and in a desktop column; and the rail is a pseudo-element behind
+   the dots rather than a border on the row, so a dot's own ring paints over it
+   instead of being cut by it. */
 .jmini {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 1px 0 3px;
+  justify-content: space-between;
+  gap: 3px;
+  width: 100%;
+  min-width: 168px;
+  padding: 7px 1px 8px;
+}
+.jmini:before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--hair);
 }
 .jdot {
-  width: 6px;
-  height: 6px;
+  position: relative;
+  width: 8px;
+  height: 8px;
   flex: none;
   border-radius: 50%;
   background: var(--paper);
@@ -5474,8 +5499,8 @@ body.siteworker .rail {
 /* The current phase, marked by size and a ring — never by a seventh colour, for
    the reason section 70 gives about one meaning per channel. */
 .jdot.on {
-  width: 9px;
-  height: 9px;
+  width: 12px;
+  height: 12px;
   box-shadow:
     0 0 0 2px var(--paper),
     0 0 0 3px var(--accent);
@@ -5506,27 +5531,188 @@ body.siteworker .rail {
    `min-width` left the value about seventy pixels, so «FAC-2025-0002 · 1.528 €»
    wrapped one word-fragment per line. Below 700px the value takes a line of its
    own and the documents follow on the next, which is three short lines instead
-   of one tall column of debris. */
+   of one tall column of debris.
+
+   REBUILT AS A TIMELINE YOU CAN OPEN. Operator: «very very unstructured, should
+   be premium structure and more info on screen available and when you click on
+   the line you see immediately the details of this step».
+
+   Three things changed. The rows hang off a SPINE — a node per event and a rule
+   between them — so the card reads as one sequence instead of a stack of
+   unrelated lines. The date, the action and its values became a fixed grid
+   rather than three flex children whose widths depended on their contents, which
+   is what made every row start in a different place. And the line is now a
+   button that opens a panel underneath it with each value on its own row and the
+   papers named, so the detail is one tap away instead of crammed onto the line
+   or missing.
+
+   The download buttons stay ON the line, not in the panel: they are the reason
+   most people open this card at all, and a document you must first expand a row
+   to reach is a document one tap further away than it was. */
 .jled .it {
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 8px;
+  padding: 0;
+  border: 0;
 }
-.jled .d {
-  min-width: 6rem;
+/* The spine. The rule is drawn on the node's own cell and stops at the last
+   row, so the line never dangles past the final event. */
+.jled .jlsp {
+  position: relative;
+  grid-row: 1 / span 2;
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  padding-top: 15px;
+}
+.jled .jlsp:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--hair);
+}
+.jled .it:first-child .jlsp:before {
+  top: 15px;
+}
+.jled .it:last-child .jlsp:before {
+  bottom: auto;
+  height: 15px;
+}
+.jled .jldot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.jled .it.on .jldot {
+  width: 9px;
+  height: 9px;
+  background: var(--accentDeep);
+}
+
+/* The line itself: a button, because it opens something. */
+.jled .jlh {
+  display: grid;
+  grid-template-columns: 5.6rem minmax(0, 1fr) 14px;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 4px 9px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.jled .jlh:hover .a {
+  color: var(--accentDeep);
+}
+.jled .jlh .d {
+  font: 600 12px var(--mono, ui-monospace, monospace);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.jled .jlm {
+  min-width: 0;
 }
 .jled .a {
-  min-width: 11rem;
+  display: block;
+  font: 600 13.5px var(--sans);
+  color: var(--ink);
 }
 .jled .v {
-  flex: 1;
+  display: block;
+  margin-top: 2px;
   color: var(--muted);
   font-size: 12.5px;
 }
+.jled .jlc {
+  align-self: center;
+  color: var(--faint);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.14s;
+}
+.jled .it.on .jlc {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+/* The papers, right of the line and vertically centred against it. */
+.jled .jlx {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 6px 0;
+}
+/* The panel. Indented to the action's column so it reads as belonging to the
+   line above it and not to the spine. */
+.jled .jld {
+  grid-column: 2 / -1;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: var(--panel, var(--greenPale, #f4f8f1));
+  border-left: 2px solid var(--accentSoft, var(--greenSoft));
+}
+.jled .jldl {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.jled .jldl + .jldl {
+  border-top: 1px solid var(--hair);
+}
+.jled .jldl label {
+  flex: 0 0 8.5rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.jled .it + .it .jlh {
+  border-top: 1px solid var(--hair);
+}
+
+/* A phone has no room for a date column beside the action. The date moves above
+   it, the papers drop to a line of their own, and the spine stays — it is the
+   thing that makes twenty events read as one story. */
 @media (max-width: 700px) {
-  .jled .a {
-    min-width: 0;
+  .jled .it {
+    grid-template-columns: 18px minmax(0, 1fr);
   }
-  .jled .v {
-    flex: 1 0 100%;
+  .jled .jlh {
+    grid-template-columns: minmax(0, 1fr) 14px;
+    padding-bottom: 6px;
+  }
+  .jled .jlh .d {
+    grid-column: 1 / -1;
+    font-size: 11px;
+  }
+  .jled .jlx {
+    grid-column: 2;
+    justify-content: flex-start;
+    padding: 0 0 10px;
+  }
+  .jled .jld {
+    grid-column: 2;
+  }
+  .jled .jldl {
+    flex-direction: column;
+    gap: 1px;
+  }
+  .jled .jldl label {
+    flex: none;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
 }
