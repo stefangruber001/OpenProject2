@@ -1884,15 +1884,20 @@ td.k,
 }
 /* Something waiting on a person is not something finished. Green is the colour
    this workspace uses for «approved and settled», so the button that says how
-   many hours are STILL open had been reading as good news. */
+   many hours are STILL open had been reading as good news.
+   A PALE gold, not the full one: at full strength it was the loudest thing on
+   the screen, which is the wrong rank for a queue — it is work waiting, not an
+   alarm. The edge and the dark ink carry the meaning; the fill only tints. */
 .btn.warn {
-  background: var(--gold);
-  border-color: var(--gold);
-  color: #3d2f00;
+  background: #fdf1cc;
+  border-color: #eccb63;
+  color: #6b5312;
   font-weight: 700;
+  justify-content: center;
+  text-align: center;
 }
 .btn.warn:hover:not([disabled]):not(:disabled) {
-  background: #e2b420;
+  background: #fbe7ac;
   border-color: #e2b420;
 }
 .secitem .lb {
@@ -4522,20 +4527,43 @@ td.num.late {
   background: var(--accent);
   color: #fff;
 }
+/* The period label is a BUTTON — pressing it is how you reach another day,
+   week, month or year — so it is styled as one, and the native picker that
+   replaces it keeps the same footprint so the strip does not jump. */
 .hscope .hseg .lb {
-  padding: 0 10px;
+  padding: 7px 12px;
+  border: 0;
+  background: var(--accentPale);
   font: 700 11px var(--sans);
   color: var(--greenDeep);
   white-space: nowrap;
+  cursor: pointer;
+}
+.hscope .hseg .lb:hover {
+  background: var(--accentSoft);
+}
+.hscope .hseg .lbp {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+  font: 700 12px var(--sans);
+  color: var(--ink);
+  padding: 6px 8px;
+  outline: 0;
+  min-width: 0;
+  width: 150px;
 }
 @media (max-width: 560px) {
   .hscope .hseg {
     flex-wrap: wrap;
   }
-  .hscope .hseg .lb {
+  .hscope .hseg .lb,
+  .hscope .hseg .lbp {
     flex: 1 0 100%;
-    padding: 6px 8px;
+    width: auto;
+    padding: 7px 8px;
     border-top: 1px solid var(--line);
+    border-left: 0;
     text-align: center;
   }
 }
@@ -4730,10 +4758,16 @@ td.num.late {
   padding: 6px 0;
   cursor: pointer;
 }
+/* A FILTER IS NOT AN ACTION. Full accent green is what this workspace puts on
+   things that DO something — approve, issue, register — so a filter wearing it
+   read as the button you press rather than the state you are in. Soft ground,
+   deep-green text, accent only on the edge: unmistakably selected, obviously
+   not a verb. */
 .rfilters .rf.on {
-  background: var(--accent);
+  background: var(--accentSoft);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--greenDeep);
+  font-weight: 700;
 }
 .rcount {
   display: flex;
@@ -4919,8 +4953,14 @@ td.num.late {
   gap: 7px;
   margin-bottom: 6px;
 }
-.hacts .btn.primary {
-  flex: 1.4 1 0;
+.hacts .btn.primary,
+.hacts .btn.warn {
+  flex: 2.2 1 0;
+}
+.hacts .btn:not(.primary):not(.warn) {
+  flex: 0 0 auto;
+  padding-left: 18px;
+  padding-right: 18px;
 }
 .hacts .btn {
   flex: 1 1 0;

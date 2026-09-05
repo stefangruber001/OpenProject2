@@ -9892,6 +9892,22 @@
          because the company total is the thing you open this for. */
       let hRangeMode = "month";
       let hProj = "all";
+      let hFavOnly = false;
+      let hPickOpen = false;
+      /* WHICH day, week, month or year — the label was a caption saying where you
+         were with no way to go anywhere else, so the only way to read last month
+         was to walk the day sheet back into it. Each mode gets the native control
+         that fits it, and all of them set the same anchor (`hDay`) that
+         `hoursRange()` already derives everything from, so the whole screen
+         follows without a second source of truth. */
+      function rangePicker() {
+        const d = hDay || erp.today;
+        if (hRangeMode === "year")
+          return `<input class="lbp" id="hPickIn" type="number" min="2000" max="2100" step="1" value="${d.slice(0, 4)}">`;
+        if (hRangeMode === "month")
+          return `<input class="lbp" id="hPickIn" type="month" value="${d.slice(0, 7)}">`;
+        return `<input class="lbp" id="hPickIn" type="date" value="${d}">`;
+      }
       function hoursRange() {
         const d = hDay || erp.today;
         const Y = +d.slice(0, 4);
@@ -9909,6 +9925,18 @@
           return { from: `${Y}-01-01`, to: `${Y}-12-31`, label: String(Y) };
         return { from: `${Y}-${pad2(M)}-01`, to: lastDay(Y, M), label: `${MONTHS[M - 1]} ${Y}` };
       }
+      /* WHICH MONTH THE RECONCILIATION IS ABOUT. Left to itself the engine picks
+         the last month that has a payroll in it, which is the right default for
+         a question asked with no period attached — but this screen now HAS a
+         period, and a report headed «junio 2025» carrying April 2026's
+         reconciliation is two answers to two different questions on one page.
+         A year spans twelve months and no single one of them is the answer, so
+         there the engine's own choice stands and the block says which month it
+         picked. */
+      function hoursRecMonth() {
+        if (hRangeMode === "year") return undefined;
+        return (hDay || erp.today).slice(0, 7);
+      }
       const H_RANGES = [
         ["day", "Día"],
         ["week", "Semana"],
@@ -9920,7 +9948,7 @@
         const r = hoursRange();
         const pid = hProj === "all" ? null : hProj;
         const s = erp.hoursSummary(r.from, r.to, pid);
-        const rec = erp.labourReconciliation();
+        const rec = erp.labourReconciliation(hoursRecMonth());
         const h = (m) => (m / 1000).toLocaleString("es-ES");
         const off = rec.unbookedCents;
         /* The same figure the per-person drill-down below adds up, carried to the
@@ -9963,41 +9991,52 @@
         const zeros = erp.state.projects
           .filter((p) => p.status !== "archived" && !s.projects.some((x) => x.code === p.code))
           .slice(0, 3);
-        const fav = hProj !== "all" && projFavs.includes(hProj);
-        let opts = projectOptions();
+        /* ONE ROW OF SCOPE, NOT THREE. The search box and the status dropdown
+           came from the shared project bar and answered a question this screen
+           does not ask: the list of jobs a company has is short enough to pick
+           from, and «Todos» is the default anyway. What is left is the job, the
+           star that narrows the list to the ones marked, and the period. */
+        const favOnly = hFavOnly;
+        let opts = erp.state.projects
+          .filter((p) => p.status !== "archived")
+          .filter((p) => !favOnly || projFavs.includes(p.id))
+          .sort((a, b) => {
+            const fa = projFavs.includes(a.id);
+            const fb = projFavs.includes(b.id);
+            if (fa !== fb) return fa ? -1 : 1;
+            return a.code < b.code ? -1 : 1;
+          });
         if (hProj !== "all" && !opts.some((p) => p.id === hProj)) {
           const active = erp.state.projects.find((p) => p.id === hProj);
           if (active) opts = [active, ...opts];
         }
-        /* The star moves to the LEFT of the job. On the right it pushed the
-           select in from the edge, so the widest field on the strip was the only
-           one not aligned with the row above it. */
+        const partyName = (p) => {
+          try {
+            return erp.party(p.partyId).name;
+          } catch (e) {
+            return "";
+          }
+        };
+        /* The star sits AFTER the job and is a filter, not a bookmark: pressed,
+           the list shows only the jobs marked as favourites. It used to favourite
+           whatever was selected, which is an action hiding inside a filter strip
+           — and there was no way to see only the ones you care about, which is
+           the thing a company with sixty jobs actually wants. */
         const scope = `<div class="hscope">
-    <div class="hstop"><span class="plbl">Proyecto</span>
-      <input id="hqf" placeholder="Buscar…" value="${esc(projFilter)}">
-      <select id="hst">${[
-        ["open", "Abiertos"],
-        ["all", "Todos"],
-        ["closed", "Cerrados"],
-        ["fav", "Favoritos"],
-      ]
-        .map(
-          ([v, l]) => `<option value="${v}"${projStatus === v ? " selected" : ""}>${l}</option>`,
-        )
-        .join("")}</select></div>
-    <div class="hsbot"><button class="fav${fav ? " on" : ""}" id="hfav"${
-      hProj === "all" ? " disabled" : ""
-    }>${fav ? "★" : "☆"}</button>
+    <div class="hsbot"><span class="plbl">Proyecto</span>
       <select id="hprj"><option value="all"${hProj === "all" ? " selected" : ""}>Todos los proyectos</option>${opts
         .map(
           (p) =>
-            `<option value="${p.id}"${p.id === hProj ? " selected" : ""}>${p.code} — ${esc(erp.party(p.partyId).name)}</option>`,
+            `<option value="${p.id}"${p.id === hProj ? " selected" : ""}>${p.code} — ${esc(partyName(p))}</option>`,
         )
-        .join("")}</select></div>
+        .join("")}</select>
+      <button class="fav${favOnly ? " on" : ""}" id="hfav" title="${
+        favOnly ? "Mostrar todos los proyectos" : "Mostrar sólo favoritos"
+      }">${favOnly ? "★" : "☆"}</button></div>
     <div class="hseg">${H_RANGES.map(
       ([k, lab]) =>
         `<button class="sg${hRangeMode === k ? " on" : ""}" data-hrange="${k}">${lab}</button>`,
-    ).join("")}<span class="lb">${esc(r.label)}</span></div>
+    ).join("")}${hPickOpen ? rangePicker() : `<button class="lb" id="hPick">${esc(r.label)}</button>`}</div>
    </div>`;
         return `${scope}
    <div class="hband">
@@ -10006,11 +10045,11 @@
     <div class="c"><div class="k">Coste</div><div class="v">${eur0(s.totalCostCents)}</div>
       <div class="s">a coste de trabajador</div></div>
     <div class="c warn"><div class="k">Sin aprobar</div><div class="v">${h(rec.openHoursMilli)}</div>
-      <div class="s">${rec.month}</div></div>
+      <div class="s">${esc(rec.month)}</div></div>
    </div>
    <div class="hacts">
-    <button class="btn warn" id="hGoOpen">Revisar ${h(rec.openHoursMilli)} h sin aprobar</button>
-    <button class="btn" id="hXls">Exportar a Excel</button>
+    <button class="btn warn" id="hGoOpen">Revisar y aprobar ${h(rec.openHoursMilli)}h</button>
+    <button class="btn" id="hXls">Excel</button>
    </div>
 
    <h4 class="hsec">A dónde han ido las horas <span>${esc(r.label)}</span></h4>
@@ -10104,6 +10143,203 @@
    </div>`;
       }
 
+      /**
+       * THE HOURS REPORT AS SOMETHING AN OWNER READS, not a dump of the table
+       * that happened to be on screen.
+       *
+       * What was exported before was the detail rows and nothing else: date,
+       * person, job, partida, hours, cost, state. Every question an owner
+       * actually opens a labour report to answer — what did this cost per hour,
+       * how much of it is overtime, how much is still unapproved, does the month
+       * reconcile against what left the bank and the till — had to be rebuilt by
+       * hand in the spreadsheet, which is the work the ERP exists to have already
+       * done.
+       *
+       * So: an identity block, a band of headline figures, then the same four
+       * questions the screen answers, then the detail underneath. It honours the
+       * period and the job filter on screen, and says so in the header — a report
+       * whose scope you cannot read off the page is a report nobody can file.
+       */
+      function hoursWorkbook() {
+        const r = hoursRange();
+        const pid = hProj === "all" ? null : hProj;
+        const sum = erp.hoursSummary(r.from, r.to, pid);
+        const rec = erp.labourReconciliation(hoursRecMonth());
+        const iss = (erp._issuerBlock && erp._issuerBlock()) || {};
+        const rows = [];
+        const style = {};
+        const push = (row, st) => {
+          if (st !== undefined) style[rows.length] = st;
+          rows.push(row);
+        };
+        const blank = () => push([""], 0);
+        const section = (t) => {
+          blank();
+          push([t], 7);
+        };
+        const h2 = (m) => (m / 1000).toLocaleString("es-ES", { maximumFractionDigits: 2 });
+        const money = (c) => (c / 100).toLocaleString("es-ES", { minimumFractionDigits: 2 });
+        const pct = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : 0) + "%";
+
+        const entries = erp.state.labour.filter(
+          (l) => l.date >= r.from && l.date <= r.to && (!pid || l.projectId === pid),
+        );
+        const totalMilli = entries.reduce((a, l) => a + l.hoursMilli, 0);
+        const totalCost = entries.reduce((a, l) => a + l.costCents, 0);
+        const extraMilli = entries
+          .filter((l) => l.kind && l.kind !== "normal")
+          .reduce((a, l) => a + l.hoursMilli, 0);
+        const openMilli = entries.filter((l) => !l.locked).reduce((a, l) => a + l.hoursMilli, 0);
+        const openCost = entries.filter((l) => !l.locked).reduce((a, l) => a + l.costCents, 0);
+        const people = new Set(entries.map((l) => l.workerId));
+        const jobs = new Set(entries.map((l) => l.projectId).filter(Boolean));
+        const days = new Set(entries.map((l) => l.date));
+        const perHour = totalMilli ? Math.round(totalCost / (totalMilli / 1000)) : 0;
+        const nameOf = (id) =>
+          (erp.state.workers.find((w) => w.id === id) || { name: String(id || "") }).name;
+        const codeOf = (id) => {
+          try {
+            return id ? erp.project(id).code : "Sin obra";
+          } catch (e) {
+            return "Sin obra";
+          }
+        };
+
+        /* ---- identity, and the scope this report was run under ---- */
+        push([iss.tradeName || iss.legalName || "Canei Subirats"], 1);
+        push(["Informe de horas"], 2);
+        push([`Periodo: ${r.label}  ·  ${fmtD(r.from)} – ${fmtD(r.to)}`], 2);
+        push([`Obra: ${pid ? codeOf(pid) : "Todos los proyectos"}`], 2);
+        push([`Emitido: ${fmtD(erp.today)}`], 2);
+
+        /* ---- the headline figures ---- */
+        section("Resumen");
+        push(["Horas totales", h2(totalMilli)], 8);
+        push(["Coste total", money(totalCost) + " €"], 8);
+        push(["Coste medio por hora", money(perHour) + " €"], 8);
+        push(["Horas extra", `${h2(extraMilli)}  (${pct(extraMilli, totalMilli)})`], 8);
+        push(["Horas sin aprobar", `${h2(openMilli)}  (${pct(openMilli, totalMilli)})`], 8);
+        push(["Coste sin aprobar", money(openCost) + " €"], 8);
+        push(["Personas", String(people.size)], 8);
+        push(["Obras con horas", String(jobs.size)], 8);
+        push(["Días con parte", String(days.size)], 8);
+        push([
+          "Horas por persona",
+          people.size ? h2(Math.round(totalMilli / people.size)) : "0",
+        ], 8);
+
+        /* ---- where the hours went ---- */
+        section("Por obra");
+        push(["Obra", "Cliente", "Horas", "% horas", "Coste", "% coste", "€/hora"], 3);
+        for (const p of sum.projects) {
+          const prj = erp.state.projects.find((x) => x.code === p.code);
+          let client = "";
+          try {
+            client = prj ? erp.party(prj.partyId).name : "";
+          } catch (e) {}
+          push([
+            p.code || "Sin obra",
+            client,
+            h2(p.hoursMilli),
+            pct(p.hoursMilli, totalMilli),
+            money(p.costCents) + " €",
+            pct(p.costCents, totalCost),
+            p.hoursMilli ? money(Math.round(p.costCents / (p.hoursMilli / 1000))) + " €" : "",
+          ]);
+        }
+        push(
+          ["TOTAL", "", h2(totalMilli), "100%", money(totalCost) + " €", "100%", money(perHour) + " €"],
+          10,
+        );
+
+        section("Por obra y partida");
+        push(["Obra", "Partida", "Horas", "Coste"], 3);
+        for (const p of sum.projects)
+          for (const c of p.chapters || [])
+            push([
+              p.code || "Sin obra",
+              c.chapterNum ? `${c.chapterNum}. ${c.name || ""}`.trim() : "Sin partida",
+              h2(c.hoursMilli),
+              money(c.costCents) + " €",
+            ]);
+
+        /* ---- who worked ---- */
+        section("Por trabajador");
+        push(["Trabajador", "Tipo", "Horas", "Extra", "Coste", "€/hora", "Obras"], 3);
+        for (const w of erp.hoursByWorker(r.from, r.to)) {
+          const only = pid ? w.projects.filter((pj) => pj.projectId === pid) : w.projects;
+          if (pid && !only.length) continue;
+          const hm = pid ? only.reduce((a, pj) => a + pj.hoursMilli, 0) : w.hoursMilli;
+          const cc = pid ? only.reduce((a, pj) => a + pj.costCents, 0) : w.costCents;
+          const wk = erp.state.workers.find((x) => x.id === w.workerId) || {};
+          push([
+            w.name,
+            WORKER_KINDS[wk.kind] || wk.kind || "",
+            h2(hm),
+            w.extraHoursMilli ? h2(w.extraHoursMilli) : "",
+            money(cc) + " €",
+            hm ? money(Math.round(cc / (hm / 1000))) + " €" : "",
+            only.map((pj) => pj.code || "—").join(" · "),
+          ]);
+        }
+
+        /* ---- does the month add up ---- */
+        const cashRows = erp.workerMonthlyReconciliation(rec.month);
+        const cashPaid = cashRows.reduce((a, w) => a + w.paidCents, 0);
+        section(`Conciliación del mes · ${rec.month}`);
+        push(["Concepto", "Importe"], 3);
+        push(["Horas imputadas a obra", money(rec.bookedCents) + " €"]);
+        push(["Nóminas pagadas por banco", money(rec.wagesCents) + " €"]);
+        push(["Pagado en efectivo a trabajadores", money(cashPaid) + " €"]);
+        push(
+          ["Diferencia sin imputar", money(rec.unbookedCents) + " €"],
+          10,
+        );
+        blank();
+        push(["Trabajador", "Imputado", "Pagado", "Diferencia"], 3);
+        for (const w of cashRows)
+          push([
+            w.name,
+            money(w.bookedCents) + " €",
+            money(w.paidCents) + " €",
+            money(w.diffCents) + " €",
+          ]);
+
+        /* ---- and the entries the whole thing is built from ---- */
+        section("Detalle de apuntes");
+        push(
+          ["Fecha", "Trabajador", "Obra", "Partida", "Subpartida", "Tipo", "Horas", "€/hora", "Coste", "Estado"],
+          3,
+        );
+        for (const l of entries.slice().sort((a, b) => a.date.localeCompare(b.date)))
+          push([
+            fmtD(l.date),
+            nameOf(l.workerId),
+            codeOf(l.projectId),
+            l.chapterNum || "",
+            hourLineLabel(l) || "",
+            HOUR_KINDS[l.kind || "normal"] || l.kind || "",
+            h2(l.hoursMilli),
+            l.rateCents ? money(l.rateCents) + " €" : "",
+            money(l.costCents) + " €",
+            l.locked ? "Aprobada" : "Abierta",
+          ]);
+
+        return xlsxBlob("Horas", rows, {
+          noHead: true,
+          /* The header block is built INTO the rows here — it carries the period
+             and the filter, which the generic one cannot know — so the generic
+             one is suppressed rather than printed twice. */
+          styleOf: (i) => (i in style ? style[i] : null),
+          freezeAt: 0,
+          foot:
+            [iss.legalName, iss.taxId, iss.registeredAddress || iss.address, iss.email]
+              .filter(Boolean)
+              .join("  ·  ") +
+            "   |   Los importes son coste de trabajador, no precio facturado.",
+        });
+      }
+
       function wireHorasSummary() {
         document.querySelectorAll("[data-hrange]").forEach(
           (b) =>
@@ -10118,33 +10354,41 @@
             hProj = psel.value;
             render();
           };
-        const pst = $("#hst");
-        if (pst)
-          pst.onchange = () => {
-            projStatus = pst.value;
-            render();
-          };
-        const pqf = $("#hqf");
-        if (pqf)
-          pqf.oninput = () => {
-            projFilter = pqf.value;
-            render();
-            const n = $("#hqf");
-            if (n) {
-              n.focus();
-              n.setSelectionRange(n.value.length, n.value.length);
-            }
-          };
         const hfav = $("#hfav");
         if (hfav)
           hfav.onclick = () => {
-            if (hProj === "all") return;
-            projFavs = projFavs.includes(hProj)
-              ? projFavs.filter((x) => x !== hProj)
-              : [...projFavs, hProj];
-            saveProjPrefs();
+            hFavOnly = !hFavOnly;
+            /* Narrowing the list must not silently narrow the FIGURES too: a job
+               that is no longer offered cannot stay selected, or the screen would
+               report one job while the picker showed another. */
+            if (hFavOnly && hProj !== "all" && !projFavs.includes(hProj)) hProj = "all";
             render();
           };
+        const pick = $("#hPick");
+        if (pick)
+          pick.onclick = () => {
+            hPickOpen = true;
+            render();
+            const inp = $("#hPickIn");
+            if (inp) inp.focus();
+          };
+        const pin = $("#hPickIn");
+        if (pin) {
+          const close = () => {
+            hPickOpen = false;
+            render();
+          };
+          pin.onchange = () => {
+            const v = pin.value;
+            if (v) {
+              if (hRangeMode === "year") hDay = `${String(v).padStart(4, "0")}-01-01`;
+              else if (hRangeMode === "month") hDay = `${v}-01`;
+              else hDay = v;
+            }
+            close();
+          };
+          pin.onblur = close;
+        }
         const more = $("#hRecMore");
         if (more)
           more.onclick = () => {
@@ -10176,24 +10420,7 @@
         const xls = $("#hXls");
         if (xls)
           xls.onclick = () => {
-            const r = hoursRange();
-            const rows = [
-              ["Fecha", "Trabajador", "Proyecto", "Partida", "Horas", "Coste", "Estado"],
-            ];
-            for (const l of erp.state.labour.filter((x) => x.date >= r.from && x.date <= r.to))
-              rows.push([
-                l.date,
-                (erp.state.workers.find((w) => w.id === l.workerId) || { name: "?" }).name,
-                l.projectId ? erp.project(l.projectId).code : "",
-                l.chapterNum || "",
-                l.hoursMilli / 1000,
-                l.costCents / 100,
-                l.locked ? "Aprobada" : "Abierta",
-              ]);
-            downloadBlob(
-              xlsxBlob("Horas", rows, { subtitle: `Horas · ${fmtD(r.from)} – ${fmtD(r.to)}` }),
-              `horas-${erp.today}.xlsx`,
-            );
+            downloadBlob(hoursWorkbook(), `horas-${hoursRange().from}-${hoursRange().to}.xlsx`);
             toast("Exportado a Excel");
           };
       }
@@ -13075,15 +13302,26 @@
                are text, and letting Excel guess turns «08960» into 8960 and eats
                the leading zero. Amounts are already formatted by the engine — the
                arithmetic happened in cents, long before this file. */
+      /* Style ids the sheet writer hands out, in the order they are declared
+         below: fonts 6/7/8 are a section title, a KPI figure and a total line;
+         border 2 is the rule above a total; cell formats 7/8/9/10 are section
+         title, KPI label, KPI figure and total.
+         Written HERE rather than beside each entry: a comment between two
+         concatenated XML strings reads to the translation source audit as a
+         user-visible literal, which is the trap CLAUDE.md records four earlier
+         sessions falling into. */
       const XLSX_STYLES =
         '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-        '<fonts count="6">' +
+        '<fonts count="9">' +
         '<font><sz val="10"/><name val="Arial"/><color rgb="FF3D3D3D"/></font>' +
         '<font><b/><sz val="16"/><name val="Georgia"/><color rgb="FF14160F"/></font>' +
         '<font><sz val="9"/><name val="Arial"/><color rgb="FF6B7063"/></font>' +
         '<font><b/><sz val="9"/><name val="Arial"/><color rgb="FFFFFFFF"/></font>' +
         '<font><b/><sz val="10"/><name val="Arial"/><color rgb="FF14160F"/></font>' +
         '<font><sz val="7.5"/><name val="Arial"/><color rgb="FF6B7063"/></font>' +
+        '<font><b/><sz val="11"/><name val="Georgia"/><color rgb="FF3A5F30"/></font>' +
+        '<font><b/><sz val="14"/><name val="Georgia"/><color rgb="FF14160F"/></font>' +
+        '<font><b/><sz val="10"/><name val="Arial"/><color rgb="FF3A5F30"/></font>' +
         "</fonts>" +
         // Excel requires these first two fills, in this order, and refuses the
         // workbook without them.
@@ -13092,11 +13330,12 @@
         '<fill><patternFill patternType="solid"><fgColor rgb="FF48733C"/><bgColor indexed="64"/></patternFill></fill>' +
         '<fill><patternFill patternType="solid"><fgColor rgb="FFF1F4EE"/><bgColor indexed="64"/></patternFill></fill>' +
         "</fills>" +
-        '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' +
+        '<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border>' +
         '<border><left/><right/><top/><bottom style="thin"><color rgb="FFD8DCD2"/></bottom><diagonal/></border>' +
+        '<border><left/><right/><top style="thin"><color rgb="FF48733C"/></top><bottom/><diagonal/></border>' +
         "</borders>" +
         '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
-        '<cellXfs count="7">' +
+        '<cellXfs count="11">' +
         '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="0" applyFont="1"/>' +
         '<xf xfId="0" numFmtId="0" fontId="1" fillId="0" borderId="0" applyFont="1"/>' +
         '<xf xfId="0" numFmtId="0" fontId="2" fillId="0" borderId="0" applyFont="1"/>' +
@@ -13104,6 +13343,10 @@
         '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="1" applyFont="1" applyBorder="1"/>' +
         '<xf xfId="0" numFmtId="0" fontId="0" fillId="3" borderId="1" applyFont="1" applyFill="1" applyBorder="1"/>' +
         '<xf xfId="0" numFmtId="0" fontId="5" fillId="0" borderId="0" applyFont="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="6" fillId="0" borderId="0" applyFont="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="2" fillId="3" borderId="0" applyFont="1" applyFill="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="7" fillId="3" borderId="0" applyFont="1" applyFill="1"/>' +
+        '<xf xfId="0" numFmtId="0" fontId="8" fillId="0" borderId="2" applyFont="1" applyBorder="1"/>' +
         "</cellXfs>" +
         '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
         "</styleSheet>";
@@ -13126,13 +13369,33 @@
             .filter(Boolean)
             .join("  ·  ");
 
+        /* A report that builds its own identity block — with the period and the
+           filter in it, which this function cannot know — says so, rather than
+           passing an empty title and relying on a falsy fallback that puts the
+           company name back. */
         const head = [];
-        if (title) head.push([{ v: title, s: 1 }]);
-        if (subtitle) head.push([{ v: subtitle, s: 2 }]);
+        if (title && !opts.noHead) head.push([{ v: title, s: 1 }]);
+        if (subtitle && !opts.noHead) head.push([{ v: subtitle, s: 2 }]);
         if (head.length) head.push([{ v: "", s: 0 }]);
         const headerRowIndex = head.length; // 0-based row of the column titles
 
-        const body = rows.map((r, i) => r.map((c) => ({ v: c, s: i === 0 ? 3 : i % 2 ? 5 : 4 })));
+        /* A ROW CAN SAY WHAT IT IS. Without this every export is one flat table:
+           header, then banded body, forever. A report an owner reads wants
+           sections, a block of headline figures and a ruled total — so a caller
+           may hand back a style id per row, and the banded default stands for
+           every caller that does not. Ids: 3 header · 4/5 banded body ·
+           7 section title · 8 KPI label · 9 KPI figure · 10 total. */
+        const styleOf = opts.styleOf;
+        const body = rows.map((r, i) => {
+          const forced = styleOf ? styleOf(i, r) : null;
+          return r.map((c, ci) => ({
+            v: c,
+            s: forced === null || forced === undefined ? (i === 0 ? 3 : i % 2 ? 5 : 4) : forced,
+            /* A KPI block reads label-then-figure, so the second cell of such a
+               row takes the figure style and the first the label's. */
+            ...(forced === 8 && ci === 1 ? { s: 9 } : {}),
+          }));
+        });
         const all = head.concat(body);
         if (foot) all.push([{ v: "", s: 0 }], [{ v: foot, s: 6 }]);
 
@@ -13167,10 +13430,14 @@
         // The header row stays on screen while the operator scrolls; on a
         // hundred-row export that is the difference between a table and a
         // wall of numbers.
-        const freeze =
-          `<sheetViews><sheetView workbookViewId="0" showGridLines="0">` +
-          `<pane ySplit="${headerRowIndex + 1}" topLeftCell="A${headerRowIndex + 2}" activePane="bottomLeft" state="frozen"/>` +
-          "</sheetView></sheetViews>";
+        /* A report with sections has no single header row to pin, and freezing
+           an arbitrary one strands the reader mid-table. `freezeAt: 0` says so. */
+        const splitAt = opts.freezeAt === undefined ? headerRowIndex + 1 : opts.freezeAt;
+        const freeze = splitAt
+          ? `<sheetViews><sheetView workbookViewId="0" showGridLines="0">` +
+            `<pane ySplit="${splitAt}" topLeftCell="A${splitAt + 1}" activePane="bottomLeft" state="frozen"/>` +
+            "</sheetView></sheetViews>"
+          : `<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>`;
 
         const f = (path, xml) => ({
           path,

@@ -9596,6 +9596,65 @@ async function testProcurement(browser, base) {
         agrees: rec.wagesCents - rec.bookedCents === rec.unbookedCents,
       };
     });
+    /* THE EXPORT IS A REPORT, NOT A DUMP OF THE TABLE ON SCREEN. It used to be
+       the detail rows and nothing else, so every question an owner opens a
+       labour report to ask — cost per hour, how much is overtime, how much is
+       still unapproved, does the month reconcile — had to be rebuilt by hand in
+       the spreadsheet. The parts are STORED in the zip, never deflated, so the
+       sheet XML appears verbatim in the bytes and can be read straight out.
+
+       Asserted here rather than eyeballed because a workbook is the one artifact
+       that leaves the building: it goes to an accountant, and a broken one is
+       found by somebody who cannot fix it. */
+    const wb = await pg.evaluate(async () => {
+      const blob = hoursWorkbook();
+      const txt = await blob.text();
+      const has = (t) => txt.includes(t);
+      return {
+        bytes: blob.size,
+        parts: ["xl/workbook.xml", "xl/styles.xml", "xl/worksheets/sheet1.xml"].filter((f) =>
+          txt.includes(f),
+        ).length,
+        sections: [
+          "Resumen",
+          "Por obra",
+          "Por obra y partida",
+          "Por trabajador",
+          "Detalle de apuntes",
+        ].filter(has).length,
+        kpis: [
+          "Coste medio por hora",
+          "Horas sin aprobar",
+          "Horas por persona",
+          "Días con parte",
+        ].filter(has).length,
+        cash: has("Pagado en efectivo a trabajadores"),
+        total: has("TOTAL"),
+        period: has("Periodo:"),
+        scope: has("Obra:"),
+        /* The identity block: an export with no company on it is a file the
+           accountant cannot tell from anyone else's. */
+        issuer: has("Informe de horas"),
+        disclaimer: has("coste de trabajador"),
+      };
+    });
+    if (
+      wb.bytes > 5000 &&
+      wb.parts === 3 &&
+      wb.sections === 5 &&
+      wb.kpis === 4 &&
+      wb.cash &&
+      wb.total &&
+      wb.period &&
+      wb.scope &&
+      wb.issuer &&
+      wb.disclaimer
+    )
+      ok(
+        `ADM-04: the Excel export is a full report — identity, scope, KPIs, five sections (${wb.bytes} bytes)`,
+      );
+    else bad("ADM-04: hours workbook", JSON.stringify(wb));
+
     if (
       summary.table &&
       summary.recBlock &&
