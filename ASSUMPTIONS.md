@@ -8308,3 +8308,55 @@ Verified both halves, because the discarded rule was load-bearing: the rail now
 sits at `top: 64, bottom: 800` — gap 0 — at the top of the page AND scrolled to
 the bottom; and horizontal overflow is still 0 across five screens at 390 and
 1440, plus the suite's own overflow checks at four widths.
+
+**S72 · The site worker's boundary is the server's, and the screens only agree
+with it.** Operator: «this user should then see only the simple entry field and
+an overview of his hours only. Not to see other staff what is not related to
+the worker.»
+
+The `site` role existed and named a set of permissions. Nothing consulted them.
+`POST /erp/command` had no permission check at all, and `PUT /erp/state` took a
+whole client-computed document from anybody who was signed in — so an account
+meant to type its own hours could rewrite the invoice register, and its state
+response carried every bank line and everybody's pay. Hiding tabs over that
+would have been a curtain, and a curtain that reads as a wall is worse than no
+curtain: it invites the operator to hand the login to a subcontractor.
+
+So the enforcement is on the wire: `runCommand` requires the permission its
+command declares; the six hours commands are the only ones an `erp.write.site`
+account may reach, and each is checked for ownership, for the site being one
+they are assigned to, and for the week being unapproved; `PUT /erp/state` needs
+`erp.write` outright; and `GET /erp/state` is BUILT for a worker rather than
+filtered — a redaction that lists what to keep cannot leak a field somebody
+adds next year, which a redaction that lists what to remove certainly can.
+
+Four decisions taken without asking, per the autonomy contract:
+
+- **Online only.** No offline queue on the phone. A queue means a second store
+  and a conflict policy for a person with no way to resolve one; the screen
+  needs a connection and says so.
+- **A worker may book only to sites he is assigned to.** If the crew moves and
+  nobody updated the assignment, the office fixes it in Corrections — a wrong
+  booking the office can see beats a right one nobody recorded.
+- **An account with no matching worker record simply has no «Mine».** The link
+  is by email, case-insensitively, with no migration. An administrator who is
+  not also on the payroll therefore sees the office view alone, which is what
+  they want.
+- **On a local copy the first worker on file is attached.** There is no server
+  to ask who is signed in, and a switch with one destination is not a switch —
+  so the personal view would otherwise be unreachable on a demo machine and
+  invisible to the gates. Everything on a local copy is already fully visible.
+
+**S73 · The phone's tab bar follows the role a launch late, on purpose.** The
+shell builds its tab bar before the first request completes — deliberately, so
+the bar is never empty for a second — which means it cannot know the role in
+time. The web layer posts it over the existing `native` bridge; the shell keeps
+it and uses it at the next launch. The same trade-off `uiLanguage` already
+makes, and safe here for a specific reason: a tab is a URL into the web app,
+which resolves every route to the hours screen for a site worker, and the
+server refuses what the account may not do. A stale bar is untidy, not open.
+
+The one tab a site worker gets is generated into `nav.json` beside the six,
+from the same `SECTIONS` and the same dictionary, because a label written into
+a shell is a label that cannot translate — which is the whole reason that file
+exists.

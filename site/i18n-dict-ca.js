@@ -18,6 +18,39 @@
  */
 window.CANEI_DICT = window.CANEI_DICT || {};
 window.CANEI_DICT.ca = {
+  "Trabajador de obra": "Treballador d'obra",
+  "Apunta sus propias horas y ve sólo las suyas. Ni importes, ni el resto del ERP.":
+    "Apunta les seves pròpies hores i només veu les seves. Ni imports, ni la resta de l'ERP.",
+  "Esta cuenta no está enlazada con ninguna ficha de trabajador, así que no tiene horas propias. La oficina puede enlazarla poniendo el mismo correo en la ficha.":
+    "Aquest compte no està enllaçat amb cap fitxa de treballador, així que no té hores pròpies. L'oficina pot enllaçar-lo posant el mateix correu a la fitxa.",
+  "Apuntar horas": "Apuntar hores",
+  "Esperando aprobación": "Esperant aprovació",
+  Aprobada: "Aprovada",
+  Esperando: "Esperant",
+  Cambiar: "Canviar",
+  "Aprobada — pídeselo a la oficina": "Aprovada — demana-ho a l'oficina",
+  "Guardar estas horas": "Desar aquestes hores",
+  "Horas guardadas": "Hores desades",
+  "Cambiar las horas": "Canviar les hores",
+  "Deja 0 para borrar el apunte.": "Deixa 0 per esborrar l'apunt.",
+  "De ellas extra": "D'aquestes, extra",
+  "Sin obra": "Sense obra",
+  "Elige la obra": "Tria l'obra",
+  "horas extra": "hores extra",
+  "sin aprobar todavía": "sense aprovar encara",
+  "A dónde han ido mis horas": "On han anat les meves hores",
+  "Sin horas en el periodo.": "Sense hores en el període.",
+  "Todavía no has apuntado nada para este día.": "Encara no has apuntat res per a aquest dia.",
+  "Esta semana ya está aprobada. Pide a la oficina que la reabra si falta algo.":
+    "Aquesta setmana ja està aprovada. Demana a l'oficina que la reobri si falta res.",
+  "La obra y la partida de ayer vienen puestas — cámbialas sólo si te has movido. Si la partida no tiene subpartidas, elige «— ninguna —».":
+    "L'obra i la partida d'ahir vénen posades — canvia-les només si t'has mogut. Si la partida no té subpartides, tria «— cap —».",
+  "No estás asignado a ninguna obra abierta este día. Díselo a la oficina.":
+    "No estàs assignat a cap obra oberta aquest dia. Digues-ho a l'oficina.",
+  "Sólo ves tus horas, y nunca un importe. La oficina revisa las imputaciones y aprueba la semana.":
+    "Només veus les teves hores, i mai un import. L'oficina revisa les imputacions i aprova la setmana.",
+  "Aquí no se ve nada que no sea tuyo: ni las horas de otras personas, ni ningún importe.":
+    "Aquí no es veu res que no sigui teu: ni les hores d'altres persones, ni cap import.",
   "Revisa el proyecto y la partida, corrige si hace falta y aprueba.":
     "Revisa el projecte i la partida, corregeix si cal i aprova.",
   "Apunte movido a otro día": "Apunt mogut a un altre dia",
@@ -4755,6 +4788,13 @@ window.CANEI_DICT.rxEs2Ca = [
   [new RegExp("^([\\d.,]+) h · ([\\d.,]+) línea$"), "$1 h · $2 línia"],
   [new RegExp("^([\\d.,]+) h · ([\\d.,]+) líneas$"), "$1 h · $2 línies"],
   [new RegExp("^([\\d.,]+) extra$"), "$1 extra"],
+
+  /* Same shape as the English rules: the worker's own screens compose a date or
+     a count into a sentence, and only the words round it translate. */
+  [new RegExp("^¿Dónde has trabajado el (\\S+)\\?$"), "On has treballat el $1?"],
+  [new RegExp("^Ya apuntado el (\\S+)$"), "Ja apuntat el $1"],
+  [new RegExp("^(\\d+) días trabajados$"), "$1 dies treballats"],
+  [new RegExp("^(\\d+) día trabajado$"), "$1 dia treballat"],
   [new RegExp("^(P-[\\w-]+ · .+) \\(cerrada\\)$"), "$1 (tancada)"],
   [new RegExp("^Email: (\\S+@\\S+)$"), "Email: $1"],
   [new RegExp("^(.+) · caja$"), "$1 · caixa"],

@@ -69,6 +69,12 @@ const ROUTES = [
      JavaScript run after the screen has drawn. */
   ["labour·resumen", "#labour", "document.querySelector('[data-htab=\"summary\"]').click()"],
   ["labour·correcciones", "#labour", "document.querySelector('[data-htab=\"register\"]').click()"],
+  ["labour·mias", "#labour", "document.querySelector('[data-hgrp=\"mine\"]').click()"],
+  [
+    "labour·mias·horas",
+    "#labour",
+    "document.querySelector('[data-hgrp=\"mine\"]').click(); document.querySelector('[data-hmtab=\"mine\"]').click()",
+  ],
 ];
 
 /* Same rules as audit.mjs: a shape wherever possible, never a word, because

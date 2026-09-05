@@ -5290,7 +5290,7 @@
          not shown a field it could never save anyway. Defaults permissive because
          local IndexedDB mode has no server-side identity to ask in the first
          place — everything on that single machine is already fully visible. */
-      let SESSION = { email: "", role: "admin", bankRead: true };
+      let SESSION = { email: "", role: "admin", bankRead: true, workerId: null };
       /**
        * A brand-new workspace, price book included.
        *
@@ -5491,6 +5491,26 @@
           } catch (e) {
             /* keep the permissive default — masking only, see SESSION above */
           }
+        }
+        /* Tell the phone shell who this is, so its native tab bar can be the one
+           this account needs. The shell builds that bar at launch, so this lands
+           on the NEXT one — the same honest limitation the language switch has,
+           and harmless: every route resolves to the hours screen for a site
+           worker anyway, and the server refuses the rest. No shell, no handler,
+           nothing happens. */
+        try {
+          const bridge = window.webkit?.messageHandlers?.native;
+          if (bridge && SESSION.role) bridge.postMessage({ action: "role", role: SESSION.role });
+        } catch (e) {
+          /* a shell that does not want to be told is not an error */
+        }
+        if (!ErpStore.isRemote() && !SESSION.workerId) {
+          /* No server means no identity to ask for, and a switch with a single
+             destination is not a switch — the personal view would be
+             unreachable on this machine. Attach the first person on file so it
+             exists here too. Everything on a local copy is visible anyway. */
+          const w0 = erp.state.workers[0];
+          if (w0) SESSION = { ...SESSION, workerId: w0.id };
         }
         measureTopbar();
         buildPeriodControls();
@@ -5813,9 +5833,17 @@
                alone, so the day a section moves there is one line to change. */
       const FLOW = ["sales", "projects", "admin"];
       let openSec = null; // section whose panel 2 is out
+      /* A SITE WORKER HAS ONE DESTINATION, so the shell around it collapses to
+         match. This is masking and says so — the boundary is the server's, and
+         it refuses the same things whether or not a button was drawn. What it
+         buys is a screen with nothing on it to misunderstand. */
+      function isSiteWorker() {
+        return SESSION.role === "site";
+      }
       function buildSections() {
         const p1 = $("#p1");
         p1.innerHTML = "";
+        if (isSiteWorker()) return;
         const curSec = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         let critical = 0;
         try {
@@ -5831,6 +5859,7 @@
         });
       }
       function visibleSubs(s) {
+        if (isSiteWorker()) return s.subs.filter((x) => x.k === "labour");
         return s.subs.filter((x) => !HIDDEN_SUBS.has(x.k));
       }
       function buildSubs(secKey) {
@@ -6031,6 +6060,9 @@
 
       function go(k, arg) {
         k = resolveRoute(k);
+        /* One route, whichever hash was typed. A screen this account may not see
+           is not a screen it should be shown asking to be let in. */
+        if (isSiteWorker()) k = "labour";
         const s = SUBMAP[k];
         if (s && s.href) {
           location.href = s.href;
@@ -6606,6 +6638,12 @@
       });
 
       function renderCreateMenu() {
+        document.body.classList.toggle("siteworker", isSiteWorker());
+        if (isSiteWorker()) {
+          const c = $("#mCreate");
+          if (c) c.innerHTML = "";
+          return;
+        }
         const secKey = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         const items = CREATE[secKey] || [];
         const m = $("#mCreate");
@@ -6655,6 +6693,7 @@
         else go("tower");
       }
       function renderBell() {
+        if (isSiteWorker()) return;
         let list = [];
         try {
           list = erp.managedAlerts();
@@ -9035,16 +9074,26 @@
            which question about them is on screen. Flattening the two into one strip
            was what made «Registro» look like a peer of «Parte diario» while
            actually being printed underneath it. */
-        const group = `<div class="hgrp">
+        /* An account with nobody attached has no «mine» to switch to, and an
+           account that may only see its own hours has no «everyone». Either way
+           the switch would be a control with one destination. */
+        const canSeeAll = SESSION.role !== "site";
+        const hasMine = !!SESSION.workerId;
+        if (!canSeeAll) hGroup = "mine";
+        else if (!hasMine) hGroup = "all";
+        const group =
+          canSeeAll && hasMine
+            ? `<div class="hgrp">
           <button class="hg${hGroup === "mine" ? " on" : ""}" data-hgrp="mine"><i>Mías</i>Mis horas</button>
-          <button class="hg${hGroup === "all" ? " on" : ""}" data-hgrp="all"><i>Oficina</i>Todos</button></div>`;
+          <button class="hg${hGroup === "all" ? " on" : ""}" data-hgrp="all"><i>Oficina</i>Todos</button></div>`
+            : "";
         const tabs = `<div class="tabstrip">
           <button class="tab${hTab === "sheet" ? " on" : ""}" data-htab="sheet">Parte diario</button>
           <button class="tab${hTab === "summary" ? " on" : ""}" data-htab="summary">Resumen</button>
           <button class="tab${hTab === "register" ? " on" : ""}" data-htab="register">Correcciones</button></div>`;
         const body =
           hGroup === "mine"
-            ? horasMinePending()
+            ? horasMine()
             : hTab === "sheet"
               ? horasSheet()
               : hTab === "summary"
@@ -9065,18 +9114,323 @@
               render();
             }),
         );
-        if (hGroup === "mine") return;
+        if (hGroup === "mine") return wireHorasMine();
         if (hTab === "sheet") wireHorasSheet();
         else if (hTab === "register") wireLabourRegisterAll();
         else wireHorasSummary();
       }
 
-      /** The «mine» half, until the screens that belong in it are built. */
-      function horasMinePending() {
-        return `<div class="card"><div class="ch"><h3>Mis horas</h3></div>
-   <div class="empty">Aquí irán las dos pantallas propias de cada persona: apuntar
-   las horas del día y consultar las suyas. Todavía no están construidas; mientras
-   tanto, usa «Todos».</div></div>`;
+      /* THE PERSON THIS ACCOUNT IS. The server answers it by matching the e-mail
+         on the session to the one on the worker record; on a single machine with
+         no server there is nobody to ask, so it stays null and the screen says so
+         rather than guessing whose hours to show. */
+      let hMineTab = "enter";
+      function myWorkerId() {
+        return SESSION.workerId || null;
+      }
+      function myWorker() {
+        const id = myWorkerId();
+        return (id && erp.state.workers.find((w) => w.id === id)) || null;
+      }
+      /** The jobs this person is assigned to on a given day — and only those. */
+      function mySites(day) {
+        const id = myWorkerId();
+        if (!id) return [];
+        const ids = new Set(
+          (erp.state.assignments || [])
+            .filter((a) => a.workerId === id && (!a.from || a.from <= day) && (!a.to || a.to >= day))
+            .map((a) => a.projectId),
+        );
+        return erp.state.projects.filter((p) => ids.has(p.id) && !p.closed);
+      }
+      function myHours(from, to) {
+        const id = myWorkerId();
+        if (!id) return [];
+        return erp.state.labour.filter(
+          (l) => l.workerId === id && (!from || l.date >= from) && (!to || l.date <= to),
+        );
+      }
+
+      /** The «mine» half: two screens, and nothing that is not this person's. */
+      function horasMine() {
+        const w = myWorker();
+        if (!w)
+          return `<div class="card"><div class="ch"><h3>Mis horas</h3></div>
+   <div class="empty">Esta cuenta no está enlazada con ninguna ficha de trabajador,
+   así que no tiene horas propias. La oficina puede enlazarla poniendo el mismo
+   correo en la ficha.</div></div>`;
+        const tabs = `<div class="tabstrip">
+          <button class="tab${hMineTab === "enter" ? " on" : ""}" data-hmtab="enter">Apuntar horas</button>
+          <button class="tab${hMineTab === "mine" ? " on" : ""}" data-hmtab="mine">Mis horas</button></div>`;
+        return tabs + (hMineTab === "enter" ? myEntryScreen(w) : myHoursScreen(w));
+      }
+
+      function myEntryScreen(w) {
+        const week = labourWeekAll(hDay);
+        const id = w.id;
+        const h = (m) => (m / 1000).toLocaleString("es-ES");
+        const mineByDay = (d) => myHours(d, d);
+        const totals = week.days.map((d) =>
+          mineByDay(d).reduce((s2, l) => s2 + l.hoursMilli, 0),
+        );
+        const sites = mySites(hDay);
+        const today = mineByDay(hDay);
+        const chaps = ((sites[0] || {}).baseline || {}).chapters || [];
+        const weekLocked = myHours(week.days[0], week.days[6]).some((l) => l.locked);
+        const entryRow = (l) => {
+          const site = l.projectId ? erp.project(l.projectId).code : "—";
+          const line = hourLineLabel(l);
+          const where = line ? `${site} · ${esc(l.chapterNum || "")}. ${esc(line)}` : esc(site);
+          return `<div class="meblk">
+           <div class="me"><div><div class="w">${where}</div>
+             <div class="l">${esc(HOUR_KINDS[l.kind] || l.kind)}</div></div>
+             <span style="flex:1"></span><div class="hh">${h(l.hoursMilli)} h</div>
+             <span class="pill ${l.locked ? "g" : "y"}">${l.locked ? "Aprobada" : "Esperando aprobación"}</span></div>
+           <div class="me2"><span style="flex:1"></span>${
+             l.locked
+               ? '<span class="mnote">Aprobada — pídeselo a la oficina</span>'
+               : `<button class="mini" data-mefix="${l.id}">Cambiar</button><button class="mini dz" data-medel="${l.id}">Eliminar</button>`
+           }</div></div>`;
+        };
+        const form = weekLocked
+          ? `<div class="card"><div class="empty">Esta semana ya está aprobada. Pide a la oficina que la reabra si falta algo.</div></div>`
+          : `<div class="card mform">
+           <div class="mfh">¿Dónde has trabajado el ${fmtD(hDay)}?</div>
+           <div class="mf"><label>Obra</label><select id="me_p">${
+             sites
+               .map((p) => `<option value="${p.id}">${esc(projectPickLabel(p))}</option>`)
+               .join("") || '<option value="">—</option>'
+           }</select></div>
+           <div class="mf"><label>Partida</label><select id="me_c">${
+             chaps
+               .map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`)
+               .join("") || '<option value="">—</option>'
+           }</select></div>
+           <div class="mf" id="me_lwrap"><label>Subpartida</label><select id="me_l"></select></div>
+           <div class="mf"><label>Tipo de hora</label><select id="me_k">${Object.keys(HOUR_KINDS)
+             .map((k) => `<option value="${k}">${HOUR_KINDS[k]}</option>`)
+             .join("")}</select></div>
+           <div class="mf hn"><label>Horas</label><input id="me_h" type="number" step="0.25" min="0" value="8"></div>
+           <div class="mhint">${
+             sites.length
+               ? "La obra y la partida de ayer vienen puestas — cámbialas sólo si te has movido. Si la partida no tiene subpartidas, elige «— ninguna —»."
+               : "No estás asignado a ninguna obra abierta este día. Díselo a la oficina."
+           }</div>
+          </div>`;
+        return `
+         <div class="weekbar">
+          <button class="wnav" id="hPrev"><span class="cv">‹</span><span class="lb">Ant.</span></button>
+          <div class="days">${week.days
+            .map(
+              (
+                d,
+                i,
+              ) => `<button class="hday${d === hDay ? " on" : ""}${i >= 5 ? " wknd" : ""}" data-hday="${d}">
+             <span class="d">${DOW[i]}</span><span class="n">${fmtD(d).slice(0, 2)}</span>
+             <span class="h${totals[i] ? "" : " zero"}">${totals[i] ? h(totals[i]) + " h" : "—"}</span></button>`,
+            )
+            .join("")}</div>
+          <button class="wnav" id="hNext"><span class="cv">›</span><span class="lb">Sig.</span></button>
+         </div>
+         ${form}
+         <h4 class="hsec">Ya apuntado el ${fmtD(hDay)}</h4>
+         <div class="rlist">${
+           today.map(entryRow).join("") ||
+           '<div class="empty">Todavía no has apuntado nada para este día.</div>'
+         }</div>
+         <p class="rnote">Sólo ves tus horas, y nunca un importe. La oficina revisa
+         las imputaciones y aprueba la semana.</p>
+         ${
+           weekLocked || !sites.length
+             ? ""
+             : `<div class="hdock"><button class="btn primary" id="me_save">Guardar estas horas</button></div>`
+         }`;
+      }
+
+      function myHoursScreen(w) {
+        const r = periodRange();
+        const h = (m) => (m / 1000).toLocaleString("es-ES");
+        const mine = myHours(r.from, r.to);
+        const total = mine.reduce((s2, l) => s2 + l.hoursMilli, 0);
+        const extra = mine
+          .filter((l) => l.kind === "extra")
+          .reduce((s2, l) => s2 + l.hoursMilli, 0);
+        const waiting = mine.filter((l) => !l.locked).reduce((s2, l) => s2 + l.hoursMilli, 0);
+        const days = new Set(mine.map((l) => l.date)).size;
+        const byProject = [];
+        for (const l of mine) {
+          const code = l.projectId ? erp.project(l.projectId).code : "Sin obra";
+          let g = byProject.find((x) => x.code === code);
+          if (!g) byProject.push((g = { code, hoursMilli: 0, lines: [] }));
+          g.hoursMilli += l.hoursMilli;
+          const lab = hourLineLabel(l) || (l.chapterNum ? String(l.chapterNum) : "Sin partida");
+          let ln = g.lines.find((x) => x.lab === lab);
+          if (!ln) g.lines.push((ln = { lab, hoursMilli: 0 }));
+          ln.hoursMilli += l.hoursMilli;
+        }
+        byProject.sort((a, b) => b.hoursMilli - a.hoursMilli);
+        const max = Math.max(1, ...byProject.map((p) => p.hoursMilli));
+        const week = labourWeekAll(hDay);
+        return `
+         <div class="hband">
+          <div class="c"><div class="k">Mis horas</div><div class="v">${h(total)}</div>
+            <div class="s">${days} día${days === 1 ? "" : "s"} trabajados</div></div>
+          <div class="c"><div class="k">De ellas extra</div><div class="v">${h(extra)}</div>
+            <div class="s">horas extra</div></div>
+          <div class="c warn"><div class="k">Esperando</div><div class="v">${h(waiting)}</div>
+            <div class="s">sin aprobar todavía</div></div>
+         </div>
+         <h4 class="hsec">A dónde han ido mis horas <span>${fmtD(r.from)} – ${fmtD(r.to)}</span></h4>
+         <div class="hrank">${
+           byProject
+             .map(
+               (p) => `<div class="hitem">
+            <div class="ih"><span class="nm">${esc(p.code)}</span><span class="amt">${h(p.hoursMilli)} h</span></div>
+            <div class="bar"><i style="width:${Math.round((p.hoursMilli / max) * 100)}%"></i></div>
+            <div class="sublist">${p.lines
+              .map(
+                (ln) =>
+                  `<div class="sub2"><span>${esc(ln.lab)}</span><b>${h(ln.hoursMilli)} h</b></div>`,
+              )
+              .join("")}</div></div>`,
+             )
+             .join("") || '<div class="empty">Sin horas en el periodo.</div>'
+         }</div>
+         <h4 class="hsec">Esta semana <span>${fmtD(week.days[0]).slice(0, 5)} – ${fmtD(week.days[6]).slice(0, 5)}</span></h4>
+         <div class="rlist">${week.days
+           .map((d, i) => {
+             const ls = myHours(d, d);
+             const t = ls.reduce((s2, l) => s2 + l.hoursMilli, 0);
+             const dayLocked = ls.length > 0 && ls.every((l) => l.locked);
+             const st = !ls.length
+               ? ""
+               : `<span class="pill ${dayLocked ? "g" : "y"}">${dayLocked ? "Aprobada" : "Esperando"}</span>`;
+             /* The day name is vocabulary and the date is data, so they are two
+                nodes — one string carrying both translates in neither language.
+                Same split as the week strip above. */
+             return `<div class="mday"><span class="dt"><span class="dw">${DOW[i]}</span> ${fmtD(d).slice(0, 5)}</span>
+              <span style="flex:1"></span>${st}<span class="hh">${t ? h(t) + " h" : "—"}</span></div>`;
+           })
+           .join("")}</div>
+         <div class="keepnote">Aquí no se ve nada que no sea tuyo: ni las horas de
+         otras personas, ni ningún importe.</div>`;
+      }
+
+      function wireHorasMine() {
+        document.querySelectorAll("[data-hmtab]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hMineTab = b.dataset.hmtab;
+              render();
+            }),
+        );
+        document.querySelectorAll("[data-hday]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              hDay = b.dataset.hday;
+              render();
+            }),
+        );
+        const prev = $("#hPrev"),
+          next = $("#hNext");
+        if (prev)
+          prev.onclick = () => {
+            hDay = isoAdd(hDay, -7);
+            render();
+          };
+        if (next)
+          next.onclick = () => {
+            hDay = isoAdd(hDay, 7);
+            render();
+          };
+        const wrap = $("#me_lwrap");
+        if (wrap) {
+          const fillLines = () => {
+            /* Nobody assigned to an open site that day has no site to ask the
+               line items of, and asking anyway is how this screen used to
+               throw. Empty select, same as an empty site. */
+            const opts = $("#me_p").value
+              ? lineOptionsFor($("#me_p").value, $("#me_c").value, "")
+              : "";
+            wrap.style.display = opts ? "" : "none";
+            $("#me_l").innerHTML = opts ? '<option value="">— ninguna —</option>' + opts : "";
+          };
+          const fillChaps = () => {
+            const p = erp.state.projects.find((x) => x.id === $("#me_p").value);
+            const chaps = (p && p.baseline && p.baseline.chapters) || [];
+            $("#me_c").innerHTML =
+              chaps.map((c) => `<option value="${c.num}">${c.num}. ${esc(c.name)}</option>`).join("") ||
+              '<option value="">—</option>';
+            fillLines();
+          };
+          fillChaps();
+          $("#me_p").onchange = fillChaps;
+          $("#me_c").onchange = fillLines;
+        }
+        const save = $("#me_save");
+        if (save)
+          save.onclick = () => {
+            const hrs = Number(String($("#me_h").value).replace(",", "."));
+            if (!(hrs > 0)) return toast("Indica las horas");
+            if (!$("#me_p").value) return toast("Elige la obra");
+            if ($("#me_lwrap").style.display !== "none" && !$("#me_l").value)
+              return toast("Las horas de obra necesitan partida y subpartida");
+            mutate(
+              () =>
+                erp.recordHours(
+                  {
+                    workerId: myWorkerId(),
+                    projectId: $("#me_p").value,
+                    chapterNum: $("#me_c").value || null,
+                    lineId:
+                      $("#me_lwrap").style.display !== "none" ? $("#me_l").value || null : null,
+                    kind: $("#me_k").value,
+                    hoursMilli: Math.round(hrs * 1000),
+                    date: hDay,
+                  },
+                  SESSION.email || "site",
+                ),
+              "Horas guardadas",
+            );
+          };
+        document.querySelectorAll("[data-medel]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(
+                () => erp.deleteHours(b.dataset.medel, SESSION.email || "site"),
+                "Apunte eliminado",
+              )),
+        );
+        document.querySelectorAll("[data-mefix]").forEach(
+          (b) =>
+            (b.onclick = async () => {
+              const l = erp.state.labour.find((x) => x.id === b.dataset.mefix);
+              if (!l) return;
+              const r = await ask(
+                "Cambiar las horas",
+                [
+                  {
+                    key: "h",
+                    label: "Horas",
+                    value: String(l.hoursMilli / 1000),
+                    hint: "Deja 0 para borrar el apunte.",
+                  },
+                ],
+                { okLabel: "Guardar" },
+              );
+              if (r === null) return;
+              const hrs = Number(String(r.h).replace(",", "."));
+              mutate(() => {
+                if (!(hrs > 0)) erp.deleteHours(l.id, SESSION.email || "site");
+                else
+                  erp.correctHours(
+                    l.id,
+                    { hoursMilli: Math.round(hrs * 1000) },
+                    SESSION.email || "site",
+                  );
+              }, "Apunte corregido");
+            }),
+        );
       }
 
       /** The seven day cells and the day's grid. */
@@ -13280,6 +13634,10 @@
          below names its client already. */
       function renderProjectBar() {
         const host = $("#projbar");
+        if (isSiteWorker()) {
+          host.innerHTML = "";
+          return;
+        }
         // PK4-A/PK4-B: PRY-01 and PRY-02 have no bar at all. Each is two
         // screens — the list of jobs, and one job's full-screen surface — so
         // the job is chosen by clicking a row, not by a dropdown above a list
@@ -21378,7 +21736,14 @@
       const USER_ROLES = [
         ["admin", "Administrador", "Todo, incluida esta pantalla."],
         ["backoffice", "Oficina", "Presupuestos, facturas, cobros y pagos. No gestiona usuarios."],
-        ["site", "Obra", "Registrar avance, partes y fotos. Sin importes ni márgenes."],
+        /* «Obra» named the construction site and the person on it with one word,
+           so a foreman reading it in a user list could not tell which was meant.
+           The stored key is unchanged — this is what the account is CALLED. */
+        [
+          "site",
+          "Trabajador de obra",
+          "Apunta sus propias horas y ve sólo las suyas. Ni importes, ni el resto del ERP.",
+        ],
         [
           "gestoria",
           "Gestoría",

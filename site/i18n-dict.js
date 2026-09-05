@@ -5873,6 +5873,56 @@ window.CANEI_DICT = {
       "Check the project and the line item, change if wrong, then approve.",
     ],
     ["Apunte movido a otro día", "Entry moved to another day"],
+    ["Trabajador de obra", "Site worker"],
+    [
+      "Apunta sus propias horas y ve sólo las suyas. Ni importes, ni el resto del ERP.",
+      "Records their own hours and sees only their own. No amounts, and none of the rest of the ERP.",
+    ],
+    [
+      "Esta cuenta no está enlazada con ninguna ficha de trabajador, así que no tiene horas propias. La oficina puede enlazarla poniendo el mismo correo en la ficha.",
+      "This account is not linked to any worker record, so it has no hours of its own. The office can link it by putting the same e-mail on the record.",
+    ],
+    ["Apuntar horas", "Enter hours"],
+    ["Esperando aprobación", "Waiting for approval"],
+    ["Aprobada", "Approved"],
+    ["Esperando", "Waiting"],
+    ["Cambiar", "Change"],
+    ["Aprobada — pídeselo a la oficina", "Approved — ask the office"],
+    ["Guardar estas horas", "Save these hours"],
+    ["Horas guardadas", "Hours saved"],
+    ["Cambiar las horas", "Change the hours"],
+    ["Deja 0 para borrar el apunte.", "Leave 0 to delete the entry."],
+    ["De ellas extra", "Of that overtime"],
+    ["Sin obra", "No site"],
+    ["Elige la obra", "Choose the site"],
+    ["horas extra", "overtime hours"],
+    ["sin aprobar todavía", "not approved yet"],
+    ["A dónde han ido mis horas", "Where my hours went"],
+    ["Sin horas en el periodo.", "No hours in the period."],
+    [
+      "Todavía no has apuntado nada para este día.",
+      "You have not entered anything for this day yet.",
+    ],
+    [
+      "Esta semana ya está aprobada. Pide a la oficina que la reabra si falta algo.",
+      "This week is already approved. Ask the office to reopen it if something is missing.",
+    ],
+    [
+      "La obra y la partida de ayer vienen puestas — cámbialas sólo si te has movido. Si la partida no tiene subpartidas, elige «— ninguna —».",
+      "Yesterday's site and line item are filled in already — change them only if you moved. If the line item has no sub-line items, choose «— none —».",
+    ],
+    [
+      "No estás asignado a ninguna obra abierta este día. Díselo a la oficina.",
+      "You are not assigned to any open site on this day. Tell the office.",
+    ],
+    [
+      "Sólo ves tus horas, y nunca un importe. La oficina revisa las imputaciones y aprueba la semana.",
+      "You see only your own hours, and never an amount. The office checks the bookings and approves the week.",
+    ],
+    [
+      "Aquí no se ve nada que no sea tuyo: ni las horas de otras personas, ni ningún importe.",
+      "Nothing here is anybody else's: not other people's hours, and not any amount.",
+    ],
     // ── S10 · the hours screen, rebuilt round its two audiences. The screen was
     //    missing from the workspace audit's route list, so none of its Spanish
     //    was ever seen by a gate whose ceiling is zero; the route is in the list
@@ -5950,6 +6000,13 @@ window.CANEI_DICT = {
     [new RegExp("^([\\d.,]+) h · ([\\d.,]+) línea$"), "$1 h · $2 line"],
     [new RegExp("^([\\d.,]+) h · ([\\d.,]+) líneas$"), "$1 h · $2 lines"],
     [new RegExp("^([\\d.,]+) extra$"), "$1 overtime"],
+
+    /* The site worker's own screens compose a date or a count into a sentence.
+       The number and the date are data; the words round them are not. */
+    [new RegExp("^¿Dónde has trabajado el (\\S+)\\?$"), "Where did you work on $1?"],
+    [new RegExp("^Ya apuntado el (\\S+)$"), "Already entered for $1"],
+    [new RegExp("^(\\d+) días trabajados$"), "$1 days worked"],
+    [new RegExp("^(\\d+) día trabajado$"), "$1 day worked"],
 
     /* The project picker composes CODE · customer · street, all data, and
        appends the one translatable word when the job is closed. Data passes

@@ -380,7 +380,7 @@ export interface CommandOutcome {
  * against what the request claims, because the request is the thing being
  * doubted.
  */
-async function refuseOutsideOwnHours(
+export async function refuseOutsideOwnHours(
   tenantId: string,
   user: string,
   command: CommandName,

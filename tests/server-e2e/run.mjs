@@ -14,6 +14,10 @@
  */
 const BASE = process.env.ERP_BASE_URL;
 const TENANT = process.env.ERP_TEST_TENANT || "reformas-demo";
+/* Optional. Set together, they make the suite sign in rather than rely on a
+   single-seat operator, which is what lets it be somebody else further down. */
+const ADMIN_EMAIL = process.env.ERP_E2E_ADMIN?.trim() || "";
+const ADMIN_PASSWORD = process.env.ERP_E2E_ADMIN_PASSWORD ?? "";
 
 if (!BASE) {
   console.log("server-e2e: skipped (set ERP_BASE_URL to run)");
@@ -54,8 +58,66 @@ const ok = (name, detail = "") => results.push({ name, pass: true, detail });
 const bad = (name, detail) => results.push({ name, pass: false, detail });
 const check = (name, cond, detail = "") => (cond ? ok(name, detail) : bad(name, detail));
 
-const api = (path, init) =>
-  fetch(`${BASE}${path}`, { headers: { accept: "application/json" }, ...init });
+/**
+ * WHO THIS SUITE IS, AND WHY IT CAN BE SOMEBODY ELSE.
+ *
+ * The server has two ways to know who is calling: one named operator in the
+ * environment (`ERP_OPERATOR`, the single-seat pilot shape), or real accounts
+ * with a signed session cookie. Under the first there is exactly one identity
+ * and it is an administrator, so the site worker's boundary — the whole point
+ * of the hours release — cannot be exercised at all: there is nobody to be.
+ *
+ * So the suite carries a cookie. Empty by default, which is the single-seat
+ * case and behaves exactly as it did before. When `ERP_E2E_ADMIN` and
+ * `ERP_E2E_ADMIN_PASSWORD` are set the suite signs in with them first, and can
+ * then create a second account, sign in AS that account, and check what it is
+ * refused. `as(cookie, fn)` swaps identity for the length of one block.
+ */
+let COOKIE = "";
+
+const api = (path, init = {}) =>
+  fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      accept: "application/json",
+      ...(COOKIE ? { cookie: COOKIE } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+
+async function as(cookie, fn) {
+  const was = COOKIE;
+  COOKIE = cookie;
+  try {
+    return await fn();
+  } finally {
+    COOKIE = was;
+  }
+}
+
+/**
+ * Sign in and return the session cookie, or "" if the credentials were refused.
+ *
+ * The login route answers a form post with a 303 and a Set-Cookie, because it
+ * has to work without JavaScript. `redirect: "manual"` is what keeps fetch from
+ * following the redirect and throwing the header away.
+ */
+async function signIn(email, password) {
+  const body = new URLSearchParams({ email, password });
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    redirect: "manual",
+  });
+  const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+  const set = raw.length ? raw : [res.headers.get("set-cookie") ?? ""];
+  const jar = set
+    .filter(Boolean)
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  return jar;
+}
 
 const json = async (res) => {
   const text = await res.text();
@@ -368,6 +430,177 @@ async function main() {
       `parties=${(untouched.state?.parties ?? []).length}`,
     );
   }
+
+  await siteWorkerBoundary();
+}
+
+/**
+ * R2 · what a site worker is REFUSED, checked against the running server.
+ *
+ * The role existed as a label for months: it named a set of permissions that
+ * nothing consulted. `POST /erp/command` had no permission check at all, and
+ * `PUT /erp/state` accepted a whole client-computed document from anybody who
+ * was signed in — so an account meant to type its own hours could rewrite the
+ * invoice register, and did receive every bank line in its state response.
+ *
+ * Unit tests cover the functions; this covers the WIRE, which is where it
+ * actually failed. Four refusals and one redaction, as a second account, over
+ * HTTP, against a real database.
+ *
+ * Skipped when the server has no named accounts (single-seat `ERP_OPERATOR`),
+ * because then there is only one identity and it is an administrator. The
+ * deploy workflow configures accounts precisely so this runs.
+ */
+async function siteWorkerBoundary() {
+  if (!ADMIN_EMAIL || !COOKIE) {
+    console.log("site-worker boundary: skipped (no named accounts configured)");
+    return;
+  }
+
+  const email = `e2e-site-${RUN}@example.com`;
+  const password = `Pw-${RUN}-site!`;
+
+  // --- create the account and let it choose its own password ---------------
+  {
+    const res = await api(`/api/${TENANT}/users`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, name: "E2E Site Worker", role: "site" }),
+    });
+    const body = await json(res);
+    check(
+      "an administrator can create a site-worker account",
+      res.status === 201,
+      `HTTP ${res.status} ${JSON.stringify(body).slice(0, 160)}`,
+    );
+    const link = body?.invitation?.link ?? "";
+    const token = link ? new URL(link).searchParams.get("token") : null;
+    check("the invitation carries a token", Boolean(token), link.slice(0, 80));
+    if (!token) return;
+
+    const act = await fetch(`${BASE}/api/auth/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+    check("and the invited person can set a password", act.ok, `HTTP ${act.status}`);
+  }
+
+  // --- link the account to a worker, the way the workspace does ------------
+  // Hours are recorded against a WORKER, and an account becomes one by sharing
+  // its email address. There is no whitelisted command for that, so the
+  // administrator does it through the document — which is itself the thing the
+  // site account is about to be refused.
+  let workerId = null;
+  let otherWorkerId = null;
+  {
+    const st = await json(await api(`/api/${TENANT}/erp/state`));
+    const state = st.state ?? {};
+    workerId = `wk-e2e-${RUN}`;
+    otherWorkerId = (state.workers ?? []).find((w) => w.id !== workerId)?.id ?? null;
+    state.workers = [
+      ...(state.workers ?? []),
+      { id: workerId, name: `E2E Site ${RUN}`, email, active: true },
+    ];
+    const res = await api(`/api/${TENANT}/erp/state`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ state, expectedVersion: st.version }),
+    });
+    check("an administrator may still save the whole document", res.ok, `HTTP ${res.status}`);
+  }
+
+  const siteCookie = await signIn(email, password);
+  check(
+    "the site worker can sign in",
+    Boolean(siteCookie),
+    siteCookie ? "cookie issued" : "no cookie",
+  );
+  if (!siteCookie) return;
+
+  await as(siteCookie, async () => {
+    const st = await json(await api(`/api/${TENANT}/erp/state`));
+
+    // --- the read is a different document, not the same one with tabs hidden
+    check(
+      "the site worker's state response is marked scoped",
+      st.scoped === true,
+      `scoped=${st.scoped}`,
+    );
+    const s = st.state ?? {};
+    check(
+      "it carries no invoices, bank movements or supplier bills",
+      !(s.invoices ?? []).length && !(s.movements ?? []).length && !(s.bills ?? []).length,
+      `invoices=${(s.invoices ?? []).length} movements=${(s.movements ?? []).length} bills=${(s.bills ?? []).length}`,
+    );
+    check(
+      "and nobody else's worker record",
+      (s.workers ?? []).every((w) => w.id === workerId),
+      `workers=${(s.workers ?? []).map((w) => w.id).join(",") || "(none)"}`,
+    );
+    const money = JSON.stringify(s).match(/"[a-zA-Z]*Cents"/g) ?? [];
+    check("and not one amount in cents", money.length === 0, money.slice(0, 6).join(" "));
+
+    // --- the other door is shut ------------------------------------------
+    {
+      const res = await api(`/api/${TENANT}/erp/state`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: s, expectedVersion: st.version }),
+      });
+      check(
+        "a site worker may not save the whole document",
+        res.status === 401,
+        `HTTP ${res.status}`,
+      );
+    }
+
+    // --- and so is approval, which is the office's job --------------------
+    {
+      const res = await command({
+        command: "approveLabourWeek",
+        args: [workerId, "2026-09-07"],
+        expectedVersion: st.version,
+      });
+      check("a site worker may not approve a week", res.status === 401, `HTTP ${res.status}`);
+    }
+
+    // --- hours for somebody else ------------------------------------------
+    if (otherWorkerId) {
+      const res = await command({
+        command: "recordHours",
+        args: [{ workerId: otherWorkerId, date: "2026-09-07", hoursMilli: 8000, kind: "normal" }],
+        expectedVersion: st.version,
+      });
+      check(
+        "a site worker may not record another person's hours",
+        res.status === 401,
+        `HTTP ${res.status}`,
+      );
+    }
+
+    // --- his own hours, but on a site nobody assigned him to ---------------
+    {
+      const res = await command({
+        command: "recordHours",
+        args: [
+          {
+            workerId,
+            projectId: "definitely-not-assigned",
+            date: "2026-09-07",
+            hoursMilli: 8000,
+            kind: "normal",
+          },
+        ],
+        expectedVersion: st.version,
+      });
+      check(
+        "nor his own hours on a site he is not assigned to",
+        res.status === 401,
+        `HTTP ${res.status}`,
+      );
+    }
+  });
 }
 
 /**
@@ -397,6 +630,26 @@ async function cleanUp() {
         v = (await json(res)).version;
       }
     }
+    /* The boundary section adds a worker so the site account has hours of its
+       own to be refused about. It is written through the document, so it comes
+       out the same way. */
+    const withWorker = await json(await api(`/api/${TENANT}/erp/state`));
+    const stray = (withWorker.state?.workers ?? []).filter((w) => /^E2E Site /.test(w.name ?? ""));
+    if (stray.length) {
+      const state = withWorker.state;
+      state.workers = (state.workers ?? []).filter((w) => !/^E2E Site /.test(w.name ?? ""));
+      const res = await api(`/api/${TENANT}/erp/state`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state, expectedVersion: withWorker.version }),
+      });
+      check(
+        "the run's own test worker is gone",
+        res.ok,
+        `HTTP ${res.status}, ${stray.length} removed`,
+      );
+    }
+
     const after = await json(await api(`/api/${TENANT}/erp/state`));
     check(
       "the run's own test customer is gone, and so is every older run's",
@@ -422,6 +675,10 @@ function report() {
    real news is why the suite crashed. */
 let crashed = null;
 try {
+  if (ADMIN_EMAIL && ADMIN_PASSWORD) {
+    COOKIE = await signIn(ADMIN_EMAIL, ADMIN_PASSWORD);
+    check("the suite can sign in as its administrator", Boolean(COOKIE), ADMIN_EMAIL);
+  }
   await main();
 } catch (err) {
   crashed = err;

@@ -67,7 +67,22 @@ enum Config {
     /// Bundled rather than fetched: the tab bar exists before the first request
     /// completes, and a bar that appears empty for a second is worse than one
     /// that is a build behind. The bundled copy is refreshed on every app build.
-    static let tabs: [WebTab] = NavManifest.load()
+    /// The ERP role of the account the web layer last signed in as.
+    ///
+    /// Written by the web app over the `native` bridge once its session is
+    /// resolved, read here at launch. It is deliberately the same arrangement
+    /// as `uiLanguage` below, with the same honest limitation: the bar follows
+    /// on the NEXT launch, because a tab bar that appears after the first
+    /// request completes is worse than one that is a launch behind.
+    ///
+    /// Nothing here is a permission. The web app sends a site worker back to
+    /// the hours screen from every route, and the server refuses every write
+    /// this account may not make — so a stale bar is a tidiness problem.
+    static var erpRole: String? {
+        UserDefaults.standard.string(forKey: "canei_role")
+    }
+
+    static let tabs: [WebTab] = NavManifest.load(role: erpRole)
 
     /// The language the tab bar is drawn in.
     ///
