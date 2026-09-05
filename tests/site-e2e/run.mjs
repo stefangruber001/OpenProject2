@@ -9524,6 +9524,50 @@ async function testProcurement(browser, base) {
       ok("ADM-04: the Resumen tab rolls up per chapter and reconciles the month");
     else bad("ADM-04: resumen tab", JSON.stringify(summary).slice(0, 200));
 
+    /* S11 · THE OTHER AUDIENCE. The «Mías» group is what a site worker sees —
+       the only screens he sees. Reached here as the office, because the office
+       is also a person with hours; the difference between the two is what the
+       SERVER sends and refuses, which is checked in tests/server-e2e. What is
+       checked HERE is that the screens exist, draw, and never print a euro.
+
+       The euro assertion is the one worth having. Everything else about this
+       release is a permission; this is the promise the operator actually made
+       to the crew — «he sees only his hours, and no amounts» — and it is the
+       one a later change could break by accident, by reusing a row component
+       that happens to render a cost. */
+    await pg.locator('[data-hgrp="mine"]').click();
+    await pg.waitForTimeout(600);
+    const mineEntry = await pg.evaluate(() => ({
+      tabs: [...document.querySelectorAll("[data-hmtab]")].map((t) => t.dataset.hmtab),
+      week: document.querySelectorAll(".weekbar .hday").length,
+      form: !!document.querySelector(".mform #me_p") || !!document.querySelector(".mform"),
+      approved: !!document.querySelector(".card .empty"),
+      text: document.querySelector("#view").innerText,
+    }));
+    if (
+      mineEntry.tabs.join() === "enter,mine" &&
+      mineEntry.week === 7 &&
+      (mineEntry.form || mineEntry.approved)
+    )
+      ok("ADM-04: the worker's own screen offers a week and one place to type");
+    else bad("ADM-04: worker entry screen", JSON.stringify(mineEntry).slice(0, 200));
+    if (!/€/.test(mineEntry.text)) ok("ADM-04: and not one euro sign on it");
+    else bad("ADM-04: the worker's entry screen shows money", mineEntry.text.slice(0, 160));
+
+    await pg.locator('[data-hmtab="mine"]').click();
+    await pg.waitForTimeout(600);
+    const mineHours = await pg.evaluate(() => ({
+      band: document.querySelectorAll(".hband .c").length,
+      days: document.querySelectorAll(".mday").length,
+      keep: !!document.querySelector(".keepnote"),
+      text: document.querySelector("#view").innerText,
+    }));
+    if (mineHours.band === 3 && mineHours.days === 7 && mineHours.keep)
+      ok("ADM-04: his own totals, his week, and the note saying what is not here");
+    else bad("ADM-04: worker hours screen", JSON.stringify(mineHours).slice(0, 200));
+    if (!/€/.test(mineHours.text)) ok("ADM-04: his hours screen carries no amount either");
+    else bad("ADM-04: the worker's hours screen shows money", mineHours.text.slice(0, 160));
+
     if (errs.length === 0) ok("procurement: no console errors");
     else bad("procurement: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
