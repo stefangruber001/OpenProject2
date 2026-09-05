@@ -1,0 +1,5 @@
+• Customer journey: every job now shows its true stage over the live records, with the real document on each stage and a full history of what has happened, paperwork attached.
+• Hours: site workers book their own day on the phone and see only their own; the office reviews and approves the week; the summary scopes by day, week, month or year and by job.
+• Invitations now carry a sign-in link and a temporary password, so a new colleague is in without hunting for a form.
+• The header shows who is signed in, and Settings is one tap away on a phone.
+• Two guides in the profile menu: start-up and day-to-day operation.

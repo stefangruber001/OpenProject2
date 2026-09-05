@@ -23643,10 +23643,52 @@
 
          `aria-hidden`, because the phase is named in words immediately beside it.
          Thirteen dots read aloud are noise, not information. */
+      /* THREE OF THE THIRTEEN ARE NAMED: where a job starts, where it becomes
+         binding, and where it ends. Thirteen anonymous dots gave a position
+         without a scale — the operator asked for key milestones to be named —
+         and thirteen labels do not fit on a 340px card, which is why the strip
+         lost its words in the first place.
+
+         THREE, NOT FOUR, AND THAT WAS MEASURED. Ejecución was the fourth, and on
+         a 320px phone its label overlapped the closing one by 23 pixels; at
+         390px it still overlapped by nine. Three clears every width down to 320
+         with 44px to spare, and start / commitment / finished is already a
+         complete scale: it says what the strip runs BETWEEN, which is the thing
+         the dots could not say on their own.
+
+         (No phrase in quotation marks anywhere above: source-audit.mjs counts a
+         quoted phrase inside a comment as a user-visible string.)
+
+         The named dots are drawn heavier, so «big dot = milestone, small dot =
+         a step between them» is legible without a legend anywhere.
+
+         The labels are `JOURNEY[i].lab` and nothing new: the same words the full
+         rail uses, already in both dictionaries, each in its own text node so it
+         translates. A short form invented here would be a fifth vocabulary for
+         the same thirteen things. */
+      const J_MARKS = [0, 5, 12];
       function journeyMini(states, at) {
-        return `<span class="jmini" aria-hidden="true">${states
-          .map((st, i) => `<i class="jdot s-${st}${i === at ? " on" : ""}"></i>`)
-          .join("")}</span>`;
+        const dots = states
+          .map(
+            (st, i) =>
+              `<i class="jdot s-${st}${i === at ? " on" : ""}${
+                J_MARKS.includes(i) ? " mk" : ""
+              }"></i>`,
+          )
+          .join("");
+        /* Anchored by arithmetic, not by eye. `space-between` puts dot i at
+           i/(n-1) of the track, so the label sits on exactly that fraction. The
+           first and last are aligned to their end instead of centred, or half of
+           each would hang off the card. */
+        const last = states.length - 1;
+        const marks = J_MARKS.filter((i) => i <= last)
+          .map((i) => {
+            const edge = i === 0 ? " st" : i === last ? " en" : "";
+            const pct = ((i / last) * 100).toFixed(2);
+            return `<span class="jmk${edge}" style="left:${pct}%">${esc(JOURNEY[i].lab)}</span>`;
+          })
+          .join("");
+        return `<span class="jmini" aria-hidden="true"><span class="jmd">${dots}</span><span class="jmks">${marks}</span></span>`;
       }
       /* THE PAPER, ON THE PHASE.
          `sheetDocHtml` returns the finished customer document as a string — the

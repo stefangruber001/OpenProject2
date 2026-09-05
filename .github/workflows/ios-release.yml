@@ -1,0 +1,65 @@
+name: iOS · App Store submission
+
+# ONE CLICK: Actions → "iOS · App Store submission" → Run workflow.
+#
+# It uploads the App Store listing — the text in both languages, the URLs, the
+# category, the screenshots and the App Review notes, all of them under
+# ios/fastlane/metadata — and then submits the build that is ALREADY in
+# TestFlight for review.
+#
+# It deliberately does NOT build a binary. Submitting a freshly built one would
+# put a version nobody has run in front of App Review; the build being submitted
+# is the one the "iOS · TestFlight" workflow uploaded and the team has used.
+#
+# Run it with `submit: false` first if you want the listing updated and a look at
+# it in App Store Connect before anything goes to review.
+#
+# Secrets it needs are the same four the TestFlight workflow uses, plus one:
+#   ASC_KEY_ID · ASC_ISSUER_ID · ASC_KEY_P8 · DEVELOPER_TEAM_ID
+#   ASC_DEMO_PASSWORD   the password of the demo account App Review signs in with
+#
+# The demo password is a secret and is never committed: the lane writes it into
+# the metadata for the length of the run only. Without it — or with the phone
+# number and demo user still unfilled — the lane stops and names what is
+# missing, because an app a reviewer cannot sign into is rejected under
+# guideline 2.1 and that costs a review cycle.
+
+on:
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: "Submit for review (false = upload the listing only)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby + fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios
+
+      - name: Upload the listing and submit for review
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
+          ASC_DEMO_PASSWORD: ${{ secrets.ASC_DEMO_PASSWORD }}
+          APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'com.caneisubirats.erp' }}
+        run: bundle exec fastlane release submit:${{ inputs.submit }}

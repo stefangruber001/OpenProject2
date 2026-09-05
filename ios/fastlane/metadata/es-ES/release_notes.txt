@@ -1,0 +1,5 @@
+• Recorrido del cliente: cada obra enseña su fase real sobre los registros vivos, con el documento de verdad en cada fase y todo lo que ha pasado, con su papeleo.
+• Horas: el trabajador de obra apunta su día en el móvil y sólo ve lo suyo; la oficina revisa y aprueba la semana; el resumen se acota por día, semana, mes o año y por obra.
+• Las invitaciones llevan enlace de acceso y contraseña temporal: el compañero entra sin buscar ningún formulario.
+• La cabecera dice quién ha entrado, y Configuración queda a un toque en el móvil.
+• Dos guías en el menú de perfil: puesta en marcha y operación diaria.

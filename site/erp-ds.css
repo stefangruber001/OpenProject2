@@ -172,6 +172,28 @@ input[type="number"] {
   font-size: var(--t-lg);
   letter-spacing: -0.018em;
 }
+/* A ROW OF BUTTONS INSIDE A CARD KEEPS THE CARD'S MARGIN.
+   `.stepbar` carries no padding of its own, which is right where it sits
+   directly on the page — `main` has already inset it. Inside a card it was
+   wrong twice over: the buttons ran flush into the border while every other
+   block in the same card (`.daylist`, and the header above it) stood 16px off
+   it, and the last button on a full row had its own border clipped by the
+   card's rounded corner. The operator photographed both on the recorrido:
+   «seems that the buttons are at the edge of the visual box».
+
+   Scoped to a DIRECT child of a card on purpose. The same class is used at the
+   top level of half a dozen screens, where a second inset would push those
+   buttons off the page's own grid. Same reasoning, opposite conclusion: the
+   padding belongs to the container that has an edge. */
+.card > .stepbar {
+  padding: 0 var(--s-5) var(--s-4);
+  margin-bottom: 0;
+}
+/* …and when it follows a list, it needs air above it rather than the list's
+   last row and a button touching. */
+.card > .daylist + .stepbar {
+  padding-top: var(--s-2);
+}
 
 /* -------------------------------------------------------------- 6 · tables
    The header row was a solid green band on every table on every screen, which
@@ -5467,17 +5489,27 @@ body.siteworker .rail {
    340px phone and in a desktop column; and the rail is a pseudo-element behind
    the dots rather than a border on the row, so a dot's own ring paints over it
    instead of being cut by it. */
+/* THE MIN-WIDTH IS WHAT THE LABELS NEED, MEASURED.
+   On a phone the cell goes full width and the strip has 262–356px to play with.
+   In the desktop table it is a COLUMN, and the column is as wide as its content
+   asks: at the old 190px the three milestone names overlapped each other. 264px
+   is the narrowest width at which they clear, plus a little, so the column asks
+   for exactly enough and the table gives it. */
 .jmini {
+  display: block;
+  width: 100%;
+  min-width: 264px;
+  padding: 7px 1px 2px;
+}
+/* The dots, on their rail. */
+.jmd {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 3px;
-  width: 100%;
-  min-width: 168px;
-  padding: 7px 1px 8px;
 }
-.jmini:before {
+.jmd:before {
   content: "";
   position: absolute;
   left: 3px;
@@ -5486,6 +5518,33 @@ body.siteworker .rail {
   height: 1px;
   margin-top: -0.5px;
   background: var(--hair);
+}
+/* The named milestones, under the dot each one belongs to.
+   A positioned band rather than a second flex row: the labels have to line up
+   with SPECIFIC dots, and a flex row would space them evenly among themselves
+   — which is a different set of positions and would point at the wrong
+   phases. */
+.jmks {
+  position: relative;
+  display: block;
+  height: 13px;
+  margin-top: 3px;
+}
+.jmk {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 600 9px var(--sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.jmk.st {
+  transform: none;
+}
+.jmk.en {
+  transform: translateX(-100%);
 }
 .jdot {
   position: relative;
@@ -5505,6 +5564,21 @@ body.siteworker .rail {
     0 0 0 2px var(--paper),
     0 0 0 3px var(--accent);
 }
+/* A named milestone is drawn heavier than the steps between it and the next,
+   so the four labels underneath need no leader lines to say which dot they
+   belong to. Size only — the colour channel already carries the phase's state
+   and must not be asked to carry a second meaning. */
+.jdot.mk {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  border-color: var(--muted);
+}
+.jdot.mk.on {
+  width: 12px;
+  height: 12px;
+  border-color: var(--line);
+}
 .jminil {
   display: block;
   font: 600 11.5px var(--sans);
@@ -5521,6 +5595,14 @@ body.siteworker .rail {
   table.cards td:has(.jmini):before {
     display: block;
     margin-bottom: 2px;
+  }
+  /* And the min-width above goes. It exists to make a TABLE COLUMN wide enough
+     for the labels; here the cell is already the full width of the card, and on
+     a 320px screen a 264px floor is two pixels wider than the card itself —
+     which is a horizontal scrollbar on the whole page, from a strip. The labels
+     clear at 262px with 44px to spare, so nothing is lost. */
+  .jmini {
+    min-width: 0;
   }
 }
 

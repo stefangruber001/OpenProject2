@@ -133,6 +133,92 @@ platform :ios do
     puts "✓ Uploaded to TestFlight. Add testers in App Store Connect › TestFlight."
   end
 
+  # ---------------------------------------------------------------- release
+  #
+  # ONE CLICK, OR A CLEAR REASON WHY NOT.
+  #
+  # `deliver` uploads everything in fastlane/metadata — the listing text in both
+  # languages, the URLs, the category, the screenshots and the App Review notes
+  # — and then submits the build for review. Everything it needs is in this
+  # repository EXCEPT three values only the operator has, which are checked
+  # first and named individually:
+  #
+  #   · the contact phone App Review calls if something is wrong
+  #   · a working demo account, because the app has no public sign-up and
+  #     guideline 2.1 rejects an app a reviewer cannot get into
+  #
+  # A submission that fails on any of those costs a review cycle — days — so
+  # this refuses to start rather than spend one. The password is never committed:
+  # it comes from ASC_DEMO_PASSWORD and is written into the metadata only for the
+  # length of the run.
+  REVIEW_DIR = "fastlane/metadata/review_information".freeze
+
+  def demo_password_from_env!
+    pw = ENV["ASC_DEMO_PASSWORD"].to_s
+    return if pw.strip.empty?
+    File.write(File.join(REVIEW_DIR, "demo_password.txt"), pw)
+  end
+
+  def refuse_if_unfilled!
+    demo_password_from_env!
+    missing = Dir[File.join(REVIEW_DIR, "*.txt")].select do |f|
+      File.read(f).include?("FILL-ME")
+    end
+    return if missing.empty?
+    names = missing.map { |f| File.basename(f, ".txt") }.sort.join(", ")
+    UI.user_error!(
+      "App Review needs these before a submission is worth making: #{names}. " \
+        "Fill them in #{REVIEW_DIR}/ (the demo password can come from the " \
+        "ASC_DEMO_PASSWORD environment variable instead of the file). " \
+        "An app a reviewer cannot sign into is rejected under guideline 2.1, " \
+        "and that costs a review cycle."
+    )
+  end
+
+  desc "Upload the App Store listing and submit the latest build for review"
+  lane :release do |options|
+    refuse_if_unfilled!
+    api_key = asc_api_key
+
+    upload_to_app_store(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      # The build is whatever TestFlight already has — `beta` put it there and
+      # it has been tested. Building a second, different binary here would
+      # submit something nobody has run.
+      skip_binary_upload: true,
+      skip_screenshots: !Dir.exist?("fastlane/screenshots") ||
+        Dir[File.join("fastlane/screenshots", "*", "*.png")].empty?,
+      overwrite_screenshots: true,
+      # Ask before it goes, unless the caller has already decided.
+      submit_for_review: options.fetch(:submit, true),
+      automatic_release: false,
+      force: true, # no interactive HTML preview — this runs unattended
+      precheck_include_in_app_purchases: false,
+      submission_information: {
+        # No IDFA, no ads, no tracking — the app is a shell around the
+        # company's own workspace.
+        add_id_info_uses_idfa: false,
+        export_compliance_uses_encryption: false,
+        content_rights_contains_third_party_content: false
+      }
+    )
+    puts "✓ Listing uploaded and build submitted for review."
+  end
+
+  desc "Upload the App Store listing only — no submission"
+  lane :metadata do
+    refuse_if_unfilled!
+    upload_to_app_store(
+      api_key: asc_api_key,
+      app_identifier: BUNDLE_ID,
+      skip_binary_upload: true,
+      skip_screenshots: true,
+      submit_for_review: false,
+      force: true
+    )
+  end
+
   desc "Just build a signed .ipa locally (no upload)"
   lane :build_only do
     build_app(

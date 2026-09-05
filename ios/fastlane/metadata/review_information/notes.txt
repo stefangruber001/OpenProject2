@@ -1,0 +1,26 @@
+Canei Subirats is the private management system of one renovation company
+(Canei Subirats, S.L., Sant Just Desvern, Barcelona). It is not a consumer app
+and it has no public sign-up: accounts are issued by the company's own
+administrator, which is why demo credentials are provided above.
+
+WHAT TO LOOK AT AFTER SIGNING IN
+1. Torre de control — the owner's dashboard: pipeline, cash, margins, alerts.
+2. Proyectos › Recorrido del cliente — pick any job; the thirteen stages show
+   where it stands, each stage carries the real customer document.
+3. Proyectos › Obras — open a job for its Gantt chart and physical progress.
+4. Administración › Horas — the site/office split: a day sheet, a review step
+   and a summary.
+
+LANGUAGE
+The interface opens in Spanish. To read it in English: the profile button in
+the top-right corner (the circle with initials) → Idioma → EN.
+
+DATA AND PRIVACY
+The app is a shell around the company's own web workspace, served over HTTPS
+from the company's server in the EU. It stores no data on the device beyond the
+session cookie and an interface-language preference. The camera is used only
+when the operator attaches a photo to a site visit, and the photo goes to the
+company's own server. No advertising, no analytics, no third-party trackers.
+Privacy policy: https://178-105-10-156.sslip.io/privacy.html
+
+The app requires a network connection; there is no offline mode.

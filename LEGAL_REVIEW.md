@@ -129,3 +129,42 @@ tenant-configurable reminder** ("send the package within N days of
 quarter-end," default 15) — not an asserted AEAT filing deadline. No specific
 Modelo 303/390/etc. due date is modelled anywhere in `site/erp-engine.js`;
 that remains tracked above, unstarted.
+
+## 8. The privacy policy published for the App Store (session 78)
+
+`site/privacy.html` was written because Apple will not accept a submission
+without a reachable privacy-policy URL and this project had none. It is a
+**factual description of what the system actually does** — no public sign-up,
+no advertising, no analytics, no IDFA, no third-party trackers; the camera only
+when somebody attaches a photo to a visit; the session cookie and the interface
+language the only things left on the device; email composed into the company's
+own Drafts folder and never sent by the system. Every one of those statements
+was checked against the code before it was written down, and each is testable.
+
+**What is asserted and needs an asesor's eye:**
+
+- **Retention periods.** The text says "generally six years for commercial
+  documentation and four for tax" (Código de Comercio art. 30; LGT art. 66).
+  Those are the ordinary periods; the actual obligation varies with the document
+  and with any interruption of the limitation period, and the policy states them
+  as a general rule rather than a per-document schedule.
+- **Roles.** It names Canei Subirats, S.L. as _responsable del tratamiento_ and
+  the server, mail and banking providers as _encargados_. That is the ordinary
+  reading, but no DPA (contrato de encargado) is on file with any of them, and
+  the RGPD requires one in writing. **That gap is real and is not closed by the
+  policy saying so.**
+- **Legal bases** are described in prose (performance of the contract, legal
+  obligation) rather than enumerated per purpose in the way art. 13 RGPD
+  expects a full information clause to do.
+- **Subject rights** name the AEPD as the supervisory authority, which is
+  correct for a Spanish controller, and give an address to write to. No DPO is
+  appointed; whether one is required has not been assessed.
+- **The contact address is `if@2iberia.com`**, which is the operator's mailbox
+  and not a dedicated privacy contact.
+
+**legally_verified: false.** The policy is honest about the software; it is not
+a lawyer's information clause and should be read by the gestoría or an asesor
+in protección de datos before the app is submitted for public review. It is
+published now because an app cannot be submitted at all without one, and a
+truthful description of the real processing is a better starting point for that
+review than a template.

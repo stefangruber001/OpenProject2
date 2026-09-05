@@ -413,6 +413,38 @@ async function testJourney(browser, base) {
       ok(`recorrido: the register draws the phase as a timeline (${strips.length} × 13 dots)`);
     else bad("recorrido: thirteen dots, one ringed, named", JSON.stringify(badStrip.slice(0, 2)));
 
+    // …AND THE STRIP CARRIES A SCALE. Thirteen anonymous dots give a position
+    // and no way to read it, so three phases are named underneath — start,
+    // commitment, end — and their dots are drawn heavier. Measured, not merely
+    // present: a fourth label used to overlap the third by 23px on a 320px
+    // phone, which is the failure this check exists to catch if anybody adds
+    // one back. The labels must also sit inside the strip, or they hang off the
+    // card.
+    const marks = await pg.evaluate(() => {
+      const s = document.querySelector(".jmini");
+      if (!s) return { missing: true };
+      const box = s.getBoundingClientRect();
+      const m = [...s.querySelectorAll(".jmk")].map((n) => {
+        const r = n.getBoundingClientRect();
+        return { t: n.textContent.trim(), l: r.left - box.left, r: r.right - box.left };
+      });
+      return {
+        texts: m.map((x) => x.t),
+        heavy: s.querySelectorAll(".jdot.mk").length,
+        overflows: m.some((x) => x.l < -0.5 || x.r > box.width + 0.5),
+        overlaps: m.some((x, i) => i > 0 && x.l < m[i - 1].r + 4),
+      };
+    });
+    if (
+      marks.texts &&
+      marks.texts.length === 3 &&
+      marks.heavy === 3 &&
+      !marks.overflows &&
+      !marks.overlaps
+    )
+      ok(`recorrido: the strip names its milestones (${marks.texts.join(" · ")})`);
+    else bad("recorrido: milestone labels fit and are named", JSON.stringify(marks));
+
     const strip0 = strips[0];
     const railTones = await pg.evaluate(
       (id) => journeySteps(journeyContext(id)).map((s) => s.state),
