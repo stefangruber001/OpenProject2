@@ -144,8 +144,12 @@ function monogram(company: string): string {
     .replace(/[,.]/g, " ")
     .split(/\s+/)
     .filter((w) => w && !/^(s\.?l\.?u?|s\.?a|sccl|cb)$/i.test(w));
-  if (!words.length) return "·";
-  return (words.length > 1 ? words[0][0] + words[1][0] : words[0][0]).toUpperCase();
+  // Indexed reads are `string | undefined` under noUncheckedIndexedAccess, and
+  // the length check above does not narrow them — so the initials are taken with
+  // slice, which answers "" rather than throwing on a word that is not there.
+  const first = (words[0] || "").slice(0, 1);
+  const second = (words[1] || "").slice(0, 1);
+  return ((second ? first + second : first) || "·").toUpperCase();
 }
 
 /** One numbered step, on the pale green band. */

@@ -4904,6 +4904,11 @@ window.CANEI_DICT.ca = {
   "Mampara de vidrio templado · 480 €/ud": "Mampara de vidre trempat · 480 €/ud",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  /* See the note on the English side. Origen and Alta are the Catalan words
+     too, so the output matches the input — but the rule MATCHING is the point:
+     it is the difference between a string nobody has translated and one whose
+     translation happens to be identical, and only the first is a gap. */
+  [new RegExp("^Origen: (.+) · Alta: (.+)$"), "Origen: $1 · Alta: $2"],
   [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Setmana $1 – $2"],
   [new RegExp("^mes (\\d{4}-\\d{2})$"), "mes $1"],
   [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Revisar $1 sense aprovar"],

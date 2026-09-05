@@ -6167,6 +6167,13 @@ window.CANEI_DICT = {
     ],
   ],
   rxEs2En: [
+    /* The customer and lead cards put the source and the date into ONE text
+       node, so neither half could ever reach the dictionary on its own — fifteen
+       identical-shaped strings across two screens, and the largest single block
+       the crawler reports. The frame translates here; what sits inside it is the
+       company's own lead-source list, which is data and stays as the company
+       wrote it, exactly like every other list value in the product. */
+    [new RegExp("^Origen: (.+) · Alta: (.+)$"), "Source: $1 · Added: $2"],
     [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Week $1 – $2"],
     [new RegExp("^mes (\\d{4}-\\d{2})$"), "month $1"],
     [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Review $1 not approved"],
