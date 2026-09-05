@@ -18,6 +18,54 @@
  */
 window.CANEI_DICT = window.CANEI_DICT || {};
 window.CANEI_DICT.ca = {
+  "Revisa el proyecto y la partida, corrige si hace falta y aprueba.":
+    "Revisa el projecte i la partida, corregeix si cal i aprova.",
+  "Apunte movido a otro día": "Apunt mogut a un altre dia",
+  "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y partida con la conciliación del mes.":
+    "El part diari per treballador amb la setmana al costat; i el resum per projecte i partida amb la conciliació del mes.",
+  Mías: "Meves",
+  "Mis horas": "Les meves hores",
+  Correcciones: "Correccions",
+  "Ant.": "Ant.",
+  "Sig.": "Seg.",
+  Lun: "Dl",
+  Mar: "Dt",
+  Jue: "Dj",
+  Vie: "Dv",
+  Dom: "Dg",
+  "Copiar ayer": "Copiar ahir",
+  "Añadir trabajador": "Afegir treballador",
+  "Añadir línea": "Afegir línia",
+  "Aprobar semana": "Aprovar setmana",
+  "Reabrir semana": "Reobrir setmana",
+  "Ficha del trabajador ›": "Fitxa del treballador ›",
+  enviado: "enviat",
+  "Exportar a Excel": "Exportar a Excel",
+  "A dónde han ido las horas": "On han anat les hores",
+  "Quién ha trabajado": "Qui ha treballat",
+  "horas · extra · coste": "hores · extra · cost",
+  "sin horas imputadas en el periodo": "sense hores imputades en el període",
+  "Comparar con lo pagado en efectivo por trabajador ›":
+    "Comparar amb el pagat en efectiu per treballador ›",
+  "Ocultar lo pagado en efectivo por trabajador ▴": "Amagar el pagat en efectiu per treballador ▴",
+  imputado: "imputat",
+  pagado: "pagat",
+  diferencia: "diferència",
+  Abiertas: "Obertes",
+  Aprobadas: "Aprovades",
+  Mostrando: "Mostrant",
+  "Editar apunte": "Editar apunt",
+  "Aprobada y bloqueada": "Aprovada i bloquejada",
+  "Editando este apunte — cualquier campo puede cambiar":
+    "Editant aquest apunt — qualsevol camp pot canviar",
+  "— ninguna —": "— cap —",
+  "Cambiar la fecha mueve el apunte a otro día — la lista dirá a dónde ha ido. Un apunte no puede moverse a una semana ya aprobada.":
+    "Canviar la data mou l'apunt a un altre dia — la llista dirà on ha anat. Un apunt no es pot moure a una setmana ja aprovada.",
+  "Apunte corregido": "Apunt corregit",
+  "Apunte eliminado": "Apunt eliminat",
+  "No hay horas sin aprobar": "No hi ha hores sense aprovar",
+  "Aquí irán las dos pantallas propias de cada persona: apuntar las horas del día y consultar las suyas. Todavía no están construidas; mientras tanto, usa «Todos».":
+    "Aquí aniran les dues pantalles pròpies de cada persona: apuntar les hores del dia i consultar les seves. Encara no estan construïdes; mentrestant, fes servir «Tots».",
   "Elige una obra: venta, coste y margen partida a partida, y el coste que ha llegado sin partida asignada.":
     "Tria una obra: venda, cost i marge partida a partida, i el cost que ha arribat sense partida assignata.",
   "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.":
@@ -4688,6 +4736,25 @@ window.CANEI_DICT.ca = {
   "Mampara de vidrio templado · 480 €/ud": "Mampara de vidre trempat · 480 €/ud",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Setmana $1 – $2"],
+  [new RegExp("^mes (\\d{4}-\\d{2})$"), "mes $1"],
+  [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Revisar $1 sense aprovar"],
+  [new RegExp("^([\\d.,]+ h) · (\\d+)% del coste del periodo$"), "$1 · $2% del cost del període"],
+  [new RegExp("^(\\d+) de (\\d+) apuntes$"), "$1 de $2 apunts"],
+  [new RegExp("^(\\d+) de (\\d+) apunte$"), "$1 de $2 apunt"],
+  [new RegExp("^Ver los (\\d+) apuntes$"), "Veure els $1 apunts"],
+  [new RegExp("^(\\d+) apuntes enviados para el (\\S+)$"), "$1 apunts enviats per al $2"],
+  [new RegExp("^(\\d+) apunte enviado para el (\\S+)$"), "$1 apunt enviat per al $2"],
+  [new RegExp("^Semana (\\S+) – (\\S+)$"), "Setmana $1 – $2"],
+  [new RegExp("^＋ Añadir otro trabajo para (.+)$"), "＋ Afegir una altra feina per a $1"],
+  [
+    new RegExp("^Reabrir la semana de (.+) para poder editarlo ›$"),
+    "Reobrir la setmana de $1 per poder editar-ho ›",
+  ],
+  [new RegExp("^Apunte movido al (\\S+)$"), "Apunt mogut al $1"],
+  [new RegExp("^([\\d.,]+) h · ([\\d.,]+) línea$"), "$1 h · $2 línia"],
+  [new RegExp("^([\\d.,]+) h · ([\\d.,]+) líneas$"), "$1 h · $2 línies"],
+  [new RegExp("^([\\d.,]+) extra$"), "$1 extra"],
   [new RegExp("^(P-[\\w-]+ · .+) \\(cerrada\\)$"), "$1 (tancada)"],
   [new RegExp("^Email: (\\S+@\\S+)$"), "Email: $1"],
   [new RegExp("^(.+) · caja$"), "$1 · caixa"],

@@ -45,6 +45,7 @@ const TARGET = argOf("--lang", "en");
 const MAX = argv.includes("--max") ? Number(argOf("--max", "0")) : null;
 const JSON_OUT = argOf("--json", "");
 
+const MAXLIST = Number(process.env.AUDIT_LIST || 10);
 /** The screens the operator walks, by their hash route. */
 const ROUTES = [
   ["tower", "#tower"],
@@ -59,6 +60,15 @@ const ROUTES = [
   ["cash", "#cash"],
   ["quotes", "#quotes"],
   ["contracts", "#contracts"],
+  /* The hours screen was missing from this list, so every Spanish string on it
+     was invisible to a gate whose ceiling is zero. Three tabs now, and the audit
+     walks all three: a route that renders behind a tab is still a screen. */
+  ["labour", "#labour"],
+  /* Two of the hours tabs render only after a click, and a string behind a tab
+     is as visible to the operator as one in front of it. The third element is
+     JavaScript run after the screen has drawn. */
+  ["labour·resumen", "#labour", "document.querySelector('[data-htab=\"summary\"]').click()"],
+  ["labour·correcciones", "#labour", "document.querySelector('[data-htab=\"register\"]').click()"],
 ];
 
 /* Same rules as audit.mjs: a shape wherever possible, never a word, because
@@ -72,6 +82,14 @@ const NEUTRAL = [
   /^https?:\/\//,
   /^[A-Z0-9]{6,}$/,
   /^B2[BC]$/,
+  /* Numbers with units, joined by a middot — "80 h · 1.330,00 €". Each half
+     already passed as neutral on its own; the separator was the only reason the
+     pair did not. No prose can match: every group is digits and a unit. */
+  /^[\d.,\s]+\s?(h|€|%|ud|u)?(\s*·\s*[\d.,\s]+\s?(h|€|%|ud|u)?)+$/iu,
+  /* A list of project codes, which is what «which sites did this person work
+     on» renders as. One code was already neutral; several are not more
+     translatable than one. */
+  /^[A-Z]{1,5}-?[A-Z]?\d{2,}[-/]?[\d-]*(\s*·\s*[A-Z]{1,5}-?[A-Z]?\d{2,}[-/]?[\d-]*)+$/,
 ];
 const SHARED = new Set(
   (
@@ -231,13 +249,17 @@ async function walk(browser, base, lang) {
   const p = await ctx.newPage();
   const found = new Map();
   const data = new Set();
-  for (const [name, hash] of ROUTES) {
+  for (const [name, hash, after] of ROUTES) {
     try {
       await p.goto(`${base}/erp.html${hash}`, { waitUntil: "networkidle" });
       // Waited for, not slept for: the shell renders its first screen from data
       // after paint, and a fixed delay measures how fast this machine is.
       await p.waitForSelector("#p1 .secitem", { timeout: 15000 });
       await p.waitForTimeout(700);
+      if (after) {
+        await p.evaluate(after);
+        await p.waitForTimeout(500);
+      }
       for (const s of await p.evaluate(`(${HARVEST})()`)) if (!found.has(s)) found.set(s, name);
       for (const s of await p.evaluate(`(${DATA_VALUES})()`)) data.add(s);
     } catch {
@@ -309,8 +331,8 @@ console.log(
 );
 for (const [screen, list] of Object.entries(byScreen)) {
   console.log(`✗ ${screen.padEnd(12)} ${String(list.length).padStart(3)} untranslated`);
-  for (const t of list.slice(0, 10)) console.log(`      · ${t.slice(0, 96)}`);
-  if (list.length > 10) console.log(`      … and ${list.length - 10} more`);
+  for (const t of list.slice(0, MAXLIST)) console.log(`      · ${t.slice(0, 96)}`);
+  if (list.length > MAXLIST) console.log(`      … and ${list.length - MAXLIST} more`);
 }
 console.log(`\n${stuck.length} untranslated strings in the booted workspace`);
 
