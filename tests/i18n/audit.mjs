@@ -85,7 +85,9 @@ const JSON_OUT = argOf("--json", "");
 const PAGES = [
   "index.html",
   "erp.html",
-  "journey.html",
+  // journey.html is a forwarding stub since the recorrido became erp.html#journey
+  // (PRY-04). What it used to hold is measured by workspace-audit.mjs, which walks
+  // the booted screens and runs at zero.
   "dashboard.html",
   "clientes.html",
   "master-data.html",

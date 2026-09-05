@@ -18,6 +18,63 @@
  */
 window.CANEI_DICT = window.CANEI_DICT || {};
 window.CANEI_DICT.ca = {
+  // PRY-04 · Recorrido del cliente.
+  de: "de",
+  recorrido: "recorregut",
+  recorridos: "recorreguts",
+  "En qué fase está cada trabajo, qué falta para la siguiente y la pantalla real de cada paso.":
+    "En quina fase és cada treball, què falta per a la següent i la pantalla real de cada pas.",
+  "← Todos los recorridos": "← Tots els recorreguts",
+  "Ningún recorrido coincide con la búsqueda.": "Cap recorregut coincideix amb la cerca.",
+  "Abrir la pantalla completa ↗": "Obrir la pantalla completa ↗",
+  "Ir a la fase": "Anar a la fase",
+  "Sin obra": "Sense obra",
+  "Envío al cliente": "Enviament al client",
+  "Inicio de obra": "Inici d'obra",
+  "Cierre y reseña": "Tancament i ressenya",
+  "Sin oportunidad registrada": "Sense oportunitat registrada",
+  "Visitas realizadas": "Visites realitzades",
+  Última: "Darrera",
+  "Sin visita registrada": "Sense visita registrada",
+  "Sin presupuesto": "Sense pressupost",
+  "Enviado y congelado": "Enviat i congelat",
+  "Todavía sin enviar al cliente": "Encara sense enviar al client",
+  "Versión aceptada": "Versió acceptada",
+  "Sin contrato formal": "Sense contracte formal",
+  "Pendiente de firma": "Pendent de signatura",
+  "Obra creada, sin iniciar": "Obra creada, sense iniciar",
+  "Sin obra abierta": "Sense obra oberta",
+  "Coste comprometido": "Cost compromès",
+  "Sin pedidos de compra": "Sense comandes de compra",
+  "Sin obra en ejecución": "Sense obra en execució",
+  "Sin facturas emitidas": "Sense factures emeses",
+  "Todo cobrado": "Tot cobrat",
+  "Nada que cobrar todavía": "Res a cobrar encara",
+  "Todo pagado": "Tot pagat",
+  "Sin facturas de proveedor": "Sense factures de proveïdor",
+  "Sin reseña": "Sense ressenya",
+  "Registrar la visita": "Registrar la visita",
+  "＋ Nuevo presupuesto": "＋ Nou pressupost",
+  "Enviar y congelar": "Enviar i congelar",
+  "Registrar la respuesta": "Registrar la resposta",
+  "Iniciar la obra": "Iniciar l'obra",
+  "Abrir la obra": "Obrir l'obra",
+  "＋ Nueva compra": "＋ Nova compra",
+  "＋ Nuevo proveedor": "＋ Nou proveïdor",
+  "Registrar reseña": "Registrar ressenya",
+  "Cerrar la obra": "Tancar l'obra",
+  Valoración: "Valoració",
+  "Obra iniciada": "Obra iniciada",
+  "Obra creada": "Obra creada",
+  "Obra cerrada": "Obra tancada",
+  "Reseña registrada": "Ressenya registrada",
+  "Un adicional se une a su obra, no abre otra":
+    "Un addicional s'uneix a la seva obra, no n'obre una altra",
+  "⚠ Antes hace falta una oportunidad": "⚠ Abans cal una oportunitat",
+  "⚠ Antes hace falta un presupuesto": "⚠ Abans cal un pressupost",
+  "⚠ Antes hace falta una obra": "⚠ Abans cal una obra",
+  "⚠ El presupuesto todavía no se ha enviado": "⚠ El pressupost encara no s'ha enviat",
+
   "Elige una obra: venta, coste y margen partida a partida, y el coste que ha llegado sin partida asignada.":
     "Tria una obra: venda, cost i marge partida a partida, i el cost que ha arribat sense partida assignata.",
   "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.":
@@ -4688,6 +4745,9 @@ window.CANEI_DICT.ca = {
   "Mampara de vidrio templado · 480 €/ud": "Mampara de vidre trempat · 480 €/ud",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  // openDrawer splits a "phrase · record" title into two nodes and marks the
+  // record translate="no", so only the phrase needs a rule.
+  [new RegExp("^Reseña ·\\s*(.*)$"), "Ressenya · $1"],
   [new RegExp("^(P-[\\w-]+ · .+) \\(cerrada\\)$"), "$1 (tancada)"],
   [new RegExp("^Email: (\\S+@\\S+)$"), "Email: $1"],
   [new RegExp("^(.+) · caja$"), "$1 · caixa"],

@@ -66,13 +66,12 @@ async function main() {
      under test show the dd/mm/yyyy the operator actually sees. Values stay
      ISO; only the paint changes. */
   const browser = await chromium.launch({ executablePath: CHROME, args: ["--lang=es-ES"] });
-  /* Every suite, in order. A list rather than thirty-four await statements so
+  /* Every suite, in order. A list rather than forty-one await statements so
      that `--only <substring>` can pick one out: the whole run takes about
      twelve minutes, and diagnosing one broken suite by re-running all of them
      is how a fix takes an afternoon. CI passes no argument and gets everything,
      which is the only mode that may report a pass. */
   const SUITES = [
-    testJourney,
     testNoOverflow,
     testMobile,
     testNativeShell,
@@ -110,10 +109,14 @@ async function main() {
     testPresupuestadorRework,
     testEvidence,
     testSendAndVersions,
-    testJourneyRealMode,
     testErp,
     testI18n,
     testLanguageAcrossTabs,
+    /* Last, and deliberately: it is the one suite that CREATES records, and
+       `newPage` shares one browser context — one IndexedDB — with everything
+       else here. Its own context keeps the writes to itself; running it last
+       keeps that true even if somebody takes the context away. */
+    testJourney,
   ];
   const onlyAt = process.argv.indexOf("--only");
   const only = onlyAt > 0 ? String(process.argv[onlyAt + 1] || "").toLowerCase() : "";
@@ -338,204 +341,211 @@ async function openTab(pg, route, tab) {
   }
 }
 
-// ── The full journey: load the sample, walk every stage, generate docs, export.
+// ── Recorrido del cliente (PRY-04): the thirteen phases, over the real records.
+//
+//    This replaces two suites. `testJourney` used to drive `journey.html`'s own
+//    walkthrough — a sample project in a database of its own — and
+//    `testJourneyRealMode` drove the read-only mirror beside it. There is one
+//    recorrido now and it is a screen of the workspace, so what is worth
+//    asserting changed with it: not that a demo can be walked, but that the
+//    phases agree with the records, and that acting on a phase writes where
+//    every other screen writes.
+//
+//    ITS OWN CONTEXT, unlike most suites here. It creates a lead and a
+//    proveedor, and `newPage` shares one browser context — one IndexedDB — with
+//    everything that runs after it. `erp-seed.js` is explicit that P-2026-0001
+//    must stay the first-sorting 2026 obra because ~147 checks name it, and a
+//    suite that quietly adds a party is exactly how that stops being true.
 async function testJourney(browser, base) {
-  const page = await browser.newPage({
-    viewport: { width: 1200, height: 900 },
-    acceptDownloads: true,
-  });
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const pg = await ctx.newPage();
   const errors = [];
-  attachConsole(page, errors);
-
+  attachConsole(pg, errors);
   try {
-    await page.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
+    // The workspace seeds itself on first boot; the recorrido reads what it wrote.
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
 
-    // ── Negative: an empty intake must not start the journey. The page is
-    // translated at runtime, so match on either language.
-    await page.locator("#clearform").click();
-    await page.waitForTimeout(150);
-    await page.locator("#startbtn").click();
-    await page.waitForTimeout(200);
-    const intakeErr = await page
-      .locator("#ierr")
-      .textContent()
-      .catch(() => "");
-    if (/customer name|nombre del cliente/i.test(intakeErr || "")) ok("blank intake is refused");
-    else bad("blank intake is refused", `#ierr = "${intakeErr}"`);
+    // ── The old address still lands on the recorrido.
+    await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(900);
+    if (/#journey$/.test(pg.url())) ok("recorrido: journey.html forwards into the workspace");
+    else bad("recorrido: journey.html forwards", pg.url());
 
-    // ── Negative: the rail must not walk past the intake gate. Before this was
-    // closed, clicking "STEP 1" while step was -1 entered the journey with no
-    // customer name, no tax id and no email.
-    const afterRail = await page.evaluate(() => {
-      document.querySelector("#rail .st.nav")?.click();
-      return document.querySelector("#stage")?.innerText.slice(0, 80) || "";
-    });
-    if (/your project|su proyecto|proyecto/i.test(afterRail))
-      ok("rail cannot bypass the intake gate");
-    else bad("rail cannot bypass the intake gate", afterRail.replace(/\n/g, " "));
+    // ── The register: every obra plus every live lead, each with its phase.
+    const rows = await pg.locator("tr.click[data-id]").count();
+    if (rows > 5) ok(`recorrido: the register lists obras and leads (${rows})`);
+    else bad("recorrido: register lists recorridos", `${rows} rows`);
 
-    // "Load sample data" pre-fills the intake form with the sample project.
-    await page.locator("#loadsample").click();
-    await page.waitForTimeout(300);
-    const intakeText = await page
-      .locator("#intake, .form")
-      .first()
-      .innerText()
-      .catch(() => "");
-    if (/[A-Za-z]/.test(intakeText)) ok("sample loads intake data");
-    else bad("sample loads intake data", "intake empty after loadsample");
-
-    // "Start the journey" commits the intake and begins at stage 0.
-    await page.locator("#startbtn").click();
-    await page.waitForTimeout(300);
-
-    // ── Negative: the gate must hold. Clearing a required field on the stage we
-    // are standing on has to disable Advance and say what is missing.
-    await page.evaluate(() => {
-      const el = document.querySelector('#stage [data-k="enquiry"]');
-      if (el) {
-        el.value = "";
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    });
-    await page.waitForTimeout(150);
-    const gated = await page.evaluate(() => ({
-      disabled: !!document.querySelector("#next")?.disabled,
-      gate: document.querySelector("#gate")?.innerText || "",
-    }));
-    if (gated.disabled && gated.gate.trim()) ok("a missing required field blocks Advance");
-    else bad("a missing required field blocks Advance", JSON.stringify(gated));
-    // put it back
-    await page.evaluate(() => {
-      const el = document.querySelector('#stage [data-k="enquiry"]');
-      if (el) {
-        el.value = "Full bathroom refit";
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    });
-    await page.waitForTimeout(150);
-
-    // Walk the whole lifecycle with the Next control.
-    let advanced = 0;
-    for (let i = 0; i < 20; i++) {
-      const next = page.locator("#next");
-      if ((await next.count()) === 0) break;
-      if (!(await next.isVisible().catch(() => false))) break;
-      if (await next.isDisabled().catch(() => false)) break;
-      await next.click();
-      await page.waitForTimeout(160);
-      advanced++;
-    }
-    if (advanced >= 10) ok(`advances through the full lifecycle (${advanced} steps)`);
-    else bad("advances through the full lifecycle", `only advanced ${advanced} steps`);
-
-    // After the invoice stage the P&L ledger holds a real revenue figure.
-    const revenue = await page.evaluate(() => {
-      const el = document.querySelector("#l-revenue");
-      return el ? (el.textContent || "").trim() : "";
-    });
-    if (/\d/.test(revenue)) ok(`ledger shows revenue (${revenue})`);
-    else bad("ledger shows revenue", `got "${revenue}"`);
-
-    // The rail now exposes clickable nav pills for every reached stage.
-    const pills = page.locator("#rail .nav");
-    const pcount = await pills.count();
-    let rendered = 0;
-    for (let i = 0; i < pcount; i++) {
-      await pills
-        .nth(i)
-        .click()
-        .catch(() => {});
-      await page.waitForTimeout(110);
-      const txt = await page
-        .locator("#stage")
-        .innerText()
-        .catch(() => "");
-      if (txt && txt.trim().length > 20) rendered++;
-    }
-    if (pcount >= 12 && rendered >= 12)
-      ok(`all lifecycle stages navigable & render (${rendered}/${pcount})`);
-    else bad("stages navigable & render", `${rendered}/${pcount} reached-nav pills`);
-
-    // ── The narrative body shows derived figures (invoice table, collection
-    // status). A field edit must redraw it: it once updated the ledger and the
-    // filed PDF but left the screen as first drawn, so a 5.000 € part payment
-    // read "Outstanding: 0,00 € · paid" on screen while the ledger said 5.000.
-    await page.evaluate(() => {
-      [...document.querySelectorAll("#rail .st.nav")][9]?.click(); // Collections
-    });
-    await page.waitForTimeout(300);
-    await page.evaluate(() => {
-      const el = document.querySelector('#stage [data-k="amountReceived"]');
-      if (el) {
-        el.value = "5000";
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-    });
-    await page.waitForTimeout(300);
-    const partial = await page.evaluate(() => ({
-      screen:
-        document.querySelector("#stagebody .did")?.innerText.replace(/\s+/g, " ").trim() || "",
-      collected: document.querySelector("#l-collected")?.textContent.trim() || "",
-    }));
-    if (/5\.?000/.test(partial.screen) && /5\.?000/.test(partial.collected))
-      ok("a part payment redraws the stage body, not just the ledger");
-    else bad("part payment redraws the stage body", JSON.stringify(partial));
-
-    // ── A reload must resume the journey, ledger included. step/reached and the
-    // whole ledger used to be module variables, so a refresh dropped the
-    // operator back on the intake with zeroes beside a full document folder.
-    const beforeReload = await page.evaluate(
-      () => document.querySelector("#l-revenue")?.textContent.trim() || "",
+    const cells = await pg.evaluate(() =>
+      [...document.querySelectorAll("tr.click[data-id]")].map((tr) => ({
+        id: tr.dataset.id,
+        fase: tr.querySelector('[data-th="Fase"]')?.innerText.trim() || "",
+        next: tr.querySelector('[data-th="Siguiente paso"]')?.innerText.trim() || "",
+      })),
     );
-    await page.reload({ waitUntil: "networkidle" });
-    await page.waitForTimeout(400);
-    const afterReload = await page.evaluate(() => ({
-      revenue: document.querySelector("#l-revenue")?.textContent.trim() || "",
-      onIntake: !!document.querySelector("#startbtn"),
-    }));
-    if (
-      !afterReload.onIntake &&
-      afterReload.revenue === beforeReload &&
-      /\d/.test(afterReload.revenue)
-    )
-      ok(`reload resumes mid-journey with the ledger intact (${afterReload.revenue})`);
-    else
-      bad(
-        "reload resumes mid-journey",
-        `before=${beforeReload} after=${JSON.stringify(afterReload)}`,
-      );
+    const blank = cells.filter((c) => !c.fase || !c.next);
+    if (!blank.length) ok("recorrido: every row names its phase and its next step");
+    else bad("recorrido: phase + next step per row", JSON.stringify(blank.slice(0, 3)));
 
-    // Export the project folder as a real .zip and assert it's non-trivial.
-    const dl = page.locator("#dlfolder");
-    if ((await dl.count()) > 0) {
-      const [download] = await Promise.all([
-        page.waitForEvent("download", { timeout: 8000 }).catch(() => null),
-        dl.click().catch(() => {}),
-      ]);
-      if (download) {
-        const name = download.suggestedFilename();
-        const path = await download.path();
-        const fs = await import("node:fs");
-        const size = path ? fs.statSync(path).size : 0;
-        // A real zip starts with the "PK" local-file-header signature.
-        const magic = path ? fs.readFileSync(path).subarray(0, 2).toString("latin1") : "";
-        if (size > 200 && magic === "PK")
-          ok(`exports project folder as a valid zip (${size} bytes, "${name}")`);
-        else bad("exports project folder zip", `name=${name} size=${size} magic=${magic}`);
-      } else {
-        bad("exports project folder .zip", "no download fired");
-      }
-    } else {
-      bad("exports project folder .zip", "#dlfolder not found");
+    // Both kinds of subject are on the list — an obra, and a lead with no obra.
+    const kinds = new Set(cells.map((c) => c.id.split(":")[0]));
+    if (kinds.has("prj") && kinds.has("opp"))
+      ok("recorrido: leads that have not become obras are on the list too");
+    else bad("recorrido: obras and leads listed", [...kinds].join(","));
+
+    // ── Search narrows it.
+    await pg.fill("#jQ", "P-2026-0001");
+    await pg.waitForTimeout(400);
+    const filtered = await pg.locator("tr.click[data-id]").count();
+    if (filtered >= 1 && filtered < rows) ok("recorrido: the search filters the register");
+    else bad("recorrido: search filters", `${rows} → ${filtered}`);
+
+    // ── Open it. Thirteen phases, and it opens ON the one the obra is in.
+    await pg.locator("tr.click[data-id]").first().click();
+    await pg.waitForTimeout(700);
+    const rail = await pg.locator(".jrail .jstep").count();
+    if (rail === 13) ok("recorrido: thirteen phases");
+    else bad("recorrido: thirteen phases", String(rail));
+
+    const opened = await pg.evaluate(() => {
+      const chips = [...document.querySelectorAll(".jrail .jstep")];
+      const on = chips.findIndex((c) => c.classList.contains("on"));
+      return {
+        on,
+        tone: (chips[on]?.className.match(/s-(\w+)/) || [])[1] || "",
+        head: document.querySelector("#view .card .tag")?.innerText.trim() || "",
+        tones: chips.map((c) => (c.className.match(/s-(\w+)/) || [])[1] || ""),
+      };
+    });
+    // «Se ve inmediatamente en qué fase está»: the phase the header names is the
+    // phase the panel opens on, and the chip for it is the one marked current.
+    if (opened.on >= 0 && opened.head.includes(String(opened.on + 1)))
+      ok(`recorrido: it opens on the phase the obra is in (${opened.head})`);
+    else bad("recorrido: opens on the current phase", JSON.stringify(opened));
+
+    // ── The colours are the records', not a decoration. P-2026-0001 has an
+    //    accepted presupuesto, a signed contract and works under way, so its early
+    //    phases are done; it also has an invoice past its due date, which is the
+    //    one red the seed stages here.
+    if (opened.tones.filter((t) => t === "done").length >= 6 && opened.tones.includes("late"))
+      ok("recorrido: the rail is coloured from the records (done · late)");
+    else bad("recorrido: rail colours follow the records", opened.tones.join(","));
+
+    // ── A frozen, sent presupuesto says so, in colour. (Operator's own example.)
+    await pg.locator('[data-j="3"]').click();
+    await pg.waitForTimeout(400);
+    const sent = await pg.locator("#view").innerText();
+    if (/Enviado y congelado/.test(sent) && /Congelada|Aceptada/.test(sent))
+      ok("recorrido: a presupuesto sent to the customer reads as sent and frozen");
+    else bad("recorrido: sent + frozen presupuesto", sent.slice(0, 200).replace(/\n/g, " | "));
+
+    // ── The phases walk.
+    await pg.click("#jFwd");
+    await pg.waitForTimeout(350);
+    const walked = await pg.evaluate(() =>
+      [...document.querySelectorAll(".jrail .jstep")].findIndex((c) => c.classList.contains("on")),
+    );
+    if (walked === 4) ok("recorrido: «Siguiente ›» moves one phase");
+    else bad("recorrido: next phase", String(walked));
+
+    // ── Every phase renders, and none of them throws.
+    let rendered = 0;
+    for (let i = 0; i < 13; i++) {
+      await pg.locator(`[data-j="${i}"]`).click();
+      await pg.waitForTimeout(120);
+      const t = await pg.locator("#view").innerText();
+      if (t && t.trim().length > 40) rendered++;
     }
+    if (rendered === 13) ok("recorrido: all thirteen phases render");
+    else bad("recorrido: all phases render", `${rendered}/13`);
 
-    if (errors.length === 0) ok("no console/page errors during journey");
-    else bad("no console/page errors during journey", errors.slice(0, 3).join(" | "));
+    // ── ACTING ON A PHASE WRITES INTO THE ERP. The proveedor first: phase 8 is
+    //    where the purchase order picker has never offered a way to file one.
+    const before = await pg.evaluate(() => erp.state.parties.length);
+    await pg.locator('[data-j="7"]').click();
+    await pg.waitForTimeout(350);
+    if ((await pg.locator("#jAct2").innerText()) === "＋ Nuevo proveedor")
+      ok("recorrido: Compras offers the proveedor form the picker never had");
+    else
+      bad("recorrido: Compras offers ＋ Nuevo proveedor", await pg.locator("#jAct2").innerText());
+    await pg.click("#jAct2");
+    await pg.waitForTimeout(400);
+    await pg.fill("#f_name", "Suministros del Recorrido S.L.");
+    await pg.fill("#f_tax", "B12345674");
+    await pg.fill("#f_mob", "600111222");
+    await pg.fill("#f_street", "C/ Prova 1");
+    await pg.fill("#f_cp", "08960");
+    await pg.fill("#f_city", "Sant Just Desvern");
+    await pg.click("#f_save");
+    await pg.waitForTimeout(700);
+    const sup = await pg.evaluate(
+      (n) => ({
+        grew: erp.state.parties.length === n + 1,
+        filed: erp.state.parties.some(
+          (p) => p.name === "Suministros del Recorrido S.L." && p.roles.includes("supplier"),
+        ),
+        stayed: location.hash === "#journey",
+      }),
+      before,
+    );
+    if (sup.grew && sup.filed && sup.stayed)
+      ok("recorrido: a proveedor entered here is filed in the ERP, without leaving the screen");
+    else bad("recorrido: proveedor written to the ERP", JSON.stringify(sup));
+    await pg.goto(`${base}/erp.html#suppliers`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    if ((await pg.locator("#view").innerText()).includes("Suministros del Recorrido"))
+      ok("recorrido: and it is on Maestros → Proveedores");
+    else bad("recorrido: proveedor on Maestros", "not listed");
+
+    // ── Then the lead, which is the operator's own example.
+    const oppsBefore = await pg.evaluate(() => erp.state.opportunities.length);
+    await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    if (await pg.locator("#jBack").count()) {
+      await pg.click("#jBack");
+      await pg.waitForTimeout(500);
+    }
+    await pg.click("#jNew");
+    await pg.waitForTimeout(400);
+    await pg.fill("#o_work", "Recorrido · reforma de cocina");
+    await pg.click("#o_save");
+    await pg.waitForTimeout(700);
+    const lead = await pg.evaluate(
+      (n) => ({
+        grew: erp.state.opportunities.length === n + 1,
+        filed: erp.state.opportunities.some(
+          (o) => o.requestedWork === "Recorrido · reforma de cocina",
+        ),
+        opened: (document.querySelector("#view .card .tag")?.innerText || "").trim(),
+      }),
+      oppsBefore,
+    );
+    if (lead.grew && lead.filed && /1|2/.test(lead.opened))
+      ok("recorrido: a lead entered here is saved and the recorrido opens on it");
+    else bad("recorrido: lead written to the ERP", JSON.stringify(lead));
+    await pg.goto(`${base}/erp.html#leads`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    if ((await pg.locator("#view").innerText()).includes("Recorrido · reforma de cocina"))
+      ok("recorrido: and it is on Comercial → Oportunidades");
+    else bad("recorrido: lead on Comercial", "not listed");
+
+    // ── Back to the register.
+    await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(600);
+    if (await pg.locator("#jBack").count()) await pg.click("#jBack");
+    await pg.waitForTimeout(500);
+    if (await pg.locator("#jQ").isVisible())
+      ok("recorrido: «Todos los recorridos» returns to the register");
+    else bad("recorrido: back to the register", "no #jQ");
+
+    if (errors.length === 0) ok("recorrido: no console/page errors");
+    else bad("recorrido: no console/page errors", errors.slice(0, 3).join(" | "));
   } catch (e) {
-    bad("journey walkthrough", String(e).slice(0, 200));
+    bad("recorrido del cliente", String(e).slice(0, 220));
   } finally {
-    await page.close();
+    await ctx.close();
   }
 }
 
@@ -545,7 +555,7 @@ async function testJourney(browser, base) {
 //    one of them carries.
 async function testNoOverflow(browser, base) {
   const pages = [
-    "journey.html",
+    "erp.html#journey",
     "master-data.html",
     "financial-data.html",
     "erp.html#tower",
@@ -1624,7 +1634,7 @@ async function testNativeShell(browser, base) {
 
 async function testSmoke(browser, base) {
   const pages = [
-    "journey.html",
+    "erp.html#journey",
     "setup-guide.html",
     "master-data.html",
     "financial-data.html",
@@ -1817,9 +1827,10 @@ async function testShell(browser, base) {
     if (
       shape.sections === 6 &&
       // 30 since PK12-S7 took Caja chica out: cash is a bank withdrawal now.
-      // 31 since the end-to-end walkthrough was given a home in the navigation
-      // (PRY-04, Proyectos): it is a page of its own, so it carries `href` and
-      // the menu marks it with ↗, the same shape Datos financieros has.
+      // 31 since the end-to-end recorrido was given a home in the navigation
+      // (PRY-04, Proyectos). It carried `href` and the ↗ while it was a page of
+      // its own; it is a screen of this shell now, so it carries neither — the
+      // count is the same because the entry never went anywhere.
       shape.subs === 31 &&
       shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
@@ -11385,10 +11396,6 @@ async function testControlTowerAndDay(browser, base) {
   }
 }
 
-// ── Recorrido completo: the project selector (session 12, §2.3, Improvement
-//    #3). "Crear nuevo proyecto" stays the untouched default — testJourney
-//    already covers it end to end — this exercises the ADDITION: picking a
-//    real, already-existing project and seeing real data, not the sample.
 /* COM-03 after Package 1 slides 8 and 9 — the heart of the system, reworked:
      · columns in the order the work is done, cost and margin before the price
      · margin is an INPUT in %, and the sale price follows from cost + margin
@@ -13504,114 +13511,6 @@ async function testVisitCapture(browser, base) {
   }
 }
 
-async function testJourneyRealMode(browser, base) {
-  const pg = await browser.newPage({
-    viewport: { width: 1400, height: 1000 },
-    acceptDownloads: true,
-  });
-  const errs = [];
-  attachConsole(pg, errs);
-  await autoAnswerModals(pg);
-  try {
-    // Visit erp.html first so this browser context's IndexedDB has real
-    // tenant data before journey.html asks for it — real mode reads the
-    // SAME "caneiERP" database, not a fixture of its own.
-    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
-    await bootedShell(pg);
-    await pg.waitForTimeout(900);
-
-    await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
-    await pg.waitForTimeout(700);
-    if (await pg.locator("#modebar").isVisible())
-      ok("recorrido: the project-mode switch is present");
-    else bad("recorrido: mode switch present", "no #modebar");
-
-    await pg.click("#modeExisting");
-    await pg.waitForTimeout(800);
-    const rowCount = await pg.locator(".projrow[data-pid]").count();
-    if (rowCount > 0)
-      ok(`recorrido: real projects are listed, searchable and filterable (${rowCount})`);
-    else bad("recorrido: real project list", "no rows — is erp.html's seed reachable?");
-
-    // Search narrows the list.
-    await pg.fill("#rpq", "P-2026-0001");
-    await pg.waitForTimeout(400);
-    const filtered = await pg.locator(".projrow[data-pid]").count();
-    if (filtered >= 1 && filtered <= rowCount) ok("recorrido: the project search filters the list");
-    else bad("recorrido: project search", `${rowCount} → ${filtered}`);
-    await pg.fill("#rpq", "");
-    await pg.waitForTimeout(300);
-
-    await pg.locator(".projrow[data-pid]").first().click();
-    await pg.waitForTimeout(700);
-    const bannerText = await pg.locator("#loadedBar").innerText();
-    if (/Proyecto cargado/.test(bannerText))
-      ok("recorrido: the loaded project stays visibly indicated");
-    else bad("recorrido: loaded-project banner", bannerText.slice(0, 80));
-
-    const railCount = await pg.locator(".rail .st").count();
-    if (railCount === 13)
-      ok("recorrido: all thirteen stages show a real status (completa/en curso/pendiente)");
-    else bad("recorrido: thirteen real stages", `${railCount}`);
-
-    const stageText = await pg.locator("#stage").innerText();
-    const hasRealLink = (await pg.locator("#stage a.btn").count()) > 0;
-    if (/COMPLETA|EN CURSO|PENDIENTE/.test(stageText) && hasRealLink)
-      ok("recorrido: a stage shows real data and links to the real screen");
-    else bad("recorrido: stage real data + link", stageText.slice(0, 120));
-
-    const ledgerMargin = await pg.locator("#l-margin").innerText();
-    if (/\d/.test(ledgerMargin))
-      ok(`recorrido: the ledger shows real project economics (${ledgerMargin})`);
-    else bad("recorrido: real ledger figures", ledgerMargin);
-
-    // Duplicate creates a genuinely new project and switches to it.
-    const codeBefore = (await pg.locator("#loadedBar b").first().innerText()).trim();
-    await pg.click("#rpDup");
-    await pg.waitForTimeout(900);
-    const codeAfter = (await pg.locator("#loadedBar b").first().innerText()).trim();
-    if (codeAfter && codeAfter !== codeBefore)
-      ok(
-        `recorrido: duplicating a project creates and loads a new one (${codeBefore} → ${codeAfter})`,
-      );
-    else bad("recorrido: duplicate project", `${codeBefore} → ${codeAfter}`);
-
-    // Downloading the real project's folder produces an actual zip.
-    const [download] = await Promise.all([
-      pg.waitForEvent("download", { timeout: 8000 }).catch(() => null),
-      pg.click("#rpDl"),
-    ]);
-    if (download) {
-      const path = await download.path();
-      const fs = await import("node:fs");
-      const size = path ? fs.statSync(path).size : 0;
-      const magic = path ? fs.readFileSync(path).subarray(0, 2).toString("latin1") : "";
-      if (size > 100 && magic === "PK")
-        ok(`recorrido: downloads the real project's folder as a zip (${size} bytes)`);
-      else bad("recorrido: real folder download", `size=${size} magic=${magic}`);
-    } else bad("recorrido: real folder download", "no download fired");
-
-    await pg.click("#rpSwitch");
-    await pg.waitForTimeout(500);
-    if (await pg.locator("#projPicker").isVisible())
-      ok("recorrido: switching project returns to the picker");
-    else bad("recorrido: switch project", "picker not shown");
-
-    await pg.click("#modeNew");
-    await pg.waitForTimeout(500);
-    if (await pg.locator("#mainArea").isVisible())
-      ok("recorrido: returning to «Crear nuevo proyecto» restores the untouched demo");
-    else bad("recorrido: return to demo mode", "mainArea hidden");
-
-    if (errs.length === 0) ok("recorrido (proyecto existente): no console errors");
-    else bad("recorrido (proyecto existente): no console errors", errs.slice(0, 3).join(" | "));
-  } catch (e) {
-    bad("recorrido — proyecto existente", String(e).slice(0, 220));
-  } finally {
-    await pg.close();
-  }
-}
-
 async function testErp(browser, base) {
   // Workspace: Control Tower renders indicators + alerts; modules navigate.
   const pg = await browser.newPage({ viewport: { width: 1280, height: 950 } });
@@ -14557,13 +14456,19 @@ async function testI18n(browser, base) {
       ok("i18n: a label resolves to three genuinely different forms");
     else bad("i18n: three forms", JSON.stringify(trio));
 
-    // English-base page flips to Spanish when ES is chosen
+    /* English-base page flips to Spanish when ES is chosen. This used to ask
+       journey.html, which declared `lang="en"`; the recorrido is a screen of
+       erp.html now and erp.html is authored in Spanish, so it can no longer
+       answer this question at all. `master-data.html` is one of the two pages
+       that still declare English over Spanish content — the exact case i18n.js
+       keeps its second, Spanish-keyed map for — so the check moves there rather
+       than being deleted with the page it happened to be standing on. */
     await chooseLang(pg, "es");
-    await pg.goto(`${base}/journey.html`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/master-data.html`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(500);
     const jLang = await pg.evaluate(() => document.documentElement.lang);
     if (jLang === "es") ok("i18n: English-base page adopts Spanish choice");
-    else bad("i18n: journey adopts ES", `lang=${jLang}`);
+    else bad("i18n: English-base page adopts ES", `lang=${jLang}`);
 
     /* ===== N1 (PK-G): every document kind renders in the chosen language ===
        The kinds the app generates, rendered through the same seam the panes

@@ -5559,6 +5559,27 @@
         }
       }
 
+      /**
+       * Where a creation form goes once it has created something.
+       *
+       * Left alone it walks to the register the new record belongs to, which is
+       * right when the form was opened from the global ＋ Crear: you asked for a
+       * lead, here are the leads. It is wrong when the form was opened from
+       * somewhere that had its own reason to ask — the recorrido opens three of
+       * them — because walking away is precisely what the caller did not want.
+       *
+       * So the rule is one line: a caller that says where it wants to end up gets
+       * to end up there. `onCreated(rec)` also hands back the record, which is
+       * what `newPartyDrawer` has always done and the reason its callers can carry
+       * on with the new party selected; `stay: true` is the same thing for a form
+       * whose record the caller does not need.
+       */
+      function afterCreate(opts, rec, route) {
+        if (opts && typeof opts.onCreated === "function") return opts.onCreated(rec);
+        if (opts && opts.stay) return;
+        go(route);
+      }
+
       /* =============================== navigation (v4 §1) ======================
          Three panels: sections (always visible) → subsections (open on demand) →
          content. Routing is by SUBSECTION key.
@@ -5650,19 +5671,17 @@
           subs: [
             { k: "progress", lab: "Obras", code: "PRY-01" },
             { k: "economics", lab: "Avance económico", code: "PRY-02" },
-            /* The end-to-end walkthrough gets a home in the navigation instead
-                     of hiding behind the identity menu (operator). It is a page of
-                     its own, so it carries `href` like Datos financieros does, and
-                     the menu marks it with the same ↗ — the arrow is the honest
-                     signal that this one leaves the shell. `wide` gives it the
-                     slightly larger tile the operator asked for: it is a different
-                     kind of thing from the two screens above it, and looking
-                     identical to them would say otherwise. */
+            /* The end-to-end recorrido, and it no longer leaves the shell — so
+                     it no longer carries `href` and no longer wears the ↗. It used
+                     to be a page of its own with a database of its own, which is
+                     what made it a page; it is a screen now, over the same records
+                     as every other one. `wide` stays: it is a different kind of
+                     thing from the two screens above it, and looking identical to
+                     them would say otherwise. */
             {
               k: "journey",
               lab: "Recorrido del cliente",
               code: "PRY-04",
-              href: "journey.html",
               wide: true,
             },
           ],
@@ -21568,6 +21587,866 @@
         );
       };
 
+      /* ==================== PRY-04 · Recorrido del cliente ====================
+
+         The same job, read from the customer's side: thirteen phases from the
+         enquiry to the review, each one showing what the records actually say and
+         offering the one thing that moves it forward.
+
+         IT OWNS NO DATA. Until now the recorrido was a second application — its own
+         `caneiJourney` database, its own price book, its own tax-id validator, its
+         own invoice numbering — so a customer was typed twice and the journey's
+         invoice was not the accountant's (JOURNEY-AUDIT C1, ASSUMPTIONS #48). That
+         is gone. Every status below is DERIVED from the records that already exist,
+         and every action is the ERP's own form: `newOpportunityDrawer` for a lead,
+         `newPartyDrawer("supplier")` for a supplier, `sendBudgetDrawer` to freeze
+         and send a presupuesto. Same validation, same duplicate check, same audit
+         entry.
+
+         Which is also why #48's two blockers do not need answering. There is no
+         stage→record mapping to keep idempotent, because a phase maps to nothing it
+         wrote; and an abandoned recorrido leaves nothing behind, because nothing is
+         created until the operator presses the ERP's own save button.
+
+         And why this is a SCREEN and not the page it used to be: ids come from a
+         counter inside the state document (`erp-engine.js` `_id`), and a local save
+         is a whole-document put with no version check. Two pages holding two engine
+         instances over one database mint colliding ids and erase each other. One
+         shell, one instance, one persist path — the writes are safe by
+         construction, and `mutate()` re-renders, so the rail recolours itself. */
+      const JOURNEY = [
+        { k: "lead", lab: "Oportunidad", route: "leads" },
+        { k: "visit", lab: "Visita", route: "visits" },
+        { k: "budget", lab: "Presupuesto", route: "quotes" },
+        { k: "sent", lab: "Envío al cliente", route: "quotes" },
+        { k: "accepted", lab: "Aceptación", route: "quotes" },
+        { k: "contract", lab: "Contrato", route: "contracts" },
+        { k: "works", lab: "Inicio de obra", route: "progress" },
+        { k: "purchases", lab: "Compras", route: "purchasing" },
+        { k: "execution", lab: "Ejecución", route: "progress" },
+        { k: "invoicing", lab: "Facturación", route: "invoicing" },
+        { k: "collections", lab: "Cobros", route: "invoicing" },
+        { k: "payments", lab: "Pagos a proveedores", route: "supplier-invoices" },
+        { k: "close", lab: "Cierre y reseña", route: "progress" },
+      ];
+      /* Six states, and the pill tone each one wears — the registers' own tones, so
+         a phase reads here exactly as the same fact reads on the screen that owns it.
+         `waiting` is blue rather than amber on purpose: a presupuesto sent and
+         frozen is not late, it is with the customer, and colouring it as a problem
+         teaches the operator to ignore the colour.
+
+         Two reds, because they are two different facts and the registers already
+         distinguish them: a lead perdido or a presupuesto rechazado is BLOCKED —
+         the phase cannot proceed — while an invoice past its due date is VENCIDO,
+         which proceeds perfectly well and simply needs chasing. Facturación writes
+         «Vencida» on exactly that condition, and one word for both would have this
+         screen disagreeing with that one. */
+      const JOURNEY_STATE = {
+        done: ["Completada", "g"],
+        doing: ["En curso", "y"],
+        waiting: ["Esperando", "b"],
+        blocked: ["Bloqueada", "r"],
+        late: ["Vencido", "r"],
+        pending: ["Pendiente", ""],
+      };
+      // jSubject names the record picked, prefixed prj or opp. Never a record
+      // of its own: this screen writes none.
+      let jSubject = null,
+        jStep = -1;
+
+      /* The chain a recorrido is drawn from, walked from whichever end was picked.
+         The five records point at each other in one direction only, and the one
+         link the ERP does NOT store is budget → oportunidad: it runs through the
+         visit (`visit.budgetId` → `visit.opportunityId`), which is exactly how
+         `budgetWorkName` in the engine finds the job a presupuesto answers. Its
+         fallback is copied too, and for the same reason: one lead for this customer
+         is the request, two are a guess, and a guess here would put another
+         customer's enquiry at the top of this screen. */
+      function journeyContext(key) {
+        if (!key) return null;
+        const [kind, id] = String(key).split(":");
+        let project = null,
+          opp = null,
+          budget = null,
+          contract = null;
+        if (kind === "prj") {
+          project = erp.state.projects.find((p) => p.id === id) || null;
+          if (!project) return null;
+          budget = project.budgetId
+            ? erp.state.budgets.find((b) => b.id === project.budgetId) || null
+            : null;
+          contract = project.contractId
+            ? erp.state.contracts.find((c) => c.id === project.contractId) || null
+            : null;
+        } else {
+          opp = erp.state.opportunities.find((o) => o.id === id) || null;
+          if (!opp) return null;
+        }
+        const partyId = project ? project.partyId : opp.partyId;
+        const party = erp.party(partyId);
+        if (!opp && budget) {
+          const via = erp.state.visits.find((v) => v.budgetId === budget.id && v.opportunityId);
+          opp = via
+            ? erp.state.opportunities.find((o) => o.id === via.opportunityId) || null
+            : null;
+          if (!opp) {
+            /* Restricted to a single candidate, exactly as `budgetWorkName` is:
+               with two won leads for one customer there is no way to tell which,
+               and naming the wrong enquiry on somebody's job is worse than naming
+               none. AND only for a budget-backed obra — a proyecto rápido was
+               created straight from the customer with no lead behind it at all, so
+               any lead attached here would be one this screen invented. */
+            const mine = erp.state.opportunities.filter((o) => o.partyId === partyId);
+            const won = mine.filter((o) => o.status === "won");
+            opp = won.length === 1 ? won[0] : mine.length === 1 ? mine[0] : null;
+          }
+        }
+        if (!budget && opp) {
+          const via = erp.state.visits.find((v) => v.opportunityId === opp.id && v.budgetId);
+          budget = via ? erp.state.budgets.find((b) => b.id === via.budgetId) || null : null;
+          if (!budget) {
+            const mine = erp.state.budgets.filter((b) => b.partyId === partyId && !b.variationOf);
+            budget = mine.length === 1 ? mine[0] : null;
+          }
+        }
+        if (!contract && budget)
+          contract = erp.state.contracts.find((c) => c.budgetId === budget.id) || null;
+        if (!project && budget)
+          project = erp.state.projects.find((p) => p.budgetId === budget.id) || null;
+        return { key, party, opp, budget, contract, project };
+      }
+
+      /**
+       * The thirteen phases of one recorrido, read off the records. Pure.
+       *
+       * `rows` is a LIST OF PAIRS, never a sentence. «2 visitas realizadas» is one
+       * text node no dictionary can hold — the lesson `countTag` already carries —
+       * and this screen would have written thirteen of them. A label and a value
+       * are two nodes: the label is vocabulary and translates, the value is the
+       * record's own and does not.
+       */
+      function journeySteps(c) {
+        const today = erp.state.today;
+        const { opp, budget, contract, project } = c;
+        const stage = budget ? erp.budgetStage(budget) : null;
+        const versions = budget ? budget.versions || [] : [];
+        const issued = versions.filter((v) => v.issued);
+        const last = issued[issued.length - 1];
+        const visits = opp ? erp.state.visits.filter((v) => v.opportunityId === opp.id) : [];
+        const doneVisits = visits.filter((v) => v.status === "done");
+        const eco = project ? erp.projectEconomics(project.id) : null;
+        const purchases = project
+          ? erp.state.purchases.filter((x) => x.projectId === project.id)
+          : [];
+        const invoices = project
+          ? erp.state.invoices.filter((i) => i.projectId === project.id && i.kind !== "creditNote")
+          : [];
+        const bills = project
+          ? erp.state.bills.filter((b) =>
+              (b.allocations || []).some((a) => a.projectId === project.id),
+            )
+          : [];
+        const invoiced = invoices.reduce((s, i) => s + i.baseCents, 0);
+        const recvOpen = invoices.reduce((s, i) => s + erp.invoiceOutstandingCents(i.id), 0);
+        const payOpen = bills.reduce((s, b) => s + erp.billOutstandingCents(b.id), 0);
+        const recvLate = invoices.some(
+          (i) => erp.invoiceOutstandingCents(i.id) > 0 && i.dueDate && i.dueDate < today,
+        );
+        const payLate = bills.some(
+          (b) => erp.billOutstandingCents(b.id) > 0 && b.dueDate && b.dueDate < today,
+        );
+        const feedback = project
+          ? (erp.state.feedback || []).filter((f) => f.projectId === project.id)
+          : [];
+        const S = (state, rows, act) => ({ state, rows, act });
+        const accepted = !!(budget && budget.acceptedVersionId);
+        return [
+          /* 1 · Oportunidad */
+          opp
+            ? S(opp.status === "lost" ? "blocked" : "done", [
+                ["Estado", (OPP_STATUS[opp.status] || [opp.status])[0]],
+                ["Trabajo", opp.requestedWork || "—"],
+              ])
+            : S("pending", [["Estado", "Sin oportunidad registrada"]], {
+                lab: "＋ Nueva oportunidad",
+                run: () =>
+                  newOpportunityDrawer(null, { onCreated: (rec) => journeyOpen("opp:" + rec.id) }),
+              }),
+          /* 2 · Visita */
+          doneVisits.length
+            ? S("done", [
+                ["Visitas realizadas", String(doneVisits.length)],
+                ["Última", fmtD(doneVisits[doneVisits.length - 1].completedAt)],
+              ])
+            : visits.length
+              ? S("waiting", [["Programada", fmtD(visits[0].scheduledAt)]], {
+                  lab: "Registrar la visita",
+                  run: () => completeVisitDrawer(visits[0].id),
+                })
+              : S("pending", [["Estado", "Sin visita registrada"]], {
+                  lab: "＋ Programar visita",
+                  run: () =>
+                    opp
+                      ? scheduleVisitDrawer(opp.id, { stay: true })
+                      : toast("⚠ Antes hace falta una oportunidad"),
+                }),
+          /* 3 · Presupuesto */
+          budget
+            ? S(
+                versions.length ? "done" : "doing",
+                [
+                  ["Presupuesto", budget.number],
+                  ["Versiones", String(versions.length)],
+                ],
+                { lab: "Abrir el presupuesto", run: () => openBuilder(budget.id) },
+              )
+            : S("pending", [["Estado", "Sin presupuesto"]], {
+                lab: "＋ Nuevo presupuesto",
+                run: () => newBudgetDrawer(),
+              }),
+          /* 4 · Envío al cliente. Congelada es un hecho del registro, y se ve. */
+          last
+            ? S(stage === "expired" ? "blocked" : accepted ? "done" : "waiting", [
+                ["Enviado y congelado", fmtD((last.sent || {}).date || last.date)],
+                ["Versión", String(last.vNumber)],
+              ])
+            : S(budget ? "doing" : "pending", [["Estado", "Todavía sin enviar al cliente"]], {
+                lab: "Enviar y congelar",
+                run: () =>
+                  budget ? sendBudgetDrawer(budget.id) : toast("⚠ Antes hace falta un presupuesto"),
+              }),
+          /* 5 · Aceptación */
+          accepted
+            ? S("done", [["Estado", "Versión aceptada"]])
+            : stage === "rejected"
+              ? S("blocked", [["Estado", "Presupuesto rechazado"]])
+              : S(issued.length ? "waiting" : "pending", [["Estado", "Sin respuesta"]], {
+                  lab: "Registrar la respuesta",
+                  run: () =>
+                    last
+                      ? budgetResponseDrawer(budget.id, last.id)
+                      : toast("⚠ El presupuesto todavía no se ha enviado"),
+                }),
+          /* 6 · Contrato */
+          contract
+            ? S(
+                contract.signature.customerSignedAt ? "done" : "doing",
+                [
+                  ["Contrato", contract.number],
+                  [
+                    "Firma",
+                    contract.signature.customerSignedAt
+                      ? fmtD(contract.signature.customerSignedAt)
+                      : "Pendiente",
+                  ],
+                ],
+                contract.signature.customerSignedAt
+                  ? null
+                  : { lab: "Firmar", run: () => signContractDrawer(contract.id) },
+              )
+            : S(
+                accepted ? "doing" : "pending",
+                [["Estado", "Sin contrato formal"]],
+                accepted
+                  ? {
+                      lab: "＋ Nuevo contrato",
+                      run: () => newContractDrawer({ budgetId: budget.id }),
+                    }
+                  : null,
+              ),
+          /* 7 · Inicio de obra */
+          project && project.dates.start
+            ? S("done", [["Inicio", fmtD(project.dates.start)]])
+            : project
+              ? S("doing", [["Estado", "Obra creada, sin iniciar"]], {
+                  lab: "Iniciar la obra",
+                  run: () =>
+                    mutate(() => erp.startWorks(project.id, "operations"), "Obra iniciada"),
+                })
+              : S(
+                  accepted ? "doing" : "pending",
+                  [["Estado", "Sin obra abierta"]],
+                  accepted
+                    ? {
+                        lab: "Abrir la obra",
+                        /* Accepting normally opens the obra by itself
+                           (`budgetResponseDrawer`), so this is the door for a
+                           presupuesto accepted before it did. The two guards are
+                           the ones that path already carries: an adicional joins
+                           its obra rather than opening a second, and a
+                           presupuesto that already has one must never open
+                           another. */
+                        run: () =>
+                          mutate(() => {
+                            if (budget.variationOf)
+                              throw new Error("Un adicional se une a su obra, no abre otra");
+                            const had = erp.state.projects.find((x) => x.budgetId === budget.id);
+                            const rec =
+                              had || erp.createProjectFromAcceptance(budget.id, "backoffice");
+                            journeySelect("prj:" + rec.id);
+                          }, "Obra creada"),
+                      }
+                    : null,
+                ),
+          /* 8 · Compras */
+          {
+            ...(purchases.length
+              ? S(purchases.every((x) => x.status.delivered) ? "done" : "doing", [
+                  ["Pedidos", String(purchases.length)],
+                  ["Coste comprometido", eur0(erp.committedCostCents(project.id))],
+                ])
+              : S("pending", [["Estado", "Sin pedidos de compra"]])),
+            act: {
+              lab: "＋ Nueva compra",
+              run: () =>
+                project ? purchaseFormDrawer(project.id) : toast("⚠ Antes hace falta una obra"),
+            },
+            /* The supplier picker on a purchase order lists what is on file and
+               offers no way to add to it, so ordering from a supplier nobody has
+               filed yet means leaving for Maestros and coming back. This is that
+               door, and it is the SAME form Maestros uses — created here, the
+               record is a normal proveedor with the same validation, the same
+               duplicate warning and the same audit entry. */
+            act2: { lab: "＋ Nuevo proveedor", run: () => newPartyDrawer("supplier") },
+          },
+          /* 9 · Ejecución — no verb of its own, on purpose. Progress is marked on
+             the chart and a cost enters through Gastos, with its document; the one
+             door that created a cost with no paper behind it was removed in package
+             13 and is not coming back through this screen. «Abrir la pantalla
+             completa» carries the obra's code, so it lands on the chart for THIS
+             job. */
+          eco
+            ? S(eco.progressPct >= 100 ? "done" : eco.progressPct > 0 ? "doing" : "pending", [
+                ["Avance", eco.progressPct + "%"],
+                ["Coste real", eur0(eco.actualCents)],
+              ])
+            : S("pending", [["Estado", "Sin obra en ejecución"]]),
+          /* 10 · Facturación */
+          invoices.length
+            ? S(
+                eco && invoiced >= eco.currentRevenueCents ? "done" : "doing",
+                [
+                  ["Facturas", String(invoices.length)],
+                  ["Facturado", eur0(invoiced)],
+                ],
+                { lab: "＋ Nueva factura", run: () => newInvoiceDrawer(project.id) },
+              )
+            : S(
+                "pending",
+                [["Estado", "Sin facturas emitidas"]],
+                project
+                  ? { lab: "＋ Nueva factura", run: () => newInvoiceDrawer(project.id) }
+                  : null,
+              ),
+          /* 11 · Cobros — the oldest unpaid invoice, opened on its own drawer,
+             which is where «Registrar cobro» already lives. */
+          invoices.length
+            ? S(
+                recvOpen <= 0 ? "done" : recvLate ? "late" : "doing",
+                recvOpen <= 0
+                  ? [["Estado", "Todo cobrado"]]
+                  : [["Pendiente de cobro", eur0(recvOpen)]],
+                recvOpen > 0
+                  ? {
+                      lab: "Registrar cobro",
+                      run: () => {
+                        const due = invoices
+                          .filter((i) => erp.invoiceOutstandingCents(i.id) > 0)
+                          .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0];
+                        if (due) invoiceDrawer(due.number);
+                      },
+                    }
+                  : null,
+              )
+            : S("pending", [["Estado", "Nada que cobrar todavía"]]),
+          /* 12 · Pagos a proveedores — and NO button. `payBills` exists and the
+             screen that used to call it was removed in package 12: pressing it
+             wrote a payment for an invoice nobody had paid. What money left the
+             company is answered by the bank, on Consolidación bancaria, so this
+             phase reports and does not act. */
+          bills.length
+            ? S(
+                payOpen <= 0 ? "done" : payLate ? "late" : "doing",
+                payOpen <= 0 ? [["Estado", "Todo pagado"]] : [["Pendiente de pago", eur0(payOpen)]],
+              )
+            : S("pending", [["Estado", "Sin facturas de proveedor"]]),
+          /* 13 · Cierre y reseña */
+          project && project.closed
+            ? S(
+                feedback.length ? "done" : "doing",
+                [
+                  ["Cierre", fmtD(project.dates.actualEnd)],
+                  ["Reseña", feedback.length ? "Registrada" : "Sin reseña"],
+                ],
+                feedback.length
+                  ? null
+                  : { lab: "Registrar reseña", run: () => journeyFeedback(project) },
+              )
+            : S(
+                project && eco && eco.progressPct >= 100 ? "doing" : "pending",
+                project
+                  ? [["Margen previsto", eur0(eco.marginForecastCents)]]
+                  : [["Estado", "Sin obra abierta"]],
+                project
+                  ? {
+                      lab: "Cerrar la obra",
+                      run: () =>
+                        mutate(() => erp.closeProject(project.id, "backoffice"), "Obra cerrada"),
+                    }
+                  : null,
+              ),
+        ];
+      }
+
+      /** CRM-07 from the recorrido: the review the last phase is named after. */
+      async function journeyFeedback(project) {
+        const r = await ask(
+          "Reseña · " + erp.party(project.partyId).name,
+          [
+            {
+              key: "rating",
+              label: "Valoración",
+              type: "number",
+              min: 1,
+              max: 5,
+              value: "5",
+              required: true,
+            },
+            { key: "text", label: "Comentario", type: "textarea", rows: 3 },
+          ],
+          { okLabel: "Registrar" },
+        );
+        if (r === null) return;
+        mutate(
+          () =>
+            erp.addFeedback(
+              project.id,
+              { kind: "satisfaction", rating: Number(r.rating) || null, text: r.text || "" },
+              "backoffice",
+            ),
+          "Reseña registrada",
+        );
+      }
+
+      /** Select a recorrido without leaving the screen (used from inside mutate). */
+      function journeySelect(key) {
+        jSubject = key;
+        /* -1, not 0. «Se ve inmediatamente en qué fase está» — so the screen opens
+           on the phase the job is actually in, and the view resolves the sentinel
+           because it is the one place that has already computed it. */
+        jStep = -1;
+        const c = journeyContext(key);
+        if (c && c.project) {
+          gProject = c.project.id;
+          projRecents = [c.project.id, ...projRecents.filter((x) => x !== c.project.id)].slice(
+            0,
+            5,
+          );
+          saveProjPrefs();
+        }
+      }
+      /** …and from outside one, where the screen still has to be repainted. */
+      function journeyOpen(key) {
+        journeySelect(key);
+        if (cur === "journey") render();
+        else go("journey");
+      }
+
+      /* A PHASE LEFT BEHIND BY A FINISHED ONE NEVER HAPPENED.
+         Not every job passes through all thirteen: a repair has no pedidos, a
+         customer walks in with the work already agreed and there is no lead on file.
+         Those phases sit at `pending` for ever and read as a to-do list on a job
+         that is closed — «Fase 1 · Oportunidad» over an obra from 2024 that was
+         finished, invoiced and paid. So the last COMPLETED phase is the line:
+         anything still pending behind it is not waiting to be done, it is a step
+         this job did not take. */
+      function journeyLastDone(steps) {
+        for (let i = steps.length - 1; i >= 0; i--) if (steps[i].state === "done") return i;
+        return -1;
+      }
+      /** Which phase the job IS in: the furthest one under way, else the first unmet
+          one ahead of everything already completed. A renovation is genuinely in
+          several at once — buying, building, billing and chasing all overlap — and
+          «how far has this got» is answered by the last of them, not the first. */
+      function journeyPhase(steps) {
+        for (let i = steps.length - 1; i >= 0; i--)
+          if (["doing", "waiting", "blocked", "late"].includes(steps[i].state)) return i;
+        const done = journeyLastDone(steps);
+        for (let i = done + 1; i < steps.length; i++) if (steps[i].state !== "done") return i;
+        return done < 0 ? 0 : done;
+      }
+      /** And what to do next — which is a different question. The earliest phase
+          that is stuck or overdue comes first, because a red phase is the reason
+          somebody opened this screen; only when nothing is red is it the earliest
+          unfinished one at or after the phase the job is in. Returns -1 when there
+          is nothing left to do. */
+      function journeyNext(steps) {
+        const urgent = steps.findIndex((x) => x.state === "blocked" || x.state === "late");
+        if (urgent >= 0) return urgent;
+        const at = Math.max(journeyPhase(steps), journeyLastDone(steps) + 1);
+        for (let i = at; i < steps.length; i++) if (steps[i].state !== "done") return i;
+        return -1;
+      }
+      /** The name of the phase that comes next, or that there is none. */
+      function journeyNextLabel(next) {
+        if (next < 0) return "Recorrido completo";
+        return JOURNEY[next].lab;
+      }
+      function journeyPill(step) {
+        const [lab, tone] = JOURNEY_STATE[step.state];
+        return `<span class="pill ${tone}">${lab}</span>`;
+      }
+      /** «Fase 4 de 13» as four nodes, for the reason `countTag` is four nodes: a
+          sentence with a number inside it is one text node no dictionary can hold. */
+      function journeyCount(word, n) {
+        return `<span>${word}</span> <span>${n}</span> <span>de</span> <span>13</span>`;
+      }
+      /** One label-and-value row of a phase, in the daylist idiom every drawer on
+          this workspace already uses. */
+      function journeyRow(pair) {
+        return `<div class="it"><span>${esc(pair[0])}</span><span style="flex:1"></span><b>${esc(
+          pair[1],
+        )}</b></div>`;
+      }
+
+      /* The register of recorridos: every obra, plus every live lead that has not
+         become one yet — phases 1 to 5 happen before an obra exists, and a screen
+         that only listed obras could never show them. `renderMasterList` is the
+         ERP's own register, so this list searches, paginates and card-ifies on a
+         phone exactly like Clientes and Obras do. */
+      function journeyRows() {
+        const rows = erp.state.projects
+          .slice()
+          .reverse()
+          .map((p) => ({
+            key: "prj:" + p.id,
+            when: p.dates.start || "",
+            ctx: journeyContext("prj:" + p.id),
+          }))
+          .filter((r) => r.ctx);
+        /* The lead an obra already accounts for is not a second recorrido. It has to
+           be collected from the OBRA side: no visit in the seed carries a
+           `budgetId`, so the lead behind a job is reached by the party fallback, and
+           asking the same question from the lead side does not always come back the
+           same way. Reading the answer the obra gave is the only version that cannot
+           disagree with itself. */
+        const claimed = new Set(rows.map((r) => r.ctx.opp && r.ctx.opp.id).filter(Boolean));
+        erp.state.opportunities.forEach((o) => {
+          if (o.status === "lost" || claimed.has(o.id)) return;
+          const c = journeyContext("opp:" + o.id);
+          if (!c || c.project) return; // already listed as its obra
+          rows.push({ key: "opp:" + o.id, when: o.date || "", ctx: c });
+        });
+        return (
+          rows
+            .map((r) => {
+              const c = r.ctx;
+              const steps = journeySteps(c);
+              const at = journeyPhase(steps);
+              const next = journeyNext(steps);
+              const eco = c.project ? erp.projectEconomics(c.project.id) : null;
+              return {
+                id: r.key,
+                code: c.project ? c.project.code : c.budget ? c.budget.number : "—",
+                party: c.party.name,
+                /* Ask the presupuesto first: that answer comes from the engine and
+                 it is the one printed on the document the customer holds. A proyecto
+                 rápido has no presupuesto and no lead, so what it is called is the
+                 description typed when it was opened. */
+                work:
+                  (c.budget && erp.budgetWorkName(c.budget.id)) ||
+                  (c.opp && c.opp.requestedWork) ||
+                  (c.project && (c.project.baseline.chapters[0] || {}).name) ||
+                  "",
+                at,
+                tone: JOURNEY_STATE[steps[at].state][1],
+                next,
+                done: next < 0,
+                amount: eco ? eco.currentRevenueCents : c.opp ? c.opp.expectedValue : 0,
+                when: r.when,
+              };
+            })
+            /* Live first, then most recent. A closed job is still a recorrido and
+             still worth reading — it is where «what did that one actually earn» is
+             answered — but it is never what the operator opened this screen for, and
+             ten of the fourteen obras on a mature workspace are closed. The same
+             rule the invoice picker already uses for obras. */
+            .sort(
+              (a, b) =>
+                Number(a.done) - Number(b.done) || String(b.when).localeCompare(String(a.when)),
+            )
+        );
+      }
+
+      VIEWS.journey = (v) => {
+        $("#sub").textContent =
+          "En qué fase está cada trabajo, qué falta para la siguiente y la pantalla real de cada paso.";
+        const c = jSubject ? journeyContext(jSubject) : null;
+        if (!c) {
+          jSubject = null;
+          return journeyPicker(v);
+        }
+        const steps = journeySteps(c);
+        const at = journeyPhase(steps);
+        if (jStep >= steps.length || jStep < 0) jStep = at;
+        const nextIdx = journeyNext(steps);
+        const step = steps[jStep];
+        const meta = JOURNEY[jStep];
+        const eco = c.project ? erp.projectEconomics(c.project.id) : null;
+        $("#headact").innerHTML =
+          `<button class="btn sm" id="jBack">← Todos los recorridos</button>`;
+
+        v.innerHTML =
+          `<div class="card"><div class="ch"><h3>${esc(c.party.name)}</h3>
+            <span class="pill">${esc(c.project ? c.project.code : c.budget ? c.budget.number : "Sin obra")}</span>
+            ${journeyPill(steps[at])}
+            <span class="tag">${journeyCount("Fase", at + 1)} · ${esc(JOURNEY[at].lab)}</span></div>
+           <div class="daylist">
+             <div class="it"><span>Siguiente paso</span><span style="flex:1"></span><b>${esc(
+               journeyNextLabel(nextIdx),
+             )}</b>${
+               nextIdx < 0
+                 ? ""
+                 : `<button class="btn primary sm" style="margin-left:12px" id="jNext"><span>Ir a la fase</span> <span>${
+                     nextIdx + 1
+                   }</span></button>`
+             }</div>
+             ${nextIdx < 0 ? "" : steps[nextIdx].rows.map(journeyRow).join("")}
+             ${
+               eco
+                 ? `<div class="it"><span>Venta actual</span><b style="margin-left:6px">${eur0(
+                     eco.currentRevenueCents,
+                   )}</b><span style="margin-left:18px">Coste real</span><b style="margin-left:6px">${eur0(
+                     eco.actualCents,
+                   )}</b><span style="margin-left:18px">Margen previsto</span><b style="margin-left:6px">${eur0(
+                     eco.marginForecastCents,
+                   )}</b><span style="margin-left:18px">Avance</span><b style="margin-left:6px">${
+                     eco.progressPct
+                   }%</b></div>`
+                 : ""
+             }
+           </div></div>` +
+          `<div class="card"><div class="scroll"><div class="jrail">${JOURNEY.map(
+            (s, i) =>
+              `<button class="jstep s-${steps[i].state}${i === jStep ? " on" : ""}" data-j="${i}">
+                 <span class="n">${i + 1}</span><span class="l">${esc(s.lab)}</span></button>`,
+          ).join("")}</div></div></div>` +
+          `<div class="card"><div class="ch"><h3>${esc(meta.lab)}</h3>${journeyPill(step)}
+             <span class="tag">${journeyCount("Fase", jStep + 1)}</span></div>
+           <div class="daylist">${step.rows.map(journeyRow).join("")}</div>
+           <div class="stepbar">
+             ${step.act ? `<button class="btn primary sm" id="jAct">${esc(step.act.lab)}</button>` : ""}
+             ${step.act2 ? `<button class="btn sm" id="jAct2">${esc(step.act2.lab)}</button>` : ""}
+             <button class="btn sm" id="jOpen">Abrir la pantalla completa ↗</button>
+             <span style="flex:1"></span>
+             <button class="btn sm" id="jPrev"${jStep === 0 ? " disabled" : ""}>‹ Anterior</button>
+             <button class="btn sm" id="jFwd"${jStep === 12 ? " disabled" : ""}>Siguiente ›</button>
+           </div>
+           ${journeyStepBody(c, jStep)}</div>`;
+
+        $("#jBack").onclick = () => {
+          jSubject = null;
+          render();
+        };
+        v.querySelectorAll("[data-j]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              jStep = Number(b.dataset.j);
+              render();
+            }),
+        );
+        if ($("#jNext"))
+          $("#jNext").onclick = () => {
+            jStep = nextIdx;
+            render();
+          };
+        if ($("#jAct")) $("#jAct").onclick = () => step.act.run();
+        if ($("#jAct2")) $("#jAct2").onclick = () => step.act2.run();
+        v.querySelectorAll("[data-inv]").forEach(
+          (tr) => (tr.onclick = () => invoiceDrawer(tr.dataset.inv)),
+        );
+        $("#jOpen").onclick = () =>
+          go(meta.route, c.project && meta.route === "progress" ? c.project.code : undefined);
+        $("#jPrev").onclick = () => {
+          jStep = Math.max(0, jStep - 1);
+          render();
+        };
+        $("#jFwd").onclick = () => {
+          jStep = Math.min(12, jStep + 1);
+          render();
+        };
+      };
+
+      /* The records behind the phase, drawn in the table and the status pills the
+         rest of the workspace uses. Not a summary of them — the rows themselves, so
+         the screen answers «cuál presupuesto, cuál pedido, cuál factura» without
+         going anywhere. */
+      function journeyStepBody(c, i) {
+        const k = JOURNEY[i].k;
+        const T = (head, rows) => {
+          if (!rows.length) return "";
+          const th = head.map((h) => `<th>${esc(h)}</th>`).join("");
+          return `<div class="scroll"><table><thead><tr>${th}</tr></thead><tbody>${rows.join(
+            "",
+          )}</tbody></table></div>`;
+        };
+        const p = c.project;
+        if (k === "lead" && c.opp)
+          return T(
+            ["Fecha", "Trabajo", "Origen", "Estado"],
+            [
+              `<tr><td>${fmtD(c.opp.date)}</td><td class="k">${esc(c.opp.requestedWork)}</td><td>${esc(
+                erp.listLabel("leadSources", c.opp.source) || c.opp.source,
+              )}</td><td><span class="pill ${
+                (OPP_STATUS[c.opp.status] || ["", ""])[1]
+              }">${esc((OPP_STATUS[c.opp.status] || [c.opp.status])[0])}</span></td></tr>`,
+            ],
+          );
+        if (k === "visit" && c.opp)
+          return T(
+            ["Fecha", "Responsable", "Estado"],
+            erp.state.visits
+              .filter((v) => v.opportunityId === c.opp.id)
+              .map(
+                (v) =>
+                  `<tr><td class="k">${fmtD(v.completedAt || v.scheduledAt)}</td><td>${esc(
+                    v.owner === "operations" ? "Obra" : "Oficina",
+                  )}</td><td><span class="pill ${v.status === "done" ? "g" : "b"}">${
+                    v.status === "done" ? "Realizada" : "Programada"
+                  }</span></td></tr>`,
+              ),
+          );
+        if ((k === "budget" || k === "sent" || k === "accepted") && c.budget)
+          return T(
+            ["Versión", "Fecha", "Importe", "Estado"],
+            (c.budget.versions || []).map((ver) => {
+              const t = erp.budgetTotals(c.budget.id, ver.id);
+              const isAccepted = c.budget.acceptedVersionId === ver.id;
+              let mark = '<span class="pill y">Borrador</span>';
+              if (isAccepted) mark = '<span class="pill g">Aceptada</span>';
+              else if (ver.issued)
+                mark = '<span class="pill b">Enviada</span> <span class="pill b">Congelada</span>';
+              return `<tr><td class="k">${esc(ver.vNumber)}</td><td>${fmtD(
+                (ver.sent || {}).date || ver.date,
+              )}</td><td class="num">${eur0(t.grandCents)}</td><td>${mark}</td></tr>`;
+            }),
+          );
+        if (k === "contract" && c.contract)
+          return T(
+            ["Contrato", "Fecha", "Importe", "Estado"],
+            [
+              `<tr><td class="k">${esc(c.contract.number)}</td><td>${fmtD(
+                c.contract.date,
+              )}</td><td class="num">${eur0(c.contract.totalCents)}</td><td><span class="pill ${
+                c.contract.signature.customerSignedAt ? "g" : "y"
+              }">${
+                c.contract.signature.customerSignedAt ? "Firmado" : "Pendiente de firma"
+              }</span></td></tr>`,
+            ],
+          );
+        if (k === "purchases" && p)
+          return T(
+            ["Pedido", "Proveedor", "Importe", "Estado"],
+            erp.state.purchases
+              .filter((x) => x.projectId === p.id)
+              .map((x) => {
+                const l = PURCHASE_STAGE_LABEL[erp.purchaseStage(x)] || ["", ""];
+                return `<tr><td class="k">${esc(x.number)}</td><td>${esc(
+                  erp.party(x.supplierId).name,
+                )}</td><td class="num">${eur0(x.totalCents)}</td><td><span class="pill ${
+                  l[1]
+                }">${esc(l[0])}</span></td></tr>`;
+              }),
+          );
+        if ((k === "invoicing" || k === "collections") && p)
+          return T(
+            ["Factura", "Fecha", "Importe", "Pendiente"],
+            erp.state.invoices
+              .filter((x) => x.projectId === p.id && x.kind !== "creditNote")
+              .map((x) => {
+                const out = erp.invoiceOutstandingCents(x.id);
+                return `<tr class="click" data-inv="${esc(x.number)}"><td class="k">${esc(
+                  x.number,
+                )}</td><td>${fmtD(x.date)}</td><td class="num">${eur0(
+                  x.totalCents,
+                )}</td><td class="num">${
+                  out > 0
+                    ? `<span class="pill y">${eur0(out)}</span>`
+                    : '<span class="pill g">Cobrada</span>'
+                }</td></tr>`;
+              }),
+          );
+        if (k === "payments" && p)
+          return T(
+            ["Factura", "Proveedor", "Importe", "Pendiente"],
+            erp.state.bills
+              .filter((b) => (b.allocations || []).some((a) => a.projectId === p.id))
+              .map((b) => {
+                const out = erp.billOutstandingCents(b.id);
+                return `<tr><td class="k">${esc(b.number)}</td><td>${esc(
+                  b.supplierName || "",
+                )}</td><td class="num">${eur0(b.totalCents)}</td><td class="num">${
+                  out > 0
+                    ? `<span class="pill y">${eur0(out)}</span>`
+                    : '<span class="pill g">Pagada</span>'
+                }</td></tr>`;
+              }),
+          );
+        if ((k === "execution" || k === "close" || k === "works") && p) {
+          const e = erp.projectEconomics(p.id);
+          return `<div class="daylist">
+            ${journeyRow(["Venta actual", eur0(e.currentRevenueCents)])}
+            ${journeyRow(["Coste comprometido", eur0(e.committedCents)])}
+            ${journeyRow(["Coste real", eur0(e.actualCents)])}
+            ${journeyRow(["Margen previsto", eur0(e.marginForecastCents)])}
+            ${journeyRow(["Avance", e.progressPct + "%"])}</div>`;
+        }
+        return "";
+      }
+
+      function journeyPicker(v) {
+        $("#headact").innerHTML = "";
+        renderMasterList(v, {
+          id: "journey",
+          noExport: true,
+          newLabel: "＋ Nueva oportunidad",
+          onNew: () =>
+            newOpportunityDrawer(null, { onCreated: (rec) => journeyOpen("opp:" + rec.id) }),
+          ids: { q: "jQ", size: "jSize", prev: "jPrev2", next: "jNext2", newBtn: "jNew" },
+          nounSingular: "recorrido",
+          nounPlural: "recorridos",
+          searchPlaceholder: "Buscar por código o cliente…",
+          emptyText: "Ningún recorrido coincide con la búsqueda.",
+          baseRows: journeyRows(),
+          matches: (r, q) => (r.code + " " + r.party + " " + r.work).toLowerCase().includes(q),
+          columns: [
+            { label: "Código", primary: true, get: (r) => r.code },
+            { label: "Cliente", get: (r) => r.party },
+            { label: "Trabajo", get: (r) => r.work },
+            {
+              label: "Fase",
+              /* The tone is the PHASE's own, not a second opinion about it: the
+                 same pill the recorrido shows when you open it, so the register and
+                 the screen behind it can never disagree. Number and name are
+                 separate nodes for the reason `journeyCount` exists. */
+              html: (r) =>
+                `<span class="pill ${r.tone}"><span>${r.at + 1}</span> · <span>${esc(
+                  JOURNEY[r.at].lab,
+                )}</span></span>`,
+            },
+            {
+              label: "Siguiente paso",
+              get: (r) => journeyNextLabel(r.next),
+            },
+            { label: "Importe", html: (r) => `<span class="num">${eur0(r.amount)}</span>` },
+          ],
+          onRowClick: (id) => {
+            journeySelect(id);
+            render();
+          },
+        });
+      }
+
       /* The invitation, shown rather than claimed. `delivered` is false whenever no
          mail actually left — the screen then hands the admin the link instead of a
          success message for a message nobody will receive. */
@@ -23158,7 +24037,7 @@
        * and nothing is half-created in the meantime: a draft that never
        * reaches `addOpportunity` leaves no trace, which is the point.
        */
-      function newOpportunityDrawer(draft) {
+      function newOpportunityDrawer(draft, opts) {
         const d = draft || {};
         const custs = erp.state.parties.filter((p) => p.active && p.roles.includes("customer"));
         // A client the draft names but that is no longer selectable (the detour
@@ -23197,13 +24076,14 @@
           if (e.target.value === NEW_PARTY) {
             const draftNow = takeDraft();
             newPartyDrawer("customer", {
-              back: () => newOpportunityDrawer(draftNow),
+              back: () => newOpportunityDrawer(draftNow, opts),
               // The client the operator just described is the one they meant to
               // pick, so it arrives selected. Its inmueble is cleared because it
               // belonged to the previous client and a brand-new one has none.
               onCreated: (rec) =>
                 newOpportunityDrawer(
                   Object.assign({}, draftNow, { partyId: rec.id, propertyId: "" }),
+                  opts,
                 ),
             });
             return;
@@ -23218,9 +24098,9 @@
           const draftNow = takeDraft();
           propertyDrawer(null, {
             partyId: chosen,
-            back: () => newOpportunityDrawer(draftNow),
+            back: () => newOpportunityDrawer(draftNow, opts),
             onSaved: (rec) =>
-              newOpportunityDrawer(Object.assign({}, draftNow, { propertyId: rec.id })),
+              newOpportunityDrawer(Object.assign({}, draftNow, { propertyId: rec.id }), opts),
           });
         };
         wireCreatableSelect("#o_next", "nextActions", "Próxima acción");
@@ -23230,7 +24110,7 @@
             if (!$("#o_party").value || $("#o_party").value === NEW_PARTY)
               throw new Error("Hace falta un cliente");
             if (!work) throw new Error("Describe el trabajo solicitado");
-            erp.addOpportunity(
+            const rec = erp.addOpportunity(
               {
                 partyId: $("#o_party").value,
                 propertyId:
@@ -23245,7 +24125,7 @@
               "backoffice",
             );
             closeDrawer();
-            go("leads");
+            afterCreate(opts, rec, "leads");
           }, "Oportunidad creada");
       }
 
@@ -23369,7 +24249,7 @@
           String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0")
         );
       }
-      function scheduleVisitDrawer(opportunityId) {
+      function scheduleVisitDrawer(opportunityId, opts) {
         const o = erp.state.opportunities.find((x) => x.id === opportunityId);
         if (!o) return;
         // A second visit is normal — a revisit before quoting, a measurement
@@ -23407,7 +24287,7 @@
             // it — so the refusal lives here, where it cannot be bypassed.
             if (date < floor)
               throw new Error("No se puede programar una visita en una fecha pasada");
-            erp.scheduleVisit(
+            const rec = erp.scheduleVisit(
               {
                 opportunityId,
                 propertyId: o.propertyId,
@@ -23419,7 +24299,7 @@
               "backoffice",
             );
             closeDrawer();
-            go("visits");
+            afterCreate(opts, rec, "visits");
           }, "Visita programada");
       }
 
@@ -23674,7 +24554,7 @@
               go("quotes", b.id);
             }, "Presupuesto creado desde la visita");
       }
-      function newQuickProjectDrawer() {
+      function newQuickProjectDrawer(opts) {
         const db = openDrawer("Nuevo proyecto");
         db.innerHTML = `<div class="fgrid">
          <div class="field full"><label>Cliente *</label><select id="n_party">${partyOptions((p) => p.roles.includes("customer"))}</select></div>
@@ -23697,7 +24577,7 @@
             if (!$("#n_party").value) throw new Error("Hace falta un cliente");
             if (!desc) throw new Error("Describe el trabajo");
             if (val <= 0) throw new Error("El valor de venta debe ser mayor que cero");
-            erp.createQuickProject(
+            const rec = erp.createQuickProject(
               {
                 partyId: $("#n_party").value,
                 desc,
@@ -23707,7 +24587,7 @@
               "backoffice",
             );
             closeDrawer();
-            go("progress");
+            afterCreate(opts, rec, "progress");
           }, "Proyecto creado");
       }
       function newTaskDrawer() {

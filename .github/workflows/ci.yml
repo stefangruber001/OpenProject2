@@ -146,11 +146,16 @@ jobs:
         if: always()
         run: node tests/i18n/coverage.mjs
 
+      # 668/845 → 91/67 (2026-09-04). Not translation work and not a claim of
+      # any: `journey.html` was a 5,455-line page of its own and carried most of
+      # both totals. It is a forwarding stub since the recorrido became
+      # erp.html#journey, so it leaves this list — and what it used to hold is
+      # measured by the booted-workspace audit below, which runs at zero.
       - name: Translation coverage (rendered pages)
         if: always()
         run: |
-          node tests/i18n/audit.mjs --lang en --max 668
-          node tests/i18n/audit.mjs --lang ca --max 845
+          node tests/i18n/audit.mjs --lang en --max 91
+          node tests/i18n/audit.mjs --lang ca --max 67
 
       # The one above reads erp.html on a static server, where the workspace
       # shell never finishes booting — so it sees the login chrome and misses
@@ -167,6 +172,11 @@ jobs:
       # one cell rendering "v1.0" and "· 2 versiones" as separate text nodes,
       # which no dictionary rule could ever match, and a rule written for
       # exactly that cell had been sitting unused since it was added.
+      #
+      # 2026-09-04: `#journey` joins the route list. PRY-04 used to be a page and
+      # was measured by the static audit above; it is a screen now, so it is
+      # measured here, where the screens are, and at the same zero — the fifty-one
+      # entries the recorrido needed were written rather than budgeted for.
       - name: Translation coverage (booted workspace)
         if: always()
         run: |
@@ -196,11 +206,15 @@ jobs:
       # translation entry. It is developer prose, never shown to a user; the
       # honest fix is the ceiling, not rewording a comment to dodge the
       # scanner. See ASSUMPTIONS #183.
+      #
+      # 205 → 162 (2026-09-04). The recorrido added fifty-one literals and every
+      # one of them got an entry; the drop is `journey.html`, which had ninety-odd
+      # of its own and is now a stub. Down, and onto the measurement.
       - name: Translation coverage (source literals)
         if: always()
         run: |
-          node tests/i18n/source-audit.mjs --lang en --max 205
-          node tests/i18n/source-audit.mjs --lang ca --max 205
+          node tests/i18n/source-audit.mjs --lang en --max 162
+          node tests/i18n/source-audit.mjs --lang ca --max 162
 
       # THE CEILINGS ARE THE MEASUREMENT, NOT A BUDGET. They were 256 and 335
       # against an actual 239 and 234 — a hundred strings of headroom in
@@ -278,11 +292,20 @@ jobs:
       # tens, not in ones. Dictionary COMPLETENESS is pinned exactly and
       # separately by `Translation completeness (dictionary)` above, which has
       # no variance because it reads files rather than driving a browser.
+      #
+      # 41/101 → 34/96 (2026-09-04). The crawl now walks 64 pages rather than the
+      # set it walked before: `journey.html` left STATIC_PAGES when the recorrido
+      # stopped being a page, and `#journey` joined DISCOVER_ROUTES because the
+      # menu entry no longer carries `href`. Measured at 31 and 93 — the one
+      # string the recorrido itself contributed was the «de» that both this
+      # screen and `countTag` build a count around, and it was translated rather
+      # than budgeted for. The three strings of slack above are kept for the
+      # reason the paragraph above them gives.
       - name: Translation coverage (translator miss ledger)
         if: always()
         run: |
-          node tests/i18n/miss-crawl.mjs --lang en --max 41
-          node tests/i18n/miss-crawl.mjs --lang ca --max 101
+          node tests/i18n/miss-crawl.mjs --lang en --max 34
+          node tests/i18n/miss-crawl.mjs --lang ca --max 96
 
   bundle:
     name: Capability bundle (build, browser-safety, drift)
