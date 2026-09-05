@@ -81,6 +81,11 @@ tab bar the shell draws, because that belongs to the shell and not the page.
 Replace them with device captures from TestFlight if you prefer — same
 filenames, they sort in display order.
 
+They are **committed**, which is the only reason the submission workflow can
+find them: it checks the repository out clean on a fresh machine, so a
+screenshot that lives only on someone's laptop is a screenshot Apple never sees.
+Regenerate them with `node scripts/app-store-shots.mjs` and commit the result.
+
 ### The submission — one click
 
 `.github/workflows/ios-release.yml` — Actions → **iOS · App Store submission** →
