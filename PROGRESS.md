@@ -2166,5 +2166,37 @@ was a picker choosing whichever supplier came first for a document that matched
 nobody. A tax id compared to a tax id is the identifier the law uses to say two
 records are one company.
 
+**S10 · The hours screen becomes two screens, for two audiences.** The day
+sheet measured 18,361 px on a day with NO hours: the correction register was
+printed underneath it, sixty entries deep. It is a tab of its own now, the
+office gets a card per person under a week strip with every field editable in
+Corrections, and the day fits on a screen.
+
+**S11 · The site worker, and the boundary that was only a label.** The `site`
+role named a set of permissions and nothing consulted them: `POST /erp/command`
+checked none, and `PUT /erp/state` accepted a whole client-computed document
+from anybody signed in. An account meant to type its own hours could rewrite
+the invoice register, and its state response carried every bank line.
+
+The enforcement is on the wire now — per-command permissions, ownership and
+assigned-site checks on the six hours commands, `erp.write` required to save a
+whole document, and a read that is BUILT for the worker rather than filtered.
+On top of that, and only in agreement with it, the two worker screens: type
+your hours, see your own totals, no amount and nobody else. `tests/server-e2e`
+now signs in as a real account, and the deploy's smoke job runs a second copy
+of the same image behind a real login to check the four refusals and the
+redaction against Postgres before anything is promoted.
+
+Two things that gate caught before production, both mine: the new permission
+check locked a single-seat deployment's only operator out of their own ERP
+(`ERP_OPERATOR` has no account row for `may()` to read), and five calls in the
+suite carried no session cookie. Both fixed and pinned. A third — an invitation
+issued for a tenant that is not the deployment's own leaves an account that can
+never sign in — is real, is not mine, and is written down as ASSUMPTIONS.md S74
+rather than patched at speed on a deploy gate.
+
 **Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
-("Forget about this for the moment") and still the oldest unanswered item.
+("Forget about this for the moment") and still the oldest unanswered item. It
+is now also what the site worker's phone waits on: the screens themselves reach
+the existing build over the air, but `nav.json` is bundled, so the single-tab
+bar for that role needs a new build.
