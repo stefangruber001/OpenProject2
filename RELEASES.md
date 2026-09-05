@@ -25,6 +25,24 @@ Confirmed live: `/api/health` over the public address reports `status ok`,
 > any phone, and it is the FIRST thing to check, not the confirmation of a
 > theory formed without it. The real fault was in the app — see below.
 
+## TestFlight build 12 — the site worker's tab bar
+
+**1.1 build 12**, from `38adc51`, uploaded 2026-09-05 03:25 and processed.
+
+The hours redesign itself does NOT need it: the shell loads the live URL, so
+both the office's three tabs and the site worker's two screens reach an older
+build on the next launch. What needs a binary is `nav.json`, which is bundled —
+and it now carries a second tab set. A `site` account gets ONE tab, «Horas /
+Hores / Hours», generated from the same `SECTIONS` and the same dictionary as
+the other six.
+
+The bar follows the role a launch late, because the shell draws it before the
+first request completes. That is deliberate and it is safe here for a reason
+worth writing down rather than assuming: a tab is a URL into the web app, the
+web app sends a site worker back to the hours screen from every route, and the
+server refuses every write the account may not make. A stale bar is untidy, not
+open.
+
 ## The iOS app against v101
 
 **Install v1.1 build 8** (`becd9f9`, uploaded 2026-08-10 06:23). Builds 6 and 7
