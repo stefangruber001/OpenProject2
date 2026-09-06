@@ -6,6 +6,7 @@
  * needed, which keeps the login page working in the phone app's web view even
  * if something else on the page fails to load.
  */
+import { json, NO_STORE } from "@/lib/api";
 import { isSharedPassword, loginConfigured } from "@/lib/auth";
 import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
 import { authenticateUser } from "@/lib/user-admin";
@@ -49,7 +50,14 @@ function isSecureRequest(req: Request): boolean {
  * is explicitly allowed. It also cannot be tricked into pointing off-site.
  */
 function redirect(path: string, extraHeaders: [string, string][] = []): Response {
-  const res = new Response(null, { status: 303, headers: { Location: path } });
+  // Never stored. This response is what CARRIES the session cookie; a browser
+  // replaying it from cache would be replaying somebody's sign-in, and one
+  // replayed without its Set-Cookie is a sign-in that appears to work and
+  // leaves you signed out.
+  const res = new Response(null, {
+    status: 303,
+    headers: { Location: path, "cache-control": NO_STORE },
+  });
   for (const [k, v] of extraHeaders) res.headers.append(k, v);
   return res;
 }
@@ -61,12 +69,12 @@ function back(params: Record<string, string>): Response {
 
 export async function POST(req: Request): Promise<Response> {
   if (!loginConfigured()) {
-    return Response.json(
+    return json(
       {
         error: "CONFIG_INVALID",
         message: "Sign-in is not configured on this server (ERP_USERS and SESSION_SECRET).",
       },
-      { status: 500 },
+      500,
     );
   }
 

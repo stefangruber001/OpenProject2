@@ -164,7 +164,13 @@
   }
 
   function remoteLoadState() {
+    /* NEVER FROM A CACHE. This response is redacted for whoever asked — a site
+       worker's document has no invoice register and no bank lines in it — so a
+       stored copy replayed into the next session on the same device is exactly
+       the boundary R2.3 exists to hold. The server sends no-store now; asking
+       for it here too means the rule does not depend on every hop agreeing. */
     return fetch(stateUrl(), {
+      cache: "no-store",
       credentials: "same-origin",
       headers: { accept: "application/json" },
     })

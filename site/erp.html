@@ -5648,7 +5648,16 @@
         if (ErpStore.isRemote()) {
           try {
             const base = ErpStore.apiBase() || "";
+            /* `no-store` on the request as well as the response. The server
+               now says it, which is the fix; this says it from the side that
+               cannot be undone by a proxy, a service worker or a web view with
+               its own ideas. The answer to «who is holding this phone» is the
+               one thing that must never come from a copy: it was served from
+               one, and the workspace wore the previous account's name and
+               permission while every write was correctly refused. */
             const res = await fetch(base + "/api/~/session", {
+              cache: "no-store",
+              credentials: "same-origin",
               headers: { "content-type": "application/json" },
             });
             if (res.ok) SESSION = await res.json();
@@ -22576,9 +22585,29 @@
 
       async function usersApi(path, opts) {
         const base = ErpStore.apiBase() || "";
+        /* NEVER FROM A CACHE, and the REFUSAL is the reason. This URL is the
+           same string in every session, and the answer to it depends entirely
+           on who is asking — an administrator gets the list, anybody else gets
+           a 401. That refusal is an ordinary response with an ordinary body, so
+           a browser stored one and handed it back after the next sign-in: an
+           administrator was shown «no permission to user.manage», which is a
+           sentence only a site worker's session can produce.
+
+           The server now says no-store on every answer including the errors,
+           which is the fix. Saying it on the REQUEST as well is what rescues a
+           device that already stored one, because no-store on new responses
+           does not evict old entries — a request made this way skips the store
+           altogether instead of waiting for somebody to clear it by hand. */
         const res = await fetch(
           base + "/api/~/users" + (path || ""),
-          Object.assign({ headers: { "content-type": "application/json" } }, opts || {}),
+          Object.assign(
+            {
+              cache: "no-store",
+              credentials: "same-origin",
+              headers: { "content-type": "application/json" },
+            },
+            opts || {},
+          ),
         );
         const data = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(data.message || data.error || "HTTP " + res.status);

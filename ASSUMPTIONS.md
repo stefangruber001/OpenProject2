@@ -8745,3 +8745,45 @@ fitting — not one famous phone's width.
 The test that pinned the old shape counted to five; it counts to six now and
 also fails on a label so squeezed its own name is cut, which is the bar saying
 it is full one section before a scrollbar says so.
+
+**S84 · Not one API response told the browser not to store it, and two accounts
+on one phone is where that surfaced.** `dynamic = "force-dynamic"` governs the
+SERVER's own caching and emits no header at all — measured against a running
+build, these responses went out with nothing but a content-type: no
+`Cache-Control`, no `Expires`, no `ETag`, no `Last-Modified`. A 200 with no
+freshness information and no validator is one a browser may store and hand back
+later, on the same device, to whoever signs in next.
+
+The operator found it by doing the obvious thing: sign out as the administrator,
+sign in as a site worker. The workspace painted the administrator's name and
+ADMINISTRATOR permission from a stored `/api/~/session`, while every write was
+correctly refused — client and server disagreeing about who was holding the
+phone. Signing back in as the administrator then showed «no permission to
+user.manage», which is a sentence only a site worker's session can produce: the
+401 from the previous session had been stored under the same URL and replayed.
+
+**The label was the visible half.** The same silence covered `/erp/state`, which
+is redacted per role — a site worker's document carries no invoice register and
+no bank lines. A stale administrator copy replayed into a site-worker session is
+exactly the boundary R2.3 exists to hold, and nothing anywhere would have said
+so.
+
+Fixed at `json()`, the one helper every route answers through, errors included,
+plus the four routes that build a `Response` themselves — login and logout
+_carry_ the cookie, and one replayed without its `Set-Cookie` is a sign-in that
+appears to work and leaves you signed out.
+
+Two things worth keeping:
+
+**`no-store` does not evict what is already stored.** Shipping the header fixes
+every response from then on and does nothing for the copies already on a device.
+That is why the three requests whose answer depends on who asked — session,
+state, users — also pass `cache: "no-store"` on the REQUEST: such a request
+skips the store entirely, so a poisoned device is correct on next launch instead
+of needing somebody to clear the app by hand.
+
+**`require_` throws `UNAUTHENTICATED` for a permission failure.** That is how
+the operator's screenshot could be read at all — the code says "not signed in"
+where the truth is "signed in, not allowed". It is not wrong enough to change
+under a caching fix, but it costs a minute of misdiagnosis every time somebody
+reads it, and the honest code is FORBIDDEN.

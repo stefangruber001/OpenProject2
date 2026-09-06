@@ -196,6 +196,44 @@ async function main() {
     check("its scripts are served too", engine.ok, `erp-engine.js HTTP ${engine.status}`);
   }
 
+  // --- NOTHING PER-ACCOUNT MAY BE STORED BY A BROWSER ----------------------
+  //
+  // Every answer here is shaped by who asked: the session route says who you
+  // are, the state route is redacted per role. Served with no `Cache-Control`,
+  // no `Expires` and no validator — which is what a `force-dynamic` route
+  // handler emits, measured, nothing but a content-type — a browser may store
+  // the response and hand it back on the same device to whoever signs in next.
+  //
+  // That is not a theory. An administrator signed out on a phone, a site worker
+  // signed in, and the workspace painted the administrator's name and
+  // ADMINISTRATOR permission while every write was correctly refused: the
+  // client reading a stored `/api/~/session` while the server knew perfectly
+  // well who was holding the phone. The label was the visible half; the same
+  // silence covers `/erp/state`, where the stale copy is the invoice register.
+  //
+  // Checked on the wire rather than by reading the source, because the header
+  // has to survive the route, the framework and the proxy in front of it.
+  {
+    for (const path of [
+      `/api/${TENANT}/session`,
+      `/api/${TENANT}/erp/state`,
+      `/api/${TENANT}/erp/version`,
+      `/api/${TENANT}/control-tower`,
+    ]) {
+      const res = await api(path);
+      const cc = (res.headers.get("cache-control") ?? "").toLowerCase();
+      check(`${path} tells the browser not to store it`, cc.includes("no-store"), cc || "(none)");
+    }
+    // The two that carry the cookie itself. One replayed from a cache without
+    // its Set-Cookie is a sign-in that appears to work and leaves you signed
+    // out — or a sign-out that appears to work and leaves you signed in.
+    for (const path of ["/api/auth/login", "/api/auth/logout"]) {
+      const res = await fetch(`${BASE}${path}`, { method: "POST", redirect: "manual" });
+      const cc = (res.headers.get("cache-control") ?? "").toLowerCase();
+      check(`${path} is never stored`, cc.includes("no-store"), `HTTP ${res.status} · ${cc}`);
+    }
+  }
+
   // --- reading state ------------------------------------------------------
   let version;
   {

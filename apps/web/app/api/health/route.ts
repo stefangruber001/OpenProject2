@@ -1,3 +1,4 @@
+import { json } from "@/lib/api";
 import { env } from "@/lib/env";
 
 // Never cache — this reflects live process/database state.
@@ -28,7 +29,12 @@ export async function GET() {
     }
   }
 
-  return Response.json({
+  // Through `json()` for its no-store: `dynamic = "force-dynamic"` governs the
+  // SERVER's caching and emits no header, so a probe answered from a cache
+  // would report the liveness of a moment that has passed — and the revision
+  // of an image that is no longer running, which is the exact failure this
+  // route was added to catch.
+  return json({
     status: "ok",
     database,
     revision: process.env.BUILD_REVISION || "unknown",

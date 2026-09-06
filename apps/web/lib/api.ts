@@ -1,12 +1,46 @@
 import { isFactoryError } from "@repo/kernel";
 
+/**
+ * What every API answer must carry.
+ *
+ * NO-STORE, AND IT IS NOT BELT-AND-BRACES. Every answer here is shaped by WHO
+ * ASKED: the session route says who you are, the state route is redacted per
+ * role, the register is a different document for a site worker than for the
+ * office. A response with no `Cache-Control`, no `Expires` and no validator is
+ * one a browser may store and hand back later on the same device — to whoever
+ * is signed in next.
+ *
+ * That is not hypothetical. `dynamic = "force-dynamic"` governs the SERVER's
+ * own caching and emits no header at all: measured on a running build, these
+ * responses went out with nothing but a content-type. An administrator signed
+ * out on a phone, a site worker signed in, and the workspace painted the
+ * administrator's name and permission from a stored copy of `/api/~/session`
+ * while every write was correctly refused — the client and the server
+ * disagreeing about who was holding the phone.
+ *
+ * The label was the visible half. The same silence applies to `/erp/state`,
+ * where the stale copy is the invoice register and the bank lines that R2.3
+ * exists to keep away from a site account.
+ *
+ * `private` as well as `no-store`: no-store is the instruction that matters,
+ * and private says the quiet part to any intermediary that treats no-store
+ * loosely — this is one person's data, never a shared cache's.
+ */
+const NO_STORE = "no-store, private";
+
 /** Uniform JSON responses + FactoryError mapping for the tenant API. */
 export function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data, null, 2), {
     status,
-    headers: { "content-type": "application/json; charset=utf-8" },
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": NO_STORE,
+    },
   });
 }
+
+/** For the few routes that answer with something other than JSON. */
+export { NO_STORE };
 
 export async function guarded(fn: () => Promise<Response>): Promise<Response> {
   try {
