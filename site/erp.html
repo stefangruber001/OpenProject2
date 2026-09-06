@@ -353,6 +353,13 @@
         background: var(--hair);
         margin: 5px 2px;
       }
+      /* The sign-out is a real form so it works without JavaScript. A form is a
+         block with a margin of its own in several user-agent stylesheets, which
+         would drop that one row off the rhythm every other row keeps. The
+         button inside it is already `.menu button`, so nothing else is needed. */
+      .menu form.mout {
+        margin: 0;
+      }
       /* The language switch, inside the profile menu.
          `.menu button` turns every child into a full-width block row, which is
          right for a command and wrong for one of three choices. Re-declared with
@@ -7065,12 +7072,39 @@
         const whoRow = `<div class="mwho"><b>${esc(SESSION.name || SESSION.email || "—")}</b>
           <span data-role="${esc(role)}">${esc(roleName)}</span></div>
           <div class="sep"></div>`;
+        /* SIGNING OUT — last, and only where there is a session to end.
+           This menu is where a person comes to check which account they are on
+           — the name and the permission are the first thing in it — so the way
+           off that account belongs next to the answer rather than hidden in
+           Configuración. Last in the list and behind its own rule, because it
+           is the one entry that ends what you were doing.
+
+           DRAWN ONLY WHEN THERE IS A SERVER. `ErpStore.isRemote()` is the same
+           question `paintUserBadge` already asks before it shows initials: the
+           published static copy has nobody signed in, so a sign-out there would
+           clear nothing and navigate to a login page that does not exist on
+           that host. A dead control that looks live is worse than no control.
+
+           A REAL FORM POST, not a fetch. The route answers with a 303 to the
+           login page and a cleared cookie precisely so that signing out needs
+           no JavaScript — the same reasoning that keeps the login page a plain
+           form for the phone's web view. Letting the browser submit it is also
+           what puts the login screen on screen, with no code here to get that
+           wrong. And POST rather than a link, because a GET would let any page
+           on the internet sign somebody out with an image tag. */
+        const outRow = ErpStore.isRemote()
+          ? `<div class="sep"></div>
+             <form class="mout" method="post" action="${esc((ErpStore.apiBase() || "") + "/api/auth/logout")}">
+               <button type="submit" id="uLogout">⇥ Cerrar sesión</button>
+             </form>`
+          : "";
         m.innerHTML = `${whoRow}<a href="company-setup-guide.html">🏁 Guía de puesta en marcha</a>
           <a href="setup-guide.html">📘 Guía de operaciones</a>
           ${langRow}
           <div class="sep"></div>
           <button id="uExport">⤓ Exportar datos</button>
-          <button id="uReset">↻ Recargar datos de demostración</button>`;
+          <button id="uReset">↻ Recargar datos de demostración</button>
+          ${outRow}`;
         m.querySelectorAll("[data-menulang]").forEach(
           (b) =>
             (b.onclick = () => {

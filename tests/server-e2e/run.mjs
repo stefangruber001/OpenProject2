@@ -549,6 +549,69 @@ async function siteWorkerBoundary() {
   );
   if (!siteCookie) return;
 
+  // --- and can sign out again ---------------------------------------------
+  // The menu's sign-out is a plain form post, so this is byte for byte what the
+  // browser sends when somebody taps it. Three things have to hold or the
+  // button lies about what it did:
+  //
+  //   · the answer sends the browser to the login page, which is the only
+  //     reason the person sees a login screen at all;
+  //   · the cookie it sets is an empty one that expires immediately;
+  //   · and a request carrying no cookie no longer reaches the workspace.
+  //
+  // The third is the one worth having. Clearing a cookie and still being able
+  // to open the application is the shape this fails in, and it would look
+  // completely correct from the outside — right redirect, right header.
+  //
+  // What is NOT claimed: that the token is dead. There is no session store to
+  // delete it from (see lib/session-token.ts), so signing out ends the session
+  // ON THIS DEVICE, which is what the word means to the person pressing it.
+  //
+  // Done with the site worker's cookie, not the suite's own: signing out is a
+  // client-side act, so it takes nothing away from the admin session the rest
+  // of this file runs on — but using a throwaway account means that stays true
+  // even if the route ever grows a real revocation.
+  {
+    const res = await fetch(`${BASE}/api/auth/logout`, {
+      method: "POST",
+      headers: { cookie: siteCookie },
+      redirect: "manual",
+    });
+    check("signing out answers with a redirect", res.status === 303, `HTTP ${res.status}`);
+    check(
+      "…and sends the browser to the login page",
+      res.headers.get("location") === "/login",
+      res.headers.get("location") ?? "(no Location)",
+    );
+    const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+    const set = (raw.length ? raw : [res.headers.get("set-cookie") ?? ""]).filter(Boolean);
+    const cleared = set.find((c) => /^[^=]+=;/.test(c) && /Max-Age=0/i.test(c)) ?? "";
+    check(
+      "…clearing the session cookie",
+      Boolean(cleared),
+      cleared || set.join(" | ") || "(no Set-Cookie)",
+    );
+
+    // A GET must not do this. Without that, any page on the internet can sign
+    // one of the crew out with an image tag pointing here — annoying rather
+    // than dangerous, but it is one line of the route and it is worth keeping.
+    const viaGet = await fetch(`${BASE}/api/auth/logout`, { redirect: "manual" });
+    check(
+      "a GET cannot sign somebody out",
+      viaGet.status === 405 || viaGet.status === 404,
+      `HTTP ${viaGet.status}`,
+    );
+
+    // And the cookie really is spent: no cookie, no workspace.
+    const after = await fetch(`${BASE}/workspace/erp.html`, { redirect: "manual" });
+    const landed = after.headers.get("location") ?? "";
+    check(
+      "and afterwards the workspace sends you to the login page",
+      after.status >= 300 && after.status < 400 && landed.includes("/login"),
+      `HTTP ${after.status} → ${landed || "(no Location)"}`,
+    );
+  }
+
   await as(siteCookie, async () => {
     const st = await json(await api(`/api/${TENANT}/erp/state`));
 

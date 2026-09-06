@@ -823,8 +823,9 @@ async function testNoOverflow(browser, base) {
       else bad("mobile: settings reachable", `⚙️ opened "${openedOn}"`);
     } else bad("mobile: settings reachable", "#btnCog not visible at 390px");
 
-    // The profile menu is TWO GUIDES, the language switch, and two data actions
-    // — set up, operate, then your own preferences. Pinned because it has been
+    // The profile menu is TWO GUIDES, the language switch, two data actions and
+    // — where there is a session — the way out of it: set up, operate, your own
+    // preferences, then sign out. Pinned because it has been
     // the dumping ground twice: it grew a beta guide written for one TestFlight
     // round, a link to the recorrido after the recorrido had become a screen of
     // the workspace, and a Configuración shortcut. Each was defensible alone;
@@ -860,6 +861,51 @@ async function testNoOverflow(browser, base) {
     )
       ok(`profile menu: two guides, the language switch on ${menu.lang}, nothing else`);
     else bad("profile menu contents", JSON.stringify(menu));
+
+    // SIGNING OUT, in both of its states, and the second one is the point.
+    //
+    // This published copy has no server, so there is no session to end and the
+    // honest menu has no sign-out — a button that clears nothing and navigates
+    // to a login page this host does not serve is worse than no button. That is
+    // the branch the suite gets for free, and on its own it would mean the row
+    // the whole company actually uses is never looked at by anything.
+    //
+    // So the other branch is driven through the real `buildUserMenu`, with the
+    // store answering the one question the row is gated on the way it answers
+    // on the server. What is checked is what makes it work with no JavaScript:
+    // a form, POSTing — a GET would let any page on the internet sign somebody
+    // out with an image tag — at the route that clears the cookie, drawn last.
+    const out = await page.evaluate(() => {
+      const before = !!document.querySelector("#uLogout");
+      const wasRemote = ErpStore.isRemote;
+      const wasBase = ErpStore.apiBase;
+      ErpStore.isRemote = () => true;
+      ErpStore.apiBase = () => "";
+      buildUserMenu();
+      const f = document.querySelector("#mUser form.mout");
+      const seen = {
+        before,
+        method: (f && f.getAttribute("method") ? f.getAttribute("method") : "").toLowerCase(),
+        action: (f && f.getAttribute("action")) || "",
+        btn: !!document.querySelector("#uLogout"),
+        last: (document.querySelector("#mUser").lastElementChild || {}).tagName || "",
+      };
+      ErpStore.isRemote = wasRemote;
+      ErpStore.apiBase = wasBase;
+      buildUserMenu();
+      seen.afterRestore = !!document.querySelector("#uLogout");
+      return seen;
+    });
+    if (
+      out.before === false &&
+      out.afterRestore === false &&
+      out.btn &&
+      out.method === "post" &&
+      out.action === "/api/auth/logout" &&
+      out.last === "FORM"
+    )
+      ok("profile menu: no sign-out without a session, a form post to the logout route with one");
+    else bad("profile menu: sign-out", JSON.stringify(out));
 
     // And it WORKS: the switch stores the choice and reloads, so the proof is
     // that the page comes back in the other language. Asserted on the menu's own

@@ -2895,6 +2895,7 @@ window.CANEI_DICT = {
     ["🏁 Guía de puesta en marcha", "🏁 Start-up guide"],
     ["📘 Guía de operaciones", "📘 Operations guide"],
     ["⤓ Exportar datos", "⤓ Export data"],
+    ["⇥ Cerrar sesión", "⇥ Sign out"],
     ["↻ Datos de ejemplo", "↻ Sample data"],
     ["🗒️ Nueva tarea", "🗒️ New task"],
     ["🎯 Nueva oportunidad", "🎯 New opportunity"],

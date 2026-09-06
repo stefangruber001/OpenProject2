@@ -2508,6 +2508,7 @@ window.CANEI_DICT.ca = {
   "🏁 Guía de puesta en marcha": "🏁 Guia de posada en marxa",
   "📘 Guía de operaciones": "📘 Guia d'operacions",
   "⤓ Exportar datos": "⤓ Exportar dades",
+  "⇥ Cerrar sesión": "⇥ Tancar la sessió",
   "＋ Oportunidad/visita": "＋ Oportunitat/visita",
   "＋ Tarea": "＋ Tasca",
   "＋ Presupuesto": "＋ Pressupost",
