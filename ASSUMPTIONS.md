@@ -8715,3 +8715,33 @@ and not only in a disposable container.
 `with_demo_password` restores the original contents in an `ensure`, so it also
 cleans up when the upload throws — which is precisely when nobody thinks to
 look. Verified across all four paths (variable set, unset, exception, restore).
+
+**S83 · «Five icons and they FIT» was never measured, and six do.** The mobile
+bottom bar dropped Configuración and the header grew a ⚙️ to compensate — a
+button whose entire existence was a workaround for that one CSS rule (S71). The
+rule's own comment asserted the constraint as fact. Measured now: six tabs fit
+at every width down to **320px** in all three languages, with no scroll on the
+bar, no overflow on the page, not one truncated label, and a narrowest tab of
+**46 × 59px** — above Apple's 44pt minimum on a screen narrower than anything
+Apple still sells.
+
+The workaround also duplicated a route the app already had: `site/nav.json`
+gives the native shell **six** tabs including Configuración, so inside the app
+the gear was a second door to a tab already on screen. That is what the operator
+saw and asked to remove.
+
+Two things follow. **A constraint written as a comment is a claim, not a
+measurement** — this one shaped the navigation and a header button for months on
+nobody's arithmetic. And with the gear gone the header collapses from three rows
+to one on a phone: **163px → 107px**, 56px of a 390px screen returned to the
+work, because the brand and the action cluster were 12px over the width and
+wrapping.
+
+Below 360px the wordmark now hides so that row still fits; the mark alone stays
+the way home, since the convention is the shape in the corner and not the
+letters beside it. The breakpoint is 359px because that is where the row stops
+fitting — not one famous phone's width.
+
+The test that pinned the old shape counted to five; it counts to six now and
+also fails on a label so squeezed its own name is cut, which is the bar saying
+it is full one section before a scrollbar says so.

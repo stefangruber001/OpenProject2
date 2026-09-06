@@ -786,42 +786,69 @@ async function testNoOverflow(browser, base) {
     }
   }
 
-  // The doc asks for a bottom bar of FIVE icons. There are six secciones, so
-  // one has to leave the bar — and it has to STAY left: the failure this
-  // guards against is a seventh section quietly making the bar scroll again,
-  // which is what it did before.
+  // ALL SIX SECTIONS ARE IN THE BOTTOM BAR, and it still does not scroll.
+  //
+  // It used to carry five: Configuración was dropped on the belief that six
+  // would not fit, and the phone was given a ⚙️ in the header instead. Nobody
+  // had measured it. Six fit at every width down to 320px in all three
+  // languages, so the section went back where the other five are and the
+  // header button — which existed only to paper over this rule — is gone.
+  //
+  // What this guards against is unchanged: a seventh section quietly making
+  // the bar scroll. It just counts to six now, and a label that has to be cut
+  // to fit is the honest early warning, so it is checked too.
   try {
     await page.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
     await bootedShell(page);
     await page.waitForTimeout(700);
     const bar = await page.evaluate(() => {
-      const items = [...document.querySelectorAll("#p1 .secitem")];
+      const items = [...document.querySelectorAll("#p1 .secitem")].filter(
+        (n) => n.offsetParent !== null,
+      );
       const rail = document.querySelector("#p1");
       return {
-        visible: items.filter((n) => n.offsetParent !== null).map((n) => n.dataset.sec),
+        visible: items.map((n) => n.dataset.sec),
         scrolls: rail.scrollWidth > rail.clientWidth + 1,
+        // A tab so narrow its own name no longer fits is the bar telling you it
+        // is full, one section before the scrollbar says so.
+        cut: items
+          .map((n) => n.querySelector(".lb"))
+          .filter((l) => l && l.scrollWidth > l.clientWidth + 1)
+          .map((l) => l.textContent.trim()),
+        cog: !!document.querySelector("#btnCog"),
       };
     });
-    if (bar.visible.length === 5 && !bar.scrolls)
-      ok(`mobile: bottom bar is five icons and does not scroll (${bar.visible.join(",")})`);
-    else bad("mobile: five-icon bottom bar", JSON.stringify(bar));
+    if (
+      bar.visible.length === 6 &&
+      bar.visible.includes("settings") &&
+      !bar.scrolls &&
+      !bar.cut.length &&
+      !bar.cog
+    )
+      ok(`mobile: six icons, no scroll, no cut label, no header ⚙️ (${bar.visible.join(",")})`);
+    else bad("mobile: six-icon bottom bar", JSON.stringify(bar));
 
-    // …and the one that left is still reachable, or it is simply missing.
-    //
-    // It used to be a line in the profile menu. That menu is now two guides and
-    // two data actions, so the route is the ⚙️ button in the header — which
-    // exists ONLY for this rule and is hidden on a wide screen, where the
-    // section has its rail icon. Assert it OPENS the section, not merely that it
-    // is drawn: the old check read `#uSettings`, which `.menu button` had been
+    // And the section it regained OPENS. Drawn is not reachable: the check this
+    // replaces once read `#uSettings`, a menu entry `.menu button` had been
     // overriding to visible at every width for months, so it would have passed
-    // just as happily with the button doing nothing.
-    if (await page.locator("#btnCog").isVisible()) {
-      await page.click("#btnCog");
-      await page.waitForTimeout(350);
-      const openedOn = await page.evaluate(() => document.querySelector("#p2h")?.textContent || "");
-      if (/config/i.test(openedOn)) ok(`mobile: the header ⚙️ opens Configuración (${openedOn})`);
-      else bad("mobile: settings reachable", `⚙️ opened "${openedOn}"`);
-    } else bad("mobile: settings reachable", "#btnCog not visible at 390px");
+    // just as happily with the control doing nothing.
+    await page.click('#p1 .secitem[data-sec="settings"]');
+    await page.waitForTimeout(350);
+    const openedOn = await page.evaluate(() => document.querySelector("#p2h")?.textContent || "");
+    if (/config/i.test(openedOn)) ok(`mobile: the Configuración tab opens it (${openedOn})`);
+    else bad("mobile: settings reachable", `the tab opened "${openedOn}"`);
+
+    // THE HEADER IS ONE ROW AGAIN. With the ⚙️ gone the brand and the action
+    // cluster share a line instead of stacking, which is 56px of a 390px-wide
+    // phone screen returned to the work. Asserted as a measurement rather than
+    // a height, because a height is a number somebody will "fix" one day.
+    const head = await page.evaluate(() => {
+      const b = document.querySelector(".brand").getBoundingClientRect();
+      const a = document.querySelector(".gactions").getBoundingClientRect();
+      return { dy: Math.round(Math.abs(b.top - a.top)), h: Math.round(a.height) };
+    });
+    if (head.dy < 4) ok(`mobile: the header is one row — brand and actions level (Δ${head.dy}px)`);
+    else bad("mobile: one-row header", JSON.stringify(head));
 
     // The profile menu is TWO GUIDES, the language switch, two data actions and
     // — where there is a session — the way out of it: set up, operate, your own
@@ -832,7 +859,8 @@ async function testNoOverflow(browser, base) {
     // together they were a second navigation. Assert what belongs AND the
     // absence of what left, or "tidy the menu" is a change that undoes itself.
     //
-    // Close the subsection sheet the ⚙️ just opened FIRST. `.subscrim` is a
+    // Close the subsection sheet the Configuración tab just opened FIRST.
+    // `.subscrim` is a
     // full-screen overlay at z-index 50 and it sits over the header, so the
     // click on the profile button times out with the locator resolved and
     // nothing happening — a failure that reads like a missing button.
@@ -957,7 +985,7 @@ async function testNoOverflow(browser, base) {
 
 // ── Smoke: each app-surfaced page loads with a title and no errors.
 // ── S14 · Mobile (§3). Tables become two-line cards, the side menu is already
-//    a five-icon bottom bar (see testNoOverflow), and frequent site actions sit
+//    a six-icon bottom bar (see testNoOverflow), and frequent site actions sit
 //    behind a floating button that is three taps from done.
 async function testMobile(browser, base) {
   const pg = await browser.newPage({

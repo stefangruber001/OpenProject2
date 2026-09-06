@@ -290,20 +290,6 @@
         border-color: #5b9bc4;
         color: #1f5878;
       }
-      /* The phone's route to Configuración. On a wide screen the section has an
-         icon in the rail and this button would be a second way to the same
-         place; on a phone the rail becomes a five-icon bar and Configuración is
-         the one that leaves it, so without this there is NO route at all.
-
-         Declared hidden HERE, early, on purpose: the phone rule that shows it
-         lives in the bottom-of-file media block and carries the same
-         specificity, so whichever is written later wins. `.mobonly` is the
-         cautionary tale — it is declared after its own media query and is
-         therefore a no-op everywhere it is not rescued by a more specific
-         selector. */
-      .gactions .cog {
-        display: none;
-      }
       .menuwrap {
         position: relative;
       }
@@ -4943,7 +4929,7 @@
      The iOS app is a shell around these pages and appends `CaneiApp/…` to its
      user agent so they can tell. Until now nothing read it, which meant a
      phone inside the app showed THREE things stacked at the bottom: the web's
-     own five-icon bar, the native floating tab bar over it, and — since S14 —
+     own section bar, the native floating tab bar over it, and — since S14 —
      the site-action button positioned to clear the web bar that is no longer
      the one in front.
 
@@ -4952,7 +4938,7 @@
      load). What the native bar cannot do is reach the twenty-nine
      subsecciones, so the breadcrumb becomes the opener for panel 2 — one tap,
      from anywhere, to the same list the web bar used to show. */
-      /* The five-icon strip stands down; the rail itself does NOT, because it
+      /* The web's section strip stands down; the rail itself does NOT, because it
      is what panel 2 is positioned against — hiding it takes the subsection
      list with it. It is made transparent to taps, so only the panel it
      carries is interactive.
@@ -5086,17 +5072,19 @@
           height: auto;
           z-index: 55;
         }
-        /* Five icons, and they FIT — no horizontal scroll. There are six
-       secciones, so one has to leave the bar: Configuración, because it is
-       the one nobody reaches for on a phone on site. It keeps a route — the
-       ⚙️ button in the header, right of the period and left of the profile.
-       That button exists FOR this rule: hide the section here without adding
-       it there and the phone loses Configuración altogether, which is where
-       the company's own record, its people and its chapters are entered. */
-        .gactions .cog {
-          display: inline-flex;
-          align-items: center;
-        }
+        /* SIX ICONS, AND THEY FIT. This bar used to drop Configuración and
+       hand the phone a ⚙️ in the header instead, on the belief that five was
+       the most that would fit without a horizontal scroll. That was never
+       measured. Six were, at every width down to 320px and in all three
+       languages: no scroll on the bar, no overflow on the page, not one label
+       truncated, and the narrowest tab is 46 × 59px — still above Apple's
+       44pt minimum on the smallest screen anyone still carries.
+
+       So the section stays where every other section is, the header loses a
+       button that was only ever a workaround for this rule, and the app and
+       the browser agree: the same six names in the same bar. The native shell
+       already shipped six (see site/nav.json), so the workaround was also
+       drawing a second route to a tab the app was already showing. */
         .p1 {
           flex-direction: row;
           height: auto;
@@ -5110,9 +5098,6 @@
         .secitem {
           flex: 1 1 0;
           min-width: 0;
-        }
-        .secitem[data-sec="settings"] {
-          display: none;
         }
         .secitem .lb {
           font-size: 10.5px;
@@ -5164,6 +5149,17 @@
           flex: 1 1 100%;
           order: 3;
           max-width: none;
+        }
+      }
+      /* Below 360px the wordmark is what stops the header being one row: the
+         name is 111px and the controls need them. The mark alone is still the
+         way home — that convention is the shape in the corner, not the letters
+         beside it — and the company's name is the first thing on the screen
+         underneath anyway. 359px and not 320px because the cut-off should be
+         where the row stops fitting, not at one famous phone's width. */
+      @media (max-width: 359px) {
+        .brand .nm {
+          display: none;
         }
       }
     </style>
@@ -5242,9 +5238,6 @@
         <select class="period" id="periodMode" aria-label="Periodo"></select>
         <input class="dt" type="date" id="periodFrom" aria-label="Desde" hidden />
         <input class="dt" type="date" id="periodTo" aria-label="Hasta" hidden />
-        <button class="btn sm cog" id="btnCog" title="Configuración" aria-label="Configuración">
-          ⚙️
-        </button>
         <div class="menuwrap">
           <button
             class="btn sm who"
@@ -7124,14 +7117,6 @@
         };
       }
       $("#btnUser").onclick = () => toggleMenu("#btnUser", "#mUser");
-      /* Opens the section, exactly as its rail icon does on a wide screen — not
-         a shortcut to one screen inside it, because which screen you want on the
-         first day (the company record) is not the one you want on the tenth
-         (a new worker, a new chapter). */
-      $("#btnCog").onclick = () => {
-        closeMenus();
-        toggleSection("settings");
-      };
       /* Task counts by status, computed by @repo/capability-scheduling through
          ErpBridge — the first read that crosses into the typed capability layer.
          Renders nothing at all if the bundle is unavailable, so the page is never
