@@ -8787,3 +8787,41 @@ the operator's screenshot could be read at all — the code says "not signed in"
 where the truth is "signed in, not allowed". It is not wrong enough to change
 under a caching fix, but it costs a minute of misdiagnosis every time somebody
 reads it, and the honest code is FORBIDDEN.
+
+**S85 · «No puedes» y «no sé quién eres» eran el mismo 401, y un operario se
+quedaba fuera de su propia aplicación.** Reported from a laptop: signed in as a
+site account, the workspace showed a red «Your session has expired. Please sign
+in again. Your latest changes are NOT saved.» The session was perfectly valid,
+Reload changed nothing, and it came back on every load.
+
+The chain, and every link was working as designed except the last:
+
+1. `GET /erp/state` answers a site account with a REDACTED document and
+   `scoped: true`.
+2. `remoteLoadState` **dropped that flag**, so the store believed it held the
+   whole company document.
+3. Any ordinary interaction debounces a whole-document `PUT /erp/state`.
+4. The server refuses it — R2.3, deliberate, asserted by the server suite.
+5. `require_` threw **`UNAUTHENTICATED`** → HTTP 401.
+6. `putState` reads 401 as an expired session, and says so, stickily.
+
+**What the refusal was protecting is worth stating.** Had that save ever
+succeeded it would have stored the redacted view AS the whole document, and the
+invoice register would have been gone. The server saying no is the only thing
+between a site worker's browser and that; the client must not be attempting it.
+
+`FORBIDDEN` now exists in the kernel's error union and maps to 403. The
+distinction is not pedantry — the recoveries are opposites, and "log in" is
+useless advice to somebody already logged in. `UNAUTHENTICATED` keeps its stated
+meaning (the union's own comment already said it means "log in"); genuine
+authentication failures in `session.ts` and the middleware are untouched.
+
+Two lessons, and the first is mine. **I found this exact conflation while fixing
+S84, wrote it down as "not wrong enough to change under a caching fix", and left
+it.** It was already breaking the crew's app at that moment. A wrong error code
+is not cosmetic when a client branches on it; the cost of leaving it was the
+operator's morning.
+
+And: **a client that ignores a field the server took the trouble to send will
+eventually act on a document it does not have.** `scoped` was returned for
+exactly this reason and was thrown away one line after arriving.

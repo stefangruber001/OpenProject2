@@ -674,6 +674,14 @@ async function siteWorkerBoundary() {
     check("and not one amount in cents", money.length === 0, money.slice(0, 6).join(" "));
 
     // --- the other door is shut ------------------------------------------
+    //
+    // 403 AND NOT 401, and the difference is the whole reason this reads the
+    // status rather than merely "not ok". These refusals used to answer 401,
+    // which the workspace reads as an expired session: a site worker was shown
+    // «your session has expired, your latest changes are NOT saved» on a
+    // perfectly valid session, on every save, with signing in again as the only
+    // cure offered — and signing in again did it all over. The boundary was
+    // right; the word it used for itself was wrong.
     {
       const res = await api(`/api/${TENANT}/erp/state`, {
         method: "PUT",
@@ -682,8 +690,14 @@ async function siteWorkerBoundary() {
       });
       check(
         "a site worker may not save the whole document",
-        res.status === 401,
+        res.status === 403,
         `HTTP ${res.status}`,
+      );
+      const body = await json(res);
+      check(
+        "…and says so as FORBIDDEN, not as «who are you»",
+        body.error === "FORBIDDEN",
+        `${body.error} · ${String(body.message).slice(0, 60)}`,
       );
     }
 
@@ -694,7 +708,7 @@ async function siteWorkerBoundary() {
         args: [workerId, "2026-09-07"],
         expectedVersion: st.version,
       });
-      check("a site worker may not approve a week", res.status === 401, `HTTP ${res.status}`);
+      check("a site worker may not approve a week", res.status === 403, `HTTP ${res.status}`);
     }
 
     // --- hours for somebody else ------------------------------------------
@@ -706,7 +720,7 @@ async function siteWorkerBoundary() {
       });
       check(
         "a site worker may not record another person's hours",
-        res.status === 401,
+        res.status === 403,
         `HTTP ${res.status}`,
       );
     }
@@ -728,7 +742,7 @@ async function siteWorkerBoundary() {
       });
       check(
         "nor his own hours on a site he is not assigned to",
-        res.status === 401,
+        res.status === 403,
         `HTTP ${res.status}`,
       );
     }

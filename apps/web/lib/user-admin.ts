@@ -145,7 +145,7 @@ export async function may(tenantId: string, email: string, permission: string): 
 /** Throws unless they may. */
 export async function require_(tenantId: string, email: string, permission: string): Promise<void> {
   if (!(await may(tenantId, email, permission)))
-    throw new FactoryError("UNAUTHENTICATED", `You do not have permission to ${permission}.`);
+    throw new FactoryError("FORBIDDEN", `You do not have permission to ${permission}.`);
 }
 
 export interface Invitation {

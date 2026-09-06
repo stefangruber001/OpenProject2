@@ -71,7 +71,11 @@ export async function PUT(req: Request, ctx: { params: Promise<{ tenant: string 
        `POST /erp/command`, where each call is checked one at a time. */
     if (!(await may(tenant, user, "erp.write")))
       throw new FactoryError(
-        "UNAUTHENTICATED",
+        // FORBIDDEN, not UNAUTHENTICATED. This refusal is the R2.3 boundary
+        // working exactly as designed, on every save a site account attempts,
+        // for ever. As a 401 the workspace read it as an expired session and
+        // told a correctly signed-in person to sign in again.
+        "FORBIDDEN",
         "This account may record its own hours, but not save the whole document. " +
           "Use the hours commands.",
       );

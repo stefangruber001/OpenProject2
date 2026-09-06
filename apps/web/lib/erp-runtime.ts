@@ -394,7 +394,8 @@ export async function refuseOutsideOwnHours(
   };
   const me = workerIdIn(state, user);
   const deny = (why: string) => {
-    throw new FactoryError("UNAUTHENTICATED", why);
+    // Who they are was never in doubt; what they may do is the question here.
+    throw new FactoryError("FORBIDDEN", why);
   };
   if (!me) deny("This account is not linked to a worker, so it has no hours of its own to record.");
 
@@ -492,7 +493,7 @@ export async function runCommand(
   /* WHO, not just WHAT. The whitelist above decides which engine methods the
      API is allowed to reach; until this check existed nothing decided which
      accounts were allowed to reach them, so the closed list was closed to
-     nobody. `require_` throws UNAUTHENTICATED with the permission named. */
+     nobody. `require_` throws FORBIDDEN with the permission named. */
   const need = (spec as CommandSpec).permission ?? "erp.write";
   await require_(tenantId, user, need);
   /* An account that may only write ITS OWN hours is narrowed further, against

@@ -81,6 +81,11 @@
      reason two people can use this at the same time. */
   var remoteVersion = 0;
 
+  /* Whether the document this browser holds is a REDACTED VIEW of the company's
+     rather than the whole of it — set from the server's own `scoped` flag on
+     every read. A scoped document is never sent back; see `remoteLoadState`. */
+  var scoped = false;
+
   function stateUrl() {
     return REMOTE + "/api/" + SELF_TENANT + "/erp/state";
   }
@@ -188,11 +193,29 @@
         // running it a different number of times per person, which is not a
         // property worth having in an invoice register.
         //
+        /* THIS DOCUMENT IS A VIEW, AND THE SERVER SAYS SO. For a site account
+           the response is redacted — no invoice register, no bank lines,
+           nobody else's worker record — and it is flagged `scoped`.
+
+           That flag used to be dropped right here, and dropping it is what
+           made the workspace unusable for the crew. Believing it held the
+           whole company document, the store would PUT it back on the first
+           ordinary save; the server refuses that (R2.3), correctly and every
+           single time; and the refusal was painted as «your session has
+           expired, your latest changes are NOT saved» over a session that was
+           perfectly valid. Signing in again fixed nothing, because the next
+           save did it again.
+
+           Worth being plain about what the server's refusal is protecting: if
+           such a save ever SUCCEEDED it would store the redacted view as the
+           whole company document, and the invoice register would be gone. The
+           client must not be trying it in the first place. */
+        scoped = body.scoped === true;
         // An empty company comes back as a valid empty document, not null.
         // Returning null would make the workspace seed its demonstration data —
         // onto the live server, into the real register. Empty and honest beats
         // populated and fictional.
-        return { state: body.state || null, migration: null, remote: true };
+        return { state: body.state || null, migration: null, remote: true, scoped: scoped };
       });
   }
 
@@ -252,6 +275,15 @@
           );
         } else if (res.status === 401) {
           saveFailed("Your session has expired.", "Please sign in again.");
+        } else if (res.status === 403) {
+          /* SIGNED IN, AND NOT ALLOWED. Two opposite messages used to arrive as
+             the same 401, so the workspace advised signing in again — useless
+             to somebody already signed in, and alarming, because it also says
+             their work was lost. It says what the server said instead. */
+          saveFailed(
+            "This account may not save this.",
+            (res.body && res.body.message) || "Ask an administrator.",
+          );
         } else {
           saveFailed("Could not save to the server.", (res.body && res.body.message) || "");
         }
@@ -474,6 +506,16 @@
   }
 
   function saveState(state) {
+    /* A SCOPED DOCUMENT IS NEVER SENT BACK, and this is not an error to report.
+       For a site account the whole-document route is closed by design, so a
+       refusal here is the system working; showing a red banner for it once per
+       save would be telling the crew their work is broken every time they use
+       the app. Their writes go through `POST /erp/command`, which is checked
+       one call at a time and is unaffected by this.
+
+       Resolved rather than rejected, so `persistNow()` and every caller that
+       waits on a save carry on normally. */
+    if (REMOTE !== null && scoped) return Promise.resolve(null);
     if (REMOTE !== null) return remoteSaveState(state);
     return put(KV, STATE_KEY, state);
   }
