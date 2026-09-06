@@ -10111,6 +10111,59 @@ async function testProcurement(browser, base) {
     if (!/€/.test(mineEntry.text)) ok("ADM-04: and not one euro sign on it");
     else bad("ADM-04: the worker's entry screen shows money", mineEntry.text.slice(0, 160));
 
+    /* THE SHELL AROUND THOSE SCREENS, which is what the crew actually got.
+       The screens above were right all along; what a site account received was
+       a page with NO BOTTOM BAR — `buildSections` emptied it and returned — and
+       an administrator's red «your company details are missing» over the top,
+       with a Completar button leading to a screen the account may not open.
+
+       That banner was not even true for them: a site account's document is
+       redacted, the company record is not in it, so `companyMissing()` reported
+       all four fields missing on a company whose details are complete. It was
+       reading the redaction as a gap, which is why it appeared every time.
+
+       Driven by setting the role and calling the two builders, the same way the
+       profile menu's server branch is exercised: this published copy has no
+       server to be a site worker on, and without this nothing in the suite ever
+       looks at the shell the crew sees. */
+    const shell = await pg.evaluate(() => {
+      const wasRole = SESSION.role;
+      const wasMissing = erp.companyMissing;
+      // Gaps to report, so "the bar stays empty" means the ROLE suppressed it
+      // and not that there was nothing to say.
+      erp.companyMissing = () => ["taxId"];
+      SESSION.role = "site";
+      buildSections();
+      renderCompanyBar();
+      const items = [...document.querySelectorAll("#p1 .secitem")];
+      const seen = {
+        tabs: items.length,
+        labels: items.map((b) => (b.querySelector(".lb") || {}).textContent || ""),
+        banner: (document.querySelector("#companybar") || {}).innerHTML || "",
+      };
+      // And the office still gets both, or the guard is too wide.
+      SESSION.role = wasRole;
+      buildSections();
+      renderCompanyBar();
+      seen.officeTabs = document.querySelectorAll("#p1 .secitem").length;
+      seen.officeBanner =
+        ((document.querySelector("#companybar") || {}).innerHTML || "").length > 0;
+      erp.companyMissing = wasMissing;
+      renderCompanyBar();
+      return seen;
+    });
+    if (
+      shell.tabs >= 1 &&
+      shell.labels.some((l) => /hora|hour/i.test(l)) &&
+      shell.banner === "" &&
+      shell.officeTabs === 6 &&
+      shell.officeBanner
+    )
+      ok(
+        `site worker: a bar that reaches the hours screen (${shell.labels.join(",")}), no company nag`,
+      );
+    else bad("site worker: the shell", JSON.stringify(shell).slice(0, 220));
+
     await pg.locator('[data-hmtab="mine"]').click();
     await pg.waitForTimeout(600);
     const mineHours = await pg.evaluate(() => ({

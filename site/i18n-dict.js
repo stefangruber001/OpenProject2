@@ -2895,6 +2895,10 @@ window.CANEI_DICT = {
     ["🏁 Guía de puesta en marcha", "🏁 Start-up guide"],
     ["📘 Guía de operaciones", "📘 Operations guide"],
     ["⤓ Exportar datos", "⤓ Export data"],
+    [
+      "Todavía no estás asignado a ninguna obra. Habla con la oficina para que te asignen y podrás apuntar tus horas aquí.",
+      "You are not assigned to any job yet. Ask the office to assign you and you will be able to book your hours here.",
+    ],
     ["⇥ Cerrar sesión", "⇥ Sign out"],
     ["↻ Datos de ejemplo", "↻ Sample data"],
     ["🗒️ Nueva tarea", "🗒️ New task"],

@@ -2508,6 +2508,8 @@ window.CANEI_DICT.ca = {
   "🏁 Guía de puesta en marcha": "🏁 Guia de posada en marxa",
   "📘 Guía de operaciones": "📘 Guia d'operacions",
   "⤓ Exportar datos": "⤓ Exportar dades",
+  "Todavía no estás asignado a ninguna obra. Habla con la oficina para que te asignen y podrás apuntar tus horas aquí.":
+    "Encara no estàs assignat a cap obra. Parla amb l'oficina perquè t'assignin i podràs apuntar les teves hores aquí.",
   "⇥ Cerrar sesión": "⇥ Tancar la sessió",
   "＋ Oportunidad/visita": "＋ Oportunitat/visita",
   "＋ Tarea": "＋ Tasca",

@@ -8825,3 +8825,42 @@ operator's morning.
 And: **a client that ignores a field the server took the trouble to send will
 eventually act on a document it does not have.** `scoped` was returned for
 exactly this reason and was thrown away one line after arriving.
+
+**S86 · The site worker's SHELL was never looked at, only their screens.** The
+hours screens were right and had been tested since R2.4. What a site account
+actually received around them had not: no bottom bar at all, and an
+administrator's red banner over the top.
+
+**No bar.** `buildSections()` emptied `#p1` and returned, on the reasoning that
+one destination needs no navigation. What that produced on a phone was a page
+with nothing to press, nothing saying where you were, and no route to the hours
+screen except the first paint. It also disagreed with the app, which builds its
+tabs from `site/nav.json` and gives a site account one tab. The bar is now built
+from `visibleSubs`, the same filtered truth the panels use, and lists SCREENS
+rather than sections — «Admin.» is the name of the section labour happens to
+live in and means nothing to somebody whose whole use of the system is typing
+hours.
+
+**A banner that was not even true.** `renderCompanyBar()` checked no role, so a
+site worker was told the company details were missing, with a button to a screen
+they may not open. And `companyMissing()` was reading a REDACTED document: the
+company record is removed before it leaves the server, so all four fields came
+back missing on a company whose details are complete. It was reporting the
+redaction as a gap — the third time today the same shape of bug appeared, after
+the cached session (S84) and the dropped `scoped` flag (S85).
+
+**The general rule this session keeps re-teaching: a partial document cannot be
+used to judge the whole.** Anything that says "X is missing" must first know
+whether X was ever sent.
+
+Also: «Todavía no hay proyectos» became «nobody has assigned you to a job yet»
+for a site account — an empty project list means something different when the
+list was filtered to what you are assigned to — and the demonstration-data
+reload is no longer offered on a server, where `resetData()` always refused it.
+`renderSeedBar` already stated that rule: do not advertise what will not be
+honoured.
+
+One trap worth naming: the new empty-state sentence was first written as two
+concatenated literals, and `source-audit.mjs` reported no new untranslated
+string — a FALSE PASS. A sentence split across a `+` is invisible to the audit
+and could never match a dictionary key either. One literal, one key.

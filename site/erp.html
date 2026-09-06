@@ -6036,7 +6036,38 @@
       function buildSections() {
         const p1 = $("#p1");
         p1.innerHTML = "";
-        if (isSiteWorker()) return;
+        /* A SITE WORKER STILL GETS A BAR — with their own destinations in it.
+           It used to get NONE: the bar was emptied and the function returned, on
+           the reasoning that one destination needs no navigation. On the phone
+           that produced a screen with no bar at all, nothing saying where you
+           are, and nothing to press if you ever landed somewhere else. The crew
+           could not reach the hours screen from anywhere but the first paint.
+
+           It also disagreed with the app, which builds its tab bar from
+           `site/nav.json` and gives a site account one tab, «Horas». Web and
+           native must not answer the same question differently.
+
+           Built from `visibleSubs`, so this bar is the same filtered truth the
+           subsection panels use — one list, one rule. A site account's entries
+           are SCREENS rather than sections, because «Admin.» is the name of the
+           section labour happens to live in and means nothing to somebody whose
+           whole use of the system is typing their hours. */
+        if (isSiteWorker()) {
+          SECTIONS.forEach((s) =>
+            visibleSubs(s).forEach((x) => {
+              const b = el("button", "secitem" + (x.k === cur ? " on" : ""));
+              b.innerHTML = `<span class="ic">${s.ic}</span><span class="lb">${x.lab}</span>`;
+              b.dataset.sec = s.k;
+              b.setAttribute("aria-label", x.lab);
+              b.onclick = () => {
+                closeSection();
+                go(x.k);
+              };
+              p1.appendChild(b);
+            }),
+          );
+          return;
+        }
         const curSec = SUBMAP[cur] ? SUBMAP[cur].sec.k : "tower";
         let critical = 0;
         try {
@@ -7100,12 +7131,23 @@
                <button type="submit" id="uLogout">⇥ Cerrar sesión</button>
              </form>`
           : "";
+        /* THE DEMONSTRATION RELOAD IS NOT OFFERED ON A SERVER. `resetData()`
+           already refuses there — the document is the company's, and replacing
+           a live register with sample data from one menu entry is not something
+           that should be one confirm box away — so the entry could only ever
+           produce a refusal. `renderSeedBar` states the rule this follows: do
+           not advertise what will not be honoured. It is worst for the crew,
+           who get a menu whose most alarming-sounding line is the one that does
+           nothing, but it was dead for everybody on a server. */
+        const resetRow = ErpStore.isRemote()
+          ? ""
+          : `<button id="uReset">↻ Recargar datos de demostración</button>`;
         m.innerHTML = `${whoRow}<a href="company-setup-guide.html">🏁 Guía de puesta en marcha</a>
           <a href="setup-guide.html">📘 Guía de operaciones</a>
           ${langRow}
           <div class="sep"></div>
           <button id="uExport">⤓ Exportar datos</button>
-          <button id="uReset">↻ Recargar datos de demostración</button>
+          ${resetRow}
           ${outRow}`;
         m.querySelectorAll("[data-menulang]").forEach(
           (b) =>
@@ -7120,10 +7162,11 @@
           closeMenus();
           exportData();
         };
-        $("#uReset").onclick = () => {
-          closeMenus();
-          resetData();
-        };
+        if ($("#uReset"))
+          $("#uReset").onclick = () => {
+            closeMenus();
+            resetData();
+          };
       }
       $("#btnUser").onclick = () => toggleMenu("#btnUser", "#mUser");
       /* Task counts by status, computed by @repo/capability-scheduling through
@@ -7150,6 +7193,24 @@
       function renderCompanyBar() {
         const host = $("#companybar");
         if (!host) return;
+        /* NEVER TO A SITE ACCOUNT, for two separate reasons and either alone
+           would be enough.
+
+           It is not their concern: issuing invoices is the office's job, and
+           the bar's own button goes to a screen this account may not open, so
+           the only thing it can produce is a person who has been told something
+           is wrong and given a door that will not open.
+
+           And it is not even TRUE for them. The document a site account holds is
+           redacted — the company record is not in it, by design — so
+           `companyMissing()` reports all four fields missing on a company whose
+           details may be perfectly complete. The bar was reading the redaction
+           as a gap, which is why it appeared for every site worker on every
+           load. A partial document cannot be used to judge the whole. */
+        if (isSiteWorker()) {
+          host.innerHTML = "";
+          return;
+        }
         let missing = [];
         try {
           missing = erp.companyMissing();
@@ -9437,7 +9498,24 @@
       function horas(v) {
         $("#sub").textContent =
           "Parte diario por trabajador, con la semana al lado; y el resumen por proyecto y partida con la conciliación del mes.";
-        if (!erp.state.projects.length) return noProjectsCard(v);
+        /* «Todavía no hay proyectos» is true for the office and false for the
+           crew. A site account's document carries only the jobs that account is
+           ASSIGNED to, so an empty list there does not mean the company has no
+           work — it means nobody has put this person on any of it. Telling a
+           bricklayer the company has no projects sends them to ask the wrong
+           question, and the answer they need is one sentence away. */
+        if (!erp.state.projects.length) {
+          if (isSiteWorker()) {
+            /* ONE literal, not two concatenated. Split across a `+` it is
+               invisible to `source-audit.mjs` — which read this file and
+               reported no new untranslated string, wrongly — and it would also
+               be two dictionary keys for one sentence, so no translation could
+               ever match it. */
+            v.innerHTML = `<div class="card"><div class="empty">Todavía no estás asignado a ninguna obra. Habla con la oficina para que te asignen y podrás apuntar tus horas aquí.</div></div>`;
+            return;
+          }
+          return noProjectsCard(v);
+        }
         if (!hDay) hDay = erp.today;
         hWeekRef = hDay;
         if (!["sheet", "summary", "register"].includes(hTab)) hTab = "sheet";
