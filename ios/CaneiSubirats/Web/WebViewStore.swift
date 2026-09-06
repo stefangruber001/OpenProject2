@@ -362,6 +362,26 @@ extension WebViewStore: WKNavigationDelegate {
         call("caneiToggleSection", id)
     }
 
+    /// "Are you still the account you were built for?"
+    ///
+    /// This shell keeps ONE LONG-LIVED WEB VIEW PER TAB, which is what makes
+    /// switching tabs instant — and also means six pages each hold the identity
+    /// they booted with. Signing out and in reloads the tab you did it in and
+    /// leaves the other five showing the previous account: reported from a
+    /// phone signed in as a site worker, where two tabs were still displaying
+    /// the administrator's quotes and labour costs.
+    ///
+    /// The page re-checks on a timer by itself, so this is not what makes it
+    /// correct — it is what makes it IMMEDIATE, on the tab about to be looked
+    /// at, instead of up to a minute later. Guarded on the JS side, so a shell
+    /// newer than the server does nothing.
+    func recheckSession() {
+        webView.evaluateJavaScript(
+            "window.caneiRecheckSession && window.caneiRecheckSession()",
+            completionHandler: nil
+        )
+    }
+
     /// One place that builds these calls, so the escaping rule is stated once.
     /// The id comes from the bundled manifest and the page checks it against
     /// its own section list before use, but it is still stripped to letters,

@@ -5690,7 +5690,93 @@
         paintUserBadge();
         buildUserMenu();
         render();
+        watchIdentity();
         if (bootNotice) toast(bootNotice);
+      }
+
+      /* ==================================================================
+         A PAGE MUST NOT KEEP SHOWING AN ACCOUNT IT NO LONGER HOLDS.
+         ==================================================================
+         Reported from the phone: signed in as a site worker, the Torre tab
+         said SITE WORKER with zeros — and Comercial and Administración, in the
+         same app at the same moment, still said ADMINISTRATOR and were still
+         showing the previous account's quotes and 3.480 € of labour cost.
+
+         Nothing was wrong with the server. The shell owns ONE LONG-LIVED WEB
+         VIEW PER TAB (`AppState`: "so pages keep their state when you switch
+         tabs"), so six tabs are six independent pages, each holding the
+         identity it booted with. Signing out and back in reloads the tab you
+         did it in; the other five keep the page they already had, and with it
+         the previous account's data on screen.
+
+         Stale pixels rather than a fresh read — the server would refuse those
+         requests now — but they are the office's figures, on a phone that is
+         signed in as the crew. That is the whole point of the boundary.
+
+         WHY NOT `visibilitychange`. `RootView` stacks all six tabs and hides
+         the inactive ones with `.opacity(0)`, leaving them in the view
+         hierarchy. To the page that is not hidden: `visibilityState` stays
+         "visible" in all six and the event never fires on a tab switch. It is
+         still listened for, because in a BROWSER it is exactly right.
+
+         So the check has three triggers, and the periodic one is the only one
+         guaranteed to fire inside the app:
+           · every minute,
+           · when a browser tab is brought forward,
+           · and on `caneiRecheckSession()`, which the shell can call the
+             moment a tab is selected once a build carries it.
+
+         It reloads only when the answer CHANGED, so the normal case costs one
+         small request a minute and disturbs nobody. */
+      let identity = "";
+      const identityOf = (s) => (s && s.email ? s.email : "") + "/" + ((s && s.role) || "");
+      let idBusy = false;
+      let idLast = 0;
+      /* `reload` is a parameter with the real thing as its default, so the
+         DECISION can be tested without a page that reloads itself out from
+         under the suite. Production passes nothing and gets location.reload. */
+      async function recheckIdentity(reload) {
+        const doReload = reload || (() => location.reload());
+        if (!ErpStore.isRemote() || idBusy) return;
+        // Not more than once every three seconds, however many things ask.
+        if (Date.now() - idLast < 3000) return;
+        idLast = Date.now();
+        idBusy = true;
+        try {
+          const res = await fetch((ErpStore.apiBase() || "") + "/api/~/session", {
+            cache: "no-store",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+          });
+          /* Signed out somewhere else. Reloading lands on the sign-in page,
+             because the server sends a browser there for any page it will not
+             serve — one rule, applied by the thing that owns it. */
+          if (res.status === 401) {
+            doReload();
+            return;
+          }
+          if (!res.ok) return;
+          const who = await res.json();
+          if (identity && identityOf(who) !== identity) doReload();
+        } catch (e) {
+          /* Offline. Say nothing and change nothing: a page that blanked itself
+             every time a lift lost signal would be worse than a stale one. */
+        } finally {
+          idBusy = false;
+        }
+      }
+      function watchIdentity() {
+        if (!ErpStore.isRemote()) return;
+        identity = identityOf(SESSION);
+        setInterval(recheckIdentity, 60000);
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") recheckIdentity();
+        });
+        // Restored from the back/forward cache with whatever it had on screen.
+        window.addEventListener("pageshow", (e) => {
+          if (e.persisted) recheckIdentity();
+        });
+        window.caneiRecheckSession = recheckIdentity;
       }
       /* Demo pictures for the seeded budget's graphic annex, keyed exactly as
          erp-seed.js references them. Drawn, not downloaded: the page must work from

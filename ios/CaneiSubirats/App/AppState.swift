@@ -47,6 +47,10 @@ final class AppState: ObservableObject {
     /// being opened is stale but no sign-in has happened to announce.
     func didSelect(_ id: String) {
         store(for: id).reloadIfShowingLogin()
+        // Who is signed in may have changed in ANOTHER tab since this one was
+        // last looked at — these web views are long-lived and independent. Ask
+        // before showing it; the page reloads itself if the answer moved.
+        store(for: id).recheckSession()
         // Match the web: a section tap opens that section's panel. The shell's
         // tabs are the web's section bar, so they owe the same answer.
         store(for: id).openSection(id)

@@ -8864,3 +8864,40 @@ One trap worth naming: the new empty-state sentence was first written as two
 concatenated literals, and `source-audit.mjs` reported no new untranslated
 string — a FALSE PASS. A sentence split across a `+` is invisible to the audit
 and could never match a dictionary key either. One literal, one key.
+
+**S87 · Six tabs, six pages, six identities.** Reported from the phone: signed
+in as a site worker, the Torre tab said SITE WORKER with zeros while Comercial
+and Administración, in the same app at the same moment, still said ADMINISTRATOR
+and were still showing the previous account's quotes and 3.480 € of labour cost.
+
+Nothing was wrong with the server. The shell owns ONE LONG-LIVED WEB VIEW PER
+TAB — `AppState`'s own comment says why, "so pages keep their state when you
+switch tabs" — so six tabs are six independent pages, each holding the identity
+it booted with. Signing out and back in reloads the tab you did it in and leaves
+the other five exactly as they were.
+
+Stale pixels rather than a fresh read; the server would refuse those requests
+now. But they are the office's figures on a phone signed in as the crew, which
+is the whole point of the boundary.
+
+**`visibilitychange` is the obvious fix and it does not work here.** `RootView`
+stacks all six tabs and hides the inactive ones with `.opacity(0)`, leaving them
+in the view hierarchy — so `visibilityState` stays "visible" in all six and the
+event never fires on a tab switch. It would have looked correct and done
+nothing. The lesson generalises past this app: _hidden to the user is not hidden
+to the page_, and any freshness rule hung on visibility has to be checked
+against how the container actually hides things.
+
+So the check has three triggers, and the periodic one is the only one guaranteed
+inside the app: every minute; on `visibilitychange` (right in a browser, inert
+here, kept because it is free); and on `window.caneiRecheckSession()`, which
+`AppState.didSelect` now calls so a tab switch checks immediately — that half
+needs a TestFlight build, the web half does not.
+
+It reloads only when the answer CHANGED, so the normal case is one small request
+a minute and no disturbance. `recheckIdentity` takes its reload function as a
+parameter with the real one as default, which is what lets the suite assert the
+DECISION — reload on a changed account, on a changed permission for the same
+account, and on a 401; do nothing when unchanged, and nothing when offline. The
+last two matter most: a page that reloaded every minute, or every time a lift
+lost signal, would be worse than the bug.

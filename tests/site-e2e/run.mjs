@@ -10164,6 +10164,66 @@ async function testProcurement(browser, base) {
       );
     else bad("site worker: the shell", JSON.stringify(shell).slice(0, 220));
 
+    /* A PAGE THAT IS NO LONGER THIS ACCOUNT'S RELOADS ITSELF.
+       The app keeps one long-lived web view per tab, so signing out and in
+       fixes the tab you did it in and leaves the others showing the previous
+       account — an administrator's quotes and labour costs, on a phone signed
+       in as the crew. `recheckIdentity` is what closes that window.
+
+       Driven directly, with `fetch` swapped for a stub, because this published
+       copy has no server to change identity on and `location.reload` cannot be
+       let loose in the middle of a suite. What is asserted is the decision:
+       reload when the account moved, reload on a 401, and — the one that would
+       make this unusable if it were wrong — do NOTHING when it has not. */
+    const watch = await pg.evaluate(async () => {
+      const realFetch = window.fetch;
+      // The published copy has no server, and `recheckIdentity` rightly does
+      // nothing without one — so say there is one, as the sign-out check does.
+      const wasRemote = ErpStore.isRemote;
+      const wasBase = ErpStore.apiBase;
+      ErpStore.isRemote = () => true;
+      ErpStore.apiBase = () => "";
+      let reloads = 0;
+      const fakeReload = () => reloads++;
+      const answer = (status, body) => {
+        window.fetch = () =>
+          Promise.resolve({ ok: status === 200, status, json: () => Promise.resolve(body) });
+      };
+      const run = async (status, body) => {
+        answer(status, body);
+        const before = reloads;
+        idLast = 0; // the three-second throttle is not what is under test
+        await recheckIdentity(fakeReload);
+        return reloads - before;
+      };
+      identity = "ana@example.com/admin";
+      const same = await run(200, { email: "ana@example.com", role: "admin" });
+      const moved = await run(200, { email: "pau@example.com", role: "site" });
+      // Same person, different permission: still a different page.
+      const demoted = await run(200, { email: "ana@example.com", role: "site" });
+      const goneAway = await run(401, {});
+      const offline = await (async () => {
+        window.fetch = () => Promise.reject(new Error("offline"));
+        const before = reloads;
+        idLast = 0;
+        await recheckIdentity(fakeReload);
+        return reloads - before;
+      })();
+      window.fetch = realFetch;
+      ErpStore.isRemote = wasRemote;
+      ErpStore.apiBase = wasBase;
+      return { same, moved, demoted, goneAway, offline };
+    });
+    if (
+      watch.same === 0 &&
+      watch.moved === 1 &&
+      watch.demoted === 1 &&
+      watch.goneAway === 1 &&
+      watch.offline === 0
+    )
+      ok("identity watch: reloads when the account moved or went, and never otherwise");
+    else bad("identity watch", JSON.stringify(watch));
+
     await pg.locator('[data-hmtab="mine"]').click();
     await pg.waitForTimeout(600);
     const mineHours = await pg.evaluate(() => ({
