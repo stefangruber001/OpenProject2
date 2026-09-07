@@ -9316,3 +9316,59 @@ first would have passed over it.
 the strip is two contract tabs again, and «Vigentes» would read correctly once
 more. It stays as it is: renaming a tab the operator navigates by is a change
 they did not ask for, and the word costs nothing.
+
+**S102 · An administrator on the crew's tab bar.** The operator opened the app
+signed in as an administrator and found a single «Horas» tab — the site
+worker's bar — while the profile menu correctly read ADMINISTRADOR. The page
+knew who it was; the navigation did not. Inside the shell the web app stands its
+own section rail down, because the native tab bar does that job, so this was not
+a wrong bar. It was a screen with no way off it.
+
+Three things had to be true at once, and each was defensible alone. The role the
+web layer reports was cached on the device and only ever written FORWARD —
+signing out did not clear it, so the last account to use a phone decided the
+shape of the bar for every account after it. The bar itself was a `static let`,
+resolved once per cold launch from that cache before any page had spoken. And
+the rail is hidden whenever the shell is present, unconditionally, on the
+assumption that the bar above it is always the right one.
+
+Fixed in the order that matters: the bar is now `@Published` state on
+`AppState`, rebuilt the moment a page reports a different account; the role is
+cleared as well as set, and announced on every session check rather than only on
+a full page boot; and the page keeps its rail whenever the shell reports a bar
+that cannot reach the rest of the app. That last one is the important one — the
+first two make the bar correct, the third makes being wrong survivable.
+
+**S102a · The reduced bar stays.** The alternative was to delete `roleTabs`
+altogether and let every account have six tabs, since the web app already
+resolves every route to the hours screen for a site worker and the server
+refuses the rest. That would have made this class of bug impossible. It was not
+taken: the crew's one-screen phone is a thing the operator asked for, and the
+guard above makes the failure recoverable without spending it. The narrower
+rule is now in the gate instead — no full-access role may be given a reduced
+bar, which is the shape of the mistake, not this instance of it.
+
+**S103 · A probe nothing reads on a schedule is not monitoring.** Production ran
+25 hours on an image 19 commits behind `main` while six consecutive deploys went
+green. Every part reported itself well: the ticks passed, `promote` genuinely retagged
+`:main` (its log names the digest), the timer was active, the container was
+healthy. `/api/health` has reported the commit it was built from since the LAST
+time this happened, and its own comment says why. Nothing read it. `ops/status.sh`
+asked `systemctl is-active canei-deploy.timer`, which is true while the service
+it fires fails every minute and true while the stack is pinned to a tag that
+will never move.
+
+So `deploy.yml` gained a `verify` job that polls `/api/health` after `promote`
+and fails when the revision answering is not the one just built, and
+`status.sh` now asks the three questions the timer cannot answer: did the last
+run succeed, is `IMAGE_APP` still following `:main`, and which commit is
+actually replying. A deliberate rollback declares itself through a repository
+variable rather than staying quietly red.
+
+**S103a · One list of image paths, not two.** `ops/deploy-now.sh` decided which
+commit the server ought to be running from a hand-written
+`(apps packages site tenants ops)`, while `deploy.yml` also builds for
+`tests/server-e2e`, the `Dockerfile` and the lockfile. A commit touching only
+those built an image the server took, and the checker compared against an older
+commit and called it fine. Both now read the list out of the workflow
+(`ops/image-paths.sh`). Two lists cannot be kept in step by intention.

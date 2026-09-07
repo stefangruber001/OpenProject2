@@ -10,13 +10,35 @@ final class AppState: ObservableObject {
     @Published var shareURL: URL?
     @Published var showSplash = true
 
+    /// The tab bar, and the role it was built for.
+    ///
+    /// This is the fix for an administrator who opened the app and found a
+    /// single «Hours» tab — a site worker's bar — with the page itself
+    /// correctly showing them as an administrator. The bar used to be a
+    /// `static let` in `Config`, resolved once from a value remembered on the
+    /// device, so whoever signed in first on a phone decided its shape for
+    /// every account afterwards. Inside the shell the web app hides its own
+    /// section rail, so that bar was the only navigation there was: the wrong
+    /// bar is not a cosmetic problem, it is no way out.
+    ///
+    /// Seeded from the remembered role so the bar still exists before the first
+    /// request completes, then rebuilt the moment a page reports a different
+    /// account.
+    @Published private(set) var tabs: [WebTab]
+    private var tabsRole: String?
+
     private(set) var stores: [String: WebViewStore] = [:]
     private var signedInObserver: NSObjectProtocol?
+    private var roleObserver: NSObjectProtocol?
 
     init() {
-        self.selection = Config.tabs.first?.id ?? "home"
-        for tab in Config.tabs {
-            stores[tab.id] = WebViewStore(tab: tab) { [weak self] url in
+        let role = Config.erpRole
+        let initial = NavManifest.load(role: role)
+        self.tabsRole = role
+        self.tabs = initial
+        self.selection = initial.first?.id ?? "home"
+        for tab in initial {
+            stores[tab.id] = WebViewStore(tab: tab, tabCount: initial.count) { [weak self] url in
                 self?.shareURL = url
             }
         }
@@ -33,6 +55,43 @@ final class AppState: ObservableObject {
             Task { @MainActor in
                 self?.stores.values.forEach { $0.reloadIfShowingLogin() }
             }
+        }
+
+        // A page has told us who it is signed in as. If that is not who the bar
+        // was built for, the bar is wrong — rebuild it now rather than at some
+        // later launch nobody is going to perform.
+        roleObserver = NotificationCenter.default.addObserver(
+            forName: .caneiRoleChanged, object: nil, queue: .main
+        ) { [weak self] note in
+            let role = note.userInfo?["role"] as? String
+            Task { @MainActor in self?.applyRole(role) }
+        }
+    }
+
+    /// Rebuild the tab bar for the account that is signed in now.
+    ///
+    /// Every page in the shell reports its role on load, so this is called
+    /// repeatedly with the same answer; it does nothing unless the answer has
+    /// actually moved.
+    ///
+    /// When it has moved, the open pages belong to the previous account, so
+    /// they go with it. Keeping them would mean an administrator arriving at
+    /// six tabs of somebody else's screens — and the pages reload themselves
+    /// under the new session anyway, so dropping them buys correctness for a
+    /// cost that was already being paid.
+    func applyRole(_ role: String?) {
+        let next = (role?.isEmpty ?? true) ? nil : role
+        guard next != tabsRole else { return }
+        tabsRole = next
+        Config.erpRole = next
+
+        let bar = NavManifest.load(role: next)
+        guard bar.map(\.id) != tabs.map(\.id) else { return }
+
+        stores.removeAll()
+        tabs = bar
+        if !bar.contains(where: { $0.id == selection }) {
+            selection = bar.first?.id ?? selection
         }
     }
 
@@ -56,11 +115,27 @@ final class AppState: ObservableObject {
         store(for: id).openSection(id)
     }
 
+    /// The web view for a tab, created on demand.
+    ///
+    /// On demand is the normal path now, not a safety net: `applyRole` drops
+    /// every store when the account changes, and the bar it hands SwiftUI may
+    /// contain tabs that have never been opened on this launch.
     func store(for id: String) -> WebViewStore {
         if let s = stores[id] { return s }
-        // Fallback (should never happen): synthesize on demand.
-        let tab = Config.tabs.first(where: { $0.id == id }) ?? Config.tabs[0]
-        let s = WebViewStore(tab: tab) { [weak self] url in self?.shareURL = url }
+        guard let tab = tabs.first(where: { $0.id == id }) ?? tabs.first else {
+            // A bar with no tabs cannot happen — `NavManifest.load` falls back
+            // to the full set rather than to nothing — but the language has to
+            // be told that, and a crash here would be a blank app.
+            let fallback = NavManifest.load(role: nil)
+            let s = WebViewStore(tab: fallback[0], tabCount: fallback.count) { [weak self] url in
+                self?.shareURL = url
+            }
+            stores[id] = s
+            return s
+        }
+        let s = WebViewStore(tab: tab, tabCount: tabs.count) { [weak self] url in
+            self?.shareURL = url
+        }
         stores[id] = s
         return s
     }

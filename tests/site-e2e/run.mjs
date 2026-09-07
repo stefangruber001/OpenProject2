@@ -10727,6 +10727,83 @@ async function testProcurement(browser, base) {
       );
     else bad("site worker: the shell", JSON.stringify(shell).slice(0, 220));
 
+    /* THE SHELL'S BAR AND THE ACCOUNT MUST AGREE, OR THE RAIL COMES BACK.
+
+       Inside the phone shell this page hides its own section rail, because the
+       native tab bar does that job. So when that bar is wrong for the account,
+       the screen has no navigation on it whatsoever — which is what an
+       administrator got after a site worker had used the same phone: one
+       «Horas» tab, and no way off it, while the profile menu correctly read
+       ADMINISTRADOR. The shell now says how many tabs it drew, and the page
+       keeps its rail when that bar cannot reach the rest of the app.
+
+       The class is asserted through the computed style, not on its own: a class
+       nobody styles would pass a test and strand somebody anyway. */
+    const rail = await pg.evaluate(() => {
+      const wasRole = SESSION.role;
+      const wasTabs = window.__caneiTabs;
+      const wasNative = document.body.classList.contains("native");
+      const display = () => getComputedStyle(document.querySelector("#p1")).display;
+      document.body.classList.add("native");
+      const seen = {};
+
+      // One tab, for an account that needs the whole app: the stranded case.
+      window.__caneiTabs = 1;
+      SESSION.role = "admin";
+      syncNativeNav();
+      seen.strandedFlag = document.body.classList.contains("tabless");
+      seen.strandedRail = display();
+
+      // The same one-tab bar is exactly right for the crew, whose every route
+      // resolves to the hours screen anyway.
+      SESSION.role = "site";
+      syncNativeNav();
+      seen.crewFlag = document.body.classList.contains("tabless");
+
+      // A full bar: the rail stands down, as it has since the shell shipped.
+      window.__caneiTabs = 6;
+      SESSION.role = "admin";
+      syncNativeNav();
+      seen.officeFlag = document.body.classList.contains("tabless");
+      seen.officeRail = display();
+
+      // A shell that says nothing is a build from before this existed. Leave it
+      // exactly as it was rather than changing an app that cannot be updated.
+      delete window.__caneiTabs;
+      syncNativeNav();
+      seen.silentFlag = document.body.classList.contains("tabless");
+
+      // And the role is announced even when there is none — the missing half of
+      // sign-out, which used to leave the last account's bar on the device.
+      const posted = [];
+      const wasWebkit = window.webkit;
+      window.webkit = { messageHandlers: { native: { postMessage: (m) => posted.push(m) } } };
+      announceRole("site");
+      announceRole(undefined);
+      window.webkit = wasWebkit;
+      seen.posted = posted;
+
+      SESSION.role = wasRole;
+      if (wasTabs === undefined) delete window.__caneiTabs;
+      else window.__caneiTabs = wasTabs;
+      if (!wasNative) document.body.classList.remove("native");
+      document.body.classList.remove("tabless");
+      return seen;
+    });
+    if (
+      rail.strandedFlag &&
+      rail.strandedRail !== "none" &&
+      !rail.crewFlag &&
+      !rail.officeFlag &&
+      rail.officeRail === "none" &&
+      !rail.silentFlag &&
+      rail.posted.length === 2 &&
+      rail.posted[0].role === "site" &&
+      rail.posted[1].role === ""
+    )
+      ok("shell: a bar that cannot navigate gives the rail back, and sign-out clears the role");
+    else bad("shell: the stranded-navigation guard", JSON.stringify(rail).slice(0, 260));
+
     /* A PAGE THAT IS NO LONGER THIS ACCOUNT'S RELOADS ITSELF.
        The app keeps one long-lived web view per tab, so signing out and in
        fixes the tab you did it in and leaves the others showing the previous

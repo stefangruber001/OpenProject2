@@ -82,6 +82,9 @@ echo "WORKSPACE=$($C exec -T app node -e 'fetch("http://127.0.0.1:3000/workspace
 echo "BYPASS=$($C exec -T db psql -U "${POSTGRES_USER:-canei}" -d "${POSTGRES_DB:-canei_erp}" -tAc "SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname='${APP_DB_USER:-canei_app}'" </dev/null 2>/dev/null | tr -d ' ')"
 echo "TENANTS=$($C exec -T db psql -U "${POSTGRES_USER:-canei}" -d "${POSTGRES_DB:-canei_erp}" -tAc "SELECT count(*) FROM erp_state" </dev/null 2>/dev/null | tr -d ' ')"
 echo "DEPLOYTIMER=$(systemctl is-active canei-deploy.timer 2>/dev/null)"
+echo "DEPLOYRESULT=$(systemctl show canei-deploy.service -p Result --value 2>/dev/null)"
+echo "DEPLOYWHEN=$(systemctl show canei-deploy.service -p ExecMainExitTimestamp --value 2>/dev/null)"
+echo "IMAGECONF=$(sed -n 's/^IMAGE_APP=//p' .env 2>/dev/null | tr -d '\"' | head -1)"
 echo "BACKUPTIMER=$(systemctl is-active canei-backup.timer 2>/dev/null)"
 echo "LASTBACKUP=$(ls -t backups/*.age 2>/dev/null | head -1)"
 echo "BACKUPAGE=$(find backups -name '*.age' -mtime -2 2>/dev/null | wc -l | tr -d ' ')"
@@ -130,8 +133,59 @@ esac
 T="$(val TENANTS)"
 [ -n "$T" ] && ok "erp_state holds ${T} tenant document(s)" || warn "Could not read erp_state"
 
-[ "$(val DEPLOYTIMER)" = "active" ] && ok "Auto-deploy timer active (pulls new images every 60s)" \
-                                    || warn "Auto-deploy timer is $(val DEPLOYTIMER)"
+# An ACTIVE TIMER IS NOT A WORKING DEPLOY, and treating it as one is how this
+# server sat 19 commits behind main for 25 hours with every tick green. The
+# timer stays active while the service it fires fails every single minute, and
+# it stays active while the stack is pinned to an image that will never move.
+# So all three are asked: is it armed, did its last run succeed, and is it even
+# pointed at the tag CI publishes.
+if [ "$(val DEPLOYTIMER)" = "active" ]; then
+  ok "Auto-deploy timer armed (fires every 60s)"
+else
+  bad "Auto-deploy timer is $(val DEPLOYTIMER) — nothing is pulling new images"
+  printf '      %ssystemctl enable --now canei-deploy.timer%s\n' "$DIM" "$OFF"
+fi
+
+case "$(val DEPLOYRESULT)" in
+  success|"") ok "Last auto-deploy run finished cleanly$([ -n "$(val DEPLOYWHEN)" ] && echo " ($(val DEPLOYWHEN))")" ;;
+  *) bad "Last auto-deploy run ended '$(val DEPLOYRESULT)' — the pull or the restart is failing"
+     printf '      %sjournalctl -u canei-deploy.service -n 50 --no-pager%s\n' "$DIM" "$OFF"
+     printf '      %sMost often an expired registry token: ./ops/set-ghcr-token.sh%s\n' "$DIM" "$OFF" ;;
+esac
+
+IMGCONF="$(val IMAGECONF)"
+case "$IMGCONF" in
+  *:main) ok "Stack follows the released tag (${IMGCONF})" ;;
+  "")     warn "Could not read IMAGE_APP from the server's .env" ;;
+  *)      bad "Stack is PINNED to ${IMGCONF} — it will never pick up a new release"
+          printf '      %sIf the rollback is over, put :main back in /opt/canei-erp/.env and restart.%s\n' "$DIM" "$OFF" ;;
+esac
+
+# The question none of the above answers: which code is actually replying.
+# `/api/health` has reported it since the last time this went wrong; until now
+# nothing compared it to anything.
+RUNREV="$(printf '%s' "$H" | sed -n 's/.*"revision":"\([^"]*\)".*/\1/p')"
+WANTREV=""
+if [ -d .git ]; then
+  # The newest commit that builds an image — later commits touching only docs or
+  # the phone app produce no image, and the server is right to stay put.
+  # shellcheck source=ops/image-paths.sh
+  . "$(dirname "$0")/image-paths.sh"
+  IFS=$'\n' read -r -d '' -a IMGP < <(image_paths "." && printf '\0')
+  WANTREV="$(git log -1 --format=%H origin/main -- "${IMGP[@]}" 2>/dev/null || true)"
+fi
+if [ -z "$RUNREV" ] || [ "$RUNREV" = "unknown" ]; then
+  warn "The running image does not report which commit it was built from"
+elif [ -z "$WANTREV" ]; then
+  ok "Running revision ${RUNREV:0:8} (no origin/main here to compare it with)"
+elif [ "$RUNREV" = "$WANTREV" ]; then
+  ok "Running the newest released commit (${RUNREV:0:8})"
+else
+  BEHIND="$(git rev-list --count "${RUNREV}..${WANTREV}" 2>/dev/null || echo "?")"
+  bad "Running ${RUNREV:0:8}, but ${WANTREV:0:8} is released — ${BEHIND} commit(s) behind"
+  printf '      %sThe pipeline is green and the image is published; the box has not taken it.%s\n' "$DIM" "$OFF"
+  printf '      %s./ops/deploy-now.sh%s\n' "$DIM" "$OFF"
+fi
 [ "$(val BACKUPTIMER)" = "active" ] && ok "Nightly backup timer active (02:30 UTC)" \
                                     || warn "Backup timer is $(val BACKUPTIMER)"
 

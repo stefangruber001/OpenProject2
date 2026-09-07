@@ -54,11 +54,22 @@ const assert = (cond, name, detail) =>
    empty list and passed, and only the count assertion noticed. A gate pointed
    at a file the feature has left is worse than no gate: it reports on
    something that is not there. Both ends are pinned below. */
-const config = read("ios/CaneiSubirats/Support/Config.swift");
+/* The tab list moved again — out of `Config` and into `AppState`, so the bar
+   can be rebuilt when the account changes instead of being frozen at launch.
+   The gate follows it, for the same reason the comment above gives. */
+const appState = read("ios/CaneiSubirats/App/AppState.swift");
 assert(
-  /static let tabs:\s*\[WebTab\]\s*=\s*NavManifest\.load\((role: erpRole)?\)/.test(config),
-  "Config.tabs is still loaded from the generated manifest",
+  /NavManifest\.load\(role:/.test(appState),
+  "AppState builds its tabs from the generated manifest",
   "if the tabs move back into Swift, this gate is reading the wrong file again",
+);
+/* And it must be able to change. A `static let` here is how an administrator
+   ended up holding the crew's single tab: the bar was resolved once, from a
+   role remembered on the device, before any page had said who was signed in. */
+assert(
+  /@Published private\(set\) var tabs: \[WebTab\]/.test(appState),
+  "the tab bar is published state, not a constant resolved once at launch",
+  "a frozen bar cannot follow a change of account",
 );
 
 const manifest = JSON.parse(read("ios/CaneiSubirats/Resources/nav.json"));
@@ -72,6 +83,21 @@ const roleTabPaths = Object.values(manifest.roleTabs || {})
 const paths = [...(manifest.tabs || []).map((t) => t.path).filter(Boolean), ...roleTabPaths];
 
 assert(paths.length >= 5, `nav.json declares its tab paths (${paths.length} found)`, paths.length);
+
+/* A reduced bar is only ever right for an account that cannot reach the rest of
+   the app anyway. Give one to a role that can, and that role loses every screen
+   the bar leaves out — with no rail underneath it inside the shell, that is an
+   account with no navigation. Nothing else in the suite would notice: adding
+   `admin` to ROLE_TABS regenerates the manifest and passes every other check. */
+const FULL_ACCESS_ROLES = ["admin", "backoffice", "gestoria"];
+const reducedFullAccess = Object.keys(manifest.roleTabs || {}).filter((r) =>
+  FULL_ACCESS_ROLES.includes(r),
+);
+assert(
+  reducedFullAccess.length === 0,
+  "no full-access role is given a reduced tab bar",
+  reducedFullAccess.join(", "),
+);
 
 /* ------------------------------------------- the shell's own section keys */
 // The ERP shell declares its sections and subsections as `k: "<key>"`. A

@@ -44,15 +44,19 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 
 # The commit the server can ACTUALLY be running.
 #
-# Not HEAD. `deploy.yml` only builds an image when a push touches apps/,
-# packages/, site/, tenants/ or ops/ — so a commit that changes only the iOS app
-# or a document produces no image at all, and the server rightly stays where it
-# is. Comparing against HEAD in that case reports a failed deploy over a server
-# that is perfectly up to date, which is precisely the false alarm this script
+# Not HEAD. `deploy.yml` only builds an image when a push touches one of the
+# paths the image is built from — so a commit that changes only the iOS app or a
+# document produces no image at all, and the server rightly stays where it is.
+# Comparing against HEAD in that case reports a failed deploy over a server that
+# is perfectly up to date, which is precisely the false alarm this script
 # already learned once not to raise.
 #
-# So: the newest commit that touches something the image is built from.
-IMAGE_PATHS=(apps packages site tenants ops)
+# So: the newest commit that touches something the image is built from. The list
+# comes out of the workflow itself — see ops/image-paths.sh for why it is not
+# written here.
+# shellcheck source=ops/image-paths.sh
+. "$(dirname "$0")/image-paths.sh"
+IFS=$'\n' read -r -d '' -a IMAGE_PATHS < <(image_paths "." && printf '\0')
 WANT="$(git log -1 --format=%H -- "${IMAGE_PATHS[@]}" 2>/dev/null || true)"
 if [ -z "$WANT" ]; then
   # A shallow clone cannot answer the question. Fall back to HEAD and say so,

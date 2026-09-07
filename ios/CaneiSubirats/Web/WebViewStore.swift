@@ -14,6 +14,11 @@ extension Notification.Name {
     /// Posted by whichever tab completed a sign-in, so the rest stop showing
     /// their own stale copy of the login page.
     static let caneiSignedIn = Notification.Name("caneiSignedIn")
+
+    /// Posted when a page reports an account whose role differs from the one
+    /// the tab bar was built for. `userInfo["role"]` is the new role, absent
+    /// for an account that has none. `AppState` rebuilds the bar.
+    static let caneiRoleChanged = Notification.Name("caneiRoleChanged")
 }
 
 final class WebViewStore: NSObject, ObservableObject {
@@ -46,7 +51,11 @@ final class WebViewStore: NSObject, ObservableObject {
     /// signal returns — essential on a job site that drops in and out of range.
     private let netMonitor = NWPathMonitor()
 
-    init(tab: WebTab, onShare: @escaping (URL) -> Void) {
+    /// - Parameter tabCount: how many tabs the bar was drawn with when this
+    ///   view was created. Handed to the page so it can tell a bar that can
+    ///   reach the rest of the app from one that cannot — see the injection
+    ///   below.
+    init(tab: WebTab, tabCount: Int, onShare: @escaping (URL) -> Void) {
         self.tab = tab
         self.onShare = onShare
 
@@ -66,8 +75,20 @@ final class WebViewStore: NSObject, ObservableObject {
         // Mark the document as running inside the native shell as early as
         // possible (before first paint) so any `.native-app` CSS applies without
         // a flash of the web chrome.
+        //
+        // The count goes with it. Inside the shell the web app stands its own
+        // section rail down, because the native tab bar does that job — so if
+        // the native bar is a single tab and the account is not the one that
+        // bar was meant for, there is no navigation on the screen at all. That
+        // happened: an administrator on a phone that had once been used by a
+        // site worker got one «Hours» tab and no way off it. The page uses this
+        // to keep its own rail when the bar it is sitting under cannot reach
+        // the rest of the app.
         let markScript = WKUserScript(
-            source: "document.documentElement.classList.add('native-app');",
+            source: """
+            document.documentElement.classList.add('native-app');
+            window.__caneiTabs = \(tabCount);
+            """,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
@@ -215,12 +236,26 @@ final class WebViewStore: NSObject, ObservableObject {
             default:        Haptics.light()
             }
         case "role":
-            // Who the web layer is signed in as. Stored, not acted on: the tab
-            // bar is built at launch (see Config.tabs), so this takes effect on
-            // the next one. A missing or unknown value simply leaves the last
-            // one in place, and the full bar is the default.
-            if let role = dict["role"] as? String, !role.isEmpty {
-                UserDefaults.standard.set(role, forKey: "canei_role")
+            // Who the web layer is signed in as. Acted on, not merely stored.
+            //
+            // This used to write the value and stop, because the tab bar was
+            // built once at launch and could not change. It also refused to
+            // write an empty role, so signing out left the previous account's
+            // role on the device — and an administrator signing in afterwards
+            // was handed the site worker's single tab. Both halves are the same
+            // mistake: a cache that is only ever written forward.
+            //
+            // Now an empty role clears it (see `Config.erpRole`) and any change
+            // is announced, so the bar follows the account that is signed in
+            // rather than the one that used the phone first.
+            let role = (dict["role"] as? String) ?? ""
+            let known = Config.erpRole ?? ""
+            if role != known {
+                var info: [AnyHashable: Any] = [:]
+                if !role.isEmpty { info["role"] = role }
+                NotificationCenter.default.post(
+                    name: .caneiRoleChanged, object: nil, userInfo: info
+                )
             }
         case "share":
             if let s = dict["url"] as? String, let u = URL(string: s) {

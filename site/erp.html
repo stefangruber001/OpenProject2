@@ -101,7 +101,7 @@
       .brand {
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 12.5px;
         min-width: 0;
         /* It is a <button>, so the browser's own button chrome has to go before
            it looks like a logo again. Everything below is reset, not styling. */
@@ -122,18 +122,18 @@
       .brand .nm {
         font-family: var(--serif);
         font-weight: 600;
-        font-size: 15.5px;
+        font-size: 19.4px;
         color: var(--ink);
         line-height: 1;
         white-space: nowrap;
       }
       .brand .nm small {
         display: block;
-        font: 600 9.5px var(--sans);
+        font: 600 11.9px var(--sans);
         letter-spacing: 0.13em;
         text-transform: uppercase;
         color: var(--green);
-        margin-top: 3px;
+        margin-top: 4px;
       }
       .tsp {
         flex: 1;
@@ -4951,14 +4951,21 @@
      counts it twice, and left a measured 84px band of the page showing under
      every sheet. The rail is zero-height here (its strip is display:none), so
      bottom:0 puts panel 2 exactly on the bottom edge. */
-      body.native .p1 {
+      /* `.tabless` is a shell whose tab bar cannot reach the rest of the app —
+     see syncNativeNav(). There the rail is the page's own navigation again,
+     exactly as it is in a browser, because the alternative is a screen nobody
+     can leave. */
+      body.native:not(.tabless) .p1 {
         display: none;
       }
-      body.native .rail {
+      body.native:not(.tabless) .rail {
         bottom: 0;
         border-top: 0;
         background: transparent;
         pointer-events: none;
+      }
+      body.native.tabless main {
+        padding-bottom: calc(168px + env(safe-area-inset-bottom));
       }
       body.native .p2 {
         pointer-events: auto;
@@ -5151,13 +5158,14 @@
           max-width: none;
         }
       }
-      /* Below 360px the wordmark is what stops the header being one row: the
-         name is 111px and the controls need them. The mark alone is still the
+      /* Below 380px the wordmark is what stops the header being one row: the
+         name is 139px and the controls need them. The mark alone is still the
          way home — that convention is the shape in the corner, not the letters
          beside it — and the company's name is the first thing on the screen
-         underneath anyway. 359px and not 320px because the cut-off should be
-         where the row stops fitting, not at one famous phone's width. */
-      @media (max-width: 359px) {
+         underneath anyway. The cut-off is where the row stops fitting rather
+         than one famous phone's width, so it moved when the brand grew by a
+         quarter: 111px of name became 139px, and 359 became 379. */
+      @media (max-width: 379px) {
         .brand .nm {
           display: none;
         }
@@ -5183,7 +5191,7 @@
         title="Ir a la Torre de control"
         aria-label="Ir a la Torre de control"
       >
-        <svg width="29" height="29" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <svg width="36" height="36" viewBox="0 0 40 40" fill="none" aria-hidden="true">
           <rect x="1" y="1" width="38" height="38" rx="11" fill="#48733c" />
           <path
             d="M11 21.5 L20 13 L29 21.5"
@@ -5665,18 +5673,10 @@
             /* keep the permissive default — masking only, see SESSION above */
           }
         }
-        /* Tell the phone shell who this is, so its native tab bar can be the one
-           this account needs. The shell builds that bar at launch, so this lands
-           on the NEXT one — the same honest limitation the language switch has,
-           and harmless: every route resolves to the hours screen for a site
-           worker anyway, and the server refuses the rest. No shell, no handler,
-           nothing happens. */
-        try {
-          const bridge = window.webkit?.messageHandlers?.native;
-          if (bridge && SESSION.role) bridge.postMessage({ action: "role", role: SESSION.role });
-        } catch (e) {
-          /* a shell that does not want to be told is not an error */
-        }
+        /* Tell the phone shell who this is, so its native tab bar is the one
+           this account needs. */
+        announceRole(SESSION.role);
+        syncNativeNav();
         if (!ErpStore.isRemote() && !SESSION.workerId) {
           /* No server means no identity to ask for, and a switch with a single
              destination is not a switch — the personal view would be
@@ -5728,6 +5728,39 @@
 
          It reloads only when the answer CHANGED, so the normal case costs one
          small request a minute and disturbs nobody. */
+      /* Tell the phone shell which account is signed in, so its native tab bar
+         can be the one this account needs.
+
+         Sent unconditionally, including when there is no role. It used to be
+         sent only when there WAS one, which meant signing out left the previous
+         account's role on the device — and the shell handed the next person to
+         sign in the bar belonging to the last one. An administrator on a phone
+         the crew had used got the site worker's single «Horas» tab.
+
+         No shell, no handler, nothing happens. */
+      function announceRole(role) {
+        try {
+          const bridge = window.webkit?.messageHandlers?.native;
+          if (bridge) bridge.postMessage({ action: "role", role: role || "" });
+        } catch (e) {
+          /* a shell that does not want to be told is not an error */
+        }
+      }
+
+      /* Keep the section rail when the native tab bar cannot reach the rest of
+         the app.
+
+         Inside the shell the rail stands down, because the native bar does that
+         job — so a bar that is wrong for this account is not untidy, it is a
+         screen with no navigation on it at all. The shell says how many tabs it
+         drew: one is right for a site worker, whose every route resolves to the
+         hours screen anyway, and wrong for anybody else. A shell that says
+         nothing is an older build, and is left exactly as it was. */
+      function syncNativeNav() {
+        const drawn = typeof window.__caneiTabs === "number" ? window.__caneiTabs : 0;
+        document.body.classList.toggle("tabless", drawn === 1 && !isSiteWorker());
+      }
+
       let identity = "";
       const identityOf = (s) => (s && s.email ? s.email : "") + "/" + ((s && s.role) || "");
       let idBusy = false;
@@ -5757,6 +5790,10 @@
           }
           if (!res.ok) return;
           const who = await res.json();
+          /* Say it again. The boot announcement is the only one the shell used
+             to get, so a tab that was signed in without reloading never told it
+             anything. This costs a message a minute and closes that hole. */
+          announceRole(who.role);
           if (identity && identityOf(who) !== identity) doReload();
         } catch (e) {
           /* Offline. Say nothing and change nothing: a page that blanked itself

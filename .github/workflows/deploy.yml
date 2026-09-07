@@ -311,3 +311,71 @@ jobs:
           BASE="${REGISTRY}/${GITHUB_REPOSITORY,,}/${{ matrix.image }}"
           docker buildx imagetools create -t "$BASE:main" "$BASE:sha-${GITHUB_SHA}"
           echo "::notice::${{ matrix.image }} promoted — the server will pull it within 60s."
+
+  # ---------------------------------------------------------------------------
+  # Did it actually arrive?
+  #
+  # Everything above this job ends at the registry. `promote` retags `:main` and
+  # the workflow goes green — and that is ALL green has ever meant here. The
+  # server pulls on its own timer, and when it stops pulling nothing says so:
+  # the ticks are green, the timer reports active, the container is healthy, and
+  # the code answering is days old. That is not a hypothetical. Production spent
+  # 25 hours on an image 19 commits behind `main` while six consecutive deploys
+  # passed, and it was the operator who noticed, not this pipeline.
+  #
+  # `/api/health` has reported the commit it was built from since the last time
+  # this happened. The probe was there; nothing read it. So this job reads it,
+  # and a server that has stopped following `main` turns the commit that exposed
+  # it red within a few minutes instead of hiding until somebody complains.
+  #
+  # It never blocks a release: `promote` has already happened by the time this
+  # runs. A red `verify` over a green `promote` says exactly the right thing —
+  # the image is good and the box did not take it.
+  verify:
+    needs: promote
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: The revision answering must be the one just built
+        env:
+          # Empty when the repository variable is unset — the step then says so
+          # and stops, rather than failing a deploy over a missing setting.
+          APP_URL: ${{ vars.APP_URL }}
+          # Set this repository variable to `true` while the server is
+          # deliberately pinned to an older image (see docs/HANDOVER-OPS.md).
+          # A rollback is a decision; this is where it gets declared, so that a
+          # frozen box is a thing somebody chose rather than a thing nobody
+          # noticed. Unset it when you put `:main` back.
+          PINNED: ${{ vars.DEPLOY_PINNED }}
+        run: |
+          set -uo pipefail
+          if [ -z "${APP_URL}" ]; then
+            echo "::warning::APP_URL is not set — cannot check what production is running."
+            exit 0
+          fi
+          if [ "${PINNED}" = "true" ]; then
+            echo "::warning::DEPLOY_PINNED is set — the server is deliberately not following :main."
+            exit 0
+          fi
+
+          # The timer pulls every 60s and the container needs a moment to come
+          # up, so give it a few minutes before calling it stuck.
+          for i in $(seq 1 20); do
+            BODY="$(curl -fsS --max-time 15 "${APP_URL%/}/api/health" || true)"
+            GOT="$(printf '%s' "$BODY" | sed -n 's/.*"revision"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+            if [ "$GOT" = "${GITHUB_SHA}" ]; then
+              echo "::notice::production is serving ${GITHUB_SHA} — the deploy arrived."
+              exit 0
+            fi
+            echo "attempt ${i}/20: production reports '${GOT:-no answer}'"
+            sleep 15
+          done
+
+          echo "::error::production is still serving '${GOT:-no answer}', not ${GITHUB_SHA}."
+          echo "The image is published and tested; the server has not taken it."
+          echo "On the box:  systemctl status canei-deploy.service"
+          echo "             journalctl -u canei-deploy.service -n 50 --no-pager"
+          echo "             grep IMAGE_ /opt/canei-erp/.env   # must end :main"
+          echo "Or from a checkout with ops/provision.conf:  ./ops/deploy-now.sh"
+          exit 1

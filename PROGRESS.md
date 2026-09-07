@@ -2670,3 +2670,27 @@ never answered in full. The pattern worth carrying forward is in the S-notes
 above: most of these were the product being confidently silent rather than
 wrong, and every one was found by a person using it while the suite stayed
 green — because those tests asked the ENGINE what the SCREEN does.
+
+## S12 · The administrator with one tab, and the server that stopped listening
+
+Two faults reported together and independent of each other.
+
+**The tab bar now follows the account.** `AppState` owns the tabs as published
+state and rebuilds them when a page reports a different role; the role is
+cleared on sign-out as well as written on sign-in, and announced on every
+session recheck rather than only on a full page boot. The page keeps its own
+section rail whenever the shell reports a bar that cannot reach the rest of the
+app, so a wrong bar can never again mean no navigation at all. Reaches the phone
+only through a new TestFlight build — the fix is in the app binary.
+
+**A stale server is now a red tick.** `deploy.yml` gained a `verify` job that
+asks `/api/health` whether the revision answering is the one just built;
+`ops/status.sh` asks whether the deploy service's last run succeeded, whether
+`IMAGE_APP` still follows `:main`, and which commit is actually replying. Both
+the deploy checker and the workflow read one list of image paths.
+
+Not done here, and only the operator can do it: production was 19 commits behind
+when this was written and this session cannot reach the host. `./ops/deploy-now.sh`
+from a checkout with `ops/provision.conf`, or the three commands in S103.
+
+See ASSUMPTIONS S102, S102a, S103, S103a.
