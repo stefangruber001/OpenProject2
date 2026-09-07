@@ -1216,6 +1216,13 @@
          this query rendered the chart AND the list at once — the same failure
          the builder's phone tab bar had the first time it shipped. */
       @media (max-width: 700px) {
+        /* The deploy marker is desktop-only. On a phone the header is a single
+           row by design and the suite measures exactly that — adding fourteen
+           characters to it pushed the row height to 56 px twice over, which the
+           mobile check caught on the full run. Temporary, like the span itself. */
+        #deployMark {
+          display: none;
+        }
         .gwrap,
         .gtools,
         .glegend {
@@ -5216,6 +5223,20 @@
       </div>
       <span class="tsp"></span>
       <div class="gactions">
+        <!-- TEMPORARY DEPLOY MARKER, and nothing else. It exists to answer one
+             question from the outside — has the build in front of me actually
+             changed? — because several reports this package turned out to be a
+             screen that was already fixed and not yet published, and there was
+             no way to tell those apart by looking. `translate="no"` keeps it out
+             of the dictionary: it is not product text and must not be treated
+             as any. Delete this span and its comment once the question is
+             answered; it is checked in only so that it deploys at all. -->
+        <span
+          id="deployMark"
+          translate="no"
+          style="font-size: 12px; color: var(--muted); margin-right: 8px; align-self: center"
+          >Hello World</span
+        >
         <div class="menuwrap">
           <button class="btn primary sm" id="btnCreate" aria-haspopup="true" aria-expanded="false">
             ＋ Crear
