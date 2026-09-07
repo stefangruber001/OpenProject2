@@ -14508,6 +14508,42 @@ async function testErp(browser, base) {
     const rateLines = (rateTxt.match(/^desde /gm) || []).length;
     if (rateLines === 2) ok("erp: DMT-04 tarifas — a second rate is added to the history");
     else bad("erp: DMT-04 tarifas", rateTxt.slice(0, 160));
+    /* PUTTING SOMEBODY ON A JOB, which until now could not be done at all.
+       `assignResource` and `assignWorkerDrawer` both existed and NOTHING EVER
+       CALLED THE DRAWER — dead code, so on a real server no worker could be
+       assigned to anything. That is not cosmetic: an assignment decides which
+       jobs a site account is sent, and with none it receives no jobs, no
+       chapters and nowhere to book hours. The crew's screen said «you are not
+       assigned to any job» and was right, for ever.
+
+       Asserted through the screen, and asserted BOTH WAYS — granted and
+       removed — because an assignment that can be given and not taken back
+       leaves somebody holding a job's chapters until the document is edited by
+       hand. */
+    const asgBefore = await pg.evaluate(() => (erp.state.assignments || []).length);
+    await pg.locator("#w_asg_p").selectOption({ index: 0 });
+    await pg.locator("#w_asg_save").click();
+    await pg.waitForTimeout(400);
+    const assigned = await pg.evaluate(() => {
+      const list = erp.state.assignments || [];
+      const last = list[list.length - 1];
+      return {
+        n: list.length,
+        // Open-ended, so it does not silently expire the same evening.
+        openEnded: !!last && !last.to,
+        rows: document.querySelectorAll("#drawer [data-wunassign]").length,
+      };
+    });
+    if (assigned.n === asgBefore + 1 && assigned.openEnded && assigned.rows >= 1)
+      ok("erp: DMT-04 obras — a worker can be put on a job, open-ended, and it is listed");
+    else bad("erp: DMT-04 assign", JSON.stringify(assigned));
+
+    await pg.locator("#drawer [data-wunassign]").first().click();
+    await pg.waitForTimeout(400);
+    const afterUnassign = await pg.evaluate(() => (erp.state.assignments || []).length);
+    if (afterUnassign === asgBefore) ok("erp: DMT-04 obras — and taken off it again");
+    else bad("erp: DMT-04 unassign", `before=${asgBefore} after=${afterUnassign}`);
+
     await pg.locator("#w_act").click();
     await pg.waitForTimeout(350);
     // The list is still filtered to this one worker's name; deactivating

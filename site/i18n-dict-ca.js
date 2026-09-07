@@ -2508,6 +2508,15 @@ window.CANEI_DICT.ca = {
   "🏁 Guía de puesta en marcha": "🏁 Guia de posada en marxa",
   "📘 Guía de operaciones": "📘 Guia d'operacions",
   "⤓ Exportar datos": "⤓ Exportar dades",
+  "Obras asignadas": "Obres assignades",
+  "＋ Asignar a la obra": "＋ Assignar a l'obra",
+  "Sin obras asignadas.": "Sense obres assignades.",
+  "Trabajador asignado a la obra": "Treballador assignat a l'obra",
+  "Asignación retirada": "Assignació retirada",
+  "Asignación no encontrada": "Assignació no trobada",
+  "Sin una obra asignada, esta persona no puede apuntar horas: sólo recibe las obras en las que está.":
+    "Sense una obra assignada, aquesta persona no pot apuntar hores: només rep les obres on és.",
+  Quitar: "Treure",
   "Todavía no estás asignado a ninguna obra. Habla con la oficina para que te asignen y podrás apuntar tus horas aquí.":
     "Encara no estàs assignat a cap obra. Parla amb l'oficina perquè t'assignin i podràs apuntar les teves hores aquí.",
   "⇥ Cerrar sesión": "⇥ Tancar la sessió",

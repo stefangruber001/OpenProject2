@@ -11874,6 +11874,59 @@
             closeDrawer();
           }, "Trabajador creado");
       }
+      /* WHICH JOBS THIS PERSON IS ON — and the only place in the application
+         where that can be said.
+
+         `assignResource` has existed since PLN-02 and `assignWorkerDrawer` was
+         written to call it, and NOTHING EVER CALLED THAT DRAWER. It sat in the
+         file, complete, unreachable: no button anywhere opened it. So on a real
+         server no worker could be assigned to anything, which is not a cosmetic
+         gap — an assignment is what decides which jobs a site account is SENT.
+         No assignment, no jobs; no jobs, no chapters; no chapters, nowhere to
+         book hours. The whole site-worker feature was unreachable in production
+         and the crew's screen correctly said «you are not assigned to any job»
+         for ever.
+
+         It goes on the worker rather than on the job because this drawer is
+         where the office already answers "who is this person" — rate, papers,
+         and now where they work. The list is here too, not just the form: an
+         assignment that can be granted and not seen is the next version of the
+         same bug. */
+      function workerJobsCard(w) {
+        const mine = (erp.state.assignments || []).filter((a) => a.workerId === w.id);
+        const open = erp.state.projects.filter((p) => !p.closed);
+        const row = (a) => {
+          let code = a.projectId;
+          try {
+            code = erp.project(a.projectId).code;
+          } catch (e) {
+            /* A job removed from under an assignment still shows its id rather
+               than an empty row, so the office can see what to clean up. */
+          }
+          const when = [a.from ? fmtD(a.from) : "", a.to ? fmtD(a.to) : ""].filter(Boolean);
+          return `<div class="it"><b>${esc(code)}</b>${
+            when.length ? ` · ${esc(when.join(" — "))}` : ""
+          }<span style="flex:1"></span>
+            <button class="mini dz" data-wunassign="${esc(a.id)}">Quitar</button></div>`;
+        };
+        return `<div class="card"><div class="ch"><h3>Obras asignadas</h3>
+          <span class="tag">${mine.length}</span></div>
+         <div class="daylist">
+          ${mine.map(row).join("") || '<div class="it">Sin obras asignadas.</div>'}
+         </div>
+         <div class="fgrid" style="padding:0 16px 14px">
+          <div class="field full"><label>Obra</label><select id="w_asg_p">${
+            open
+              .map((p) => `<option value="${esc(p.id)}">${esc(projectPickLabel(p))}</option>`)
+              .join("") || '<option value="">—</option>'
+          }</select></div>
+          <div class="field"><label>Desde</label><input id="w_asg_from" type="date" value="${erp.today}"></div>
+          <div class="field"><label>Hasta</label><input id="w_asg_to" type="date"></div>
+          <div class="field full"><button class="btn sm primary" id="w_asg_save">＋ Asignar a la obra</button></div>
+          <div class="field full"><div class="mhint">Sin una obra asignada, esta persona no puede apuntar horas: sólo recibe las obras en las que está.</div></div>
+         </div></div>`;
+      }
+
       function workerDrawer(id) {
         const w = erp.state.workers.find((x) => x.id === id);
         const db = openDrawer(w.name);
@@ -11914,7 +11967,8 @@
           <div class="daylist">
            ${(w.docs || []).map((d) => `<div class="it"><span class="dot ${d.expiresOn && d.expiresOn < erp.today ? "r" : "g"}"></span> ${esc(d.kind)} — vence ${d.expiresOn ? fmtD(d.expiresOn) : "—"}</div>`).join("") || '<div class="it">Sin documentación registrada.</div>'}
            <div class="it"><button class="btn sm" id="w_docs">🪪 Añadir / renovar documento</button></div>
-          </div></div>`;
+          </div></div>
+         ${workerJobsCard(w)}`;
         $("#w_save").onclick = () =>
           mutate(() => {
             const name = $("#w_name").value.trim();
@@ -11958,6 +12012,35 @@
             workerDrawer(id);
           }, "Tarifa añadida");
         $("#w_docs").onclick = () => workerDocDrawer(id);
+        /* Reopen the drawer after either change so the list above reflects it.
+           `mutate` re-renders the SCREEN behind, not the drawer on top of it. */
+        if ($("#w_asg_save"))
+          $("#w_asg_save").onclick = () =>
+            mutate(() => {
+              const pid = $("#w_asg_p").value;
+              if (!pid) throw new Error("Elige la obra");
+              erp.assignResource(
+                pid,
+                {
+                  workerId: id,
+                  from: $("#w_asg_from").value || erp.today,
+                  /* Open-ended by default. A date typed in «Hasta» is a decision;
+                     one defaulted to today would silently end the assignment the
+                     same evening, which is how this reads as not having worked. */
+                  to: $("#w_asg_to").value || null,
+                },
+                "backoffice",
+              );
+              workerDrawer(id);
+            }, "Trabajador asignado a la obra");
+        document.querySelectorAll("[data-wunassign]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(() => {
+                erp.unassignResource(b.dataset.wunassign, "backoffice");
+                workerDrawer(id);
+              }, "Asignación retirada")),
+        );
       }
 
       /* ===================== Conciliación bancaria (spec §5.3) ===========================

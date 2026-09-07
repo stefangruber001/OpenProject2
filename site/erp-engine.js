@@ -11184,6 +11184,25 @@
       this._log(user, "assignResource", projectId);
       return rec;
     }
+    /**
+     * Take somebody off a job.
+     *
+     * The other half of PLN-02, and it was missing. An assignment is not a note:
+     * it is what decides which jobs a site account is SENT — the scoped read
+     * carries the jobs a worker is assigned to and nothing else — so an
+     * assignment made by mistake is a person holding a job's chapters until
+     * somebody edits the document by hand. A thing that can be granted through
+     * a screen has to be removable through the same screen.
+     */
+    unassignResource(id, user) {
+      const A = this.state.assignments || [];
+      const i = A.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Asignación no encontrada");
+      const rec = A[i];
+      A.splice(i, 1);
+      this._log(user, "unassignResource", rec.projectId);
+      return rec;
+    }
     resourceConflicts() {
       // PLN-02: overlapping assignments visible
       const A = this.state.assignments || [];

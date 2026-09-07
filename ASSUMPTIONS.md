@@ -8941,3 +8941,36 @@ early return sits ABOVE `horasMine`'s precise «this account is not linked to an
 worker record», so an unlinked account was told to ask for an assignment — which
 would not have helped, because there is nothing to assign to. Two problems the
 office fixes in two different places must not share a sentence.
+
+**S89 · The whole site-worker feature was unreachable, and the missing piece was
+a button.** `assignWorkerDrawer` sits in `erp.html`, complete, calling
+`assignResource` which has existed since PLN-02 — and NOTHING EVER CALLED IT.
+One match in the whole file: its own definition.
+
+So on a real server no worker could be assigned to a job. That is not cosmetic.
+An assignment decides which jobs a site account is SENT — `redactForWorker`
+carries the jobs a worker is assigned to and nothing else. No assignment, no
+jobs; no jobs, no chapters; no chapters, nowhere to book hours. The crew's
+screen said «you are not assigned to any job» and was telling the exact truth,
+permanently.
+
+It also explains why three days of fixes each got one step further and stopped:
+the bar appeared (S86), the message became honest (S86), the money stopped
+leaking and the sub-chapters got their data (S88) — and the thing actually
+missing was a control nobody had wired.
+
+**A feature is not shipped when its functions exist.** `assignResource`,
+`assignWorkerDrawer` and the scoped read were all written, reviewed and tested
+in their own layers; the product was still impossible to use. Nothing in the
+gates asks "can a person reach this from a screen", which is why a whole
+release could pass every check and do nothing. The new test drives it through
+the screen, both ways, for exactly that reason.
+
+`unassignResource` did not exist either. An assignment that can be granted and
+not withdrawn leaves somebody holding a job's chapters until the document is
+edited by hand — the grant and the removal are one feature, not two.
+
+Two details worth keeping: «Hasta» defaults to EMPTY, because a date defaulted
+to today ends the assignment the same evening and reads as the app not working;
+and the card shows the LIST as well as the form, because an assignment that can
+be created and not seen is the next version of this bug.
