@@ -773,6 +773,10 @@ window.CANEI_DICT = {
     ["Cuentas y tarjetas", "Accounts and cards"],
     ["Ir a Configuración › Empresa", "Go to Settings › Company"],
     [
+      "Primero crea la tarjeta en Configuración › Empresa",
+      "Create the card first in Settings › Company",
+    ],
+    [
       "Las cuentas y las tarjetas se crean en Configuración › Empresa.",
       "Accounts and cards are created in Settings › Company.",
     ],

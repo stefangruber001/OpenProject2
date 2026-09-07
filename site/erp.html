@@ -19801,6 +19801,10 @@
           }, "Extracto importado");
       }
 
+      /* Hoisted out of the template for the reason this file has recorded seven
+               times: a string literal inside a conditional inside a template reads
+               to the source audit as prose with no translation. */
+      const NO_CARD_YET = "Primero crea la tarjeta en Configuración › Empresa";
       /* Paying the card off is not a cost — the purchases on the card are, and
                counting the monthly charge too counts every one of them twice. So a
                negative bank line can be marked as the settlement of a card, which
@@ -19815,7 +19819,19 @@
                  point of deactivating it, and for a while it was the whole point of
                  a method nothing called. */
         const cards = erp.activeBankAccounts().filter((a) => a.kind === "card");
-        if (!cards.length) return "";
+        /* AND WHEN THERE IS NO CARD, SAY SO — do not return "". A workspace with
+                 no card account made this whole answer VANISH from the picker: the
+                 operator opened a line that says «ADEUDO MENSUAL DE TARJETA … su
+                 desglose figura en el extracto de tarjeta adjunto», found nothing
+                 about a card anywhere on the panel, and had no way to learn that the
+                 product models this properly and is only missing the account. A
+                 precondition nobody can read is the same closed door package 13 has
+                 now opened four times; the recorrido's rule is the one that applies,
+                 and it is that a verb is never hidden — it is shown refused, with
+                 what it is waiting for. Disabled, so pressing Identificar with it
+                 writes nothing. */
+        if (!cards.length)
+          return `<optgroup label="Liquidación de tarjeta"><option value="" disabled>${esc(NO_CARD_YET)}</option></optgroup>`;
         const opts = cards.map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`).join("");
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
       }

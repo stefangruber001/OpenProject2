@@ -2226,6 +2226,39 @@ worker-assignment fix (S89), and `main` at `ab8f71d` is **738/738 unfiltered**
 plus `tests/site-sync` 20/20 in CI — 736 plus the two checks that fix brought,
 so nothing was lost in either direction.
 
+**S13 · The card settlement was there, and no workspace could find it.** «I
+still don't see the Credit Card Statement to be conciliated in the Bank Account
+conciliation» — a bank line reading «ADEUDO MENSUAL DE TARJETA … su desglose
+figura en el extracto de tarjeta adjunto», opened in Conciliación, with nothing
+anywhere on the panel about a card.
+
+The product has modelled this correctly since PK7-B: the purchases on the card
+are the costs, the bank's monthly charge is not, and «Identificar como… →
+Liquidación de tarjeta» classifies it an internal transfer naming the card so
+nothing is counted twice. But `cardSettleGroup` returned `""` when the
+workspace had no card account, and the seed ships two bank accounts and no
+card. In every workspace that has not yet created one — which is every workspace
+on its first day — the whole answer was suppressed. Not disabled, not
+explained: absent, with «Marcar sin respaldo» as the only exit that looked
+honest.
+
+Shown refused now, with what it waits for, which is the recorrido's own rule
+from PK14-S77. And the gate had the product's blind spot: the browser suite
+covered this path thoroughly — a card created through the product, its
+statement imported through the real file input, the settlement written — but it
+CREATED the card first, so the one state every real tenant starts in was the
+one state never exercised. The new check runs before the run's own card exists,
+because afterwards that state is unreachable.
+
+**Next, from the same report:** the settlement names the card and not WHICH
+statement, so a report to the accountant cannot show the movements a charge
+covers; and the caja-chica cycle has no register, only a card inside one
+movement's drawer. ASSUMPTIONS S93 and S94.
+
+Gates: site E2E **739/739 unfiltered** (738 on `main` plus this check), site-sync
+20/20, boundaries, site syntax, i18n coverage 4219 complete in three languages,
+source literals 162/162, workspace audit 0/0.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they

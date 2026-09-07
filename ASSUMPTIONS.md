@@ -9019,3 +9019,57 @@ this one's call, so Package 13 gets an INDEX of those seven entries instead: one
 line each, pointing here. A fresh session that reads Package 13 now learns that
 there is more on `main` than the section describes, which is the failure mode
 that mattered.
+
+**S92 · A precondition nobody can read is a feature nobody can find.**
+Reported from the live workspace: a bank line reading «ADEUDO MENSUAL DE
+TARJETA ***8442 LIQUIDACION 01/11/2026-30/11/2026 … su desglose figura en el
+extracto de tarjeta adjunto», opened in Conciliación, and NOTHING on the panel
+about a card. Propuestas 0, two candidates differing by 1.553 € and 2.879 €,
+and «Marcar sin respaldo» as the only honest-looking way out.
+
+The product models this correctly and has since PK7-B. `markCardSettlement`
+knows the money truth — the PURCHASES on the card are the costs, the bank's
+monthly charge is not, and counting it too counts every purchase twice — and
+the way in is «Identificar como… → Liquidación de tarjeta». But
+`cardSettleGroup` ended `if (!cards.length) return ""`, and the seeded
+workspace ships two bank accounts and no card. So in every workspace that has
+not yet created a card account, the entire answer was suppressed: not disabled,
+not explained, absent. The only way to learn the feature exists was to read the
+source.
+
+Shown refused now, with what it waits for — the recorrido's rule (S77c), which
+is the rule this repo keeps having to rediscover. Disabled, so pressing
+Identificar writes nothing.
+
+**And the gate had the same blind spot the product did.** The e2e suite covered
+this path well — a card created through the product, its statement imported
+through the real file input, the settlement written and classified — but it
+CREATED the card first, so the state every real tenant starts in was the one
+state never exercised. A fixture that builds the precondition before checking
+the screen cannot see a missing precondition. The new check runs at the top of
+the banking suite, before the run's own card exists, because afterwards the
+state is unreachable. Fourth false-green of this shape in a week (S86's
+concatenated chain, S88's empty assignments, the crawl ceilings).
+
+**S93 · The settlement names the card but not WHICH statement, and that is the
+next unit.** The operator's follow-up, and it is right: `cardSettlement` stores
+`{ accountId }` alone, so a report to the accountant can say «Liquidación de
+tarjeta · Visa» and cannot show the movements that charge covers. The data is
+almost there — every imported movement carries `importId`, `importBatches`
+holds `{ accountId, from, to, count }` per statement, and the bank line's own
+concept quotes the period.
+
+The identifier will be the PERIOD on the card account, not the `importId`: an
+importId identifies the file somebody uploaded, which breaks on a re-import, on
+a statement split across two files, and on movements imported before imports
+were batched (those carry no importId at all). A period is what a card
+statement IS, it survives re-import, and it is what is printed on the paper and
+on the bank line. The check worth having falls out of it: the covered purchases
+must foot to the charge, and nothing verifies that today.
+
+**S94 · `cashGroup` has the same closed door, one function below the one just
+fixed.** For money coming IN it returns "" when no withdrawal is open, so a
+deposit of unspent cash entered before the withdrawal was declared offers
+«Devolución de efectivo» nowhere and says nothing. Left standing in this commit
+because it is a different screen state and belongs with the caja-chica register
+S93 needs, not because it is acceptable.

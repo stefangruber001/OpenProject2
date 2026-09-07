@@ -846,6 +846,8 @@ window.CANEI_DICT.ca = {
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
   "Cuentas y tarjetas": "Comptes i targetes",
   "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
+  "Primero crea la tarjeta en Configuración › Empresa":
+    "Primer crea la targeta a Configuració › Empresa",
   "Las cuentas y las tarjetas se crean en Configuración › Empresa.":
     "Els comptes i les targetes es creen a Configuració › Empresa.",
   Desactivar: "Desactivar",

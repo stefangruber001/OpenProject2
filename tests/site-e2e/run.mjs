@@ -6769,6 +6769,51 @@ async function testBankAndCash(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(500);
 
+    /* FIRST, WITH NO CARD IN THE WORKSPACE AT ALL. This is the state the
+       operator reported from the live install: a bank line reading «ADEUDO
+       MENSUAL DE TARJETA … su desglose figura en el extracto de tarjeta
+       adjunto», and nothing anywhere on the panel about a card, because the
+       whole optgroup was suppressed when no card account existed. The answer
+       has to be ON the panel, refused, saying what it waits for — otherwise
+       the only way to learn this product models card settlements is to read
+       its source. Checked HERE, at the top of the suite, because this run
+       creates a card of its own further down and after that the state is
+       unreachable — the seeded workspace ships two bank accounts and no card,
+       which is the shape the report came from. */
+    const noCardYet = await pg.evaluate(async () => {
+      if (erp.state.bankAccounts.some((a) => a.kind === "card")) return { pre: "a card exists" };
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 800));
+      for (const row of [...document.querySelectorAll("#rcList tr.click")]) {
+        const m = erp.state.movements.find((x) => x.id === row.dataset.id);
+        if (!m || m.amountCents >= 0) continue;
+        const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+        if (!acc || acc.kind === "card") continue;
+        row.click();
+        await new Promise((r) => setTimeout(r, 350));
+        const sel = document.getElementById("rcDest");
+        if (!sel) continue;
+        const grp = [...sel.querySelectorAll("optgroup")].find(
+          (g) => g.label === "Liquidación de tarjeta",
+        );
+        const opt = grp && grp.querySelector("option");
+        return {
+          shown: !!grp,
+          disabled: !!(opt && opt.disabled),
+          text: opt ? opt.textContent : "",
+        };
+      }
+      return { shown: false, noRow: true };
+    });
+    if (noCardYet.shown && noCardYet.disabled && /Configuración/.test(noCardYet.text))
+      ok(
+        "1C: with no card configured the settlement is still offered, refused, and says where to create one",
+      );
+    else bad("1C: settlement precondition is readable", JSON.stringify(noCardYet));
+    await pg.evaluate(() => closeDrawer());
+    await pg.evaluate(() => goTab("banking", "_bankAccounts"));
+    await pg.waitForTimeout(400);
+
     const cash = await pg.evaluate(() => {
       const w = erp.state.movements.find((m) => m.cashWithdrawal);
       if (!w) return { missing: true };
