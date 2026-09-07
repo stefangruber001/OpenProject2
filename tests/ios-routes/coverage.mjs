@@ -56,13 +56,20 @@ const assert = (cond, name, detail) =>
    something that is not there. Both ends are pinned below. */
 const config = read("ios/CaneiSubirats/Support/Config.swift");
 assert(
-  /static let tabs:\s*\[WebTab\]\s*=\s*NavManifest\.load\(\)/.test(config),
+  /static let tabs:\s*\[WebTab\]\s*=\s*NavManifest\.load\((role: erpRole)?\)/.test(config),
   "Config.tabs is still loaded from the generated manifest",
   "if the tabs move back into Swift, this gate is reading the wrong file again",
 );
 
 const manifest = JSON.parse(read("ios/CaneiSubirats/Resources/nav.json"));
-const paths = (manifest.tabs || []).map((t) => t.path).filter(Boolean);
+/* Role bars count as tabs. A site worker's bar is one entry pointing at the
+   hours screen, and a route renamed out from under it is the same blank screen
+   the six-tab bar would give — so it is checked in the same list. */
+const roleTabPaths = Object.values(manifest.roleTabs || {})
+  .flat()
+  .map((t) => t.path)
+  .filter(Boolean);
+const paths = [...(manifest.tabs || []).map((t) => t.path).filter(Boolean), ...roleTabPaths];
 
 assert(paths.length >= 5, `nav.json declares its tab paths (${paths.length} found)`, paths.length);
 

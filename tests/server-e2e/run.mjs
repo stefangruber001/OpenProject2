@@ -14,6 +14,10 @@
  */
 const BASE = process.env.ERP_BASE_URL;
 const TENANT = process.env.ERP_TEST_TENANT || "reformas-demo";
+/* Optional. Set together, they make the suite sign in rather than rely on a
+   single-seat operator, which is what lets it be somebody else further down. */
+const ADMIN_EMAIL = process.env.ERP_E2E_ADMIN?.trim() || "";
+const ADMIN_PASSWORD = process.env.ERP_E2E_ADMIN_PASSWORD ?? "";
 
 if (!BASE) {
   console.log("server-e2e: skipped (set ERP_BASE_URL to run)");
@@ -54,8 +58,66 @@ const ok = (name, detail = "") => results.push({ name, pass: true, detail });
 const bad = (name, detail) => results.push({ name, pass: false, detail });
 const check = (name, cond, detail = "") => (cond ? ok(name, detail) : bad(name, detail));
 
-const api = (path, init) =>
-  fetch(`${BASE}${path}`, { headers: { accept: "application/json" }, ...init });
+/**
+ * WHO THIS SUITE IS, AND WHY IT CAN BE SOMEBODY ELSE.
+ *
+ * The server has two ways to know who is calling: one named operator in the
+ * environment (`ERP_OPERATOR`, the single-seat pilot shape), or real accounts
+ * with a signed session cookie. Under the first there is exactly one identity
+ * and it is an administrator, so the site worker's boundary — the whole point
+ * of the hours release — cannot be exercised at all: there is nobody to be.
+ *
+ * So the suite carries a cookie. Empty by default, which is the single-seat
+ * case and behaves exactly as it did before. When `ERP_E2E_ADMIN` and
+ * `ERP_E2E_ADMIN_PASSWORD` are set the suite signs in with them first, and can
+ * then create a second account, sign in AS that account, and check what it is
+ * refused. `as(cookie, fn)` swaps identity for the length of one block.
+ */
+let COOKIE = "";
+
+const api = (path, init = {}) =>
+  fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      accept: "application/json",
+      ...(COOKIE ? { cookie: COOKIE } : {}),
+      ...(init.headers ?? {}),
+    },
+  });
+
+async function as(cookie, fn) {
+  const was = COOKIE;
+  COOKIE = cookie;
+  try {
+    return await fn();
+  } finally {
+    COOKIE = was;
+  }
+}
+
+/**
+ * Sign in and return the session cookie, or "" if the credentials were refused.
+ *
+ * The login route answers a form post with a 303 and a Set-Cookie, because it
+ * has to work without JavaScript. `redirect: "manual"` is what keeps fetch from
+ * following the redirect and throwing the header away.
+ */
+async function signIn(email, password) {
+  const body = new URLSearchParams({ email, password });
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    redirect: "manual",
+  });
+  const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+  const set = raw.length ? raw : [res.headers.get("set-cookie") ?? ""];
+  const jar = set
+    .filter(Boolean)
+    .map((c) => c.split(";")[0])
+    .join("; ");
+  return jar;
+}
 
 const json = async (res) => {
   const text = await res.text();
@@ -121,7 +183,7 @@ async function main() {
   // traced into the standalone output and must be copied explicitly, and
   // without it the server hosts an API with no user interface.
   {
-    const res = await fetch(`${BASE}/workspace/erp.html`);
+    const res = await api("/workspace/erp.html");
     const html = await res.text();
     check("the workspace page is served", res.ok, `HTTP ${res.status}`);
     const marked = /<meta\s+name="erp-api"/.test(html);
@@ -130,8 +192,46 @@ async function main() {
       marked,
       marked ? "erp-api marker present" : "no erp-api marker — sync-workspace.mjs did not run",
     );
-    const engine = await fetch(`${BASE}/workspace/erp-engine.js`);
+    const engine = await api("/workspace/erp-engine.js");
     check("its scripts are served too", engine.ok, `erp-engine.js HTTP ${engine.status}`);
+  }
+
+  // --- NOTHING PER-ACCOUNT MAY BE STORED BY A BROWSER ----------------------
+  //
+  // Every answer here is shaped by who asked: the session route says who you
+  // are, the state route is redacted per role. Served with no `Cache-Control`,
+  // no `Expires` and no validator — which is what a `force-dynamic` route
+  // handler emits, measured, nothing but a content-type — a browser may store
+  // the response and hand it back on the same device to whoever signs in next.
+  //
+  // That is not a theory. An administrator signed out on a phone, a site worker
+  // signed in, and the workspace painted the administrator's name and
+  // ADMINISTRATOR permission while every write was correctly refused: the
+  // client reading a stored `/api/~/session` while the server knew perfectly
+  // well who was holding the phone. The label was the visible half; the same
+  // silence covers `/erp/state`, where the stale copy is the invoice register.
+  //
+  // Checked on the wire rather than by reading the source, because the header
+  // has to survive the route, the framework and the proxy in front of it.
+  {
+    for (const path of [
+      `/api/${TENANT}/session`,
+      `/api/${TENANT}/erp/state`,
+      `/api/${TENANT}/erp/version`,
+      `/api/${TENANT}/control-tower`,
+    ]) {
+      const res = await api(path);
+      const cc = (res.headers.get("cache-control") ?? "").toLowerCase();
+      check(`${path} tells the browser not to store it`, cc.includes("no-store"), cc || "(none)");
+    }
+    // The two that carry the cookie itself. One replayed from a cache without
+    // its Set-Cookie is a sign-in that appears to work and leaves you signed
+    // out — or a sign-out that appears to work and leaves you signed in.
+    for (const path of ["/api/auth/login", "/api/auth/logout"]) {
+      const res = await fetch(`${BASE}${path}`, { method: "POST", redirect: "manual" });
+      const cc = (res.headers.get("cache-control") ?? "").toLowerCase();
+      check(`${path} is never stored`, cc.includes("no-store"), `HTTP ${res.status} · ${cc}`);
+    }
   }
 
   // --- reading state ------------------------------------------------------
@@ -264,7 +364,7 @@ async function main() {
         "trailer<</Root 1 0 R>>\n%%EOF\n",
       "utf8",
     );
-    const put = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`, {
+    const put = await api(`/api/${TENANT}/erp/blob/${key}`, {
       method: "PUT",
       headers: { "content-type": "application/pdf" },
       body: pdf,
@@ -276,7 +376,7 @@ async function main() {
       `HTTP ${put.status} ${JSON.stringify(putBody).slice(0, 140)}`,
     );
 
-    const got = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`);
+    const got = await api(`/api/${TENANT}/erp/blob/${key}`);
     const back = Buffer.from(await got.arrayBuffer());
     check(
       "and comes back byte for byte, as a PDF",
@@ -289,14 +389,14 @@ async function main() {
     // The allow-list is still a list. An SVG is a document that can carry
     // script, served from the company's own origin beside its session
     // cookie — widening the list for PDFs must not have widened it for that.
-    const svg = await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}_svg`, {
+    const svg = await api(`/api/${TENANT}/erp/blob/${key}_svg`, {
       method: "PUT",
       headers: { "content-type": "image/svg+xml" },
       body: '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>',
     });
     check("an SVG is still refused", svg.status === 400, `HTTP ${svg.status}`);
 
-    await fetch(`${BASE}/api/${TENANT}/erp/blob/${key}`, { method: "DELETE" });
+    await api(`/api/${TENANT}/erp/blob/${key}`, { method: "DELETE" });
   }
 
   // --- business rules still belong to the engine --------------------------
@@ -323,9 +423,9 @@ async function main() {
 
   // --- moving an existing document onto the server ------------------------
   {
-    const importUrl = (q = "") => `${BASE}/api/${TENANT}/erp/import${q}`;
+    const importUrl = (q = "") => `/api/${TENANT}/erp/import${q}`;
     const post = (body, q = "") =>
-      fetch(importUrl(q), {
+      api(importUrl(q), {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify(body),
@@ -368,6 +468,336 @@ async function main() {
       `parties=${(untouched.state?.parties ?? []).length}`,
     );
   }
+
+  await siteWorkerBoundary();
+}
+
+/**
+ * R2 · what a site worker is REFUSED, checked against the running server.
+ *
+ * The role existed as a label for months: it named a set of permissions that
+ * nothing consulted. `POST /erp/command` had no permission check at all, and
+ * `PUT /erp/state` accepted a whole client-computed document from anybody who
+ * was signed in — so an account meant to type its own hours could rewrite the
+ * invoice register, and did receive every bank line in its state response.
+ *
+ * Unit tests cover the functions; this covers the WIRE, which is where it
+ * actually failed. Four refusals and one redaction, as a second account, over
+ * HTTP, against a real database.
+ *
+ * Skipped when the server has no named accounts (single-seat `ERP_OPERATOR`),
+ * because then there is only one identity and it is an administrator. The
+ * deploy workflow configures accounts precisely so this runs.
+ */
+async function siteWorkerBoundary() {
+  if (!ADMIN_EMAIL || !COOKIE) {
+    console.log("site-worker boundary: skipped (no named accounts configured)");
+    return;
+  }
+
+  const email = `e2e-site-${RUN}@example.com`;
+  const password = `Pw-${RUN}-site!`;
+
+  // --- create the account and let it choose its own password ---------------
+  {
+    const res = await api(`/api/${TENANT}/users`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email, name: "E2E Site Worker", role: "site" }),
+    });
+    const body = await json(res);
+    check(
+      "an administrator can create a site-worker account",
+      res.status === 201,
+      `HTTP ${res.status} ${JSON.stringify(body).slice(0, 160)}`,
+    );
+    const link = body?.invitation?.link ?? "";
+    const token = link ? new URL(link).searchParams.get("token") : null;
+    check("the invitation carries a token", Boolean(token), link.slice(0, 80));
+
+    /* THE TEMPORARY PASSWORD, PROVED AGAINST A REAL DATABASE. This is the only
+       place it can be: the password is written to the account row at invitation
+       time, so a unit test can assert the string is generated but not that it
+       opens the door. What the operator asked for was "copy it, paste it, be
+       in" — so that is what is checked, before the link is used at all. */
+    const tempPw = body?.invitation?.tempPassword ?? "";
+    check(
+      "the invitation carries a temporary password",
+      typeof tempPw === "string" && tempPw.length >= 12,
+      JSON.stringify(tempPw).slice(0, 40),
+    );
+    const loginUrl = body?.invitation?.loginUrl ?? "";
+    check("…and the address of the page to type it on", /\/login$/.test(loginUrl), loginUrl);
+    if (tempPw) {
+      const tempCookie = await signIn(email, tempPw);
+      check(
+        "and it signs in on its own, without following any link",
+        Boolean(tempCookie),
+        tempCookie ? "cookie issued" : "no cookie",
+      );
+    }
+
+    if (!token) return;
+
+    const act = await fetch(`${BASE}/api/auth/activate`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+    /* The body, not just the status. This step failed once with a bare 400 and
+       the reason — the invitation was filed under one company and looked up in
+       another — was invisible until the message was printed. */
+    const actBody = await json(act);
+    check(
+      "and the invited person can set a password",
+      act.ok,
+      `HTTP ${act.status} ${JSON.stringify(actBody).slice(0, 160)}`,
+    );
+  }
+
+  // --- link the account to a worker, the way the workspace does ------------
+  // Hours are recorded against a WORKER, and an account becomes one by sharing
+  // its email address. There is no whitelisted command for that, so the
+  // administrator does it through the document — which is itself the thing the
+  // site account is about to be refused.
+  let workerId = null;
+  let otherWorkerId = null;
+  let assignedProjectId = null;
+  {
+    const st = await json(await api(`/api/${TENANT}/erp/state`));
+    const state = st.state ?? {};
+    workerId = `wk-e2e-${RUN}`;
+    otherWorkerId = (state.workers ?? []).find((w) => w.id !== workerId)?.id ?? null;
+    state.workers = [
+      ...(state.workers ?? []),
+      { id: workerId, name: `E2E Site ${RUN}`, email, active: true },
+    ];
+    /* AND ASSIGNED TO A REAL JOB. Until now this suite created the worker and
+       stopped, so `assignments` was empty, the scoped read carried NO projects,
+       and every check below about what a project may contain ran over an empty
+       list. "Not one amount in cents" passed for a year without once being
+       handed a project — while a real assigned worker was being sent the job's
+       revenue, cost and margin and every chapter's sale and cost price.
+
+       A fixture that cannot fail is not a test. This one now has something to
+       redact. */
+    assignedProjectId = (state.projects ?? []).find((p) => !p.closed)?.id ?? null;
+    if (assignedProjectId)
+      state.assignments = [
+        ...(state.assignments ?? []),
+        { workerId, projectId: assignedProjectId, from: null, to: null },
+      ];
+    const res = await api(`/api/${TENANT}/erp/state`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ state, expectedVersion: st.version }),
+    });
+    check("an administrator may still save the whole document", res.ok, `HTTP ${res.status}`);
+  }
+
+  const siteCookie = await signIn(email, password);
+  check(
+    "the site worker can sign in",
+    Boolean(siteCookie),
+    siteCookie ? "cookie issued" : "no cookie",
+  );
+  if (!siteCookie) return;
+
+  // --- and can sign out again ---------------------------------------------
+  // The menu's sign-out is a plain form post, so this is byte for byte what the
+  // browser sends when somebody taps it. Three things have to hold or the
+  // button lies about what it did:
+  //
+  //   · the answer sends the browser to the login page, which is the only
+  //     reason the person sees a login screen at all;
+  //   · the cookie it sets is an empty one that expires immediately;
+  //   · and a request carrying no cookie no longer reaches the workspace.
+  //
+  // The third is the one worth having. Clearing a cookie and still being able
+  // to open the application is the shape this fails in, and it would look
+  // completely correct from the outside — right redirect, right header.
+  //
+  // What is NOT claimed: that the token is dead. There is no session store to
+  // delete it from (see lib/session-token.ts), so signing out ends the session
+  // ON THIS DEVICE, which is what the word means to the person pressing it.
+  //
+  // Done with the site worker's cookie, not the suite's own: signing out is a
+  // client-side act, so it takes nothing away from the admin session the rest
+  // of this file runs on — but using a throwaway account means that stays true
+  // even if the route ever grows a real revocation.
+  {
+    const res = await fetch(`${BASE}/api/auth/logout`, {
+      method: "POST",
+      headers: { cookie: siteCookie },
+      redirect: "manual",
+    });
+    check("signing out answers with a redirect", res.status === 303, `HTTP ${res.status}`);
+    check(
+      "…and sends the browser to the login page",
+      res.headers.get("location") === "/login",
+      res.headers.get("location") ?? "(no Location)",
+    );
+    const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+    const set = (raw.length ? raw : [res.headers.get("set-cookie") ?? ""]).filter(Boolean);
+    const cleared = set.find((c) => /^[^=]+=;/.test(c) && /Max-Age=0/i.test(c)) ?? "";
+    check(
+      "…clearing the session cookie",
+      Boolean(cleared),
+      cleared || set.join(" | ") || "(no Set-Cookie)",
+    );
+
+    // A GET must not do this. Without that, any page on the internet can sign
+    // one of the crew out with an image tag pointing here — annoying rather
+    // than dangerous, but it is one line of the route and it is worth keeping.
+    const viaGet = await fetch(`${BASE}/api/auth/logout`, { redirect: "manual" });
+    check(
+      "a GET cannot sign somebody out",
+      viaGet.status === 405 || viaGet.status === 404,
+      `HTTP ${viaGet.status}`,
+    );
+
+    // And the cookie really is spent: no cookie, no workspace.
+    const after = await fetch(`${BASE}/workspace/erp.html`, { redirect: "manual" });
+    const landed = after.headers.get("location") ?? "";
+    check(
+      "and afterwards the workspace sends you to the login page",
+      after.status >= 300 && after.status < 400 && landed.includes("/login"),
+      `HTTP ${after.status} → ${landed || "(no Location)"}`,
+    );
+  }
+
+  await as(siteCookie, async () => {
+    const st = await json(await api(`/api/${TENANT}/erp/state`));
+
+    // --- the read is a different document, not the same one with tabs hidden
+    check(
+      "the site worker's state response is marked scoped",
+      st.scoped === true,
+      `scoped=${st.scoped}`,
+    );
+    const s = st.state ?? {};
+    check(
+      "it carries no invoices, bank movements or supplier bills",
+      !(s.invoices ?? []).length && !(s.movements ?? []).length && !(s.bills ?? []).length,
+      `invoices=${(s.invoices ?? []).length} movements=${(s.movements ?? []).length} bills=${(s.bills ?? []).length}`,
+    );
+    check(
+      "and nobody else's worker record",
+      (s.workers ?? []).every((w) => w.id === workerId),
+      `workers=${(s.workers ?? []).map((w) => w.id).join(",") || "(none)"}`,
+    );
+    /* THE ASSIGNED JOB IS ACTUALLY THERE, checked before the money is, because
+       everything below is vacuous without it — which is exactly how the cents
+       assertion passed while a leak was live. */
+    check(
+      "the job he is assigned to is in his document",
+      !assignedProjectId || (s.projects ?? []).some((p) => p.id === assignedProjectId),
+      `assigned=${assignedProjectId ?? "(none open)"} got=${(s.projects ?? []).length}`,
+    );
+    /* AND IT CARRIES WHAT THE ENTRY SCREEN NEEDS. Hours are booked against a
+       chapter and a line; the line list lives in the budget, and the budget is
+       not sent. Without these fields lifted onto the chapter, «Subpartida» is
+       empty for ever and the hours lose their attribution. */
+    const scopedProject = (s.projects ?? []).find((p) => p.id === assignedProjectId);
+    const chapters = scopedProject?.baseline?.chapters ?? [];
+    check(
+      "with its chapters named",
+      !assignedProjectId || chapters.some((c) => c.num && c.name),
+      `chapters=${chapters.length}`,
+    );
+    check(
+      "and their line items, so a sub-chapter can be chosen",
+      !assignedProjectId || chapters.some((c) => (c.lines ?? []).some((l) => l.id)),
+      `lines=${chapters.reduce((n, c) => n + (c.lines ?? []).length, 0)}`,
+    );
+
+    const money = JSON.stringify(s).match(/"[a-zA-Z]*Cents"/g) ?? [];
+    check("and not one amount in cents", money.length === 0, money.slice(0, 6).join(" "));
+    /* Belt and braces on the one that got through: the baseline's own three
+       totals, named, because those are what a project carried in whole. */
+    const baselineMoney = ["revenueCents", "costCents", "marginCents", "saleCents"].filter((k) =>
+      JSON.stringify(s.projects ?? []).includes(`"${k}"`),
+    );
+    check(
+      "and no job revenue, cost or margin",
+      baselineMoney.length === 0,
+      baselineMoney.join(" ") || "clean",
+    );
+
+    // --- the other door is shut ------------------------------------------
+    //
+    // 403 AND NOT 401, and the difference is the whole reason this reads the
+    // status rather than merely "not ok". These refusals used to answer 401,
+    // which the workspace reads as an expired session: a site worker was shown
+    // «your session has expired, your latest changes are NOT saved» on a
+    // perfectly valid session, on every save, with signing in again as the only
+    // cure offered — and signing in again did it all over. The boundary was
+    // right; the word it used for itself was wrong.
+    {
+      const res = await api(`/api/${TENANT}/erp/state`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: s, expectedVersion: st.version }),
+      });
+      check(
+        "a site worker may not save the whole document",
+        res.status === 403,
+        `HTTP ${res.status}`,
+      );
+      const body = await json(res);
+      check(
+        "…and says so as FORBIDDEN, not as «who are you»",
+        body.error === "FORBIDDEN",
+        `${body.error} · ${String(body.message).slice(0, 60)}`,
+      );
+    }
+
+    // --- and so is approval, which is the office's job --------------------
+    {
+      const res = await command({
+        command: "approveLabourWeek",
+        args: [workerId, "2026-09-07"],
+        expectedVersion: st.version,
+      });
+      check("a site worker may not approve a week", res.status === 403, `HTTP ${res.status}`);
+    }
+
+    // --- hours for somebody else ------------------------------------------
+    if (otherWorkerId) {
+      const res = await command({
+        command: "recordHours",
+        args: [{ workerId: otherWorkerId, date: "2026-09-07", hoursMilli: 8000, kind: "normal" }],
+        expectedVersion: st.version,
+      });
+      check(
+        "a site worker may not record another person's hours",
+        res.status === 403,
+        `HTTP ${res.status}`,
+      );
+    }
+
+    // --- his own hours, but on a site nobody assigned him to ---------------
+    {
+      const res = await command({
+        command: "recordHours",
+        args: [
+          {
+            workerId,
+            projectId: "definitely-not-assigned",
+            date: "2026-09-07",
+            hoursMilli: 8000,
+            kind: "normal",
+          },
+        ],
+        expectedVersion: st.version,
+      });
+      check(
+        "nor his own hours on a site he is not assigned to",
+        res.status === 403,
+        `HTTP ${res.status}`,
+      );
+    }
+  });
 }
 
 /**
@@ -397,6 +827,26 @@ async function cleanUp() {
         v = (await json(res)).version;
       }
     }
+    /* The boundary section adds a worker so the site account has hours of its
+       own to be refused about. It is written through the document, so it comes
+       out the same way. */
+    const withWorker = await json(await api(`/api/${TENANT}/erp/state`));
+    const stray = (withWorker.state?.workers ?? []).filter((w) => /^E2E Site /.test(w.name ?? ""));
+    if (stray.length) {
+      const state = withWorker.state;
+      state.workers = (state.workers ?? []).filter((w) => !/^E2E Site /.test(w.name ?? ""));
+      const res = await api(`/api/${TENANT}/erp/state`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state, expectedVersion: withWorker.version }),
+      });
+      check(
+        "the run's own test worker is gone",
+        res.ok,
+        `HTTP ${res.status}, ${stray.length} removed`,
+      );
+    }
+
     const after = await json(await api(`/api/${TENANT}/erp/state`));
     check(
       "the run's own test customer is gone, and so is every older run's",
@@ -422,6 +872,10 @@ function report() {
    real news is why the suite crashed. */
 let crashed = null;
 try {
+  if (ADMIN_EMAIL && ADMIN_PASSWORD) {
+    COOKIE = await signIn(ADMIN_EMAIL, ADMIN_PASSWORD);
+    check("the suite can sign in as its administrator", Boolean(COOKIE), ADMIN_EMAIL);
+  }
   await main();
 } catch (err) {
   crashed = err;

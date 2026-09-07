@@ -8531,6 +8531,12 @@
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
       this.state.labour.push(rec);
+      /* CREATION IS AUDITED TOO. `correctHours` and `deleteHours` both wrote a
+         line and this one did not, so the one mutation you most want attributed
+         — who first said these hours happened — was the only one with no answer.
+         It is also what lets a screen tell an entry the office typed from one a
+         person sent in from a site. */
+      this._log(user, "recordHours", rec.id);
       return rec;
     }
     deleteHours(id, user) {
@@ -11923,6 +11929,24 @@
       const rec = this.state.labour.find((x) => x.id === id);
       if (!rec) throw new Error("Hours entry not found");
       if (rec.locked) throw new Error("Hours entry is in an approved week — reopen the week first");
+      /* THE DESTINATION HAS A LOCK TOO. The check above asks whether THIS entry
+         is approved; moving an open one onto a date inside a week that is already
+         approved would slip a cost past an approval that had already been given,
+         and the payroll run that relied on it would be wrong after the fact.
+         Guarding it here rather than in the screen is deliberate — the API is the
+         other door, and a rule only one door carries is not a rule. */
+      if (patch && patch.date && patch.date !== rec.date) {
+        const clash = this.state.labour.find(
+          (x) =>
+            x.workerId === rec.workerId &&
+            x.locked &&
+            weekStartOf(x.date) === weekStartOf(patch.date),
+        );
+        if (clash)
+          throw new Error(
+            "That week is already approved for this worker — reopen it before moving hours into it",
+          );
+      }
       const allowed = [
         "projectId",
         "chapterNum",

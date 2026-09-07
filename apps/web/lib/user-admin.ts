@@ -13,6 +13,7 @@
  * creating them properly and deleting a line from `.env` — in that order, never
  * the other way round.
  */
+import { randomBytes } from "node:crypto";
 import { FactoryError } from "@repo/kernel";
 import * as db from "@repo/db";
 import { hashPassword } from "./auth";
@@ -82,10 +83,50 @@ export async function allUsers(tenantId: string): Promise<UserRecord[]> {
   return [...rows, ...envUsers().filter((u) => !seen.has(u.email))];
 }
 
+/**
+ * THE SINGLE-SEAT OPERATOR IS THE ADMINISTRATOR OF THEIR OWN SERVER.
+ *
+ * A deployment with no accounts and no shared password has one identity:
+ * `ERP_OPERATOR`, the name `requireUser` stamps on every record so the audit
+ * trail is attributable. That person has no row and no environment account, so
+ * `findUser` used to answer null for them — which was harmless while nothing
+ * asked, and became a lockout the moment the command runner started asking.
+ * They could not record an invoice on a server that is entirely theirs.
+ *
+ * Narrow on purpose. It applies ONLY when sign-in is not configured at all, so
+ * it can never widen a deployment that does have accounts: there,
+ * `requireUser` returns whoever the session cookie names and never this value.
+ */
+function singleSeatOperator(): UserRecord | null {
+  const operator = process.env.ERP_OPERATOR?.trim();
+  if (!operator) return null;
+  const configured =
+    Boolean(process.env.ERP_USERS?.trim()) || Boolean(process.env.ERP_ACCESS_PASSWORD?.trim());
+  if (configured && process.env.SESSION_SECRET?.trim()) return null;
+  const epoch = new Date(0);
+  return {
+    email: operator.trim().toLowerCase(),
+    name: operator,
+    role: "admin",
+    state: "active",
+    // No password: there is nothing to sign in to. This record exists to answer
+    // "what may they do", not "is this them" — that question was already
+    // settled by the configuration itself.
+    hash: "",
+    sessionsValidFrom: epoch,
+    createdAt: epoch,
+    createdBy: "env",
+    disabledAt: null,
+  };
+}
+
 /** The one user, or null. */
 export async function findUser(tenantId: string, email: string): Promise<UserRecord | null> {
   const wanted = email.trim().toLowerCase();
-  return (await allUsers(tenantId)).find((u) => u.email === wanted) ?? null;
+  const found = (await allUsers(tenantId)).find((u) => u.email === wanted);
+  if (found) return found;
+  const solo = singleSeatOperator();
+  return solo && solo.email === wanted ? solo : null;
 }
 
 /**
@@ -104,23 +145,61 @@ export async function may(tenantId: string, email: string, permission: string): 
 /** Throws unless they may. */
 export async function require_(tenantId: string, email: string, permission: string): Promise<void> {
   if (!(await may(tenantId, email, permission)))
-    throw new FactoryError("UNAUTHENTICATED", `You do not have permission to ${permission}.`);
+    throw new FactoryError("FORBIDDEN", `You do not have permission to ${permission}.`);
 }
 
 export interface Invitation {
   /** The address to send, or to copy when no mail can leave. */
   link: string;
+  /** Where the temporary password is typed: the sign-in page. */
+  loginUrl: string;
+  /**
+   * A password that works right now, or "" when this account could not be given
+   * one (an `ERP_USERS` bootstrap account has no row to write it to).
+   */
+  tempPassword: string;
   expiresAt: string;
   /** False when `email-out@1` has no real adapter and nothing was actually sent. */
   delivered: boolean;
 }
 
 /**
+ * A temporary password somebody can read off a screen and type on a phone.
+ *
+ * Three groups of four from an alphabet with no `O/0`, `I/l/1` or `S/5`: the
+ * characters that get read back wrong are exactly the ones that turn "the
+ * password does not work" into a support call. 33^12 is about 60 bits, which is
+ * far more than a password living for one sign-in needs, and the grouping is
+ * what makes it transcribable at all — an unbroken twelve-character string gets
+ * copied wrong by hand every time.
+ */
+const PW_ALPHABET = "ABCDEFGHJKLMNPQRTUVWXYZ23456789#@";
+function mintTempPassword(): string {
+  const bytes = randomBytes(12);
+  const chars = [...bytes].map((b) => PW_ALPHABET[b % PW_ALPHABET.length]);
+  return [chars.slice(0, 4), chars.slice(4, 8), chars.slice(8, 12)]
+    .map((g) => g.join(""))
+    .join("-");
+}
+
+/**
  * Issue an invitation or a password reset.
+ *
+ * TWO WAYS IN, ON PURPOSE. The link still exists and still lets the person
+ * choose their own password — that is the better credential and it is what the
+ * reset flow has always been. But an activation link alone is what the operator
+ * met in practice: a wall of URL pasted into WhatsApp, opened on a phone,
+ * leading to a form. So the invitation now ALSO carries a temporary password
+ * and the address of the sign-in page. Copy, paste, in.
+ *
+ * The temporary password is written to the account immediately, which is what
+ * makes it work; the account stays `invited` until somebody actually signs in,
+ * so the screen can still say who has not been in yet.
  *
  * Any outstanding link for this person is retired first. Without that, a link
  * mailed a month ago still sets the password on an account whose invitation was
- * reissued precisely because the first one went astray.
+ * reissued precisely because the first one went astray. Issuing a new
+ * invitation replaces the temporary password for the same reason.
  */
 export async function issueInvitation(
   tenantId: string,
@@ -130,11 +209,35 @@ export async function issueInvitation(
   origin: string,
 ): Promise<Invitation> {
   const s = store(tenantId);
+  const base = origin.replace(/\/$/, "");
   const { raw, hash, expiresAt } = mintToken();
   await s.revokeTokens(email);
   await s.putToken({ tokenHash: hash, email, purpose, expiresAt, createdBy: by });
+
+  /* Never at the cost of the invitation itself. A bootstrap account from
+     `ERP_USERS` has no row to write a password to, and a database that blinks
+     must not turn "invite a colleague" into an error — the link is still a
+     complete answer on its own. */
+  let tempPassword = "";
+  try {
+    const candidate = mintTempPassword();
+    await s.update(email.trim().toLowerCase(), {
+      hash: await hashPassword(candidate),
+      // Every session that existed before this password did is over. If the
+      // reason for the reset was that somebody else had the old one, leaving
+      // their session alive would defeat the exercise — the same rule
+      // `activate` follows.
+      sessionsValidFrom: new Date(),
+    });
+    tempPassword = candidate;
+  } catch {
+    tempPassword = "";
+  }
+
   return {
-    link: `${origin.replace(/\/$/, "")}/activate?token=${encodeURIComponent(raw)}`,
+    link: `${base}/activate?token=${encodeURIComponent(raw)}`,
+    loginUrl: `${base}/login`,
+    tempPassword,
     expiresAt: expiresAt.toISOString(),
     delivered: false, // set by the caller once a real adapter reports success
   };
@@ -310,5 +413,22 @@ export async function authenticateUser(
 ): Promise<string | null> {
   const { authenticateAgainst } = await import("./users");
   const found = await authenticateAgainst(await allUsers(tenantId), email, password);
-  return found ? found.email : null;
+  if (!found) return null;
+
+  /* SIGNING IN IS WHAT ACTIVATION MEANS NOW, so the promotion happens here
+     rather than in the route — there are two callers and one rule, and a rule
+     enforced in one of two places is not a rule. It is also not optional:
+     `sessionStillValid` requires `active`, so an invited account that signed in
+     and stayed invited would be handed a cookie and then refused on its very
+     next request, which reads as a broken login rather than a rejected one. */
+  if (found.state === "invited") {
+    try {
+      await store(tenantId).update(found.email, { state: "active", disabledAt: null });
+    } catch {
+      /* No row to promote — an `ERP_USERS` account is already active by
+         definition and never reaches this branch. Nothing to repair, and
+         refusing a correct password over it would be the worse answer. */
+    }
+  }
+  return found.email;
 }

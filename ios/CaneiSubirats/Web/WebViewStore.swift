@@ -214,6 +214,14 @@ final class WebViewStore: NSObject, ObservableObject {
             case "soft":    Haptics.soft()
             default:        Haptics.light()
             }
+        case "role":
+            // Who the web layer is signed in as. Stored, not acted on: the tab
+            // bar is built at launch (see Config.tabs), so this takes effect on
+            // the next one. A missing or unknown value simply leaves the last
+            // one in place, and the full bar is the default.
+            if let role = dict["role"] as? String, !role.isEmpty {
+                UserDefaults.standard.set(role, forKey: "canei_role")
+            }
         case "share":
             if let s = dict["url"] as? String, let u = URL(string: s) {
                 onShare(u)
@@ -352,6 +360,26 @@ extension WebViewStore: WKNavigationDelegate {
     /// a re-tap of the active tab, where the same gesture has to do both.
     func toggleSection(_ id: String) {
         call("caneiToggleSection", id)
+    }
+
+    /// "Are you still the account you were built for?"
+    ///
+    /// This shell keeps ONE LONG-LIVED WEB VIEW PER TAB, which is what makes
+    /// switching tabs instant — and also means six pages each hold the identity
+    /// they booted with. Signing out and in reloads the tab you did it in and
+    /// leaves the other five showing the previous account: reported from a
+    /// phone signed in as a site worker, where two tabs were still displaying
+    /// the administrator's quotes and labour costs.
+    ///
+    /// The page re-checks on a timer by itself, so this is not what makes it
+    /// correct — it is what makes it IMMEDIATE, on the tab about to be looked
+    /// at, instead of up to a minute later. Guarded on the JS side, so a shell
+    /// newer than the server does nothing.
+    func recheckSession() {
+        webView.evaluateJavaScript(
+            "window.caneiRecheckSession && window.caneiRecheckSession()",
+            completionHandler: nil
+        )
     }
 
     /// One place that builds these calls, so the escaping rule is stated once.

@@ -172,6 +172,28 @@ input[type="number"] {
   font-size: var(--t-lg);
   letter-spacing: -0.018em;
 }
+/* A ROW OF BUTTONS INSIDE A CARD KEEPS THE CARD'S MARGIN.
+   `.stepbar` carries no padding of its own, which is right where it sits
+   directly on the page — `main` has already inset it. Inside a card it was
+   wrong twice over: the buttons ran flush into the border while every other
+   block in the same card (`.daylist`, and the header above it) stood 16px off
+   it, and the last button on a full row had its own border clipped by the
+   card's rounded corner. The operator photographed both on the recorrido:
+   «seems that the buttons are at the edge of the visual box».
+
+   Scoped to a DIRECT child of a card on purpose. The same class is used at the
+   top level of half a dozen screens, where a second inset would push those
+   buttons off the page's own grid. Same reasoning, opposite conclusion: the
+   padding belongs to the container that has an edge. */
+.card > .stepbar {
+  padding: 0 var(--s-5) var(--s-4);
+  margin-bottom: 0;
+}
+/* …and when it follows a list, it needs air above it rather than the list's
+   last row and a button touching. */
+.card > .daylist + .stepbar {
+  padding-top: var(--s-2);
+}
 
 /* -------------------------------------------------------------- 6 · tables
    The header row was a solid green band on every table on every screen, which
@@ -1881,6 +1903,24 @@ td.k,
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+}
+/* Something waiting on a person is not something finished. Green is the colour
+   this workspace uses for «approved and settled», so the button that says how
+   many hours are STILL open had been reading as good news.
+   A PALE gold, not the full one: at full strength it was the loudest thing on
+   the screen, which is the wrong rank for a queue — it is work waiting, not an
+   alarm. The edge and the dark ink carry the meaning; the fill only tints. */
+.btn.warn {
+  background: #fdf1cc;
+  border-color: #eccb63;
+  color: #6b5312;
+  font-weight: 700;
+  justify-content: center;
+  text-align: center;
+}
+.btn.warn:hover:not([disabled]):not(:disabled) {
+  background: #fbe7ac;
+  border-color: #e2b420;
 }
 .secitem .lb {
   font: 600 10.5px var(--sans);
@@ -3911,9 +3951,9 @@ td.num.late {
    reasons it is not simply a third equal tile: it sits below Obras and Avance
    económico rather than beside one of them, which is the position asked for
    and also the honest one — it is the end of the list, not a peer half-way
-   down it; and it is a different KIND of entry, a page of its own rather than
-   a screen of this one, which the ↗ already says and the size now agrees
-   with. */
+   down it; and it is a different KIND of entry, the whole chain rather than
+   one link of it. It used to be a page of its own and wore the ↗ to say so;
+   the page is gone and so is the arrow, and the size is what remains. */
 #p2wide {
   display: grid;
   gap: 8px;
@@ -4043,5 +4083,1718 @@ td.num.late {
   .p2step.on .l {
     color: var(--ink);
     font-weight: 700;
+  }
+}
+
+/* ------------------------------- 69 · the hours screen, rebuilt round its jobs
+   ------------------------------------------------------------------------
+   Two levels of navigation, because the screen answers two questions that are
+   not the same shape: WHOSE hours (the group) and WHICH question about them
+   (the tab). Then the day's work as one card per person instead of a table
+   whose sixth column was a pair of icons.
+
+   The register is no longer printed under the day. It has its own tab, which
+   is what takes the day sheet from eighteen thousand pixels to one screen: on
+   a day with no hours at all, the sixty past entries below it were the page. */
+
+.hgrp {
+  display: flex;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  margin: 0 0 10px;
+}
+.hgrp .hg {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: none;
+  color: var(--muted);
+  font: 600 13px var(--sans);
+  padding: 7px 4px;
+  cursor: pointer;
+  text-align: center;
+}
+.hgrp .hg:last-child {
+  border-right: 0;
+}
+.hgrp .hg i {
+  display: block;
+  font-style: normal;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.hgrp .hg.on {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ---- the week strip: navigation AND completeness in one control ---- */
+.weekbar {
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.weekbar .wnav {
+  width: 38px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  cursor: pointer;
+}
+.weekbar .wnav .cv {
+  font-size: 14px;
+  line-height: 1;
+}
+.weekbar .wnav .lb {
+  font: 700 8px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.weekbar .days {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.weekbar .hday {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  padding: 5px 0 6px;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  min-width: 0;
+}
+.weekbar .hday .d {
+  display: block;
+  font: 700 9px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.weekbar .hday .n {
+  display: block;
+  font: 700 13px var(--sans);
+  margin-top: 1px;
+}
+.weekbar .hday .h {
+  display: block;
+  font: 600 10px var(--sans);
+  color: var(--accentDeep);
+  margin-top: 2px;
+}
+.weekbar .hday .h.zero {
+  color: var(--faint);
+}
+.weekbar .hday.wknd {
+  background: var(--hair);
+}
+/* Saturday and Sunday keep a grey number. The ink colour is what the eye reads
+   as "a day with work in it", and a weekend printed in the same blue as a
+   Tuesday makes the strip say something the week does not. */
+.weekbar .hday.wknd .n {
+  color: var(--faint);
+}
+.weekbar .hday.on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.weekbar .hday.on .d,
+.weekbar .hday.on .n,
+.weekbar .hday.on .h {
+  color: #fff;
+}
+
+.wtot,
+.wday {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 2px;
+  margin-bottom: 8px;
+}
+.wtot .k,
+.wday .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  flex: 1;
+}
+.wtot .v,
+.wday .v {
+  font: 700 14px var(--sans);
+}
+.wday {
+  margin-top: 12px;
+}
+
+.wsent {
+  border-left: 3px solid var(--gold);
+  background: #fdf9ec;
+  color: #5c4a12;
+  padding: 7px 11px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.wsent b {
+  font-weight: 700;
+}
+
+/* ---- one card per person; everything about that person is inside it ---- */
+.wcard {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+.wcard.locked {
+  opacity: 0.72;
+}
+.wcard .wch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+}
+.wcard .wch .nm {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--greenDeep);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wcard .wch .role {
+  font-size: 10.5px;
+  color: var(--muted);
+  background: var(--paper);
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.wcard .wch .src {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: #fdf3d6;
+  color: #7a5c05;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+/* EVERY FIELD SAYS WHAT IT IS. The row used to be three unlabelled dropdowns
+   stacked under each other with an unexplained box floating to their right, and
+   the only way to learn that the box wanted hours was to try it. Now each
+   control sits under its own caption, every control is the same width as its
+   neighbours, and the hours field is the last field of the same list rather
+   than a separate column — so the eye runs down one edge instead of hunting. */
+.wcard .wrow {
+  display: grid;
+  gap: 8px;
+  padding: 10px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.wcard .wwhere {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+/* Partida and subpartida share a line, as hour type and hours do below: four
+   stacked fields per entry made a three-line day scroll like a form. */
+.wcard .wpair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+}
+.wcard .wend {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 104px;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+}
+.wcard .wf {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.wcard .wf > label,
+.wcard .whrs > label {
+  font: 700 9px var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.wcard .whrs > label {
+  text-align: center;
+}
+/* A VALUE, NOT A CONTROL. Same box a select occupied, so a card of three
+   entries lines up down one edge and every row is the same height — which is
+   what a select could never give, because its height came from the browser. */
+.wcard .wf .val {
+  font-size: 13px;
+  color: var(--ink);
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 5px 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wcard .wf .val.strong {
+  font-weight: 600;
+}
+.wcard .wrow.empty2 {
+  padding: 12px 11px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.wcard .wch .tot {
+  font: 700 13px var(--sans);
+  color: var(--greenDeep);
+  white-space: nowrap;
+}
+.wcard .wproj {
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 0;
+}
+.wcard .wline,
+.wcard .wkind,
+.wcard .wsel {
+  font-size: 11.5px;
+  color: var(--muted);
+  min-width: 0;
+}
+.wcard .wline .sub {
+  color: var(--muted);
+}
+/* The selects a blank row offers are the widest thing in the card, and a
+   `max-width` on them was what let one sit at half the width of the next. */
+.wcard .wwhere select.inline,
+.wcard .wend select.inline {
+  width: 100%;
+  max-width: none;
+}
+.wcard .wline select.inline + select.inline {
+  margin-top: 5px;
+}
+.wcard .whrs {
+  display: grid;
+  gap: 3px;
+}
+/* `input.inline` caps itself at 130px, which is right for a field in a table
+   row and wrong for the one field this row exists to collect. */
+.wcard .whrs input.hin {
+  width: 100%;
+  max-width: none;
+  text-align: center;
+  font: 700 15px var(--sans);
+  padding: 7px 4px;
+}
+/* The hours box keeps the height and the border the input had, so a row of
+   values still reads as the row that collects them. */
+.wcard .whrs .ro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  font: 700 15px var(--sans);
+  color: var(--ink);
+  padding: 5px 4px;
+}
+.wcard .wcf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 11px;
+  border-top: 1px dashed var(--line);
+  background: var(--accentPale);
+}
+.wcard .lnk {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--accentDeep);
+  text-align: left;
+}
+.wcard .lnk.quiet {
+  color: var(--muted);
+}
+
+/* ---- one bar of actions, ABOVE the day's work ----
+   It used to sit at the end, which is fine on a day with three lines and wrong
+   on a day with thirty: adding a line meant scrolling past every line already
+   there to reach the button that adds one. The actions are about the day, so
+   they belong where the day starts. */
+.hdock {
+  display: flex;
+  gap: 7px;
+  margin: 4px 0 12px;
+}
+.hdock .btn {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  padding: 10px 6px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- the summary's own scope: which job, over what stretch ---- */
+.hscope {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.hscope .hstop,
+.hscope .hsbot {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.hscope .plbl {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.hscope input,
+.hscope select {
+  font: 12.5px var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  padding: 6px 9px;
+  outline: 0;
+  min-width: 0;
+}
+.hscope select {
+  font-weight: 600;
+}
+.hscope .hstop input {
+  flex: 1;
+}
+.hscope .hsbot select {
+  flex: 1;
+}
+.hscope .fav {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 2px;
+  color: var(--faint);
+  flex: 0 0 auto;
+}
+.hscope .fav.on {
+  color: var(--gold);
+}
+.hscope .fav[disabled] {
+  opacity: 0.35;
+  cursor: default;
+}
+/* One segmented control for the stretch of time. Equal cells, one filled — the
+   same shape the language switch and the Mine/Everyone group already use, so
+   the workspace has one way of saying "pick one of these". */
+.hscope .hseg {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--line);
+}
+.hscope .hseg .sg {
+  flex: 1;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font: 600 12px var(--sans);
+  padding: 7px 4px;
+  cursor: pointer;
+  min-width: 0;
+}
+.hscope .hseg .sg.on {
+  background: var(--accent);
+  color: #fff;
+}
+/* The period label is a BUTTON — pressing it is how you reach another day,
+   week, month or year — so it is styled as one, and the native picker that
+   replaces it keeps the same footprint so the strip does not jump. */
+.hscope .hseg .lb {
+  padding: 7px 12px;
+  border: 0;
+  background: var(--accentPale);
+  font: 700 11px var(--sans);
+  color: var(--greenDeep);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hscope .hseg .lb:hover {
+  background: var(--accentSoft);
+}
+.hscope .hseg .lbp {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--paper);
+  font: 700 12px var(--sans);
+  color: var(--ink);
+  padding: 6px 8px;
+  outline: 0;
+  min-width: 0;
+  width: 150px;
+}
+@media (max-width: 560px) {
+  .hscope .hseg {
+    flex-wrap: wrap;
+  }
+  .hscope .hseg .lb,
+  .hscope .hseg .lbp {
+    flex: 1 0 100%;
+    width: auto;
+    padding: 7px 8px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    text-align: center;
+  }
+}
+/* Given room, the three stacked rows become one toolbar. Stretched to 1440px
+   the search box was a third of a metre wide and each period cell the size of a
+   button nobody needs that large — width the layout was given rather than
+   width it wanted. */
+@media (min-width: 900px) {
+  .hscope {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+  }
+  .hscope .hstop,
+  .hscope .hsbot {
+    flex: 0 1 auto;
+  }
+  .hscope .hstop input {
+    flex: 0 0 auto;
+    width: 220px;
+  }
+  .hscope .hsbot select {
+    flex: 0 0 auto;
+    width: 340px;
+    max-width: 40vw;
+  }
+  .hscope .hseg {
+    margin-left: auto;
+  }
+  .hscope .hseg .sg {
+    flex: 0 0 auto;
+    padding: 7px 16px;
+  }
+}
+
+/* ---- who worked: three numbers, one column each ---- */
+.hwlist {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 14px;
+}
+.hwlist .hwh,
+.hwlist .hworker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px 62px 88px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 11px;
+}
+.hwlist .hwh {
+  background: var(--accentPale);
+  border-bottom: 1px solid var(--line);
+  font: 700 9px var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.hwlist .hwh .n {
+  text-align: right;
+}
+.hwlist .hworker {
+  border-bottom: 1px solid var(--hair);
+}
+.hwlist .hworker:last-child {
+  border-bottom: 0;
+}
+.hwlist .who {
+  min-width: 0;
+}
+.hwlist .nm {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwlist .r {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hwlist .n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+.hwlist .hh {
+  font-weight: 700;
+}
+.hwlist .ot {
+  color: var(--gold);
+  font-weight: 600;
+}
+.hwlist .ot.zero {
+  color: var(--faint);
+  font-weight: 400;
+}
+.hwlist .cc {
+  font-weight: 700;
+}
+@media (max-width: 480px) {
+  .hwlist .hwh,
+  .hwlist .hworker {
+    grid-template-columns: minmax(0, 1fr) 48px 48px 74px;
+    gap: 6px;
+    padding: 8px 9px;
+  }
+  .hwlist .n {
+    font-size: 12px;
+  }
+}
+
+/* ---- the office's sign-off, at the head of the review ----
+   Deliberately the first thing on this tab and deliberately NOT on the day
+   sheet: approving locks a week, and a lock is not something to place on the
+   screen the crew's hours are typed into. */
+.happ {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.happ .haph {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+}
+.happ .haph .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--greenDeep);
+}
+.happ .haph .n {
+  font: 700 11px var(--sans);
+  color: var(--paper);
+  background: var(--accentDeep);
+  padding: 1px 7px;
+}
+.happ .haprow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.happ .haprow:last-child {
+  border-bottom: 0;
+}
+.happ .haprow .who {
+  min-width: 0;
+}
+.happ .haprow .nm {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.happ .haprow .sub {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.happ .haprow .sub b {
+  color: var(--ink);
+  font-weight: 700;
+}
+.happ .empty {
+  padding: 12px;
+}
+
+/* ---- review: the register as a list of entries, each editable ---- */
+.rfilters {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.rfilters .rf {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font: 600 12px var(--sans);
+  padding: 6px 0;
+  cursor: pointer;
+}
+/* A FILTER IS NOT AN ACTION. Full accent green is what this workspace puts on
+   things that DO something — approve, issue, register — so a filter wearing it
+   read as the button you press rather than the state you are in. Soft ground,
+   deep-green text, accent only on the edge: unmistakably selected, obviously
+   not a verb. */
+.rfilters .rf.on {
+  background: var(--accentSoft);
+  border-color: var(--accent);
+  color: var(--greenDeep);
+  font-weight: 700;
+}
+.rcount {
+  display: flex;
+  align-items: baseline;
+  padding: 0 2px;
+  margin-bottom: 7px;
+}
+.rcount .k {
+  font: 700 11px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.rcount .v {
+  font: 700 13px var(--sans);
+}
+.rlist {
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.rentry {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.rentry:last-child {
+  border-bottom: 0;
+}
+.rentry.open {
+  background: var(--accentPale);
+}
+.rentry .r1,
+.rentry .r2,
+.rentry .r3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rentry .r3 {
+  align-items: center;
+  margin-top: 6px;
+}
+.rentry .r1 .nm {
+  font-weight: 700;
+  font-size: 13px;
+}
+.rentry .r1 .dt {
+  font-size: 11.5px;
+  color: var(--faint);
+}
+.rentry .r1 .hh {
+  font: 700 13px var(--sans);
+}
+.rentry .r2 {
+  margin-top: 1px;
+}
+.rentry .r2 .w {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rentry .r2 .cc {
+  font: 600 12px var(--sans);
+  color: var(--accentDeep);
+  white-space: nowrap;
+}
+.rentry .rreopen {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: 7px;
+  border: 0;
+  border-top: 1px dashed var(--line);
+  background: none;
+  padding: 7px 0 0;
+  cursor: pointer;
+  font: 600 11.5px var(--sans);
+  color: var(--accentDeep);
+}
+.redit {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.redit .eh {
+  font: 700 12px var(--sans);
+  color: var(--accentDeep);
+  margin-bottom: 7px;
+}
+.redit .ef {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.redit .ef label {
+  font: 600 9.5px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1.2;
+}
+.redit .ef input,
+.redit .ef select {
+  width: 100%;
+  min-width: 0;
+}
+.redit .ef.hn input {
+  font: 700 16px var(--sans);
+  text-align: center;
+  color: var(--accentDeep);
+}
+.redit .eact {
+  display: flex;
+  gap: 6px;
+  margin-top: 9px;
+}
+.redit .eact .btn {
+  flex: 1;
+  text-align: center;
+}
+.rnote {
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 9px 2px 0;
+}
+.rmore {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--accentPale);
+  color: var(--accentDeep);
+  font: 600 12.5px var(--sans);
+  padding: 10px;
+  cursor: pointer;
+}
+
+/* ---- the overview: four questions, in the order they are asked ---- */
+.hband {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  margin-bottom: 8px;
+}
+.hband .c {
+  padding: 10px 9px;
+  border-right: 1px solid var(--hair);
+  min-width: 0;
+}
+.hband .c:last-child {
+  border-right: 0;
+}
+.hband .k {
+  font: 700 9.5px var(--sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.hband .v {
+  font: 700 19px var(--sans);
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+.hband .s {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.hband .c.warn {
+  background: #fdf9ec;
+}
+.hband .c.warn .v {
+  color: #7a5c05;
+}
+.hacts {
+  display: flex;
+  gap: 7px;
+  margin-bottom: 6px;
+}
+.hacts .btn.primary,
+.hacts .btn.warn {
+  flex: 2.2 1 0;
+}
+.hacts .btn:not(.primary):not(.warn) {
+  flex: 0 0 auto;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.hacts .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+h4.hsec {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin: 16px 0 7px;
+}
+h4.hsec span {
+  margin-left: auto;
+  font: 500 10.5px var(--sans);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.hrank,
+.hrec {
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.hitem {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.hitem:last-child {
+  border-bottom: 0;
+}
+.hitem .ih {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.hitem .ih .nm {
+  font-weight: 600;
+  font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hitem .ih .amt {
+  font: 700 12.5px var(--sans);
+  white-space: nowrap;
+}
+.hitem .meta {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+.hitem .bar {
+  height: 5px;
+  background: var(--hair);
+  margin-top: 5px;
+}
+.hitem .bar i {
+  display: block;
+  height: 5px;
+  background: var(--accent);
+}
+.hitem .sublist {
+  margin-top: 6px;
+  padding-left: 9px;
+  border-left: 2px solid var(--accentSoft);
+}
+.hitem .sub2 {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 1px 0;
+}
+.hitem .sub2 b {
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.hworker {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--hair);
+}
+.hworker:last-child {
+  border-bottom: 0;
+}
+.hworker .who {
+  min-width: 0;
+}
+.hworker .nm {
+  font-weight: 600;
+  font-size: 12.5px;
+}
+.hworker .r {
+  font-size: 10.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hworker .hh {
+  font: 700 12.5px var(--sans);
+  text-align: right;
+  white-space: nowrap;
+}
+.hworker .ot {
+  display: inline-block;
+  font: 700 9.5px var(--sans);
+  background: #fdf3d6;
+  color: #7a5c05;
+  padding: 1px 5px;
+  margin-left: 5px;
+}
+.hworker .cc {
+  font: 700 12.5px var(--sans);
+  text-align: right;
+  color: var(--accentDeep);
+  white-space: nowrap;
+}
+.hrec .rr {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12.5px;
+}
+.hrec .rr b {
+  font-weight: 700;
+  font-size: 13px;
+}
+.hrec .rr.tot {
+  background: var(--accentPale);
+}
+.hrec .pct {
+  font: 700 9.5px var(--sans);
+  background: var(--accentSoft);
+  color: var(--greenDeep);
+  padding: 1px 6px;
+  margin-left: 6px;
+}
+.hrec .pct.r {
+  background: #f7dedb;
+  color: var(--danger);
+}
+.hrec .rnote2 {
+  padding: 8px 11px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.45;
+  border-bottom: 1px solid var(--hair);
+}
+.hrec .hdrill {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  padding: 9px 11px;
+  cursor: pointer;
+  font: 600 12px var(--sans);
+  color: var(--accentDeep);
+}
+.hcash {
+  border-top: 1px solid var(--hair);
+  background: var(--accentPale);
+}
+.hcash .cw {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 11px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12px;
+}
+.hcash .cw .nm {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hcash .a {
+  min-width: 62px;
+  text-align: right;
+  white-space: nowrap;
+}
+.hcash .a.d {
+  font-weight: 700;
+}
+.hcash .ch3 {
+  display: flex;
+  gap: 8px;
+  padding: 4px 11px 7px;
+  font: 700 9px var(--sans);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.hcash .ch3 span {
+  min-width: 62px;
+  text-align: right;
+}
+
+/* ---- a person's own two screens: hours, never money ---- */
+.mform .mfh {
+  padding: 9px 12px;
+  background: var(--accentSoft);
+  border-bottom: 1px solid var(--line);
+  font: 700 13px var(--sans);
+  color: var(--greenDeep);
+}
+.mform .mf {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 9px;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--hair);
+}
+.mform .mf label {
+  font: 600 9.5px var(--sans);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+  line-height: 1.2;
+}
+.mform .mf select,
+.mform .mf input {
+  width: 100%;
+  min-width: 0;
+}
+.mform .mf.hn input {
+  font: 700 20px var(--sans);
+  text-align: center;
+  color: var(--accentDeep);
+  background: var(--accentPale);
+  border-color: var(--accent);
+}
+.mform .mhint {
+  padding: 8px 12px;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: var(--accentPale);
+  border-top: 1px dashed var(--line);
+  line-height: 1.4;
+}
+.rlist .meblk {
+  border-bottom: 1px solid var(--hair);
+}
+.rlist .meblk:last-child {
+  border-bottom: 0;
+}
+.rlist .me {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 12px 0;
+}
+.rlist .me .w {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.rlist .me .l {
+  font-size: 11px;
+  color: var(--muted);
+}
+.rlist .me .hh {
+  font: 700 13px var(--sans);
+  white-space: nowrap;
+}
+.rlist .me2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 9px;
+}
+.rlist .me2 .mnote {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.rlist .mini {
+  font: 600 10.5px var(--sans);
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  padding: 3px 9px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rlist .mini.dz {
+  color: var(--danger);
+  border-color: #e6cfcd;
+}
+.rlist .mday {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12.5px;
+}
+.rlist .mday:last-child {
+  border-bottom: 0;
+}
+.rlist .mday .dt {
+  font-weight: 600;
+}
+.rlist .mday .hh {
+  font: 700 12.5px var(--sans);
+  white-space: nowrap;
+}
+.keepnote {
+  border-left: 3px solid var(--accent);
+  background: var(--accentPale);
+  padding: 8px 11px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ---- a site worker's shell: what is not theirs is not drawn ---- */
+body.siteworker .fab,
+body.siteworker #btnCreate,
+body.siteworker .bell,
+body.siteworker #btnCal,
+body.siteworker .search,
+body.siteworker #p1,
+body.siteworker .rail {
+  display: none !important;
+}
+
+/* ---- a site worker's shell: what is not theirs is not drawn ----
+   #btnCog is the phone's route to Configuración, and Configuración is not a
+   site worker's screen. Masking only; the server refuses the section's calls
+   whether or not the button was drawn. */
+body.siteworker #btnCreate,
+body.siteworker #btnBell,
+body.siteworker #btnCog,
+body.siteworker .gsearch,
+body.siteworker #p1,
+body.siteworker .rail {
+  display: none !important;
+}
+
+/* ------------------------------- 70 · the recorrido: thirteen phases, in view
+   The flow strip in the sections panel is three chips over a rail and it is
+   the right drawing for three. Thirteen is a different problem: equal columns
+   would give each label about 45px, and a label nobody can read is a number
+   nobody can place. So the phases keep the chip — same node, same size, same
+   type, so the two strips read as one idea — and lay out as a row that
+   SCROLLS, with the label under each node at its natural width.
+
+   Colour carries the state, and it is the register's own: the same five tones
+   `.pill` uses, on the node rather than beside it, so a glance down the rail
+   answers «where is this job» without reading a word. `s-pending` is
+   deliberately the quietest thing on the screen — most of a young job is
+   pending, and thirteen grey nodes must not look like thirteen problems.
+
+   The current phase is marked by weight and a ring, never by colour: colour is
+   already saying something else here, and a second meaning on one channel is
+   how a legend stops working. */
+.jrail {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 14px 10px 10px;
+  min-width: min-content;
+}
+.jstep {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font: 600 10.5px var(--sans);
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  position: relative;
+  flex: 1 0 auto;
+  min-width: 74px;
+}
+/* The line that makes thirteen chips one path, drawn behind the nodes and
+   stopping half a chip short at each end so it never runs off the first or
+   past the last. */
+.jstep + .jstep::before {
+  content: "";
+  position: absolute;
+  right: 50%;
+  left: -50%;
+  top: 11px;
+  height: 1px;
+  background: var(--line);
+}
+.jstep .n {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font: 700 11px var(--sans);
+  position: relative;
+  z-index: 1;
+}
+.jstep .l {
+  max-width: 100px;
+  text-align: center;
+  line-height: 1.25;
+}
+.jstep:hover .l {
+  color: var(--ink);
+}
+.jstep.s-done .n {
+  background: #ccfbf1;
+  border-color: #99e6da;
+  color: #0f766e;
+}
+.jstep.s-doing .n {
+  background: #fef3c7;
+  border-color: #f0d69a;
+  color: #b45309;
+}
+.jstep.s-waiting .n {
+  background: #dbeafe;
+  border-color: #b3cdf7;
+  color: #1d4ed8;
+}
+.jstep.s-blocked .n,
+.jstep.s-late .n {
+  background: #fee2e2;
+  border-color: #f4bcbc;
+  color: #b91c1c;
+}
+.jstep.on .n {
+  box-shadow:
+    0 0 0 3px var(--paper),
+    0 0 0 4px var(--accent);
+}
+.jstep.on .l {
+  color: var(--ink);
+  font-weight: 700;
+}
+/* A phone reads the rail by scrolling it; the nodes stay the size a thumb can
+   hit rather than shrinking to fit a width they were never going to fit. */
+@media (max-width: 700px) {
+  .jrail {
+    padding: 14px 8px 10px;
+  }
+  .jstep {
+    min-width: 68px;
+  }
+  .jstep .l {
+    max-width: 68px;
+  }
+}
+
+/* ---- the invitation drawer's explanation line ---- */
+.invnote {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 8px 0 0;
+  line-height: 1.45;
+}
+
+/* --------------------------- 71 · the same thirteen phases, at row size
+   Operator, on the register: «show in a graphical way like the timeline at which
+   stage the project is». The rail from section 70 cannot go in a table row —
+   thirteen labelled chips measure about a thousand pixels and the phone card it
+   would sit in is 340 — so the phases keep the one thing that carries at this
+   size, their colour, and lose their words to the line underneath.
+
+   THE TONES ARE NOT REDECLARED. `.jdot` joins `.jstep .n`'s own selector list in
+   section 70 rather than restating six hex pairs here, because two lists of
+   colours for one meaning is how a register and the screen behind it come to
+   disagree about what amber means. */
+/* THE STRIP TAKES THE WHOLE WIDTH, because at six pixels in the corner of a
+   value cell it was a decoration rather than a reading. Operator: «use full
+   broad size to make graphic timeline more visible».
+
+   So it spreads the thirteen dots across the card and draws the rail they sit
+   on. Two consequences worth stating: `justify-content: space-between` means
+   the spacing is the CARD's, not a fixed gap, so the strip reads the same on a
+   340px phone and in a desktop column; and the rail is a pseudo-element behind
+   the dots rather than a border on the row, so a dot's own ring paints over it
+   instead of being cut by it. */
+/* THE MIN-WIDTH IS WHAT THE LABELS NEED, MEASURED.
+   On a phone the cell goes full width and the strip has 262–356px to play with.
+   In the desktop table it is a COLUMN, and the column is as wide as its content
+   asks: at the old 190px the three milestone names overlapped each other. 264px
+   is the narrowest width at which they clear, plus a little, so the column asks
+   for exactly enough and the table gives it. */
+.jmini {
+  display: block;
+  width: 100%;
+  min-width: 264px;
+  padding: 7px 1px 2px;
+}
+/* The dots, on their rail. */
+.jmd {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3px;
+}
+.jmd:before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 50%;
+  height: 1px;
+  margin-top: -0.5px;
+  background: var(--hair);
+}
+/* The named milestones, under the dot each one belongs to.
+   A positioned band rather than a second flex row: the labels have to line up
+   with SPECIFIC dots, and a flex row would space them evenly among themselves
+   — which is a different set of positions and would point at the wrong
+   phases. */
+.jmks {
+  position: relative;
+  display: block;
+  height: 13px;
+  margin-top: 3px;
+}
+.jmk {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font: 600 9px var(--sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.jmk.st {
+  transform: none;
+}
+.jmk.en {
+  transform: translateX(-100%);
+}
+.jdot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+/* The current phase, marked by size and a ring — never by a seventh colour, for
+   the reason section 70 gives about one meaning per channel. */
+.jdot.on {
+  width: 12px;
+  height: 12px;
+  box-shadow:
+    0 0 0 2px var(--paper),
+    0 0 0 3px var(--accent);
+}
+/* A named milestone is drawn heavier than the steps between it and the next,
+   so the four labels underneath need no leader lines to say which dot they
+   belong to. Size only — the colour channel already carries the phase's state
+   and must not be asked to carry a second meaning. */
+.jdot.mk {
+  width: 10px;
+  height: 10px;
+  border-width: 1.5px;
+  border-color: var(--muted);
+}
+.jdot.mk.on {
+  width: 12px;
+  height: 12px;
+  border-color: var(--line);
+}
+.jminil {
+  display: block;
+  font: 600 11.5px var(--sans);
+  color: var(--body);
+}
+
+/* A phone lays every cell out as `label … value` on one line. This one is two
+   lines of its own — a strip over a name — so it opts out of that row and keeps
+   its label above it, the way a field does. */
+@media (max-width: 700px) {
+  table.cards td:has(.jmini) {
+    display: block;
+  }
+  table.cards td:has(.jmini):before {
+    display: block;
+    margin-bottom: 2px;
+  }
+  /* And the min-width above goes. It exists to make a TABLE COLUMN wide enough
+     for the labels; here the cell is already the full width of the card, and on
+     a 320px screen a 264px floor is two pixels wider than the card itself —
+     which is a horizontal scrollbar on the whole page, from a strip. The labels
+     clear at 262px with 44px to spare, so nothing is lost. */
+  .jmini {
+    min-width: 0;
+  }
+}
+
+/* --------------------------- 72 · «Lo hecho hasta ahora»
+   The recorrido's ledger: what this job has been through, one row per event.
+   On a desktop the row reads across — date, action, what it was, the paperwork
+   right-aligned. On a phone the three columns do NOT fit: the action column's
+   `min-width` left the value about seventy pixels, so «FAC-2025-0002 · 1.528 €»
+   wrapped one word-fragment per line. Below 700px the value takes a line of its
+   own and the documents follow on the next, which is three short lines instead
+   of one tall column of debris.
+
+   REBUILT AS A TIMELINE YOU CAN OPEN. Operator: «very very unstructured, should
+   be premium structure and more info on screen available and when you click on
+   the line you see immediately the details of this step».
+
+   Three things changed. The rows hang off a SPINE — a node per event and a rule
+   between them — so the card reads as one sequence instead of a stack of
+   unrelated lines. The date, the action and its values became a fixed grid
+   rather than three flex children whose widths depended on their contents, which
+   is what made every row start in a different place. And the line is now a
+   button that opens a panel underneath it with each value on its own row and the
+   papers named, so the detail is one tap away instead of crammed onto the line
+   or missing.
+
+   The download buttons stay ON the line, not in the panel: they are the reason
+   most people open this card at all, and a document you must first expand a row
+   to reach is a document one tap further away than it was. */
+.jled .it {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 2px 8px;
+  padding: 0;
+  border: 0;
+}
+/* The spine. The rule is drawn on the node's own cell and stops at the last
+   row, so the line never dangles past the final event. */
+.jled .jlsp {
+  position: relative;
+  grid-row: 1 / span 2;
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  padding-top: 15px;
+}
+.jled .jlsp:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--hair);
+}
+.jled .it:first-child .jlsp:before {
+  top: 15px;
+}
+.jled .it:last-child .jlsp:before {
+  bottom: auto;
+  height: 15px;
+}
+.jled .jldot {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.jled .it.on .jldot {
+  width: 9px;
+  height: 9px;
+  background: var(--accentDeep);
+}
+
+/* The line itself: a button, because it opens something. */
+.jled .jlh {
+  display: grid;
+  grid-template-columns: 5.6rem minmax(0, 1fr) 14px;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 4px 9px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.jled .jlh:hover .a {
+  color: var(--accentDeep);
+}
+.jled .jlh .d {
+  font: 600 12px var(--mono, ui-monospace, monospace);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.jled .jlm {
+  min-width: 0;
+}
+.jled .a {
+  display: block;
+  font: 600 13.5px var(--sans);
+  color: var(--ink);
+}
+.jled .v {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.jled .jlc {
+  align-self: center;
+  color: var(--faint);
+  font-size: 15px;
+  line-height: 1;
+  transition: transform 0.14s;
+}
+.jled .it.on .jlc {
+  transform: rotate(90deg);
+  color: var(--accent);
+}
+/* The papers, right of the line and vertically centred against it. */
+.jled .jlx {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding: 6px 0;
+}
+/* The panel. Indented to the action's column so it reads as belonging to the
+   line above it and not to the spine. */
+.jled .jld {
+  grid-column: 2 / -1;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  background: var(--panel, var(--greenPale, #f4f8f1));
+  border-left: 2px solid var(--accentSoft, var(--greenSoft));
+}
+.jled .jldl {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.jled .jldl + .jldl {
+  border-top: 1px solid var(--hair);
+}
+.jled .jldl label {
+  flex: 0 0 8.5rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.jled .it + .it .jlh {
+  border-top: 1px solid var(--hair);
+}
+
+/* A phone has no room for a date column beside the action. The date moves above
+   it, the papers drop to a line of their own, and the spine stays — it is the
+   thing that makes twenty events read as one story. */
+@media (max-width: 700px) {
+  .jled .it {
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+  .jled .jlh {
+    grid-template-columns: minmax(0, 1fr) 14px;
+    padding-bottom: 6px;
+  }
+  .jled .jlh .d {
+    grid-column: 1 / -1;
+    font-size: 11px;
+  }
+  .jled .jlx {
+    grid-column: 2;
+    justify-content: flex-start;
+    padding: 0 0 10px;
+  }
+  .jled .jld {
+    grid-column: 2;
+  }
+  .jled .jldl {
+    flex-direction: column;
+    gap: 1px;
+  }
+  .jled .jldl label {
+    flex: none;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
   }
 }

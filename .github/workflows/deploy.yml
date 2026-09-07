@@ -204,6 +204,75 @@ jobs:
           ERP_TEST_TENANT: reformas-demo
         run: node tests/server-e2e/run.mjs || { docker logs app; exit 1; }
 
+      # A SECOND CONTAINER, BEHIND A REAL LOGIN.
+      #
+      # The container above runs single-seat (`ERP_OPERATOR`), where there is
+      # exactly one identity and it is an administrator. That is the shape the
+      # pilot ships in, and it is worth smoking — but it cannot prove anything
+      # about what a SITE WORKER is refused, because there is nobody to be.
+      #
+      # The site-worker boundary is not cosmetic: before it existed, an account
+      # meant to type its own hours could PUT the whole document — the invoice
+      # register included — and its state response carried every bank line. So
+      # this starts a second copy of the SAME image with named accounts, on
+      # another port, sharing the same database, and runs the suite against it.
+      # With credentials present the suite signs in, creates a `site` account,
+      # signs in as that account, and checks the four refusals and the redaction.
+      #
+      # ERP_DEFAULT_TENANT matters more than it looks. Accounts and invitations
+      # belong to the DEPLOYMENT'S OWN company — `/api/auth/activate` has no
+      # tenant in its path on purpose, because the person following an
+      # invitation is not signed in yet, so it resolves `defaultTenant()`. Left
+      # unset that is "diorka", while the suite creates its account under
+      # `reformas-demo`: the invitation is filed in one company and looked up in
+      # another, and the activation answers 400. Naming the company the suite
+      # uses makes this container a coherent deployment rather than two halves
+      # of different ones. See ASSUMPTIONS.md S74 — the same mismatch is
+      # reachable by hand on a real server, and is its own change to fix.
+      #
+      # The hash format is auth.ts's (`scrypt$N$r$p$salt$key`, base64). It is
+      # duplicated here rather than shared because generating one needs a
+      # terminal — hash-password.mjs refuses a non-TTY on purpose, so a password
+      # never lands in a shell history. If the format ever changes, the sign-in
+      # below fails loudly on the first run rather than silently skipping.
+      - name: Start a second copy behind named accounts
+        run: |
+          ADMIN_PW="smoke-$(openssl rand -hex 12)"
+          HASH=$(node -e '
+            const { randomBytes, scryptSync } = require("node:crypto");
+            const salt = randomBytes(16);
+            const key = scryptSync(process.argv[1], salt, 64, { N: 16384, r: 8, p: 1, maxmem: 67108864 });
+            process.stdout.write(`scrypt$16384$8$1$${salt.toString("base64")}$${key.toString("base64")}`);
+          ' "$ADMIN_PW")
+          docker run -d --name app-auth --network host \
+            -e PORT=3100 \
+            -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
+            -e SESSION_SECRET="smoke-$(openssl rand -hex 16)" \
+            -e ERP_USERS="smoke-admin@example.com:$HASH" \
+            -e ERP_DEFAULT_TENANT="reformas-demo" \
+            "$IMAGE_BASE/app:sha-${{ github.sha }}"
+          for i in $(seq 1 40); do
+            curl -fsS -o /dev/null http://127.0.0.1:3100/api/health 2>/dev/null && break
+            sleep 3
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:3100/api/health || { docker logs app-auth; exit 1; }
+          # The login page must be reachable without a session; everything else
+          # must not be. Both directions, because a lock that lets everybody in
+          # and a lock that lets nobody in fail the same test if you only run one.
+          curl -fsS -o /dev/null http://127.0.0.1:3100/login || { docker logs app-auth; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/api/reformas-demo/erp/state)
+          [ "$code" = "401" ] || { echo "::error::unauthenticated state read answered $code, expected 401"; docker logs app-auth; exit 1; }
+          echo "ADMIN_PW=$ADMIN_PW" >> "$GITHUB_ENV"
+
+      - name: A site worker must be refused what the office may do
+        env:
+          ERP_BASE_URL: http://127.0.0.1:3100
+          ERP_TEST_TENANT: reformas-demo
+          ERP_E2E_ADMIN: smoke-admin@example.com
+        run: |
+          ERP_E2E_ADMIN_PASSWORD="$ADMIN_PW" node tests/server-e2e/run.mjs \
+            || { docker logs app-auth; exit 1; }
+
   # The actual release step: move the rolling `main` tag onto images that have
   # just been proven to boot, migrate, serve a tenant and pass the ERP suite.
   # The server pulls `:main` every 60s, so THIS job is the deploy — everything

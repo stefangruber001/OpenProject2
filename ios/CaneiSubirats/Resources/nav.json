@@ -68,5 +68,20 @@
         "ca": "Config."
       }
     }
-  ]
+  ],
+  "roleTabs": {
+    "site": [
+      {
+        "id": "labour",
+        "code": "ADM-04",
+        "path": "erp.html#labour",
+        "icon": "clock.fill",
+        "label": {
+          "es": "Horas",
+          "en": "Hours",
+          "ca": "Hores"
+        }
+      }
+    ]
+  }
 }

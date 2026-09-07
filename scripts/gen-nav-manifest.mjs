@@ -77,6 +77,24 @@ const TABS = [
   { section: "settings", icon: "gearshape.fill" },
 ];
 
+/**
+ * The bar a role gets INSTEAD, by ROUTE key rather than by section.
+ *
+ * A site worker reaches one screen and is sent back to it from every other, so
+ * six tabs would be six ways to arrive at the same place. The reason this is
+ * generated rather than written into the shells is the reason the whole file
+ * exists: a label hardcoded in a shell cannot translate, and this one has to
+ * say Horas, Hores and Hours like every other.
+ *
+ * The tab is not a boundary and is not pretending to be one. The server refuses
+ * what this account may not do, and the web app resolves every route to the
+ * hours screen for it — so a shell that has not read this yet is untidy, not
+ * unsafe.
+ */
+const ROLE_TABS = {
+  site: [{ route: "labour", icon: "clock.fill" }],
+};
+
 /* ---- read SECTIONS out of the workspace ---------------------------------- */
 const html = readFileSync(resolve(SITE, "erp.html"), "utf8");
 const start = html.indexOf("const SECTIONS = [");
@@ -103,6 +121,12 @@ for (const m of block.matchAll(
 }
 if (sections.size < 5) {
   throw new Error(`only ${sections.size} sections parsed from SECTIONS — the shape changed`);
+}
+
+/** Every sub-route by key, for the role bars — which name a screen, not a section. */
+const routes = new Map();
+for (const m of block.matchAll(/\{ k: "([^"]+)", lab: "([^"]+)", code: "([^"]+)"/g)) {
+  if (!routes.has(m[1])) routes.set(m[1], { lab: m[2], code: m[3] });
 }
 
 /* ---- resolve each label through the same dictionary the web uses --------- */
@@ -141,6 +165,33 @@ const tabs = TABS.map((t) => {
   };
 });
 
+/* ---- and the same for the role bars -------------------------------------- */
+const roleTabs = {};
+for (const [role, list] of Object.entries(ROLE_TABS)) {
+  roleTabs[role] = list.map((t) => {
+    const found = routes.get(t.route);
+    if (!found) {
+      throw new Error(
+        `the ${role} tab bar points at route "${t.route}", which SECTIONS does not ` +
+          `declare. Either the route was renamed or the tab is dead — fix ROLE_TABS ` +
+          `in this file.`,
+      );
+    }
+    const es = found.lab;
+    const en = EN.get(es);
+    const ca = CA[es];
+    if (!en) missing.push(`${role}/${t.route}: no English for "${es}"`);
+    if (!ca) missing.push(`${role}/${t.route}: no Catalan for "${es}"`);
+    return {
+      id: t.route,
+      code: found.code,
+      path: `erp.html#${t.route}`,
+      icon: t.icon,
+      label: { es, en: en || es, ca: ca || es },
+    };
+  });
+}
+
 if (missing.length) {
   console.error("FAIL: tab labels without a translation —");
   for (const m of missing) console.error("  " + m);
@@ -158,6 +209,9 @@ const manifest = {
     "carry the same names as the web, in the same three languages.",
   version: 1,
   tabs,
+  /* Additive: both shells read `tabs` by name and ignore what they do not know,
+     so an older build meets a newer manifest without noticing. */
+  roleTabs,
 };
 const json = JSON.stringify(manifest, null, 2) + "\n";
 

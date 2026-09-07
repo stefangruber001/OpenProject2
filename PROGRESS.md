@@ -2166,5 +2166,249 @@ was a picker choosing whichever supplier came first for a document that matched
 nobody. A tax id compared to a tax id is the identifier the law uses to say two
 records are one company.
 
+**S10 · The hours screen becomes two screens, for two audiences.** The day
+sheet measured 18,361 px on a day with NO hours: the correction register was
+printed underneath it, sixty entries deep. It is a tab of its own now, the
+office gets a card per person under a week strip with every field editable in
+Corrections, and the day fits on a screen.
+
+**S11 · The site worker, and the boundary that was only a label.** The `site`
+role named a set of permissions and nothing consulted them: `POST /erp/command`
+checked none, and `PUT /erp/state` accepted a whole client-computed document
+from anybody signed in. An account meant to type its own hours could rewrite
+the invoice register, and its state response carried every bank line.
+
+The enforcement is on the wire now — per-command permissions, ownership and
+assigned-site checks on the six hours commands, `erp.write` required to save a
+whole document, and a read that is BUILT for the worker rather than filtered.
+On top of that, and only in agreement with it, the two worker screens: type
+your hours, see your own totals, no amount and nobody else. `tests/server-e2e`
+now signs in as a real account, and the deploy's smoke job runs a second copy
+of the same image behind a real login to check the four refusals and the
+redaction against Postgres before anything is promoted.
+
+Two things that gate caught before production, both mine: the new permission
+check locked a single-seat deployment's only operator out of their own ERP
+(`ERP_OPERATOR` has no account row for `may()` to read), and five calls in the
+suite carried no session cookie. Both fixed and pinned. A third — an invitation
+issued for a tenant that is not the deployment's own leaves an account that can
+never sign in — is real, is not mine, and is written down as ASSUMPTIONS.md S74
+rather than patched at speed on a deploy gate.
+
 **Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
-("Forget about this for the moment") and still the oldest unanswered item.
+("Forget about this for the moment") and still the oldest unanswered item. It
+is now also what the site worker's phone waits on: the screens themselves reach
+the existing build over the air, but `nav.json` is bundled, so the single-tab
+bar for that role needs a new build.
+
+## Package 14 — the recorrido stops being a second application (2026-09-04)
+
+The operator asked for four things on Proyectos → Recorrido del cliente: that
+every step look like the ERP screen that owns its data, that the explanations
+go, that the steps flow, and that picking any obra shows its real phase in
+colour, names the next step, and writes back — «if a new lead is entered in the
+customer journey then also in the leads this should be saved».
+
+All four are one change, and it is the one the repo has had on its own list
+since 07/08: **JOURNEY-AUDIT C1 / ASSUMPTIONS #48, Tier-1 item 1.**
+
+**What it was.** `journey.html` was two applications sharing a page. «Crear
+nuevo proyecto» was a 5,455-line narrated demo with its own `caneiJourney`
+IndexedDB, its own price book, its own tax-id validator and its own invoice
+numbering — so a customer was typed twice and the recorrido's factura was not
+the accountant's. «Proyecto existente», added in session 12, read the real
+database but was a stub: a status pill, one line of summary and a link that
+left the page. One write in the whole mode.
+
+**What it is.** `VIEWS.journey` in `erp.html`, route `#journey`, already
+declared in the menu as PRY-04. `journey.html` forwards to it, the way
+`index.html` forwards to the Torre, so the profile menu, both native shells and
+any bookmark keep working.
+
+Three of the four asks collapse into that one move. It IS the ERP, so `.fgrid`,
+`.field`, `.card`, `.pill` and `.drawer` apply natively — and «＋ Nuevo
+proveedor» on phase 8 opens `newPartyDrawer("supplier")`, the same form
+Maestros uses, with the same validation, the same duplicate warning and the
+same audit entry. Loading `erp-ds.css` into the old page had been tried and
+reverted (`7b52be4`) for the reason that made this necessary: the form CSS is
+not in the design layer, it is inline in `erp.html`, and so are the thirty
+globals every drawer reads.
+
+**And the write is only safe here.** Ids come from a counter inside the state
+document and a local save is a whole-document put with no version check; two
+pages holding two engine instances over one `caneiERP` mint colliding ids and
+erase each other. One shell, one instance, one persist path.
+
+**The two blockers in #48 dissolved rather than being solved.** The recorrido
+owns no data: every phase is a projection of records that already exist, and
+every action is an existing engine verb through `mutate()`. So there is no
+stage→record mapping to keep idempotent — a phase maps to nothing it wrote —
+and an abandoned recorrido leaves nothing behind, because nothing is created
+until the operator presses the ERP's own save button. `mutate()` re-renders, so
+the rail recolours itself: execute a step, and the phase that step belongs to
+changes colour with no wiring at all.
+
+**Thirteen phases, and what each one says.** Oportunidad · Visita · Presupuesto
+· Envío al cliente · Aceptación · Contrato · Inicio de obra · Compras ·
+Ejecución · Facturación · Cobros · Pagos a proveedores · Cierre y reseña. Five
+states in the registers' own pill tones, and **two reds** because they are two
+facts: `blocked` for a lead perdido or a presupuesto rechazado, `late` for
+money past its date — Facturación already writes «Vencida» on exactly that
+condition and one word for both would have the two screens disagreeing.
+«Enviado y congelado» is `v.frozen && v.issued`, which is the operator's own
+example.
+
+**Fase and Siguiente paso are different questions, and are answered
+separately.** The phase a job is IN is the furthest one under way — a
+renovation buys, builds, bills and chases at once — while the next step is the
+earliest phase that is stuck or overdue, and only failing that the earliest
+unfinished one at or after the current phase. Without the second half a closed
+obra with no pedidos reported «siguiente paso: Compras» for ever.
+
+**Two phases have no button, on purpose.** Ejecución does not, because progress
+is marked on the chart and a cost enters through Gastos with its document — the
+one door that made a cost with no paper was removed in package 13. Pagos a
+proveedores does not, because `payBills` lost its screen in package 12 for
+writing a payment nobody had made; what money left the company is answered by
+the bank.
+
+**Removed:** the `caneiJourney` database, the sample walkthrough, the second
+price book, the second tax-id validator and the generated demo PDF/e-mail/ZIP
+artifacts — about 5,400 lines. They are the explanations the operator asked to
+lose, and they are incompatible with mirroring the ERP: a screen cannot reflect
+the records and keep a private copy of the same nouns.
+
+**Gates.** Site E2E **702/702 unfiltered** — `testJourney` and
+`testJourneyRealMode` replaced by one suite of eighteen checks that drives the
+screen and proves the write-back both ways: a proveedor filed from phase 8
+appears in Maestros → Proveedores, a lead filed from the register appears in
+Comercial → Oportunidades, and neither leaves the screen. It takes its own
+browser context and runs last, because it is the only suite that creates
+records and `newPage` shares one IndexedDB with everything after it.
+
+Translation, all four gates re-measured: **workspace audit 0/0 in both
+languages** with `#journey` added to its route list — 52 new dictionary entries,
+and every composed string built as separate nodes for the reason `countTag`
+already carries. Source literals **205 → 162**, rendered pages **668/845 →
+91/67** and the miss ledger **41/101 → 34/96** (measured 31 and 93), all of them
+down, and mostly because a 5,455-line page left the lists rather than because
+anything was excused. The one string the recorrido itself contributed was the
+«de» that both this screen and `countTag` build a count around, and it was
+translated. `["Visita", "Site"]` became `["Visita", "Visit"]` on the way past:
+the old English was written when the word was a stage abbreviation on a
+dashboard that no longer exists.
+
+`pnpm lint · check-types · test · boundaries · build`, the nav manifest, the
+ownership guard and `tests/site-sync` 20/20 all green. No capability changed, so
+the committed `site/erp-factory` bundle is untouched.
+
+**Merged with the hours redesign, 05/09.** The two packages were written in
+parallel and met in nine files. Nothing was content-copied: `site/erp-ds.css`
+was rebuilt as main's file plus this branch's two edits, and every other
+conflict was resolved by keeping both sides — the workspace audit walks the six
+`#labour` routes AND `#journey`, and the numbered CSS section and the
+ASSUMPTIONS entries were renumbered behind the ones that landed first (69/S72–74
+theirs, 70/S75 ours). Three things the merge itself surfaced:
+
+- **«Sin obra» meant two different facts.** The hours release owns it for an
+  apunte with no obra assigned; the recorrido was using the same two words for a
+  lead that has not become one yet. Renamed to «Todavía sin obra», which is also
+  the truer sentence — the alternative was one screen saying "site" in the middle
+  of another that says "job" everywhere.
+- **`hashchange` did not carry the clamp `go()` does.** A site worker typing a
+  hash reached any screen; the state is redacted on the server, so what came up
+  was empty rather than somebody else's data, but a rule enforced on one of two
+  doors is the shape this workspace has been caught by before. One line, their
+  own rule.
+- **«Completada» and «Bloqueada» had no dictionary entry, and «Vencido» was the
+  wrong word.** The first two were caught by the translator crawl; «Completada»
+  turned out to be untranslated on the subcontract register too. The third is now
+  «Vencida» — feminine like every other state in the map, the word Facturación
+  already writes for an overdue invoice, and not the one that resolves to
+  "Expired".
+
+Re-measured on the merged tree, not carried over: **707/707 unfiltered**, site
+E2E; workspace audit **0/0** across eighteen screens; source literals
+**162/162**; rendered pages **91/67**; miss ledger **34/94** against ceilings
+37/97 — an EN raise against the hours release's 33, argued in ASSUMPTIONS S75g
+rather than adjusted quietly.
+
+### PK14-S77 · The recorrido as the operator uses it (05/09)
+
+Three requests off two phone screenshots of the live workspace, plus four
+defects the screenshots showed without being mentioned.
+
+**The register reads as a process.** The «Fase» cell is a strip of thirteen
+dots above the phase name, in the same tones the big rail uses — `journeyRows`
+already computed the states and threw them away. The strip's tones are asserted
+equal to `journeySteps(...).map(s => s.state)` for the same job, so the two
+drawings of one fact cannot drift apart. ~130px on a 10px pitch: it fits the
+desktop column and a 390px card, where the full rail never could.
+
+**«Siguiente paso» names the work.** It repeated the phase name, so both
+columns said `4 · Envío al cliente`. It returns the phase's verb now. The
+amount asks the accepted quote before the lead's expected value — a job with a
+presupuesto was reporting `0 €`.
+
+**A verb is never hidden.** The operator photographed a Contrato phase with a
+status, no button and no reason, which reads as a screen that cannot do
+anything. A verb the engine would refuse renders disabled with its precondition
+beside it as a «Falta» row — 64 of them across the seeded workspace, each
+quoting the engine guard it mirrors. Pressing one writes nothing.
+
+**The work happens here.** «Abrir la pantalla completa ↗» is gone from every
+phase. The customer's real document — quote, contract, invoice — is drawn
+inside the phase by `sheetDocHtml`, the same sheet the PDF is printed from, so
+changing the document changes this screen too. Two screens keep a named way
+out, the presupuestador and the carta Gantt, because reproducing a three-pane
+builder in a card would be the second implementation this screen exists to
+avoid (ASSUMPTIONS S77d).
+
+**«Lo hecho hasta ahora».** A last card listing every action performed and
+every document produced, newest first, each with `⤓ PDF` / `⤓ Word` through
+`downloadHistoryDoc` — the Historial's own route, so the document offered is
+the one the customer already has. Built from the records, not the audit log,
+and ordered by each record's own date because several are backdatable
+(S77f). 458 rows over the workspace, 176 with a document. `project.diary` gets
+its first reader in the product.
+
+On the way past: `histRows` read four field names that do not exist on the
+record, so the Historial modal's date column had been blank since it was
+written (S77i).
+
+Gates, measured on this tree: site E2E **717/717 unfiltered** (the recorrido
+suite 18 → 28 checks); workspace audit **0/0**; source literals **162/162**,
+back to main's number after four engine guards quoted in comments were requoted
+and six block reasons given entries; rendered pages **91/67**; miss ledger
+**33/94** locally against ceilings that STAY at 37/97 — main reverted exactly
+this ratchet in `f31a1c2` after CI failed on it, and the crawl walks a different
+set of pages per branch, so one local reading is not the number CI sees
+(ASSUMPTIONS S77h). `pnpm lint · check-types · test ·
+boundaries · build` green, nav manifest and ownership guard green. No
+capability changed, so the committed `site/erp-factory` bundle is byte-identical.
+
+## N · The App is ready for Apple, and two ways it would have failed quietly
+
+`main` carries the whole Apple path: `site/privacy.html` published,
+`ios/fastlane/metadata/` in `deliver`'s layout in both languages, the App Review
+notes written for a **Custom App** distributed through Apple Business Manager,
+the `release` lane that refuses to submit without a demo account, and
+`.github/workflows/ios-release.yml` behind one button. TestFlight run **#24** is
+green on `8830f42` and carries the current web work; nothing bundled into the
+shell has changed since, so no rebuild is owed. `docs/RELEASE-IOS.md` opens with
+the one question that decides whether tomorrow is possible at all — whether the
+company is already enrolled in Business Manager — and says plainly that
+enrolment takes days and that TestFlight keeps working meanwhile.
+
+Two defects found by checking the release path rather than the screens, both of
+the kind nothing goes red for:
+
+- **The ten screenshots were gitignored** and existed only in the container that
+  made them. The submission runs from a clean checkout, so the listing would
+  have gone to review with an empty gallery (ASSUMPTIONS S81).
+- **The App Review password was left in a tracked file** after the lane ran.
+  Harmless in CI, one `git add -A` from a committed secret on a real machine
+  (S82).
+
+Next, and only the operator can do it: the Business Manager Organization ID, the
+contact phone, and a working demo account.

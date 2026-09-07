@@ -14,7 +14,12 @@ xcuserdata/
 # fastlane
 fastlane/report.xml
 fastlane/Preview.html
-fastlane/screenshots/**/*.png
+# NOT the screenshots. They are part of the App Store listing exactly like
+# description.txt is, and the `release` lane uploads whatever is in
+# fastlane/screenshots from a CLEAN CI checkout. Ignored, they existed only on
+# the machine that generated them and the one-click submission would have gone
+# up with an empty gallery. Regenerate with `node scripts/app-store-shots.mjs`
+# and commit the result.
 fastlane/test_output
 fastlane/*.mobileprovision
 

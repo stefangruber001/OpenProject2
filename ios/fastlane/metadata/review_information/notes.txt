@@ -1,0 +1,33 @@
+THIS IS A CUSTOM APP, distributed privately through Apple Business Manager to a
+single organisation: Canei Subirats, S.L., a renovation contractor in Sant Just
+Desvern, Barcelona. It is that company's own management system. It is not
+intended for the general public, it is not listed on the App Store, and it has
+no public sign-up — accounts are issued by the company's own administrator,
+which is why demo credentials are provided above.
+
+WHAT THE APP IS
+A native shell around the company's web workspace, served over HTTPS from the
+company's own server in the European Union. Staff use it to run renovation jobs
+end to end: enquiry, site visit, quote, contract, the work itself, purchases,
+hours worked, invoicing and collection.
+
+WHAT TO LOOK AT AFTER SIGNING IN
+1. Torre de control — the owner's dashboard: pipeline, cash, margins, alerts.
+2. Proyectos > Recorrido del cliente — pick any job; thirteen stages show where
+   it stands, and each stage carries the real customer document.
+3. Proyectos > Obras — open a job for its Gantt chart and physical progress.
+4. Administración > Horas — the site/office split: a day sheet for the crew, a
+   review step for the office, and a summary.
+
+LANGUAGE
+The interface opens in Spanish. To read it in English: the profile button in the
+top-right corner (the circle with initials) > Idioma > EN.
+
+DATA AND PRIVACY
+No data is stored on the device beyond the session cookie and an
+interface-language preference. The camera is used only when the operator
+attaches a photo to a site visit, and the photo goes to the company's own
+server. No advertising, no analytics, no third-party trackers, no IDFA.
+Privacy policy: https://178-105-10-156.sslip.io/privacy.html
+
+The app requires a network connection; there is no offline mode.

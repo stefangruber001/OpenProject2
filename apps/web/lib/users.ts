@@ -83,11 +83,22 @@ export function isRole(v: unknown): v is UserRole {
  */
 const GRANTS: Record<UserRole, string[]> = {
   admin: ["*"],
-  backoffice: ["erp.read", "erp.write", "money.read", "margin.read", "export", "party.bank.read"],
-  // Site: records what happened on the job. No money, and nothing about margin.
+  backoffice: [
+    "erp.read",
+    "erp.read.all",
+    "erp.write",
+    "money.read",
+    "margin.read",
+    "export",
+    "party.bank.read",
+  ],
+  /* Site worker: records what happened on the job, and only their own. No
+     money, nothing about margin — and, since this became a boundary rather
+     than a label, no `erp.read.all` either: the document they are sent holds
+     their own hours and the jobs they are assigned to, and nothing else. */
   site: ["erp.read", "erp.write.site", "photo.capture"],
   // Read-and-export only, and explicitly not margin.read or party.bank.read.
-  gestoria: ["erp.read", "money.read", "export"],
+  gestoria: ["erp.read", "erp.read.all", "money.read", "export"],
 };
 
 export function permissionsOf(role: UserRole): string[] {
@@ -178,9 +189,22 @@ export function envUsers(): UserRecord[] {
  * `auth.ts` does it: a wrong address answering faster than a wrong password
  * tells an attacker who has an account here.
  *
- * A disabled account, and an invited one that has not set a password yet, both
- * fail the same way a wrong password does. Saying "this account is disabled"
- * would be friendlier and would also confirm the address exists.
+ * A disabled account fails the same way a wrong password does. Saying "this
+ * account is disabled" would be friendlier and would also confirm the address
+ * exists.
+ *
+ * AN INVITED ACCOUNT MAY SIGN IN, and that is a change worth stating plainly.
+ * It used to be refused, because "invited" meant "created, with no password" —
+ * the only credential was a one-time link. An invitation now carries a
+ * temporary password as well, so "invited" means "has credentials, has not used
+ * them yet", and refusing it would refuse the very password the invitation was
+ * written to hand over. The empty-hash test is what still does the work: an
+ * account with no password set cannot be signed into whatever its state says,
+ * and every account starts that way.
+ *
+ * The state does not stay "invited": `authenticateUser` promotes it on the
+ * first successful sign-in, which is what makes the screen's «Invitado» pill
+ * mean "has not been in yet" rather than "cannot get in".
  */
 const DECOY =
   "scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -192,7 +216,8 @@ export async function authenticateAgainst(
 ): Promise<UserRecord | null> {
   const wanted = email.trim().toLowerCase();
   const found = users.find((u) => u.email === wanted);
-  const usable = found && found.state === "active" && found.hash !== "";
+  const usable =
+    found && (found.state === "active" || found.state === "invited") && found.hash !== "";
   const ok = await verifyPassword(password, usable ? found.hash : DECOY);
   return ok && usable ? found : null;
 }

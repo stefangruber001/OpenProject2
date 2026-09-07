@@ -31,9 +31,58 @@ export interface CommandSpec {
   readonly arity: number;
   /** Sentence fragment for the audit note and error messages. */
   readonly describes: string;
+  /**
+   * The permission a caller must hold.
+   *
+   * DEFAULTED, NOT OPTIONAL. Every command listed before this field existed was
+   * an office action, so `erp.write` is what they all required in practice and
+   * `runCommand` applies it to any entry that does not say otherwise. Saying so
+   * out loud matters: until this landed the whitelist decided WHAT could be
+   * called and nothing decided WHO could call it, so any signed-in account —
+   * including a site worker's — could run every command on the list.
+   */
+  readonly permission?: string;
 }
 
 export const COMMANDS = {
+  // --- hours -----------------------------------------------------------
+  /* The hours a person books for themself are the one write a site worker
+     makes, so these carry `erp.write.site` — the permission that role has
+     held since it was defined and that no screen had ever asked for. The
+     runtime narrows them further: a caller holding only `erp.write.site` may
+     name no worker but their own, no project they are not assigned to, and no
+     week that is already approved. Approving is not on that list; it is the
+     office's decision about somebody else's work. */
+  recordHours: {
+    method: "recordHours",
+    arity: 1,
+    describes: "record hours",
+    permission: "erp.write.site",
+  },
+  correctHours: {
+    method: "correctHours",
+    arity: 2,
+    describes: "correct an hours entry",
+    permission: "erp.write.site",
+  },
+  deleteHours: {
+    method: "deleteHours",
+    arity: 1,
+    describes: "delete an hours entry",
+    permission: "erp.write.site",
+  },
+  repeatDay: { method: "repeatDay", arity: 3, describes: "repeat a day of hours" },
+  approveLabourWeek: {
+    method: "approveLabourWeek",
+    arity: 2,
+    describes: "approve a worker's week",
+  },
+  unapproveLabourWeek: {
+    method: "unapproveLabourWeek",
+    arity: 2,
+    describes: "reopen a worker's week",
+  },
+
   // --- parties ---------------------------------------------------------
   addParty: { method: "addParty", arity: 1, describes: "add a party" },
   updateParty: { method: "updateParty", arity: 2, describes: "update a party" },

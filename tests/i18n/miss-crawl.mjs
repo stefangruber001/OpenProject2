@@ -80,7 +80,9 @@ const CLICKS = Number(argOf("--clicks", "40"));
  * from the running application and cannot disagree with it.
  */
 const STATIC_PAGES = [
-  ["journey.html", ""],
+  // The recorrido left this list when it stopped being a page: DISCOVER_ROUTES
+  // picks up #journey from SECTIONS now that the entry no longer carries `href`,
+  // so it is crawled as the screen it is.
   ["master-data.html", ""],
   ["financial-data.html", ""],
 ];
