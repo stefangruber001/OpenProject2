@@ -339,8 +339,7 @@ jobs:
     steps:
       - name: The revision answering must be the one just built
         env:
-          # Empty when the repository variable is unset — the step then says so
-          # and stops, rather than failing a deploy over a missing setting.
+          # Required. An unset variable FAILS this job — see the run below.
           APP_URL: ${{ vars.APP_URL }}
           # Set this repository variable to `true` while the server is
           # deliberately pinned to an older image (see docs/HANDOVER-OPS.md).
@@ -350,9 +349,20 @@ jobs:
           PINNED: ${{ vars.DEPLOY_PINNED }}
         run: |
           set -uo pipefail
+          # THIS USED TO WARN AND PASS, AND THE FIRST RUN PROVED WHY IT MUST NOT.
+          # `vars.APP_URL` was never set, so the very first `verify` — written to
+          # catch a green pipeline over a stale server — exited 0 in under a
+          # second having checked nothing, and reported success. A gate that
+          # cannot see its subject must say so in the only way a pipeline
+          # communicates: by failing. «I could not look» and «I looked and it is
+          # fine» are the same colour otherwise, which is the whole bug.
           if [ -z "${APP_URL}" ]; then
-            echo "::warning::APP_URL is not set — cannot check what production is running."
-            exit 0
+            echo "::error::APP_URL is not set, so nothing here checked what production is running."
+            echo "Set it under Settings → Secrets and variables → Actions → Variables,"
+            echo "as the public address of the server, e.g. https://<host>"
+            echo "It is the same variable NEXT_PUBLIC_APP_URL is built from (see the images job),"
+            echo "which is also empty in every image built while it was unset."
+            exit 1
           fi
           if [ "${PINNED}" = "true" ]; then
             echo "::warning::DEPLOY_PINNED is set — the server is deliberately not following :main."

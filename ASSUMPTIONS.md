@@ -9392,3 +9392,23 @@ Worth saying plainly: the question the marker exists to answer is now answered
 twice over. The operator reported it never reached the server, and `deploy.yml`
 has a `verify` job that asks `/api/health` whether the revision answering is the
 one just built. Nothing needs a span in the header to find that out any more.
+
+**S103b · The check written to catch a silent pass, passed silently.** The first
+run of the new `verify` job finished in under a second and reported success. It
+had checked nothing: `vars.APP_URL` has never been set in this repository, and
+the job's own guard warned and exited 0 on an empty value — «cannot check» was
+wearing the same colour as «checked, and it is fine». That is the identical
+shape of the incident it was written for, reproduced inside the fix for it,
+within one run.
+
+It now fails on an unset `APP_URL` and says where to set it. The rule this
+earns, and it generalises past this job: **a gate that cannot see its subject
+must fail, not warn.** A warning is invisible in a green tick, and green is the
+only thing anyone reads.
+
+**S103c · And the same variable is a build argument.** `deploy.yml` passes
+`NEXT_PUBLIC_APP_URL=${{ vars.APP_URL }}` when building the image. Unset means
+every image published so far carries an empty public address. That is a separate
+question from the deploy — it governs absolute links and preview cards, not
+whether the server updates — but it is the same missing setting, and setting the
+variable fixes both. Noted rather than chased here.
