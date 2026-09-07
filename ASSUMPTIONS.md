@@ -8974,3 +8974,48 @@ Two details worth keeping: «Hasta» defaults to EMPTY, because a date defaulted
 to today ends the assignment the same evening and reads as the app not working;
 and the card shows the LIST as well as the form, because an assignment that can
 be created and not seen is the next version of this bug.
+
+**S90 · An address is found by SHAPE and POSITION, not by a label.** Everything
+else the extraction capability reads is announced by a word — a total, a date, a
+tax id all have a caption beside them. A postal address has none: it is four
+lines of text in a block near the top of the page. So the pass anchors on the
+postal code, the one token an address always carries and nothing else on an
+invoice resembles, and takes the block around it — above the recipient boundary,
+which is the same fact that already keeps the issuer's tax id from being
+confused with ours.
+
+The telephone is the exception and takes its label. Nine digits in three groups
+is also the shape of a registry code, and this operator's own document carries
+one two segments away from the phone. A wrong telephone on a supplier record is
+worse than an empty one, because somebody dials it; an empty field is visibly
+empty and gets filled.
+
+Shapes stay in the jurisdiction pack: a postal code here is five digits whose
+first two are a province, 01 to 52, and that sentence is a fact about one
+country, so `jurisdiction-es-es` states it and the capability asks. A profile
+that describes no address loses the six fields, not the document — the reader
+still returns everything else it found.
+
+Six generic keys, named for what they are and not for where they came from:
+`issuerAddress`, `issuerPostcode`, `issuerCity`, `issuerRegion`, `issuerPhone`,
+`issuerEmail`.
+
+**S91 · Two sessions, one numbered list, and the collision it already
+produced.** PROGRESS.md's Package 13 is appended to by both working sessions,
+each numbering its own next entry. Both reached S10 independently: the hours
+redesign wrote «S10 · The hours screen becomes two screens» and this stream
+wrote «S10 · The reader had no fields for half the header», which also landed at
+the END of the file, below Package 14 and the Apple section, where a fresh
+session told to start at Package 13 would never read it.
+
+Moved into Package 13 and renumbered **S12**, which is the most reversible fix
+available: it takes the first free number and renumbers nothing anybody else
+wrote. The next entry from either session is S13.
+
+The deeper fact is that six commits of shipped product work — S83 to S89 in this
+file — are on `main` and not in PROGRESS.md at all, so the file understates the
+tree by three days. Narrating another session's work in its own voice is not
+this one's call, so Package 13 gets an INDEX of those seven entries instead: one
+line each, pointing here. A fresh session that reads Package 13 now learns that
+there is more on `main` than the section describes, which is the failure mode
+that mattered.
