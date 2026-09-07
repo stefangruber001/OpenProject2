@@ -1530,6 +1530,13 @@ window.CANEI_DICT.ca = {
   "Sin documento": "Sense document",
   "mismo día": "mateix dia",
   "importe exacto": "import exacte",
+  "tarjeta citada": "targeta citada",
+  "periodo en el concepto": "període en el concepte",
+  Liquidación: "Liquidació",
+  "movimientos entre": "moviments entre",
+  "Liquidación de tarjeta registrada": "Liquidació de targeta registrada",
+  "Pagar la tarjeta no es un gasto: lo son las compras que ya están en su cuenta. Se marca como traspaso interno.":
+    "Pagar la targeta no és una despesa: ho són les compres que ja són al seu compte. Es marca com a traspàs intern.",
   "pago parcial": "pagament parcial",
   "más. Busca para acotar.": "més. Cerca per acotar.",
   "El extracto no nombra a la contraparte. Compruébalo antes de conciliar.":

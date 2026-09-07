@@ -7368,6 +7368,73 @@ async function testBankAndCash(browser, base) {
       ok("1C: picking it marks the bank line as the card's settlement, an internal transfer");
     else bad("1C: settlement written", JSON.stringify(settled));
 
+    /* PK13-S11 · THE SETTLEMENT IS PROPOSED, NOT HUNTED FOR. The operator, on
+       a line reading «ADEUDO MENSUAL DE TARJETA ...8442 LIQUIDACION
+       01/11/2026-30/11/2026» with every purchase on that card already
+       reconciled: "I can not match the Account movement with the Credit card
+       movement. There is no Propuestas." There could not be — Propuestas only
+       ever argued about documents, and a card settlement is explained by none.
+       The evidence was all on the page: the period in plain digits, and a
+       month of purchases adding to the cent to the charge that pays for them.
+       Built from the operator's own concept text. */
+    const cardProp = await pg.evaluate(async (cardId) => {
+      const card = erp.state.bankAccounts.find((a) => a.id === cardId);
+      const bank = erp.state.bankAccounts.find((a) => a.kind === "bank");
+      // A month of purchases on the card…
+      erp.importMovements(
+        cardId,
+        [
+          { accountingDate: "2026-11-06", concept: "E2E CARD A", amountCents: -5000 },
+          { accountingDate: "2026-11-19", concept: "E2E CARD B", amountCents: -7584 },
+        ],
+        "bo",
+      );
+      // …and the bank line that pays for exactly those.
+      erp.importMovements(
+        bank.id,
+        [
+          {
+            accountingDate: "2026-12-05",
+            concept:
+              "00120 ADEUDO MENSUAL DE TARJETA ************8442 LIQUIDACION 01/11/2026-30/11/2026",
+            amountCents: -12584,
+          },
+        ],
+        "bo",
+      );
+      const mv = erp.state.movements[erp.state.movements.length - 1];
+      bankAcc = bank.id;
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 700));
+      matchDrawer(mv.id);
+      await new Promise((r) => setTimeout(r, 600));
+      const btn = document.querySelector("[data-cardsettle]");
+      const text = document.querySelector("#dbody").innerText;
+      const out = {
+        proposed: !!btn,
+        forThisCard: btn ? btn.dataset.cardsettle === cardId : false,
+        saysExact: /importe exacto/i.test(text),
+        saysPeriod: /periodo en el concepto/i.test(text),
+        namesCard: text.includes(card.name),
+      };
+      if (btn) {
+        btn.click();
+        await new Promise((r) => setTimeout(r, 700));
+        const after = erp.state.movements.find((x) => x.id === mv.id);
+        out.written = after.cardSettlement && after.cardSettlement.accountId === cardId;
+        out.internal = after.class === "internalTransfer";
+      }
+      return out;
+    }, cardAcc);
+    if (cardProp.proposed && cardProp.forThisCard && cardProp.saysExact && cardProp.saysPeriod)
+      ok(
+        "1C: the card settlement is PROPOSED, with the period and the exact amount as its argument",
+      );
+    else bad("1C: settlement proposed", JSON.stringify(cardProp));
+    if (cardProp.written && cardProp.internal)
+      ok("1C: …and accepting it goes through the same door the dropdown uses");
+    else bad("1C: settlement written from the proposal", JSON.stringify(cardProp));
+
     // ── 1D: a movement with no invoice can be EXPLAINED, and the queue
     //    stops asking — only unexplained ones stay flagged.
     await pg.evaluate(() => goTab("banking", "_reconcile"));

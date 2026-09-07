@@ -3584,6 +3584,15 @@ window.CANEI_DICT = {
     ["Sin documento", "No document"],
     ["mismo día", "same day"],
     ["importe exacto", "exact amount"],
+    ["tarjeta citada", "card named"],
+    ["periodo en el concepto", "period in the concept"],
+    ["Liquidación", "Settlement"],
+    ["movimientos entre", "transactions between"],
+    ["Liquidación de tarjeta registrada", "Card settlement recorded"],
+    [
+      "Pagar la tarjeta no es un gasto: lo son las compras que ya están en su cuenta. Se marca como traspaso interno.",
+      "Paying the card off is not a cost: the purchases already on its account are. It is recorded as an internal transfer.",
+    ],
     ["pago parcial", "partial payment"],
     ["más. Busca para acotar.", "more. Search to narrow it down."],
     [

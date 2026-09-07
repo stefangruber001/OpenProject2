@@ -12707,6 +12707,29 @@
                  three earlier templates — and no amount of rewording fixes that;
                  moving the literal out of the conditional does. */
         const moreNote = `<div class="it" style="color:var(--muted)"><span>…y</span> <span>${hidden}</span> <span>más. Busca para acotar.</span></div>`;
+        /* Built before the template, like `moreNote` above and for the same
+                 reason: a conditional that opens a nested template literal is read by
+                 the source audit as prose nobody translated. */
+        const nothingExplains =
+          '<div class="it" style="color:var(--muted)">Ningún documento explica este movimiento. Búscalo abajo o explícalo sin factura.</div>';
+        const cardProps = cardSettlementProposals(m);
+        const cardBlock = cardProps
+          .map((p) => {
+            const why = [];
+            if (p.exact) why.push("<b>importe exacto</b>");
+            if (p.named) why.push("<b>tarjeta citada</b>");
+            if (p.fromConcept) why.push("<b>periodo en el concepto</b>");
+            const btn = closed
+              ? ""
+              : `<button class="btn sm${p.exact ? " primary" : ""}" data-cardsettle="${esc(p.card.id)}">Conciliar</button>`;
+            return `<div class="sugg${p.exact ? " strong" : ""}">
+              <div class="hd"><span class="pill b">Liquidación</span>
+               <span style="flex:1;margin-left:8px">${esc(p.card.name)}</span>${btn}</div>
+              <div class="why">${why.join(" · ")} · <span>${p.count}</span> <span>movimientos entre</span> <span translate="no">${fmtD(p.from)}</span> <span>y</span> <span translate="no">${fmtD(p.to)}</span> · <span translate="no">${eur(p.sumCents)}</span></div>
+              <div class="why" style="color:var(--muted)">Pagar la tarjeta no es un gasto: lo son las compras que ya están en su cuenta. Se marca como traspaso interno.</div>
+             </div>`;
+          })
+          .join("");
         const db = openDrawer("Conciliar movimiento");
         db.innerHTML = `
          <div class="card" style="margin:0 0 12px"><div class="daylist" style="padding:10px 14px">
@@ -12716,8 +12739,9 @@
          </div></div>
          ${closed ? '<div class="it" style="color:var(--danger);margin-bottom:10px">El periodo está cerrado. Reábrelo para conciliar.</div>' : ""}
 
-         <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Propuestas</h3><span class="tag">${suggestions.length}</span></div>
+         <div class="card" style="margin:0 0 12px"><div class="ch"><h3>Propuestas</h3><span class="tag">${suggestions.length + cardProps.length}</span></div>
           <div style="padding:11px 14px">
+           ${cardBlock}
            ${
              suggestions
                .map((s) => {
@@ -12739,8 +12763,7 @@
               ${near ? '<div class="why" style="color:var(--danger)">El extracto no nombra a la contraparte. Compruébalo antes de conciliar.</div>' : ""}
              </div>`;
                })
-               .join("") ||
-             '<div class="it" style="color:var(--muted)">Ningún documento explica este movimiento. Búscalo abajo o explícalo sin factura.</div>'
+               .join("") || (cardProps.length ? "" : nothingExplains)
            }
           </div></div>
 
@@ -12850,6 +12873,17 @@
         );
         db.querySelectorAll("[data-pick]").forEach(
           (b) => (b.onclick = () => settle([b.dataset.pick])),
+        );
+        /* The SAME door the dropdown uses. A proposal that took its own route
+                 to the same state is two implementations of one rule, and they drift
+                 — which is the note `newContractDrawer` already carries. */
+        db.querySelectorAll("[data-cardsettle]").forEach(
+          (b) =>
+            (b.onclick = () =>
+              mutate(() => {
+                erp.markCardSettlement(m.id, b.dataset.cardsettle, "backoffice");
+                closeDrawer();
+              }, "Liquidación de tarjeta registrada")),
         );
         const add = $("#rcAdd");
         if (add)
@@ -19718,6 +19752,84 @@
           }, "Extracto importado");
       }
 
+      /**
+       * THE LINE THAT PAYS THE CARD OFF, PROPOSED RATHER THAN HUNTED FOR.
+       *
+       * The operator, on a bank line reading «ADEUDO MENSUAL DE TARJETA ...8442
+       * LIQUIDACION 01/11/2026-30/11/2026», with every purchase on that card
+       * already reconciled: "I can not match the Account movement with the
+       * Credit card movement. There is no Propuestas."
+       *
+       * There was not, and could not be. Propuestas has only ever argued about
+       * DOCUMENTS — invoices and bills, scored on amount, date, reference and
+       * counterparty — and a card settlement is explained by no document at
+       * all. It is one account paying another, and the only way to say so was
+       * an <optgroup> inside a dropdown of unrelated identifications, which a
+       * person has to already know is there.
+       *
+       * So the same evidence the matcher would have used, used. The concept
+       * carries the period in plain digits, so the window is not guessed: the
+       * card's own movements inside it are summed and compared to what left the
+       * bank. An exact match is the whole argument — a month of purchases
+       * adding to the cent to the charge that pays for them is not a
+       * coincidence — and the card being named in the concept corroborates it.
+       * Neither is enough to act alone, which is why this proposes and a person
+       * presses.
+       */
+      function cardSettlementProposals(m) {
+        const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+        if (!acc || acc.kind === "card" || m.amountCents >= 0) return [];
+        if (m.matched || m.cardSettlement) return [];
+        const cards = erp.activeBankAccounts().filter((a) => a.kind === "card");
+        if (!cards.length) return [];
+        const text = String(m.concept || m.merchantText || "");
+        const digits = (v) => String(v || "").replace(/\D/g, "");
+        const target = Math.abs(m.amountCents);
+        /* A period written into the concept beats any window this could infer.
+           Falls back to the calendar month before the charge, which is what a
+           card statement covers when the bank does not spell it out. */
+        const range = /(\d{2})\/(\d{2})\/(\d{4})\s*[-–—]\s*(\d{2})\/(\d{2})\/(\d{4})/.exec(text);
+        let from, to;
+        if (range) {
+          from = range[3] + "-" + range[2] + "-" + range[1];
+          to = range[6] + "-" + range[5] + "-" + range[4];
+        } else {
+          const d = new Date((m.accountingDate || erp.today) + "T00:00:00Z");
+          const y = d.getUTCFullYear();
+          const mo = d.getUTCMonth(); // 0-based: this is already last month's index
+          const first = new Date(Date.UTC(y, mo - 1, 1));
+          const last = new Date(Date.UTC(y, mo, 0));
+          from = first.toISOString().slice(0, 10);
+          to = last.toISOString().slice(0, 10);
+        }
+        const out = [];
+        for (const c of cards) {
+          const rows = erp.state.movements.filter(
+            (x) => x.accountId === c.id && x.accountingDate >= from && x.accountingDate <= to,
+          );
+          const sum = rows.reduce((a, x) => a + Math.abs(x.amountCents), 0);
+          const tail = digits(c.iban).slice(-4);
+          const named =
+            (tail.length === 4 && text.includes(tail)) ||
+            (c.name && text.toUpperCase().includes(String(c.name).toUpperCase()));
+          if (!rows.length && !named) continue;
+          if (sum !== target && !named) continue;
+          out.push({
+            card: c,
+            from,
+            to,
+            count: rows.length,
+            sumCents: sum,
+            exact: sum === target,
+            named: !!named,
+            fromConcept: !!range,
+          });
+        }
+        // An exact amount first: it is the only one of these that is arithmetic.
+        return out.sort(
+          (a, b) => Number(b.exact) - Number(a.exact) || Number(b.named) - Number(a.named),
+        );
+      }
       /* Paying the card off is not a cost — the purchases on the card are, and
                counting the monthly charge too counts every one of them twice. So a
                negative bank line can be marked as the settlement of a card, which
