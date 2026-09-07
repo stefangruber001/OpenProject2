@@ -2898,6 +2898,16 @@ window.CANEI_DICT = {
     ["🏁 Guía de puesta en marcha", "🏁 Start-up guide"],
     ["📘 Guía de operaciones", "📘 Operations guide"],
     ["⤓ Exportar datos", "⤓ Export data"],
+    ["Obras asignadas", "Assigned jobs"],
+    ["＋ Asignar a la obra", "＋ Assign to the job"],
+    ["Sin obras asignadas.", "No jobs assigned."],
+    ["Trabajador asignado a la obra", "Worker assigned to the job"],
+    ["Asignación retirada", "Assignment removed"],
+    ["Asignación no encontrada", "Assignment not found"],
+    [
+      "Sin una obra asignada, esta persona no puede apuntar horas: sólo recibe las obras en las que está.",
+      "Without a job assigned, this person cannot book hours: they only receive the jobs they are on.",
+    ],
     [
       "Todavía no estás asignado a ninguna obra. Habla con la oficina para que te asignen y podrás apuntar tus horas aquí.",
       "You are not assigned to any job yet. Ask the office to assign you and you will be able to book your hours here.",
