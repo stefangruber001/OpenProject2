@@ -844,6 +844,12 @@ window.CANEI_DICT.ca = {
     "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
   "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
+  "Al firmarlo": "En signar-lo",
+  "Sus partidas entran en el alcance de la obra.": "Les seves partides entren a l'abast de l'obra.",
+  "Su hito de pago se añade al contrato.": "La seva fita de pagament s'afegeix al contracte.",
+  "Sus días se suman a la fecha de fin.": "Els seus dies se sumen a la data de fi.",
+  "Todavía no está en la obra: ni sus partidas, ni su hito de pago, ni sus días. Se incorpora al firmarlo.":
+    "Encara no és a l'obra: ni les seves partides, ni la seva fita de pagament, ni els seus dies. S'incorpora en signar-lo.",
   "Anexo firmado": "Annex signat",
   "✍ Firmar anexo": "✍ Signar l'annex",
   "Nombre y apellidos": "Nom i cognoms",

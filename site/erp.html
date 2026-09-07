@@ -26200,6 +26200,11 @@
          <div class="card"><div class="ch"><h3>Fecha</h3></div><div class="fgrid" style="padding:12px 16px">
           <div class="field"><label>Firmado el</label><input id="anx_when" type="date" value="${esc((a.signature && a.signature.signedAt) || erp.state.today)}"></div>
          </div></div>
+         <div class="card"><div class="ch"><h3>Al firmarlo</h3></div><div class="daylist">
+          <div class="it">Sus partidas entran en el alcance de la obra.</div>
+          <div class="it">Su hito de pago se añade al contrato.</div>
+          <div class="it">Sus días se suman a la fecha de fin.</div>
+         </div></div>
          <div style="margin-top:10px;display:flex;gap:8px">
           <button class="btn primary" id="anx_go">Guardar</button>
           ${a.signature ? '<button class="btn sm" id="anx_clear">Quitar la firma</button>' : ""}
@@ -29267,6 +29272,7 @@
           <div class="who"><b>${esc(d.number)}</b><span>${esc(d.customer.name)}</span></div>
           ${val.differs ? `<span class="pill y">${val.annexes === 1 ? "1 anexo" : val.annexes + " anexos"}</span>` : ""}
           <div class="tot"><span>Importe vigente</span><b>${eur(val.currentCents)}</b></div>
+          ${val.pendingAnnexes ? `<div class="tot"><span>Pendiente de firma</span><b>${eur(val.pendingAnnexCents)}</b></div>` : ""}
           <div class="acts">
            ${
              /* Signing had exactly one door, and it was on the way in: the creation
@@ -29676,11 +29682,20 @@
                   /* Built as statements, not inside the template: a literal
                      inside a conditional inside a template is what the source
                      audit reads as prose with no translation. */
+                  /* «Sin firmar» is the state, and the sentence beside it is
+                     the consequence — the fact the operator asked for: an
+                     adicional the customer has agreed a price for is not in
+                     the job until the annex is agreed here. A pill that only
+                     names a state leaves the reader to work out what it costs
+                     them, and this one costs them the scope. */
                   const signPill = sg
                     ? sg.method === "verbal"
                       ? '<span class="pill y">Aprobado verbalmente</span>'
                       : '<span class="pill g">Anexo firmado</span>'
-                    : '<span class="pill">Sin firmar</span>';
+                    : '<span class="pill y">Pendiente de firma</span>';
+                  const pendingNote = sg
+                    ? ""
+                    : '<div class="it" style="color:var(--muted)">Todavía no está en la obra: ni sus partidas, ni su hito de pago, ni sus días. Se incorpora al firmarlo.</div>';
                   const docRow =
                     sg && sg.method === "document" && sg.document
                       ? `<div class="it"><span>Anexo firmado</span><span style="flex:1"></span>
@@ -29705,6 +29720,7 @@
                       : "";
                   return `<div class="card" style="margin:0"><div class="ch"><h3>${esc(a.number)}</h3>${signPill}<span style="flex:1"></span><b>${eur(a.valueCents)}</b></div>
             <div class="daylist">
+             ${pendingNote}
              <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(a.date)}</b></div>
              ${o.ref ? `<div class="it"><span>Adicional</span><span style="flex:1"></span><b>${esc(o.ref)}${o.note ? ` · ${esc(o.note)}` : ""}</b></div>` : ""}
              ${o.why ? `<div class="it"><span>Motivo</span><span style="flex:1"></span><b>${esc(o.why)}</b></div>` : ""}

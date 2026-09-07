@@ -9153,3 +9153,68 @@ It records the fact and moves nothing. Scope, plan and money still arrive on
 acceptance exactly as they do today; moving that gate is the plan's phase 4,
 with the migration that phase needs. Shipping the field first means the paper
 the operator already has can be attached while the rest is built.
+
+**S99 · Acceptance in the budget tool does nothing until the annex is agreed
+on the contract.** The operator, correcting the phasing of the adicionales
+plan: _"Acceptance camming from Budget tool do nothing until we accept it on
+Contracts/Annex. This is key."_ Said twice, the second time pointing at the
+sentence where the previous commit had called the annex signature inert and
+deferred the gate to a later phase. They were right that this is not a later
+phase — it is the point of the redesign, and shipping the screens around an
+unchanged rule would have left the product saying one thing and doing another.
+
+The product used to treat two different events as one. A customer agreeing a
+price and an annex to a signed contract are not the same fact, and acceptance
+moved the scope, the completion date and the money in a single step — so there
+was no state in which an extra was agreed commercially and not yet part of the
+job. That state is most of the life of a real adicional.
+
+Accepting now writes the annex and stops. `_applyContractAnnex` holds
+everything that used to happen on acceptance and runs when the annex is signed;
+`_unapplyContractAnnex` is its exact inverse and is shared by withdrawing a
+signature and removing the annex, because a half-undo is the same bug either
+way. `projectVariations` — the single walk everything chapter-addressed goes
+through — asks whether the annex was agreed, which is why one predicate gates
+Alcance, both progress readers, the cost allocation targets and certification
+at once.
+
+**S99a · The migration dissolved, and that is worth keeping.** `_annexApplied`
+reads an ABSENT `applied` flag as applied. Every annex written before the gate
+existed was applied the moment it was created, so a workspace saved before this
+change keeps every one of them and no data is touched; only rows written from
+here start `false`, which is the only population the gate can safely govern. The
+plan called a stamping migration the single most dangerous part of the work. A
+field that means "applied" by its absence removes the danger rather than
+managing it — a stamping pass could have missed a row; an absent field cannot.
+
+**S99b · Two states keep the old rule, both deliberately.** A job with no
+contract has no annex to sign, so its adicional applies on acceptance as it
+always did — refusing would strand work behind a signature with nowhere to be
+given, which is the principle `writeContractAnnex` already stated when it chose
+to return null rather than throw. And the legacy `state.changes` register keeps
+its one-step approval: half-gating it — an annex with no milestone but its days
+applied two lines later — would have recreated the "half the consequence
+missing" bug that method exists to fix.
+
+**S99c · I wrote the gate and forgot to arm it.** `writeContractAnnex` never set
+`applied: false`, so `_annexApplied` answered true for every new annex and
+`_applyContractAnnex` returned at its first line. Every check still passed
+except the one reading the flag through `contractValue` — the effects were all
+correct because the signature applied them, and nothing was gated because
+nothing was ever unapplied. A gate that is open by construction passes every
+test that only measures what happens when you go through it.
+
+**S99d · A test's comment named the rule it was defending.** `testVariationBudget`
+booked a cost onto a variation's partida under the line "what is NEW is the join
+on acceptance", and broke on «Unknown subpartida» — correct behaviour, obsolete
+test. Rewritten to measure the economics before the signature and after it, so
+it is now the second witness of the gate on the variation-BUDGET route where the
+new checks cover the adicional-VERSION one. Found only by the unfiltered run:
+both targeted suites and every static gate were green with this broken.
+
+**S99e · Nothing yet tells the operator where to go.** After accepting an
+adicional the Gantt and the economics correctly show nothing, and no screen says
+the annex is waiting to be signed. That is the same closed-door shape as the
+card settlement and it is NOT fixed here; it belongs with the register split,
+where the two lists make the pending ones visible. Written down rather than
+left to be rediscovered.

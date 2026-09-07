@@ -3728,8 +3728,14 @@ async function testVariationBudget(browser, base) {
       ok("5-6: an adicional opens an adenda, not a second contract — days asked, money read");
     else bad("5-6: adicional goes to the adenda door", JSON.stringify(doors));
 
-    // Build and accept through the engine — the builder's own UI is already
-    // covered by two suites; what is NEW is the join on acceptance.
+    /* Build and accept through the engine — the builder's own UI is already
+       covered by two suites. What this asserts is the JOIN, and PK13-S15 moved
+       when it happens: acceptance used to put the variation into the job in one
+       step, and the operator's rule is that it does nothing until the annex is
+       agreed on the contract. So the join is measured in two halves here — the
+       economics before the signature and after it — which makes this suite the
+       second witness of the gate, on the variation-BUDGET route, where the
+       PK13-S15 checks cover the adicional-VERSION one. */
     const joined = await pg.evaluate((projectId) => {
       const b = erp.state.budgets.find((x) => x.variationOf === projectId);
       const ch = erp.addChapter(b.id, { name: "Cocina ampliada" }, "bo");
@@ -3748,6 +3754,13 @@ async function testVariationBudget(browser, base) {
       erp.issueVersion(b.id, {}, "bo");
       erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "firmado" }, "bo");
       const v = erp.version(b.id, b.acceptedVersionId);
+      // Accepted and not yet agreed: the money must NOT be in the job.
+      const beforeSign = erp.projectEconomics(projectId).variationRevenueCents;
+      const p = erp.project(projectId);
+      const con = p.contractId && erp.state.contracts.find((x) => x.id === p.contractId);
+      const annex = con && (con.annexes || []).find((a) => a.budgetId === b.id && !a.versionId);
+      if (annex)
+        erp.signContractAnnex(p.contractId, annex.number, { method: "verbal", by: "E2E" }, "bo");
       const ec = erp.projectEconomics(projectId);
       // a cost onto the variation's partida, for the drill-down below
       const sup = erp.state.parties.find((x) =>
@@ -3767,14 +3780,21 @@ async function testVariationBudget(browser, base) {
       return {
         num: v.chapters[0].num,
         vr: ec.variationRevenueCents,
+        beforeSign,
+        hadAnnex: !!annex,
         lineId: ln.id,
       };
     }, pid);
     if (Number(joined.num) > 1 && joined.vr === 60000)
       ok(
-        `5-6: acceptance renumbers into the project (chapter ${joined.num}) and joins the economics (+600,00 €)`,
+        `5-6: agreeing the annex renumbers the variation into the project (chapter ${joined.num}) and joins the economics (+600,00 €)`,
       );
     else bad("5-6: acceptance join", JSON.stringify(joined));
+    if (!joined.hadAnnex)
+      ok("5-6: no contract on this job, so there is no annex to gate on — applied on acceptance");
+    else if (joined.beforeSign === 0)
+      ok("PK13-S15: accepted and unsigned, the variation is NOT in the job's economics");
+    else bad("PK13-S15: variation gated until agreed", JSON.stringify(joined));
 
     // The economics screen: the variation row, its pill, and the drill-down.
     await pg.evaluate((projectId) => {
@@ -8958,7 +8978,8 @@ async function testChangeApprovalEvidence(browser, base) {
       if (/ADI-E2E-9/.test(names))
         ok("anexo moderno: the tab names which adicional the annex came from");
       else bad("anexo moderno: annex names its adicional", names.slice(0, 200));
-      if (/Sin firmar/.test(names)) ok("anexo moderno: and says it is not signed yet");
+      if (/Pendiente de firma/.test(names) && /Todavía no está en la obra/.test(names))
+        ok("anexo moderno: and says it is pending, and what that costs the job");
       else bad("anexo moderno: unsigned pill", names.slice(0, 200));
 
       // ---- signed, with the document, and the document opens ---------------
@@ -9043,6 +9064,7 @@ async function testChangeApprovalEvidence(browser, base) {
         const c = erp.state.contracts.find((y) => y.id === x.contractId);
         const before = {
           annexes: (c.annexes || []).length,
+          // Appended by the signature above, not by writing the annex.
           inst: (c.installments || []).filter((i) => i.annexNumber === x.number).length,
         };
         const out = erp.removeContractAnnex(x.contractId, x.number, "e2e");
@@ -9077,6 +9099,10 @@ async function testChangeApprovalEvidence(browser, base) {
         const wasVersion = p.acceptedVersionId;
         const c0 = erp.state.contracts.find((y) => y.id === p.contractId);
         const endBefore = p.dates && p.dates.targetEnd;
+        const instBefore = (c0.installments || []).length;
+        // Relative, not absolute: this contract may already carry annexes from
+        // earlier in the suite, and the fact under test is the delta.
+        const pendingBefore = erp.contractValue(p.contractId).pendingAnnexes;
         const v = erp.createAdditionalVersion(
           p.budgetId,
           { reason: "E2E: adicional real", scheduleImpactDays: 4 },
@@ -9092,33 +9118,56 @@ async function testChangeApprovalEvidence(browser, base) {
         erp.issueVersion(p.budgetId, {}, "e2e");
         erp.acceptVersion(p.budgetId, v.id, { evidenceRef: "e2e" }, "e2e");
         const annex = (c0.annexes || [])[(c0.annexes || []).length - 1];
-        const applied = {
-          accepted: p.acceptedVersionId === v.id,
+        /* THE POINT OF THE WHOLE GATE: the customer has agreed the price and
+           the job has not moved. Scope, milestone and completion date are all
+           still what the signed contract says. */
+        const onAccept = {
           annex: !!annex,
-          endAfter: p.dates && p.dates.targetEnd,
+          scope: p.acceptedVersionId === wasVersion,
+          inst: (c0.installments || []).length === instBefore,
+          end: (p.dates && p.dates.targetEnd) === endBefore,
+          vigente: erp.contractValue(p.contractId).pendingAnnexes === pendingBefore + 1,
+        };
+        erp.signContractAnnex(p.contractId, annex.number, { method: "verbal", by: "E2E" }, "e2e");
+        const onSign = {
+          scope: p.acceptedVersionId === v.id,
+          inst: (c0.installments || []).length === instBefore + 1,
+          end: (p.dates && p.dates.targetEnd) !== endBefore,
+          vigente: erp.contractValue(p.contractId).pendingAnnexes === pendingBefore,
         };
         const out = erp.removeContractAnnex(p.contractId, annex.number, "e2e");
         return {
-          applied,
+          onAccept,
+          onSign,
           out,
-          endBefore,
-          endBack: p.dates && p.dates.targetEnd,
+          endBack: (p.dates && p.dates.targetEnd) === endBefore,
+          instBack: (c0.installments || []).length === instBefore,
           backToBase: p.acceptedVersionId === wasVersion,
           gone: !(c0.annexes || []).some((y) => y.number === annex.number),
         };
       });
       if (!real) bad("anexo real: a running job to revise", "none");
-      else if (
-        real.applied.accepted &&
-        real.applied.annex &&
-        real.gone &&
-        real.backToBase &&
-        real.endBack === real.endBefore
-      )
-        ok(
-          `anexo real: withdrawing an accepted adicional gives back the scope and the ${real.out.days} days it took`,
-        );
-      else bad("anexo real: withdrawal restores the job", JSON.stringify(real));
+      else {
+        if (
+          real.onAccept.annex &&
+          real.onAccept.scope &&
+          real.onAccept.inst &&
+          real.onAccept.end &&
+          real.onAccept.vigente
+        )
+          ok(
+            "PK13-S15: accepting an adicional moves NOTHING — no scope, no milestone, no days, not in the importe vigente",
+          );
+        else bad("PK13-S15: acceptance is inert", JSON.stringify(real.onAccept));
+        if (real.onSign.scope && real.onSign.inst && real.onSign.end && real.onSign.vigente)
+          ok("PK13-S15: agreeing the annex on the contract is what puts all four into the job");
+        else bad("PK13-S15: the signature applies it", JSON.stringify(real.onSign));
+        if (real.gone && real.backToBase && real.endBack && real.instBack)
+          ok(
+            `PK13-S15: and withdrawing it gives back the scope, the milestone and the ${real.out.days} days`,
+          );
+        else bad("PK13-S15: withdrawal restores the job", JSON.stringify(real));
+      }
     }
 
     if (errs.length) bad("anexo evidence: no console errors", errs.slice(0, 2).join(" | "));

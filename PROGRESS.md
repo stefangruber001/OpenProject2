@@ -2296,6 +2296,46 @@ Gates: site E2E **746/746 unfiltered** (the annex suite 5 → 13 checks),
 site-sync 20/20, boundaries, site syntax, i18n coverage complete in three
 languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S95–S98.
 
+**S15 · Accepting an adicional stops moving the job.** The operator, twice,
+correcting the phasing of the plan: _"Acceptance camming from Budget tool do
+nothing until we accept it on Contracts/Annex. This is key."_ The second time
+they quoted the sentence where the last commit called the annex signature inert
+and deferred this to a later phase. They were right: it is not a later phase, it
+is the point, and building the screens around an unchanged rule would have left
+the product saying one thing and doing another.
+
+Two different events had been one. A customer agreeing a price and an annex to a
+signed contract are not the same fact, and acceptance moved scope, completion
+date and money in a single step — so there was no state in which an extra was
+agreed commercially and not yet part of the job, which is most of the life of a
+real adicional. Accepting writes the annex and stops. Agreeing it on the
+contract — signed document or verbally, with a name — is what puts the partidas
+in the scope, the hito in the contract and the days on the end date.
+
+One predicate does it: `projectVariations` is the single walk Alcance, both
+progress readers, cost allocation and certification all resolve through, so the
+gate is one line and everything downstream follows.
+
+**And the migration dissolved.** An ABSENT `applied` flag reads as applied, so
+every annex written before today keeps its scope, its milestone and its days
+untouched, and only new rows are governed. The plan had called a stamping
+migration the most dangerous part of this work; a field that means "applied" by
+its absence removes the danger instead of managing it.
+
+Three of mine, and the last two were caught only by the unfiltered run: a job
+with no contract and the legacy change register keep the old one-step rule, both
+on purpose; I wrote the gate and forgot to set `applied: false`, so it was open
+by construction and every test that goes through it still passed; and
+`testVariationBudget` booked a cost under the comment "what is NEW is the join
+on acceptance" — the exact rule this overturns. Rewritten to measure the
+economics before the signature and after, it is now the second witness of the
+gate.
+
+Gates: site E2E **749/749 unfiltered**, site-sync 20/20, boundaries, site
+syntax, i18n coverage complete in three languages, source literals 162/162,
+workspace audit 0/0. ASSUMPTIONS S99. Still open, written down rather than
+fixed here: no screen yet says the annex is waiting (S99e).
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they
