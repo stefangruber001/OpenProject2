@@ -2259,6 +2259,43 @@ Gates: site E2E **739/739 unfiltered** (738 on `main` plus this check), site-syn
 20/20, boundaries, site syntax, i18n coverage 4219 complete in three languages,
 source literals 162/162, workspace audit 0/0.
 
+**S14 · The annex says what it is, carries its signed paper, and can be taken
+back.** Two reports and an authorisation, all on the adicionales chain the
+operator called _"very very unclear"_ — the checked redesign is
+`docs/ADICIONALES-PLAN.md`; this is the part of it that stands on its own.
+
+**The three «sin adjuntar» rows were a miss, not an empty slot.** The contract's
+Anexos tab read the motivo and the backing document out of the legacy change
+register through `a.changeId`, and annexes written by the route that replaced it
+leave that null. No upload would ever have appeared there. It reads the annex's
+own fields now — which adicional, the motivo, the signature — and keeps the old
+lookup as the fallback it has become.
+
+**The signed annex can be attached and opened**, through the same control the
+contract uses, or recorded as agreed verbally with the name of whoever agreed
+it. Deliberately inert: it records the fact and moves nothing, because moving
+the gate that applies an adicional is the plan's phase 4 and needs that phase's
+migration.
+
+**And an annex can now be withdrawn.** It could be granted and never taken back
+— third instance of a shape this repo has named twice — so an adicional accepted
+by mistake stayed in the contract, the milestones and the completion date for
+good. Withdrawal removes everything it put in, including the accepted pointer
+that put its partidas in the job, and refuses on an invoiced milestone or on
+progress marked over the scope it brought. Built as an explicit guarded verb
+rather than a migration that runs on load: permission to delete is not
+permission to delete invisibly.
+
+Two of mine that the tests caught: the progress guard refused on the base scope
+of a running job, because an adicional version is a clone carrying every line
+and its progress; and giving the days back through `extendProjectDeadline`
+silently did nothing, since that verb returns null on anything at or below zero.
+The second reported «4 days» in its result with the date unchanged.
+
+Gates: site E2E **746/746 unfiltered** (the annex suite 5 → 13 checks),
+site-sync 20/20, boundaries, site syntax, i18n coverage complete in three
+languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S95–S98.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they

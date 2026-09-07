@@ -26164,6 +26164,119 @@
             closeDrawer();
           }, "Planificación actualizada con los días de los adicionales");
       }
+      /* ---- The annex signature, and the way back out of one (PK13-S14) ----
+         Two options because the operator named two, and the second one has no
+         paper: «aprobado verbalmente» and «anexo firmado». The verbal one asks
+         WHO instead of a file — an annex agreed on site is a fact about a
+         conversation, and the only thing standing in for a signature is the
+         name of the person who gave it. The signed one takes the file through
+         the same control the contract uses, so it lands in the blob store
+         immediately and can be reopened from the tab afterwards. */
+      function signAnnexDrawer(contractId, annexNumber) {
+        const c = erp.state.contracts.find((x) => x.id === contractId);
+        const a = c && (c.annexes || []).find((x) => x.number === annexNumber);
+        if (!a) return;
+        let how = (a.signature && a.signature.method) || "document";
+        let ev = null;
+        const db = openDrawer("Firmar " + annexNumber);
+        const paint = () => {
+          db.innerHTML = `
+         <div class="card"><div class="ch"><h3>${esc(annexNumber)}</h3><b>${eur(a.valueCents)}</b></div>
+          <div class="daylist" style="gap:9px">
+           <div class="it"><label class="opt"><input type="radio" name="anxhow" value="document"${how === "document" ? " checked" : ""}>
+             <span>Anexo firmado</span></label></div>
+           <div class="it" style="color:var(--muted);margin-top:-4px">El documento que firmó el cliente, como el contrato.</div>
+           <div class="it"><label class="opt"><input type="radio" name="anxhow" value="verbal"${how === "verbal" ? " checked" : ""}>
+             <span>Aprobado verbalmente</span></label></div>
+           <div class="it" style="color:var(--muted);margin-top:-4px">Queda registrado como lo que es: sin documento, y con el nombre de quien lo aprobó.</div>
+          </div></div>
+         ${
+           how === "verbal"
+             ? `<div class="card"><div class="ch"><h3>Quién lo aprobó</h3></div><div class="fgrid" style="padding:12px 16px">
+          <div class="field full"><label>Nombre</label><input id="anx_by" value="${esc((a.signature && a.signature.by) || "")}" placeholder="Nombre y apellidos"></div>
+         </div></div>`
+             : `<div class="card"><div class="ch"><h3>El documento firmado</h3></div><div id="anx_ev" style="padding:12px 16px"></div></div>`
+         }
+         <div class="card"><div class="ch"><h3>Fecha</h3></div><div class="fgrid" style="padding:12px 16px">
+          <div class="field"><label>Firmado el</label><input id="anx_when" type="date" value="${esc((a.signature && a.signature.signedAt) || erp.state.today)}"></div>
+         </div></div>
+         <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn primary" id="anx_go">Guardar</button>
+          ${a.signature ? '<button class="btn sm" id="anx_clear">Quitar la firma</button>' : ""}
+         </div>`;
+          db.querySelectorAll('input[name="anxhow"]').forEach((r) => {
+            r.onchange = () => {
+              how = r.value;
+              paint();
+            };
+          });
+          const host = $("#anx_ev");
+          if (host)
+            ev = evidenceField(host, {
+              value: (a.signature && a.signature.document) || null,
+              prefix: "anexo",
+            });
+          $("#anx_go").onclick = () =>
+            mutate(() => {
+              erp.signContractAnnex(
+                contractId,
+                annexNumber,
+                {
+                  method: how,
+                  document: ev ? ev.value() : null,
+                  by: how === "verbal" ? ($("#anx_by") || {}).value : null,
+                  date: $("#anx_when").value,
+                },
+                "backoffice",
+              );
+              closeDrawer();
+            }, "Anexo firmado");
+          const cl = $("#anx_clear");
+          if (cl)
+            cl.onclick = () =>
+              mutate(() => {
+                erp.clearContractAnnexSignature(contractId, annexNumber, "backoffice");
+                closeDrawer();
+              }, "Firma retirada");
+        };
+        paint();
+      }
+      /* Taking an annex back out, and SAYING WHAT THAT COSTS before it happens.
+         The engine removes everything the annex put in — the milestone, the
+         days, the accepted scope — and refuses when somebody has already relied
+         on it. The confirmation names those three consequences rather than
+         asking «are you sure», because the question a person can actually
+         answer is what they are about to lose. `annexNumber` null means all of
+         them, newest first, which is the order the accepted pointer unwinds. */
+      function removeAnnexAsk(contractId, annexNumber) {
+        const c = erp.state.contracts.find((x) => x.id === contractId);
+        if (!c) return;
+        const list = annexNumber
+          ? (c.annexes || []).filter((x) => x.number === annexNumber)
+          : c.annexes || [];
+        if (!list.length) return;
+        const total = list.reduce((s, x) => s + (x.valueCents || 0), 0);
+        const db = openDrawer(annexNumber ? "Quitar " + annexNumber : "Quitar todos los anexos");
+        db.innerHTML = `
+         <div class="card"><div class="ch"><h3>Qué se deshace</h3><span class="tag">${list.length}</span></div>
+          <div class="daylist">
+           ${list.map((x) => `<div class="it"><span style="flex:1">${esc(x.number)}</span><b>${eur(x.valueCents)}</b></div>`).join("")}
+           <div class="it" style="border-top:1px solid var(--line)"><span style="flex:1">Importe que sale del contrato</span><b>${eur(total)}</b></div>
+          </div></div>
+         <div class="card"><div class="ch"><h3>Y con ello</h3></div><div class="daylist">
+          <div class="it">El hito de pago que cada anexo añadió.</div>
+          <div class="it">Los días que sumó a la fecha de fin.</div>
+          <div class="it">Sus partidas dejan de estar en el alcance de la obra.</div>
+          <div class="it" style="color:var(--muted)">Se niega si el hito ya está facturado o si hay avance marcado sobre sus partidas.</div>
+         </div></div>
+         <div style="margin-top:10px"><button class="btn primary" id="anx_del">Quitar</button></div>`;
+        $("#anx_del").onclick = () =>
+          mutate(() => {
+            if (annexNumber) erp.removeContractAnnex(contractId, annexNumber, "backoffice");
+            else erp.removeAllContractAnnexes(contractId, "backoffice");
+            closeDrawer();
+          }, "Anexo retirado");
+      }
       /** Where «←» goes from the quote builder, when it is not Presupuestos. */
       let budgetBackTo = null;
       function newAdditionalDrawer() {
@@ -29525,43 +29638,98 @@
           return;
         }
         if (conWork.tab === "anexos") {
-          // Package 2 slide 8: a number, a date and an amount proved an anexo
-          // EXISTS but said nothing about what it was or let anyone reopen
-          // its backup — the change record behind each one already carries
-          // both (desc/reason from when it was raised, evidence from when it
-          // was approved), so this reads them rather than adding a second
-          // place to store the same facts.
+          /* WHAT AN ANNEX IS, read off the annex.
+             Package 2 slide 8 asked for more than a number, a date and an
+             amount, and this tab answered it by reading `state.changes` through
+             `a.changeId`. That register is the LEGACY route: PK12-S13 replaced
+             it with the adicional version, whose annexes carry `budgetId`,
+             `versionId` and `ref` and leave `changeId` null. So the lookup
+             could not succeed on anything written since, and «Justificante: sin
+             adjuntar» was not an empty slot waiting for a file — it was a miss
+             that no upload could ever have filled. Reported by the operator
+             from a contract with three of them.
+
+             The annex's own fields first, the change record only as the
+             fallback it now is. */
+          const annexOrigin = (a) => {
+            if (a.changeId) {
+              const chg = erp.state.changes.find((x) => x.id === a.changeId);
+              return chg
+                ? { ref: chg.annexNumber || "", why: chg.desc || "", note: chg.reason || "", chg }
+                : { ref: "", why: "", note: "", chg: null };
+            }
+            const b = a.budgetId ? erp.state.budgets.find((x) => x.id === a.budgetId) : null;
+            const v = b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
+            return {
+              ref: a.ref || (v && v.adiNumber) || (b && b.number) || "",
+              why: (v && v.reason) || (b && b.internalRef) || "",
+              note: b && a.versionId ? b.number : "",
+              chg: null,
+            };
+          };
           host.innerHTML = `<div class="daylist" style="gap:10px">
             ${
               d.annexes
                 .map((a) => {
-                  const chg = erp.state.changes.find((x) => x.id === a.changeId);
-                  return `<div class="card" style="margin:0"><div class="ch"><h3>${esc(a.number)}</h3><b>${eur(a.valueCents)}</b></div>
+                  const o = annexOrigin(a);
+                  const sg = a.signature;
+                  /* Built as statements, not inside the template: a literal
+                     inside a conditional inside a template is what the source
+                     audit reads as prose with no translation. */
+                  const signPill = sg
+                    ? sg.method === "verbal"
+                      ? '<span class="pill y">Aprobado verbalmente</span>'
+                      : '<span class="pill g">Anexo firmado</span>'
+                    : '<span class="pill">Sin firmar</span>';
+                  const docRow =
+                    sg && sg.method === "document" && sg.document
+                      ? `<div class="it"><span>Anexo firmado</span><span style="flex:1"></span>
+              <b><a href="#" data-evidence="${esc(JSON.stringify(sg.document))}">${esc(sg.document.name || "Ver el documento")}</a></b></div>`
+                      : "";
+                  const byRow =
+                    sg && sg.by
+                      ? `<div class="it"><span>Lo aprobó</span><span style="flex:1"></span><b>${esc(sg.by)}</b></div>`
+                      : "";
+                  const whenRow = sg
+                    ? `<div class="it"><span>Firmado el</span><span style="flex:1"></span><b>${fmtD(sg.signedAt)}</b></div>`
+                    : "";
+                  const legacyDoc =
+                    o.chg && o.chg.evidence && o.chg.evidence.storageKey
+                      ? `<div class="it"><span>Justificante</span><span style="flex:1"></span>
+              <b><a href="#" data-evidence="${esc(JSON.stringify(o.chg.evidence))}">${esc(o.chg.evidence.name || "Ver el documento")}</a></b></div>`
+                      : "";
+                  const photo =
+                    o.chg && o.chg.photoRef
+                      ? `<div class="it"><span>Foto de origen</span><span style="flex:1"></span>
+              <img data-blob="${esc(o.chg.photoRef)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:0"></div>`
+                      : "";
+                  return `<div class="card" style="margin:0"><div class="ch"><h3>${esc(a.number)}</h3>${signPill}<span style="flex:1"></span><b>${eur(a.valueCents)}</b></div>
             <div class="daylist">
              <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(a.date)}</b></div>
-             ${chg ? `<div class="it"><span>Motivo</span><span style="flex:1"></span><b>${esc(chg.desc)}</b></div>` : ""}
-             ${chg && chg.reason ? `<div class="it" style="color:var(--muted)">${esc(chg.reason)}</div>` : ""}
-             ${
-               chg && chg.photoRef
-                 ? `<div class="it"><span>Foto de origen</span><span style="flex:1"></span>
-              <img data-blob="${esc(chg.photoRef)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:0"></div>`
-                 : ""
-             }
-             ${
-               chg && chg.evidence && chg.evidence.storageKey
-                 ? `<div class="it"><span>Justificante</span><span style="flex:1"></span>
-              <b data-evidence="${esc(JSON.stringify(chg.evidence))}">${esc(chg.evidence.name || "Ver el documento")}</b></div>`
-                 : chg && chg.evidenceRef
-                   ? `<div class="it" style="color:var(--muted)"><span>Justificante</span><span style="flex:1"></span><b>${esc(chg.evidenceRef)}</b></div>`
-                   : `<div class="it" style="color:var(--muted)"><span>Justificante</span><span style="flex:1"></span><b>sin adjuntar</b></div>`
-             }
+             ${o.ref ? `<div class="it"><span>Adicional</span><span style="flex:1"></span><b>${esc(o.ref)}${o.note ? ` · ${esc(o.note)}` : ""}</b></div>` : ""}
+             ${o.why ? `<div class="it"><span>Motivo</span><span style="flex:1"></span><b>${esc(o.why)}</b></div>` : ""}
+             ${photo}
+             ${legacyDoc}
+             ${whenRow}${byRow}${docRow}
+             <div class="it"><span style="flex:1"></span>
+              <button class="btn sm" data-annexsign="${esc(a.number)}">${sg ? "Cambiar la firma" : "✍ Firmar anexo"}</button>
+              <button class="btn sm" data-annexdel="${esc(a.number)}">Quitar anexo</button></div>
             </div></div>`;
                 })
                 .join("") ||
               '<div class="card" style="margin:0"><div class="daylist"><div class="it">Sin anexos. El importe vigente es el original.</div></div></div>'
             }
             ${d.annexes.length ? `<div class="it"><span>Total anexos</span><span style="flex:1"></span><b>${eur(val.annexCents)}</b></div>` : ""}
+            ${d.annexes.length ? `<div class="it"><span style="flex:1"></span><button class="btn sm" id="anxWipe">Quitar todos los anexos</button></div>` : ""}
            </div>`;
+          host.querySelectorAll("[data-annexsign]").forEach((b) => {
+            b.onclick = () => signAnnexDrawer(d.id, b.dataset.annexsign);
+          });
+          host.querySelectorAll("[data-annexdel]").forEach((b) => {
+            b.onclick = () => removeAnnexAsk(d.id, b.dataset.annexdel);
+          });
+          const wipe = host.querySelector("#anxWipe");
+          if (wipe) wipe.onclick = () => removeAnnexAsk(d.id, null);
           paintImages(host);
           return;
         }

@@ -8916,6 +8916,211 @@ async function testChangeApprovalEvidence(browser, base) {
       else bad("anexo evidence: viewer opens the backup", JSON.stringify(viewer));
     }
 
+    /* The block above ends with the document viewer OPEN, and it covers the
+       page: every click after it times out against an overlay rather than the
+       control it names. Closed explicitly, because a suite that leaves a modal
+       up is a suite whose next failure describes the wrong thing. */
+    await pg.evaluate(() => closePhotoViewer());
+    await pg.waitForTimeout(300);
+
+    /* ---- PK13-S14: the MODERN annex, which this tab could never read ------
+       Everything above exercises the LEGACY route: a `state.changes` record,
+       found through `a.changeId`. PK12-S13 replaced that with the adicional
+       version, whose annex carries `budgetId`/`versionId`/`ref` and leaves
+       `changeId` null — so the lookup missed, and «Justificante: sin adjuntar»
+       was a miss no upload could fill rather than an empty slot. Reported from
+       a live contract with three of them, and untested here because this suite
+       only ever built the old shape. */
+    const modern = await pg.evaluate(() => {
+      const p = erp.state.projects.find((x) => x.contractId && x.budgetId && x.acceptedVersionId);
+      if (!p) return null;
+      const a = erp.writeContractAnnex(
+        p.id,
+        {
+          valueCents: 50000,
+          budgetId: p.budgetId,
+          versionId: p.acceptedVersionId,
+          ref: "ADI-E2E-9",
+        },
+        "e2e",
+      );
+      render();
+      return a ? { number: a.number, contractId: p.contractId } : null;
+    });
+    if (!modern) bad("anexo moderno: a project with a contract and accepted scope", "none");
+    else {
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(500);
+      const names = await pg.locator("#conBody").innerText();
+      if (/ADI-E2E-9/.test(names))
+        ok("anexo moderno: the tab names which adicional the annex came from");
+      else bad("anexo moderno: annex names its adicional", names.slice(0, 200));
+      if (/Sin firmar/.test(names)) ok("anexo moderno: and says it is not signed yet");
+      else bad("anexo moderno: unsigned pill", names.slice(0, 200));
+
+      // ---- signed, with the document, and the document opens ---------------
+      await pg.evaluate((x) => signAnnexDrawer(x.contractId, x.number), modern);
+      await pg.waitForTimeout(500);
+      await pg.setInputFiles("#anx_ev input[type=file]", {
+        name: "anexo-firmado.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from(minimalPdf(), "latin1"),
+      });
+      await pg.waitForTimeout(700);
+      await pg.click("#anx_go");
+      await pg.waitForTimeout(700);
+      const sig = await pg.evaluate((x) => {
+        const c = erp.state.contracts.find((y) => y.id === x.contractId);
+        const a = (c.annexes || []).find((y) => y.number === x.number);
+        const g = a && a.signature;
+        return g
+          ? {
+              method: g.method,
+              name: (g.document || {}).name || "",
+              key: !!(g.document || {}).storageKey,
+            }
+          : null;
+      }, modern);
+      if (sig && sig.method === "document" && sig.name === "anexo-firmado.pdf" && sig.key)
+        ok("anexo moderno: the signed annex is stored as the real file");
+      else bad("anexo moderno: signature persisted", JSON.stringify(sig));
+
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(500);
+      const signedText = await pg.locator("#conBody").innerText();
+      const opens = await pg.evaluate(
+        () => !!document.querySelector('#conBody [data-evidence*="anexo-firmado"]'),
+      );
+      if (/Anexo firmado/.test(signedText) && opens)
+        ok("anexo moderno: and it is on the tab afterwards, as a document you can open");
+      else bad("anexo moderno: signed document visible", signedText.slice(0, 200));
+
+      // ---- a verbal annex names who agreed it, or is refused ---------------
+      const verbal = await pg.evaluate((x) => {
+        const tries = (f) => {
+          try {
+            f();
+            return "";
+          } catch (e) {
+            return String(e.message || e);
+          }
+        };
+        const noName = tries(() =>
+          erp.signContractAnnex(x.contractId, x.number, { method: "verbal" }, "e2e"),
+        );
+        erp.signContractAnnex(
+          x.contractId,
+          x.number,
+          { method: "verbal", by: "Ignacio F." },
+          "e2e",
+        );
+        const c = erp.state.contracts.find((y) => y.id === x.contractId);
+        const a = (c.annexes || []).find((y) => y.number === x.number);
+        return {
+          noName,
+          method: a.signature.method,
+          by: a.signature.by,
+          doc: a.signature.document,
+        };
+      }, modern);
+      if (
+        /verbalmente/.test(verbal.noName) &&
+        verbal.method === "verbal" &&
+        verbal.by === "Ignacio F." &&
+        !verbal.doc
+      )
+        ok("anexo moderno: a verbal annex needs a name, keeps no document, and says so");
+      else bad("anexo moderno: verbal signature", JSON.stringify(verbal));
+
+      // ---- and it can be taken back out, all of it -------------------------
+      const removed = await pg.evaluate((x) => {
+        const c = erp.state.contracts.find((y) => y.id === x.contractId);
+        const before = {
+          annexes: (c.annexes || []).length,
+          inst: (c.installments || []).filter((i) => i.annexNumber === x.number).length,
+        };
+        const out = erp.removeContractAnnex(x.contractId, x.number, "e2e");
+        return {
+          before,
+          out,
+          annexes: (c.annexes || []).length,
+          inst: (c.installments || []).filter((i) => i.annexNumber === x.number).length,
+          seated: (c.installments || []).every((i, n) => i.idx === n),
+        };
+      }, modern);
+      if (
+        removed.before.inst === 1 &&
+        removed.annexes === removed.before.annexes - 1 &&
+        removed.inst === 0 &&
+        removed.seated
+      )
+        ok("anexo moderno: removing it takes the annex AND the milestone it appended");
+      else bad("anexo moderno: removal", JSON.stringify(removed));
+
+      /* ---- and now the real thing, through the whole chain -----------------
+         The annex above was written directly, which tests the tab but not what
+         removal has to undo on a genuine adicional: the accepted pointer that
+         puts its partidas in the job, and the days it added to the completion
+         date. So one is built the way the product builds them — a new version,
+         a chapter of its own, issued and accepted — and then taken back. */
+      const real = await pg.evaluate(() => {
+        const p = erp.state.projects.find(
+          (x) => x.contractId && x.budgetId && x.acceptedVersionId && !x.closed,
+        );
+        if (!p) return null;
+        const wasVersion = p.acceptedVersionId;
+        const c0 = erp.state.contracts.find((y) => y.id === p.contractId);
+        const endBefore = p.dates && p.dates.targetEnd;
+        const v = erp.createAdditionalVersion(
+          p.budgetId,
+          { reason: "E2E: adicional real", scheduleImpactDays: 4 },
+          "e2e",
+        );
+        const ch = erp.addChapter(p.budgetId, { name: "E2E ampliación" }, "e2e");
+        erp.addLine(p.budgetId, ch.id, {
+          desc: "Partida del adicional",
+          unit: "ud",
+          qtyMilli: 1000,
+          priceCents: 30000,
+        });
+        erp.issueVersion(p.budgetId, {}, "e2e");
+        erp.acceptVersion(p.budgetId, v.id, { evidenceRef: "e2e" }, "e2e");
+        const annex = (c0.annexes || [])[(c0.annexes || []).length - 1];
+        const applied = {
+          accepted: p.acceptedVersionId === v.id,
+          annex: !!annex,
+          endAfter: p.dates && p.dates.targetEnd,
+        };
+        const out = erp.removeContractAnnex(p.contractId, annex.number, "e2e");
+        return {
+          applied,
+          out,
+          endBefore,
+          endBack: p.dates && p.dates.targetEnd,
+          backToBase: p.acceptedVersionId === wasVersion,
+          gone: !(c0.annexes || []).some((y) => y.number === annex.number),
+        };
+      });
+      if (!real) bad("anexo real: a running job to revise", "none");
+      else if (
+        real.applied.accepted &&
+        real.applied.annex &&
+        real.gone &&
+        real.backToBase &&
+        real.endBack === real.endBefore
+      )
+        ok(
+          `anexo real: withdrawing an accepted adicional gives back the scope and the ${real.out.days} days it took`,
+        );
+      else bad("anexo real: withdrawal restores the job", JSON.stringify(real));
+    }
+
     if (errs.length) bad("anexo evidence: no console errors", errs.slice(0, 2).join(" | "));
     else ok("anexo evidence: no console errors");
   } catch (e) {

@@ -4412,6 +4412,27 @@
       return pj.dates.targetEnd;
     }
     /**
+     * Give back days a variation added. Not `extendProjectDeadline` with a
+     * negative: that one refuses anything at or below zero, on purpose — it is
+     * the verb for "this extra takes longer", and a caller handing it a
+     * negative is confused about which direction it works in. Withdrawing an
+     * annex is the one legitimate way a completion date moves BACK, and it
+     * moves back by exactly what that annex moved it forward, never further.
+     */
+    _giveBackDeadlineDays(projectId, days, ref, user) {
+      const n = Math.round(days || 0);
+      if (n <= 0) return null;
+      const pj = this.state.projects.find((x) => x.id === projectId);
+      if (!pj || !pj.dates || !pj.dates.targetEnd) return null;
+      pj.dates.targetEnd = addDays(pj.dates.targetEnd, -n);
+      this._log(
+        user,
+        "annexReturnsDeadline",
+        pj.code + " −" + n + "d → " + pj.dates.targetEnd + (ref ? " · " + ref : ""),
+      );
+      return pj.dates.targetEnd;
+    }
+    /**
      * The CON-12 annex chain, from one place too.
      *
      * `approveChange` built this inline, so an accepted variation budget — the
@@ -4473,6 +4494,194 @@
       });
       this._log(user, "writeContractAnnex", rec.number + " · " + grossCents + "c");
       return rec;
+    }
+    /**
+     * The annex's own signature, and it is deliberately NOT the contract's.
+     *
+     * `signContract` refuses without a document — CON-11, and rightly, because
+     * the first invoice of a job opens on the strength of it. An annex agreed
+     * on site does not work that way. The operator's own account of it is two
+     * options, and the second has no paper: «aprobado verbalmente» and «anexo
+     * firmado». Refusing the verbal one would not produce more signed paper; it
+     * would produce a blank page scanned to get past the gate, which is worse
+     * than the truth because it LOOKS like evidence.
+     *
+     * So both are accepted and the record says WHICH. A verbal annex is a fact
+     * about a conversation and is held as one — who agreed it, when, and that
+     * there is no document — and every screen that prints it prints that too.
+     * The signed one carries the file, openable, because a document nobody can
+     * reopen proves nothing (the same rule the evidence field was built on).
+     *
+     * Inert for now, on purpose: it records the fact and moves nothing. What
+     * an annex adds to the scope, the plan and the money still arrives on
+     * acceptance, exactly as it does today. Moving that gate is its own change
+     * with its own migration, and shipping the field first means the operator
+     * can attach the paper they already have while the rest is built.
+     */
+    signContractAnnex(contractId, annexNumber, { method, document, by, date } = {}, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      const how = method === "verbal" ? "verbal" : "document";
+      const when = date || this.state.today;
+      if (when > this.state.today) throw new Error("A signature cannot be dated in the future");
+      const doc = document || null;
+      if (how === "document" && !(doc && (doc.storageKey || doc.ref || doc.name)))
+        throw new Error("Un anexo firmado necesita el documento firmado");
+      /* A verbal agreement names the person who gave it. «Somebody said yes»
+         is not a record anybody can stand behind six months later, and this is
+         the only field standing in for a signature. */
+      if (how === "verbal" && !(by && String(by).trim()))
+        throw new Error("Di quién lo aprobó verbalmente");
+      a.signature = {
+        signedAt: when,
+        method: how,
+        document: how === "document" ? doc : null,
+        by: (by && String(by).trim()) || null,
+      };
+      this._log(user, "signContractAnnex", annexNumber + " · " + how);
+      return a;
+    }
+    /** Untie an annex signature. The annex goes back to unsigned; nothing else moves. */
+    clearContractAnnexSignature(contractId, annexNumber, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      if (!a.signature) throw new Error("That annex is not signed");
+      delete a.signature;
+      this._log(user, "clearContractAnnexSignature", annexNumber);
+      return a;
+    }
+    /**
+     * Take an annex back OUT of the job — all of it, or refuse.
+     *
+     * Annexes were write-only. `writeContractAnnex` is the only thing that
+     * ever touched `con.annexes`, so an adicional accepted by mistake stayed
+     * in the contract, in the milestones and in the delivery date for good,
+     * and the only way out was editing the document by hand. This repo has
+     * met that shape before and named it: a thing that can be granted and not
+     * withdrawn is half a feature (`undoImport`, `clearCashReturn`).
+     *
+     * WHAT COMES OUT IS EVERYTHING IT PUT IN, because a half-undo is worse
+     * than none: the annex row, the milestone it appended, the days it added
+     * to the completion date, and — for an adicional VERSION — the accepted
+     * pointer it moved, which is what puts its partidas in the scope. Remove
+     * only the row and the job keeps the scope and the date of something the
+     * contract no longer mentions.
+     *
+     * REFUSES rather than half-does, and each refusal names a fact somebody
+     * else already relied on:
+     *   · an invoiced milestone — the invoice points at an installment, and
+     *     deleting it would leave sealed paper describing a document that is
+     *     no longer there;
+     *   · progress marked on the scope it brought, because that is somebody's
+     *     record of work actually done on site.
+     * Both are answerable by the operator (credit the invoice, clear the
+     * progress) and neither is answerable by this method.
+     */
+    removeContractAnnex(contractId, annexNumber, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      const inst = (c.installments || []).filter((x) => x.annexNumber === annexNumber);
+      const invoiced = inst.find((x) => x.invoiceId || x.status === "invoiced");
+      if (invoiced)
+        throw new Error(
+          "El hito de este anexo ya se ha facturado. Rectifica la factura antes de quitarlo.",
+        );
+      const prj = this.state.projects.find((p) => p.contractId === c.id);
+      /* The scope this annex brought, and whether anybody has built any of it.
+         Read BEFORE anything is unwound, because after the pointer moves the
+         chapters are no longer reachable through the project's own walk. */
+      /* ONLY THE LINES THIS ANNEX ACTUALLY BROUGHT. An adicional version is a
+         CLONE of the version it revises, ids preserved, progress and all — so
+         reading its whole chapter list finds every line of the base scope and
+         refuses on work that has nothing to do with this annex. The lines it
+         brought are the ones that were not in `additionalOf`. A variation
+         BUDGET is a different record entirely, so all of it is its own. */
+      let broughtLines = [];
+      const b = a.budgetId ? this.state.budgets.find((x) => x.id === a.budgetId) : null;
+      const linesOf = (v) => (v ? (v.chapters || []).flatMap((ch) => ch.lines || []) : []);
+      if (b && a.versionId) {
+        const v = (b.versions || []).find((x) => x.id === a.versionId);
+        /* No `additionalOf` means the annex names a version that is not an
+           adicional at all, so it revised nothing and brought no scope of its
+           own. Reading the whole version there would refuse on the base scope
+           of a job in execution — every line of it, none of it this annex's. */
+        const from =
+          v && v.additionalOf ? (b.versions || []).find((x) => x.id === v.additionalOf) : null;
+        if (from) {
+          const had = new Set(linesOf(from).map((l) => l.id));
+          broughtLines = linesOf(v).filter((l) => !had.has(l.id));
+        }
+      } else if (b && b.variationOf && b.acceptedVersionId) {
+        broughtLines = linesOf((b.versions || []).find((x) => x.id === b.acceptedVersionId));
+      }
+      const built = broughtLines.find((l) => (l.progressPct || 0) > 0 || l.progress === "done");
+      if (built)
+        throw new Error(
+          "Hay avance marcado sobre las partidas de este anexo. Ponlo a cero antes de quitarlo.",
+        );
+      const undone = { annex: annexNumber, installments: inst.length, days: 0, scope: false };
+      c.installments = (c.installments || []).filter((x) => x.annexNumber !== annexNumber);
+      // The index is positional and several screens read it, so it is re-seated.
+      c.installments.forEach((x, i) => {
+        x.idx = i;
+      });
+      if (b && a.versionId) {
+        const v = (b.versions || []).find((x) => x.id === a.versionId);
+        if (v && v.additionalOf) {
+          const back = (b.versions || []).find((x) => x.id === v.additionalOf);
+          if (back) {
+            /* The version it superseded becomes the accepted scope again. It
+               stays frozen: it was frozen when the customer accepted it, and a
+               withdrawn adicional does not un-agree what came before. */
+            back.superseded = false;
+            b.acceptedVersionId = back.id;
+            if (prj) prj.acceptedVersionId = back.id;
+            undone.scope = true;
+          }
+          undone.days = Math.max(0, Math.round(v.scheduleAppliedDays || 0));
+          if (prj) this._giveBackDeadlineDays(prj.id, undone.days, annexNumber, user);
+          v.scheduleAppliedDays = 0;
+          v.customerResponse = null;
+          v.superseded = true;
+        }
+      } else if (b && b.variationOf) {
+        /* A variation BUDGET leaves the scope by losing its acceptance —
+           `projectVariations` filters on exactly that — so nothing has to be
+           unpicked chapter by chapter. */
+        const v = (b.versions || []).find((x) => x.id === b.acceptedVersionId);
+        if (v) v.customerResponse = null;
+        b.acceptedVersionId = null;
+        b.status = "issued";
+        undone.scope = true;
+        undone.days = Math.max(0, Math.round(b.scheduleAppliedDays || 0));
+        this._giveBackDeadlineDays(b.variationOf, undone.days, annexNumber, user);
+        b.scheduleAppliedDays = 0;
+      }
+      c.annexes = (c.annexes || []).filter((x) => x.number !== annexNumber);
+      this._log(
+        user,
+        "removeContractAnnex",
+        annexNumber + " · " + undone.installments + " hito(s) · " + undone.days + "d",
+      );
+      return undone;
+    }
+    /** Every annex of a contract, taken back in one pass. Stops at the first refusal. */
+    removeAllContractAnnexes(contractId, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const out = [];
+      /* Newest first. An adicional's accepted pointer walks BACK one step at a
+         time (`additionalOf`), so unwinding the oldest first would restore a
+         version that a later adicional had already superseded. */
+      for (const n of (c.annexes || []).map((x) => x.number).reverse())
+        out.push(this.removeContractAnnex(contractId, n, user));
+      return out;
     }
     /**
      * Set (or change) the days an adicional adds, applying only the DIFFERENCE.

@@ -9073,3 +9073,83 @@ deposit of unspent cash entered before the withdrawal was declared offers
 «Devolución de efectivo» nowhere and says nothing. Left standing in this commit
 because it is a different screen state and belongs with the caja-chica register
 S93 needs, not because it is acceptable.
+
+**S95 · An adicional that starts empty can only ADD, and that is the trade.**
+Settled with the operator on 07/09: _"agree"_, against the cost stated in full
+before it was taken. Under the redesign an adicional is its own budget record
+started from scratch, not a clone of the accepted scope, so it cannot modify or
+reduce a line that is already agreed. Reductions become explicit negative
+lines — honest on the customer's paper, and `writeContractAnnex` already
+accepts a negative annex — and editing an agreed line in place goes away.
+
+That capability is the one thing PK12-S13's version model bought and this
+gives back: _"the same partida stays the same partida, so a cost booked to it
+still lands where it was booked"_. It is the right thing to lose. An agreed
+line is a thing the customer signed, and a product that lets it be edited in
+place is a product where the scope somebody agreed to can change without a new
+piece of paper. The decision is recorded here rather than left to be
+rediscovered in phase 2, which is where it would otherwise have surfaced.
+
+**S96 · An annex could be granted and never withdrawn.** `writeContractAnnex`
+was the only thing in the engine that ever touched `con.annexes`. So an
+adicional accepted by mistake stayed in the contract, in the milestones and in
+the completion date permanently, and the only way out was editing the state
+document by hand. Third instance of the shape this repo has now named twice
+(`undoImport`, `clearCashReturn`, S89's assignment): granting and withdrawing
+are one feature, not two.
+
+`removeContractAnnex` takes out everything the annex put in — the row, the
+milestone it appended, the days it added, and the accepted pointer that put its
+partidas in the job. A half-undo is worse than none: remove only the row and
+the job silently keeps the scope and the date of something the contract no
+longer mentions. It refuses on two facts somebody already relied on, an
+invoiced milestone and progress marked on the scope it brought, and both
+refusals name what the operator has to do first.
+
+The operator authorised this on 07/09 — _"eliminate all annex of the project if
+required"_ — as permission to clear rather than migrate. It is built as an
+explicit, guarded, logged verb behind a confirmation that names the three
+consequences, NOT as a migration that runs on load: a silent wipe of scope,
+milestones and dates on a running job is exactly what the plan's own migration
+warning was about, and permission to delete is not permission to delete
+invisibly.
+
+**S96a · The progress guard first refused on scope the annex never brought.**
+An adicional version is a CLONE of the version it revises, ids and progress
+preserved, so reading its whole chapter list found every line of the base scope
+of a job in execution. It reads only the lines absent from `additionalOf`; an
+annex naming a version with no `additionalOf` revised nothing and brought no
+scope of its own.
+
+**S96b · `extendProjectDeadline(-4)` silently did nothing.** It returns null on
+anything at or below zero, correctly — it is the verb for "this extra takes
+longer", and a caller handing it a negative has the direction confused.
+Withdrawal reported `days: 4` in its result while the completion date did not
+move, which is the false-green shape this package keeps meeting. Its own
+private verb now gives the days back, by exactly what the annex moved forward
+and never further.
+
+**S97 · «Justificante: sin adjuntar» was a miss, not an empty slot.** The
+contract's Anexos tab read the motivo and the backing document from
+`state.changes` through `a.changeId`. That register is the LEGACY route:
+PK12-S13 replaced it with the adicional version, whose annexes carry
+`budgetId`, `versionId` and `ref` and leave `changeId` null. So on every annex
+written since, the lookup could not succeed and no upload would ever have shown
+there — which is what the operator photographed, three times on one contract.
+The tab reads the annex's own fields now, with the change record kept as the
+fallback it has become.
+
+**S98 · The annex signature is deliberately NOT the contract's, and it is
+inert.** `signContract` refuses without a document (CON-11) because a job's
+first invoice opens on the strength of it. An annex agreed on site does not
+work that way, and the operator named two options, the second of which has no
+paper. Refusing the verbal one would not produce more signed paper; it would
+produce a blank page scanned to get past the gate, which is worse than the
+truth because it LOOKS like evidence. Both are accepted, the record says which,
+and a verbal one names the person who agreed it — the only field standing in
+for a signature.
+
+It records the fact and moves nothing. Scope, plan and money still arrive on
+acceptance exactly as they do today; moving that gate is the plan's phase 4,
+with the migration that phase needs. Shipping the field first means the paper
+the operator already has can be attached while the rest is built.

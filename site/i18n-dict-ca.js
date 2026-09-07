@@ -844,6 +844,38 @@ window.CANEI_DICT.ca = {
     "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
   "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
+  "Anexo firmado": "Annex signat",
+  "✍ Firmar anexo": "✍ Signar l'annex",
+  "Nombre y apellidos": "Nom i cognoms",
+  "Anexo retirado": "Annex retirat",
+  "Aprobado verbalmente": "Aprovat verbalment",
+  "Cambiar la firma": "Canviar la signatura",
+  "El documento firmado": "El document signat",
+  "Firma retirada": "Signatura retirada",
+  "Importe que sale del contrato": "Import que surt del contracte",
+  "Lo aprobó": "Ho va aprovar",
+  "Quién lo aprobó": "Qui ho va aprovar",
+  "Qué se deshace": "Què es desfà",
+  "Quitar anexo": "Treure l'annex",
+  "Quitar la firma": "Treure la signatura",
+  "Quitar todos los anexos": "Treure tots els annexos",
+  "Y con ello": "I amb això",
+  "El documento que firmó el cliente, como el contrato.":
+    "El document que va signar el client, com el contracte.",
+  "Queda registrado como lo que es: sin documento, y con el nombre de quien lo aprobó.":
+    "Queda registrat com el que és: sense document, i amb el nom de qui ho va aprovar.",
+  "El hito de pago que cada anexo añadió.": "La fita de pagament que cada annex va afegir.",
+  "Los días que sumó a la fecha de fin.": "Els dies que va sumar a la data de fi.",
+  "Sus partidas dejan de estar en el alcance de la obra.":
+    "Les seves partides deixen d'estar a l'abast de l'obra.",
+  "Se niega si el hito ya está facturado o si hay avance marcado sobre sus partidas.":
+    "Es nega si la fita ja està facturada o si hi ha avanç marcat sobre les seves partides.",
+  "Un anexo firmado necesita el documento firmado": "Un annex signat necessita el document signat",
+  "Di quién lo aprobó verbalmente": "Digues qui ho va aprovar verbalment",
+  "El hito de este anexo ya se ha facturado. Rectifica la factura antes de quitarlo.":
+    "La fita d'aquest annex ja s'ha facturat. Rectifica la factura abans de treure'l.",
+  "Hay avance marcado sobre las partidas de este anexo. Ponlo a cero antes de quitarlo.":
+    "Hi ha avanç marcat sobre les partides d'aquest annex. Posa'l a zero abans de treure'l.",
   "Cuentas y tarjetas": "Comptes i targetes",
   "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
   "Primero crea la tarjeta en Configuración › Empresa":
