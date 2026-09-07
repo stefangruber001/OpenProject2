@@ -4827,6 +4827,68 @@ async function testCapture(browser, base) {
         "ADM-03: one press writes the split, files the bill off the document's own figures, and the bank can match it",
       );
     else bad("ADM-03: one press does all of it", JSON.stringify(onepress));
+    /* PK13-S10 · THE WHOLE HEADER, NOT JUST THE NAME AND THE NIF. The operator
+       created a supplier from an invoice and got a record whose address, town,
+       province and telephone were empty — on a document that prints every one
+       of them in its header: "it does not read all the information from the
+       doc." Nothing was lost in transit; the reader had no fields for any of
+       it, so the record was incomplete by construction and had to be finished
+       by hand from the page just photographed. Asserted on the PARTY, because
+       a field read and not carried is the same failure to the person filling
+       in the form. */
+    const carried = await pg.evaluate(() => {
+      const cap = erp.captureDocument({ docType: "supplierInvoice", imageRef: "e2e_addr" }, "bo");
+      erp.confirmCapture(
+        cap.id,
+        {
+          issuerName: "CONSORCI E2E DE PROVES",
+          issuerTaxId: "G52100773",
+          docNumber: "E2E-ADDR-1",
+          date: erp.today,
+          baseCents: 10000,
+          vatCents: 2100,
+          totalCents: 12100,
+          issuerAddress: "Carretera de Rubi km 4",
+          issuerPostcode: "08191",
+          issuerCity: "Rubi",
+          issuerRegion: "Barcelona",
+          issuerPhone: "935 880 471",
+          issuerEmail: "facturacio@e2e.example",
+        },
+        "bo",
+      );
+      const made = supplierFromDocument(
+        erp.state.captured.find((c) => c.id === cap.id).confirmed,
+        "bo",
+      );
+      const p = erp.party(made.id);
+      const c = erp.partyCompleteness(p.id);
+      return {
+        created: made.created,
+        street: p.billStreet,
+        cp: p.billPostalCode,
+        city: p.billCity,
+        province: p.billProvince,
+        phone: p.landline,
+        email: p.email,
+        // The point of carrying them: the record stops arriving incomplete.
+        missing: c.missing,
+      };
+    });
+    if (
+      carried.created &&
+      carried.street === "Carretera de Rubi km 4" &&
+      carried.cp === "08191" &&
+      carried.city === "Rubi" &&
+      carried.province === "Barcelona" &&
+      carried.phone === "935 880 471" &&
+      carried.email === "facturacio@e2e.example"
+    )
+      ok(
+        "ADM-03: a supplier created from a document carries its address, town, province and phone",
+      );
+    else bad("ADM-03: issuer contact carried to the party", JSON.stringify(carried));
+
     if (errs.length === 0) ok("ADM-03: no console errors");
     else bad("ADM-03: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

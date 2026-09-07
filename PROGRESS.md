@@ -2412,3 +2412,31 @@ the kind nothing goes red for:
 
 Next, and only the operator can do it: the Business Manager Organization ID, the
 contact phone, and a working demo account.
+
+**S10 · The reader had no fields for half the header.** «Whenever I do the Alta
+desde documento, it does not read all the information from the doc» — a supplier
+created from an invoice that prints the street, the town, the province and the
+telephone, arriving with all four empty and every one marked required. Nothing
+was lost in transit: the extraction capability scanned for eleven things and a
+postal address was not among them, so a party record built from a document was
+incomplete BY CONSTRUCTION and had to be finished by hand from the page just
+photographed — the work the route exists to remove.
+
+Six generic keys added (`issuerAddress`, `issuerPostcode`, `issuerCity`,
+`issuerRegion`, `issuerPhone`, `issuerEmail`), found by a different method from
+everything else in that file: an amount is announced by a label, an address is a
+SHAPE in a POSITION. The pass anchors on the postal code — the one token an
+address always carries and nothing else resembles — above the recipient
+boundary, which is the same fact that already stops the issuer's tax id being
+confused with ours. The telephone alone needs its label, because nine digits in
+three groups is also what a registry code looks like and this operator's own
+document carries one two segments away; a wrong telephone on a supplier record
+is worse than an empty one, since somebody dials it. Spanish shapes stayed in
+the jurisdiction pack: a postal code here is five digits whose first two are a
+province, 01 to 52. A profile that describes no address loses the fields, not
+the document.
+
+**Merged with the partner's session** — six tabs, session identity, the mobile
+shell, the Apple route — a 4 200-line change to `site/erp.html` beside this one.
+Clean textually, which proves nothing, so the whole battery was re-run on the
+merged tree before pushing: 736/736.

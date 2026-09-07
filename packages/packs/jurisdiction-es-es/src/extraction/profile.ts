@@ -151,6 +151,30 @@ export const ES_EXTRACTION_PROFILE: ExtractionProfile = {
     withholdingAmount: ["retencion", "irpf", "ret. irpf", "retencion irpf"],
     totalAmount: ["total factura", "total a pagar", "importe total", "total"],
     iban: ["iban", "cuenta", "cta", "domiciliacion"],
+    /* Only the telephone needs its label. The address and the postal code are
+       found by shape and position; nine digits in three groups are also what a
+       registry code and half an account number look like, and a wrong
+       telephone on a supplier record is worse than an empty one because
+       somebody dials it. Catalan sits beside Castilian because the documents
+       do. */
+    issuerPhone: [
+      "tel",
+      "tel.",
+      "telf",
+      "telf.",
+      "telefono",
+      "teléfono",
+      "tfno",
+      "movil",
+      "móvil",
+      "mobil",
+      "mòbil",
+    ],
+    issuerAddress: ["direccion", "dirección", "domicilio", "adreca", "adreça"],
+    issuerPostcode: ["c.p.", "cp", "codigo postal", "código postal"],
+    issuerCity: ["poblacion", "población", "localidad", "municipio", "poblacio", "població"],
+    issuerRegion: ["provincia"],
+    issuerEmail: ["email", "e-mail", "correo", "correu"],
     /* What ties a supplier's document to work of ours. «Contrato:» and
        «Presupuesto:» are the two that matter most and were missing entirely —
        a supplier who writes them is handing us the link to the job, the
@@ -186,6 +210,16 @@ export const ES_EXTRACTION_PROFILE: ExtractionProfile = {
     percent: /\b\d{1,2}(?:[.,]\d{1,2})?\s?%/g,
     accountNumber: /\bES\d{2}[\s]?(?:\d{4}[\s]?){5}\b/g,
     docNumber: /\b[A-Z]{0,4}[-/]?\d{2,}[-/]?\d*\b/g,
+    /* A postal code here is five digits whose first two are a province, 01 to
+       52 — which is what keeps this from matching every five-digit number on
+       an invoice. It must be followed by the name of a town, because a code
+       standing alone beside a figure is a figure. */
+    postcode: /\b(?:0[1-9]|[1-4]\d|5[0-2])\d{3}\b(?=\s+\p{L})/gu,
+    /* Nine digits, written in the groups people actually use, with the
+       country code optional. Read only where a label says telephone. */
+    phone:
+      /(?:\+34[\s.-]?)?(?:\d{3}[\s.-]?\d{3}[\s.-]?\d{3}|\d{3}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2})\b/g,
+    email: /[\w.+-]+@[\w-]+\.[\w.-]{2,}/g,
   },
 
   /* How a company's legal name ends here. The extractor uses these to tell a

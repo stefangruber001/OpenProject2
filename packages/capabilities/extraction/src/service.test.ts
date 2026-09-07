@@ -29,6 +29,7 @@ const invented: ExtractionProfile = {
     totalAmount: ["grand total"],
     iban: ["account"],
     orderRef: ["order"],
+    issuerPhone: ["ring"],
   },
   patterns: {
     amount: /\d{1,3}(?:_\d{3})*\|\d{2}/g,
@@ -36,6 +37,10 @@ const invented: ExtractionProfile = {
     taxId: /\b[A-Z]{2}\d{6}\b/g,
     percent: /\d{1,2}\s?pct/g,
     accountNumber: /\bACC-\d{8}\b/g,
+    // An invented country: a postal code is three letters and two digits.
+    postcode: /\b[A-Z]{3}\d{2}\b(?=\s+\p{L})/gu,
+    phone: /\b\d{2}-\d{4}-\d{4}\b/g,
+    email: /[\w.+-]+@[\w-]+\.[\w.-]{2,}/g,
   },
   parseAmountCents(raw) {
     const m = /^(\d{1,3}(?:_\d{3})*)\|(\d{2})$/.exec(raw.trim());
@@ -346,5 +351,75 @@ describe("ExtractionService", () => {
     const r = svc().extract({ text: ["Issued by: Acme Supplies Ltd", "Grand total 1_150|00"] });
     const totalPaged = field(r, "totalAmount");
     expect(totalPaged.source!.page).toBe(2);
+  });
+});
+
+describe("where the issuer is", () => {
+  /* The operator, having created a supplier from an invoice and found the
+     address, the town and the telephone empty on a document that prints all
+     three: "it does not read all the information from the doc." There were no
+     fields for them at all, so a party record built from a document arrived
+     incomplete by construction. */
+  const HEADER = [
+    "ACME SUPPLIES",
+    "Registry no AB123400 · 14 Long Road, QRS42 Northgate (Westshire) · ring 55-1234-5678",
+    "orders@acme.example",
+    "Billed to",
+    "Our Company Ltd",
+    "9 Other Street, TUV11 Southgate (Eastshire)",
+    "Grand total 1_150|00",
+  ];
+
+  it("reads the address, the town and the region around the postal code", () => {
+    const r = svc().extract({ text: HEADER });
+    expect(field(r, "issuerAddress").value).toBe("14 Long Road");
+    expect(field(r, "issuerPostcode").value).toBe("QRS42");
+    expect(field(r, "issuerCity").value).toBe("Northgate");
+    expect(field(r, "issuerRegion").value).toBe("Westshire");
+  });
+
+  it("takes the issuer's address, never the recipient's", () => {
+    const r = svc().extract({ text: HEADER });
+    // Everything below the recipient heading belongs to whoever is billed.
+    expect(field(r, "issuerCity").value).not.toBe("Southgate");
+    expect(field(r, "issuerPostcode").value).not.toBe("TUV11");
+  });
+
+  it("reads a telephone only where the page says it is one", () => {
+    const r = svc().extract({ text: HEADER });
+    expect(field(r, "issuerPhone").value).toBe("55-1234-5678");
+    // The same digits with no label are a registry code, not a number to dial.
+    const bare = svc().extract({
+      text: ["ACME SUPPLIES", "Reference 55-1234-5678", "Grand total 1_150|00"],
+    });
+    expect(field(bare, "issuerPhone").value).toBeNull();
+  });
+
+  it("reads an email in the issuer block", () => {
+    expect(field(svc().extract({ text: HEADER }), "issuerEmail").value).toBe("orders@acme.example");
+  });
+
+  it("takes the line above when the postal code opens its own line", () => {
+    const r = svc().extract({
+      text: ["ACME SUPPLIES", "14 Long Road", "QRS42 Northgate", "Grand total 1_150|00"],
+    });
+    expect(field(r, "issuerAddress").value).toBe("14 Long Road");
+    expect(field(r, "issuerCity").value).toBe("Northgate");
+  });
+
+  it("returns nothing at all when the profile has no postal-code pattern", () => {
+    // A profile that does not describe an address loses the fields, not the
+    // document: nothing is guessed from a shape nobody vouched for.
+    const r = svc({ patterns: { ...invented.patterns, postcode: undefined } }).extract({
+      text: HEADER,
+    });
+    expect(field(r, "issuerAddress").value).toBeNull();
+    expect(field(r, "issuerPostcode").value).toBeNull();
+  });
+
+  it("never claims green: nothing here is check-summed", () => {
+    const r = svc().extract({ text: HEADER });
+    for (const k of ["issuerAddress", "issuerPostcode", "issuerCity", "issuerPhone"] as const)
+      expect(field(r, k).verdict).toBe("amber");
   });
 });

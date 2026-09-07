@@ -45,6 +45,15 @@ export interface ExtractInput {
 const FIELD_TOKEN: Record<FieldKey, "amount" | "date" | "taxId" | "account" | "text"> = {
   issuerName: "text",
   issuerTaxId: "taxId",
+  /* Text, but never found by the label pass: an address is not announced by a
+     word, it is a shape in a position. `issuerContact` fills these directly,
+     the way `unlabelledIssuer` fills the name. */
+  issuerAddress: "text",
+  issuerPostcode: "text",
+  issuerCity: "text",
+  issuerRegion: "text",
+  issuerPhone: "text",
+  issuerEmail: "text",
   docNumber: "text",
   issueDate: "date",
   dueDate: "date",
@@ -120,6 +129,9 @@ export class ExtractionService {
       const guessed = this.unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt);
       if (guessed) perField.set("issuerName", [guessed]);
     }
+    // …and neither is where they are. See `issuerContact`.
+    for (const [key, cand] of this.issuerContact(lines, pageOf, profile, recipientAt))
+      if (!perField.get(key)?.length) perField.set(key, [cand]);
 
     // The issue date, once found, decides which rates were law — so it is
     // resolved before the checks that depend on it.
@@ -550,6 +562,162 @@ export class ExtractionService {
       };
     }
     return null;
+  }
+
+  /**
+   * WHERE THE ISSUER IS, READ OFF THE HEAD OF THE PAGE.
+   *
+   * The operator, having created a supplier from an invoice and found the
+   * address, the town and the telephone all empty on a document that states
+   * every one of them: "it does not read all the information from the doc."
+   * It was not losing them in transit — there were no fields for them at all,
+   * so a party record built from a document arrived incomplete by
+   * construction and had to be finished by hand from the same page.
+   *
+   * A postal address is not announced by a label the way an amount is; it is a
+   * SHAPE in a POSITION. So this does not go through the keyword pass. It
+   * looks above the recipient boundary — everything there belongs to the
+   * issuer, which is the same fact that already keeps their tax id from being
+   * confused with ours — and anchors on the one token an address always
+   * contains and nothing else looks like: the postal code.
+   *
+   * Around that anchor the rest falls out. What follows it on the same segment
+   * is the town, with a region in brackets after it where this locale writes
+   * one; what precedes it is the street. Segments, because a header line is
+   * very often one line with separators in it — a tax id, a registry number,
+   * an address and a telephone divided by bullets — and splitting on those
+   * turns one crowded line into the four facts it is carrying.
+   *
+   * The telephone is the exception and needs its label. Nine digits in three
+   * groups is also what a document number, a registry code and an account
+   * fragment look like, and a wrong telephone on a supplier record is worse
+   * than none: it gets dialled. So it is read only where the page says it is
+   * one. An address that this profile has no postal-code pattern for simply
+   * comes back empty — nothing is guessed.
+   */
+  private issuerContact(
+    lines: string[],
+    pageOf: number[],
+    profile: ExtractionProfile,
+    recipientAt: number,
+  ): Map<FieldKey, Candidate> {
+    const out = new Map<FieldKey, Candidate>();
+    const head = Math.min(lines.length, recipientAt);
+    const make = (
+      value: string,
+      line: number,
+      start: number,
+      end: number,
+      why: string,
+    ): Candidate => ({
+      value,
+      raw: value,
+      // Never green on its own: nothing here is check-summed, and a person
+      // reads it once on the way past.
+      confidence: 0.5,
+      source: { line, text: lines[line] ?? "", start, end, page: pageOf[line] },
+      reasons: [why],
+      labelled: false,
+      validated: false,
+    });
+
+    const pc = profile.patterns.postcode;
+    if (pc) {
+      outer: for (let i = 0; i < head; i++) {
+        const raw = lines[i] ?? "";
+        // A header line often carries four facts divided by bullets.
+        const segments = raw.split(/\s[·|—–]\s|\t{2,}/g);
+        let consumed = 0;
+        for (const seg of segments) {
+          const at = raw.indexOf(seg, consumed);
+          consumed = at + seg.length;
+          const rx = new RegExp(pc.source, pc.flags);
+          const m = rx.exec(seg);
+          if (!m) continue;
+          const code = m[0].trim();
+          const before = seg
+            .slice(0, m.index)
+            .replace(/[\s,;.]+$/u, "")
+            .trim();
+          const after = seg.slice(m.index + m[0].length).trim();
+          const bracket = /\(([^)]+)\)/u.exec(after);
+          const town = after
+            .replace(/\([^)]*\)/gu, "")
+            .replace(/^[\s,;.-]+/u, "")
+            .trim();
+          const base = at + m.index;
+          out.set("issuerPostcode", make(code, i, base, base + m[0].length, "postal code"));
+          if (town)
+            out.set(
+              "issuerCity",
+              make(town, i, base, base + seg.length - m.index, "beside the postal code"),
+            );
+          if (bracket && bracket[1])
+            out.set(
+              "issuerRegion",
+              make(bracket[1].trim(), i, base, base + seg.length, "in brackets after the town"),
+            );
+          /* The street is what came before the code on the same segment, and
+             when the code opens its own line — the ordinary two-line address
+             — it is the line above. */
+          let street = before;
+          if (!street) {
+            for (let k = i - 1; k >= 0 && k >= i - 2; k--) {
+              const prev = (lines[k] ?? "").trim();
+              if (prev.length > 3 && /\p{L}/u.test(prev)) {
+                street = prev;
+                break;
+              }
+            }
+          }
+          if (street)
+            out.set(
+              "issuerAddress",
+              make(street, i, at, at + seg.length, "before the postal code"),
+            );
+          break outer;
+        }
+      }
+    }
+
+    const ph = profile.patterns.phone;
+    const phoneWords = (profile.keywords.issuerPhone ?? []).map(fold).filter(Boolean);
+    if (ph && phoneWords.length) {
+      for (let i = 0; i < head && !out.has("issuerPhone"); i++) {
+        const raw = lines[i] ?? "";
+        const segments = raw.split(/\s[·|—–]\s|\t{2,}/g);
+        let consumed = 0;
+        for (const seg of segments) {
+          const at = raw.indexOf(seg, consumed);
+          consumed = at + seg.length;
+          if (!phoneWords.some((w) => fold(seg).includes(w))) continue;
+          const rx = new RegExp(ph.source, ph.flags);
+          const m = rx.exec(seg);
+          if (!m) continue;
+          const v = m[0].trim();
+          out.set(
+            "issuerPhone",
+            make(v, i, at + m.index, at + m.index + m[0].length, "beside a telephone label"),
+          );
+          break;
+        }
+      }
+    }
+
+    const em = profile.patterns.email;
+    if (em) {
+      for (let i = 0; i < head && !out.has("issuerEmail"); i++) {
+        const raw = lines[i] ?? "";
+        const rx = new RegExp(em.source, em.flags);
+        const m = rx.exec(raw);
+        if (m)
+          out.set(
+            "issuerEmail",
+            make(m[0].trim(), i, m.index, m.index + m[0].length, "an address in the issuer block"),
+          );
+      }
+    }
+    return out;
   }
 
   /**

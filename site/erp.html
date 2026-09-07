@@ -17153,6 +17153,19 @@
       const CAP_FIELDS = [
         ["issuerName", "Emisor"],
         ["issuerTaxId", "NIF"],
+        /* WHERE THE ISSUER IS. The reader had no fields for any of this, so a
+                 supplier created from a document arrived with its address, its town
+                 and its telephone empty — on a document that prints all three in its
+                 header — and somebody finished the record by hand from the page they
+                 had just photographed. Shown here because everything on this panel
+                 is correctable: what the reader proposes, a person can fix before it
+                 becomes a party record. */
+        ["issuerAddress", "Dirección"],
+        ["issuerPostcode", "C.P."],
+        ["issuerCity", "Población"],
+        ["issuerRegion", "Provincia"],
+        ["issuerPhone", "Teléfono"],
+        ["issuerEmail", "Email"],
         ["docNumber", "Nº documento"],
         ["issueDate", "Fecha"],
         ["dueDate", "Vencimiento"],
@@ -18163,6 +18176,12 @@
               name: get("issuerName"),
               taxId: get("issuerTaxId"),
               iban: get("iban"),
+              address: get("issuerAddress"),
+              postcode: get("issuerPostcode"),
+              city: get("issuerCity"),
+              region: get("issuerRegion"),
+              phone: get("issuerPhone"),
+              email: get("issuerEmail"),
             });
           })
           .catch(() => {
@@ -18198,6 +18217,12 @@
             <div class="field full"><label>Nombre o razón social</label><input id="sd_name" value="${esc(held.name || "")}" placeholder="Quién emite el documento"></div>
             <div class="field"><label>NIF/CIF</label><input id="sd_tax" value="${esc(held.taxId || "")}" placeholder="NIF o CIF"></div>
             <div class="field"><label>IBAN</label><input id="sd_iban" value="${esc(held.iban || "")}" placeholder="Si el documento lo trae"></div>
+            <div class="field full"><label>Dirección</label><input id="sd_addr" value="${esc(held.address || "")}" placeholder="Calle y número"></div>
+            <div class="field"><label>C.P.</label><input id="sd_cp" value="${esc(held.postcode || "")}" placeholder="Código postal"></div>
+            <div class="field"><label>Población</label><input id="sd_city" value="${esc(held.city || "")}" placeholder="Municipio"></div>
+            <div class="field"><label>Provincia</label><input id="sd_prov" value="${esc(held.region || "")}" placeholder="Provincia"></div>
+            <div class="field"><label>Teléfono</label><input id="sd_tel" value="${esc(held.phone || "")}" placeholder="Fijo o móvil"></div>
+            <div class="field full"><label>Email</label><input id="sd_mail" value="${esc(held.email || "")}" placeholder="Si el documento lo trae"></div>
            </div>
            <div class="daylist">${already}${badTax}
             <div class="it" style="color:var(--muted)">La imagen sólo se usa para leerla: no se guarda aquí. Si el documento es una factura que además es un coste, captúrelo en Gastos.</div>
@@ -18209,15 +18234,32 @@
               closeDrawer();
               partyDrawer(exists.id);
             };
-          ["sd_name", "sd_tax", "sd_iban"].forEach((id) => {
+          const readForm = () => ({
+            name: $("#sd_name").value,
+            taxId: $("#sd_tax").value,
+            iban: $("#sd_iban").value,
+            address: $("#sd_addr").value,
+            postcode: $("#sd_cp").value,
+            city: $("#sd_city").value,
+            region: $("#sd_prov").value,
+            phone: $("#sd_tel").value,
+            email: $("#sd_mail").value,
+          });
+          [
+            "sd_name",
+            "sd_tax",
+            "sd_iban",
+            "sd_addr",
+            "sd_cp",
+            "sd_city",
+            "sd_prov",
+            "sd_tel",
+            "sd_mail",
+          ].forEach((id) => {
             const i = $("#" + id);
             if (i)
               i.onchange = () => {
-                held = {
-                  name: $("#sd_name").value,
-                  taxId: $("#sd_tax").value,
-                  iban: $("#sd_iban").value,
-                };
+                held = readForm();
                 paint();
               };
           });
@@ -18235,8 +18277,18 @@
                 if (!name) throw new Error("El proveedor necesita un nombre");
                 if (!ErpEngine.validTaxId(tax))
                   throw new Error("El NIF del emisor falta o no es válido");
+                const form = readForm();
                 const made = supplierFromDocument(
-                  { issuerName: name, issuerTaxId: tax },
+                  {
+                    issuerName: name,
+                    issuerTaxId: tax,
+                    issuerAddress: form.address,
+                    issuerPostcode: form.postcode,
+                    issuerCity: form.city,
+                    issuerRegion: form.region,
+                    issuerPhone: form.phone,
+                    issuerEmail: form.email,
+                  },
                   "backoffice",
                 );
                 const iban = $("#sd_iban").value.trim();
@@ -18522,6 +18574,14 @@
            invoices as an autónomo. That is not an inference about the world,
            it is what the format means. */
         const person = /^[0-9]{8}[A-Z]$/.test(taxId) || /^[XYZ][0-9]{7}[A-Z]$/.test(taxId);
+        /* EVERYTHING THE PAGE SAID, not just the two fields that identify them.
+             A record created with a name and a tax id and nothing else is a record
+             somebody has to finish by hand, from the document that was just read —
+             which is the work this route exists to remove. Blank stays blank: a
+             field the reader did not find is left for the party screen rather than
+             filled with a guess, and `partyCompleteness` goes on saying what is
+             missing. The mobile is deliberately not populated from a landline. */
+        const text = (v) => String(v || "").trim();
         const made = erp.addParty(
           {
             name,
@@ -18529,6 +18589,12 @@
             roles: [person ? "selfEmployed" : "supplier"],
             partyType: person ? "individual" : "company",
             sourceSystem: "documento",
+            billStreet: text(cf && cf.issuerAddress),
+            billPostalCode: text(cf && cf.issuerPostcode),
+            billCity: text(cf && cf.issuerCity),
+            ...(text(cf && cf.issuerRegion) ? { billProvince: text(cf.issuerRegion) } : {}),
+            landline: text(cf && cf.issuerPhone),
+            email: text(cf && cf.issuerEmail),
           },
           user || "backoffice",
         );
@@ -18665,6 +18731,15 @@
                   vatCents: val("taxAmount") || 0,
                   totalCents: val("totalAmount") || 0,
                   iban: val("iban") || "",
+                  /* Kept on the DOCUMENT, not only pushed into the party. The
+                       record was created from this page and a year from now the
+                       question is what the page said, not what the file says now. */
+                  issuerAddress: val("issuerAddress") || "",
+                  issuerPostcode: val("issuerPostcode") || "",
+                  issuerCity: val("issuerCity") || "",
+                  issuerRegion: val("issuerRegion") || "",
+                  issuerPhone: val("issuerPhone") || "",
+                  issuerEmail: val("issuerEmail") || "",
                 },
                 "backoffice",
               );
