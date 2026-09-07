@@ -2440,3 +2440,37 @@ the document.
 shell, the Apple route — a 4 200-line change to `site/erp.html` beside this one.
 Clean textually, which proves nothing, so the whole battery was re-run on the
 merged tree before pushing: 736/736.
+
+**S11 · The card settlement is proposed, not hunted for.** «I have all the
+credit card conciliated but I can not match the Account movement with the
+Credit card movement. How can we do this? There is no Propuestas.» There could
+not be: Propuestas has only ever argued about DOCUMENTS — invoices and bills
+scored on amount, date, reference and counterparty — and a card settlement is
+explained by no document at all, being one account paying another. The matcher
+was right to say nothing, and the mechanism that does record it was an
+`<optgroup>` inside a dropdown of unrelated identifications: present, correct,
+and reachable only by somebody who had already been shown it. The fourth
+instance this package of a rule whose door is the part that is missing.
+
+The evidence was on the line all along. «ADEUDO MENSUAL DE TARJETA ...8442
+LIQUIDACION 01/11/2026-30/11/2026» states the period in plain digits, so the
+window is not inferred: the card's own movements inside it are summed and
+compared with what left the bank. A month of purchases adding to the cent to
+the charge that pays for them is not a coincidence, and the card named in the
+concept corroborates it. Neither acts alone — it proposes, a person presses —
+and accepting goes through `markCardSettlement`, the same door the dropdown
+uses, because a proposal with its own route to the same state is two
+implementations of one rule waiting to drift. Falls back to the calendar month
+before the charge when the bank does not spell the period out.
+
+**Merged with the partner again** — assigning somebody to an obra, which no
+screen could do. Re-run whole on the merged tree rather than on either half:
+**740/740**.
+
+**Where a fresh session picks up.** Package 13 is eleven items, all shipped and
+pushed; `main` is the only branch and deploys from `site/**`. The oldest open
+item remains iOS parity and TestFlight, deferred by the operator on 04/09 and
+never answered in full. The pattern worth carrying forward is in the S-notes
+above: nine of these eleven were the product being confidently silent rather
+than wrong, and every one was found by a person using it while the suite stayed
+green — because those tests asked the ENGINE what the SCREEN does.
