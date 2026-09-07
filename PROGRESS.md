@@ -2195,6 +2195,256 @@ issued for a tenant that is not the deployment's own leaves an account that can
 never sign in — is real, is not mine, and is written down as ASSUMPTIONS.md S74
 rather than patched at speed on a deploy gate.
 
+**S12 · The reader had no fields for half the header.** «Whenever I do the Alta
+desde documento, it does not read all the information from the doc» — a supplier
+created from an invoice that prints the street, the town, the province and the
+telephone, arriving with all four empty and every one marked required. Nothing
+was lost in transit: the extraction capability scanned for eleven things and a
+postal address was not among them, so a party record built from a document was
+incomplete BY CONSTRUCTION and had to be finished by hand from the page just
+photographed — the work the route exists to remove.
+
+Six generic keys added (`issuerAddress`, `issuerPostcode`, `issuerCity`,
+`issuerRegion`, `issuerPhone`, `issuerEmail`), found by a different method from
+everything else in that file: an amount is announced by a label, an address is a
+SHAPE in a POSITION. The pass anchors on the postal code — the one token an
+address always carries and nothing else resembles — above the recipient
+boundary, which is the same fact that already stops the issuer's tax id being
+confused with ours. The telephone alone needs its label, because nine digits in
+three groups is also what a registry code looks like and this operator's own
+document carries one two segments away; a wrong telephone on a supplier record
+is worse than an empty one, since somebody dials it. Spanish shapes stayed in
+the jurisdiction pack: a postal code here is five digits whose first two are a
+province, 01 to 52. A profile that describes no address loses the fields, not
+the document.
+
+**Merged with the partner's session** — six tabs, session identity, the mobile
+shell, the Apple route — a 4 200-line change to `site/erp.html` beside this one.
+Clean textually, which proves nothing, so the whole battery was re-run on the
+merged tree before pushing: 736/736. Merged again on 07/09 with that session's
+worker-assignment fix (S89), and `main` at `ab8f71d` is **738/738 unfiltered**
+plus `tests/site-sync` 20/20 in CI — 736 plus the two checks that fix brought,
+so nothing was lost in either direction.
+
+**S13 · The card settlement was there, and no workspace could find it.** «I
+still don't see the Credit Card Statement to be conciliated in the Bank Account
+conciliation» — a bank line reading «ADEUDO MENSUAL DE TARJETA … su desglose
+figura en el extracto de tarjeta adjunto», opened in Conciliación, with nothing
+anywhere on the panel about a card.
+
+The product has modelled this correctly since PK7-B: the purchases on the card
+are the costs, the bank's monthly charge is not, and «Identificar como… →
+Liquidación de tarjeta» classifies it an internal transfer naming the card so
+nothing is counted twice. But `cardSettleGroup` returned `""` when the
+workspace had no card account, and the seed ships two bank accounts and no
+card. In every workspace that has not yet created one — which is every workspace
+on its first day — the whole answer was suppressed. Not disabled, not
+explained: absent, with «Marcar sin respaldo» as the only exit that looked
+honest.
+
+Shown refused now, with what it waits for, which is the recorrido's own rule
+from PK14-S77. And the gate had the product's blind spot: the browser suite
+covered this path thoroughly — a card created through the product, its
+statement imported through the real file input, the settlement written — but it
+CREATED the card first, so the one state every real tenant starts in was the
+one state never exercised. The new check runs before the run's own card exists,
+because afterwards that state is unreachable.
+
+**Next, from the same report:** the settlement names the card and not WHICH
+statement, so a report to the accountant cannot show the movements a charge
+covers; and the caja-chica cycle has no register, only a card inside one
+movement's drawer. ASSUMPTIONS S93 and S94.
+
+Gates: site E2E **739/739 unfiltered** (738 on `main` plus this check), site-sync
+20/20, boundaries, site syntax, i18n coverage 4219 complete in three languages,
+source literals 162/162, workspace audit 0/0.
+
+**S14 · The annex says what it is, carries its signed paper, and can be taken
+back.** Two reports and an authorisation, all on the adicionales chain the
+operator called _"very very unclear"_ — the checked redesign is
+`docs/ADICIONALES-PLAN.md`; this is the part of it that stands on its own.
+
+**The three «sin adjuntar» rows were a miss, not an empty slot.** The contract's
+Anexos tab read the motivo and the backing document out of the legacy change
+register through `a.changeId`, and annexes written by the route that replaced it
+leave that null. No upload would ever have appeared there. It reads the annex's
+own fields now — which adicional, the motivo, the signature — and keeps the old
+lookup as the fallback it has become.
+
+**The signed annex can be attached and opened**, through the same control the
+contract uses, or recorded as agreed verbally with the name of whoever agreed
+it. Deliberately inert: it records the fact and moves nothing, because moving
+the gate that applies an adicional is the plan's phase 4 and needs that phase's
+migration.
+
+**And an annex can now be withdrawn.** It could be granted and never taken back
+— third instance of a shape this repo has named twice — so an adicional accepted
+by mistake stayed in the contract, the milestones and the completion date for
+good. Withdrawal removes everything it put in, including the accepted pointer
+that put its partidas in the job, and refuses on an invoiced milestone or on
+progress marked over the scope it brought. Built as an explicit guarded verb
+rather than a migration that runs on load: permission to delete is not
+permission to delete invisibly.
+
+Two of mine that the tests caught: the progress guard refused on the base scope
+of a running job, because an adicional version is a clone carrying every line
+and its progress; and giving the days back through `extendProjectDeadline`
+silently did nothing, since that verb returns null on anything at or below zero.
+The second reported «4 days» in its result with the date unchanged.
+
+Gates: site E2E **746/746 unfiltered** (the annex suite 5 → 13 checks),
+site-sync 20/20, boundaries, site syntax, i18n coverage complete in three
+languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S95–S98.
+
+**S15 · Accepting an adicional stops moving the job.** The operator, twice,
+correcting the phasing of the plan: _"Acceptance camming from Budget tool do
+nothing until we accept it on Contracts/Annex. This is key."_ The second time
+they quoted the sentence where the last commit called the annex signature inert
+and deferred this to a later phase. They were right: it is not a later phase, it
+is the point, and building the screens around an unchanged rule would have left
+the product saying one thing and doing another.
+
+Two different events had been one. A customer agreeing a price and an annex to a
+signed contract are not the same fact, and acceptance moved scope, completion
+date and money in a single step — so there was no state in which an extra was
+agreed commercially and not yet part of the job, which is most of the life of a
+real adicional. Accepting writes the annex and stops. Agreeing it on the
+contract — signed document or verbally, with a name — is what puts the partidas
+in the scope, the hito in the contract and the days on the end date.
+
+One predicate does it: `projectVariations` is the single walk Alcance, both
+progress readers, cost allocation and certification all resolve through, so the
+gate is one line and everything downstream follows.
+
+**And the migration dissolved.** An ABSENT `applied` flag reads as applied, so
+every annex written before today keeps its scope, its milestone and its days
+untouched, and only new rows are governed. The plan had called a stamping
+migration the most dangerous part of this work; a field that means "applied" by
+its absence removes the danger instead of managing it.
+
+Three of mine, and the last two were caught only by the unfiltered run: a job
+with no contract and the legacy change register keep the old one-step rule, both
+on purpose; I wrote the gate and forgot to set `applied: false`, so it was open
+by construction and every test that goes through it still passed; and
+`testVariationBudget` booked a cost under the comment "what is NEW is the join
+on acceptance" — the exact rule this overturns. Rewritten to measure the
+economics before the signature and after, it is now the second witness of the
+gate.
+
+Gates: site E2E **749/749 unfiltered**, site-sync 20/20, boundaries, site
+syntax, i18n coverage complete in three languages, source literals 162/162,
+workspace audit 0/0. ASSUMPTIONS S99. Still open, written down rather than
+fixed here: no screen yet says the annex is waiting (S99e).
+
+**S16 · Presupuestos becomes two registers, and the adicional becomes its own
+record.** The operator's items 1 and 2, and the reason the model had to change
+first: in their screenshot `PRE-2026-0009 · Adicional · ADI-2026-0001` WAS the
+original budget of P-2026-0009 wearing its adicional's badge. One record, two
+lifecycles, one Estado column that could only report one of them. A tab split is
+impossible while an adicional is a version of the original budget, because they
+are the same row.
+
+«Nuevos» and «Adicionales», each with its own door. **＋ Adicional asks for the
+contract it amends** — not a job, because an adicional becomes an annex to a
+signed document and naming it at creation is what stops the two drifting apart —
+and then opens the builder EMPTY. That part needed no work at all:
+`createVariationBudget` has always made a fresh budget with one blank version.
+The route that cloned the accepted scope was the version route, and it is the
+one being retired; ＋ Presupuesto no longer offers it and says where it moved.
+
+Each adicional carries an **ADI number of its own** for the customer's document.
+That was the single good argument for the version model — a customer handed a
+PRE number reads a re-quote of the whole job — and it was always about the paper
+rather than the record, so it survives the move.
+
+Two things found on the way, both consequences of S15 that S15 missed: the days
+were still applying on acceptance on BOTH routes, because
+`setVariationScheduleDays` and `setAdditionalScheduleDays` gated on
+`acceptedVersionId` rather than on the annex; and S99e is closed — an accepted
+adicional whose annex is unsigned now says «Anexo sin firmar» in the register,
+instead of reading «Aceptado» while the job correctly showed nothing.
+
+Gates: site E2E **754/754 unfiltered**, site-sync 20/20, iOS routes 7/7,
+boundaries, site syntax, i18n coverage complete in three languages, source
+literals 162/162, workspace audit 0/0. ASSUMPTIONS S100.
+
+**S17 · Adicionales leaves Contratos, and the days move to where they take
+effect.** The operator's item 5, and it could not be done by deleting first:
+«Formalizar un adicional» was the only place the days per partida and the
+customer's answer were captured. Both separate cleanly along the line S15 drew —
+the answer belongs to the presupuesto and is given there like any other; the
+days belong to the moment they apply, which is no longer acceptance but the
+annex. So the signing panel asks for them, which is the operator's own item 4.
+
+One verb serves both routes, so the screen never has to know which shape of
+adicional it is looking at. The variation-budget route gained a per-partida
+breakdown it never had: the schedule consumes one delay per partida, and an
+adicional that moves a completion date but not the bars underneath it is half a
+plan.
+
+Then the tab went, with its rows, its columns, its 112-line drawer and the
+back-link special case that existed only to return to it.
+
+Two found by the tests, and the second is one the operator would have hit: the
+days verb THREW on an annex with no adicional behind it, which would have
+refused a SIGNATURE over a field that should never have been offered; and
+switching between «Anexo firmado» and «Aprobado verbalmente» wiped the days
+already typed, because `paint()` re-read them from the values the drawer opened
+with. The second is the rule the evidence field in the same file already states,
+and it was found only because the test types the days and THEN picks the method,
+which is the order a person uses.
+
+With this, all five of the operator's items are in.
+
+Gates: site E2E **756/756 unfiltered**, site-sync 20/20, iOS routes 7/7,
+boundaries, site syntax, i18n coverage complete in three languages, source
+literals 162/162, workspace audit 0/0. ASSUMPTIONS S101.
+
+**Read with S13, not instead of it.** The two were written in parallel against
+the same operator stream and they answer different halves: S13 is the workspace
+with no card account at all, where the whole answer was suppressed and the panel
+said nothing; S18 is the workspace that HAS its cards and its statement, where
+the answer existed and only somebody already shown it could find it. Neither
+supersedes the other and both are on this tree.
+
+**S18 · The card settlement is proposed, not hunted for.** «I have all the
+credit card conciliated but I can not match the Account movement with the
+Credit card movement. How can we do this? There is no Propuestas.» There could
+not be: Propuestas has only ever argued about DOCUMENTS — invoices and bills
+scored on amount, date, reference and counterparty — and a card settlement is
+explained by no document at all, being one account paying another. The matcher
+was right to say nothing, and the mechanism that does record it was an
+`<optgroup>` inside a dropdown of unrelated identifications: present, correct,
+and reachable only by somebody who had already been shown it. The fourth
+instance this package of a rule whose door is the part that is missing.
+
+The evidence was on the line all along. «ADEUDO MENSUAL DE TARJETA ...8442
+LIQUIDACION 01/11/2026-30/11/2026» states the period in plain digits, so the
+window is not inferred: the card's own movements inside it are summed and
+compared with what left the bank. A month of purchases adding to the cent to
+the charge that pays for them is not a coincidence, and the card named in the
+concept corroborates it. Neither acts alone — it proposes, a person presses —
+and accepting goes through `markCardSettlement`, the same door the dropdown
+uses, because a proposal with its own route to the same state is two
+implementations of one rule waiting to drift. Falls back to the calendar month
+before the charge when the bank does not spell the period out.
+
+**Merged with the partner again** — assigning somebody to an obra, which no
+screen could do. Re-run whole on the merged tree rather than on either half:
+**740/740**.
+
+**Where the parallel stream is.** S10 and S11 above, and everything on `main`
+after them, come from the session working the hours redesign and the site-worker
+boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they
+are logged in ASSUMPTIONS.md as **S83–S89** and are all on `main`: six sections
+in the mobile bar and a one-line header (S83), not one API response telling the
+browser not to store it (S84), a permission refusal read as an expired session
+(S85), the site worker's shell rather than their screens (S86), six tabs holding
+six identities (S87), a site account being sent what its jobs sell for, cost and
+earn (S88), and the whole site-worker feature unreachable because
+`assignWorkerDrawer` had no caller (S89). Read those before taking this section
+as a description of the tree.
+
 **Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
 ("Forget about this for the moment") and still the oldest unanswered item. It
 is now also what the site worker's phone waits on: the screens themselves reach
@@ -2413,64 +2663,10 @@ the kind nothing goes red for:
 Next, and only the operator can do it: the Business Manager Organization ID, the
 contact phone, and a working demo account.
 
-**S10 · The reader had no fields for half the header.** «Whenever I do the Alta
-desde documento, it does not read all the information from the doc» — a supplier
-created from an invoice that prints the street, the town, the province and the
-telephone, arriving with all four empty and every one marked required. Nothing
-was lost in transit: the extraction capability scanned for eleven things and a
-postal address was not among them, so a party record built from a document was
-incomplete BY CONSTRUCTION and had to be finished by hand from the page just
-photographed — the work the route exists to remove.
-
-Six generic keys added (`issuerAddress`, `issuerPostcode`, `issuerCity`,
-`issuerRegion`, `issuerPhone`, `issuerEmail`), found by a different method from
-everything else in that file: an amount is announced by a label, an address is a
-SHAPE in a POSITION. The pass anchors on the postal code — the one token an
-address always carries and nothing else resembles — above the recipient
-boundary, which is the same fact that already stops the issuer's tax id being
-confused with ours. The telephone alone needs its label, because nine digits in
-three groups is also what a registry code looks like and this operator's own
-document carries one two segments away; a wrong telephone on a supplier record
-is worse than an empty one, since somebody dials it. Spanish shapes stayed in
-the jurisdiction pack: a postal code here is five digits whose first two are a
-province, 01 to 52. A profile that describes no address loses the fields, not
-the document.
-
-**Merged with the partner's session** — six tabs, session identity, the mobile
-shell, the Apple route — a 4 200-line change to `site/erp.html` beside this one.
-Clean textually, which proves nothing, so the whole battery was re-run on the
-merged tree before pushing: 736/736.
-
-**S11 · The card settlement is proposed, not hunted for.** «I have all the
-credit card conciliated but I can not match the Account movement with the
-Credit card movement. How can we do this? There is no Propuestas.» There could
-not be: Propuestas has only ever argued about DOCUMENTS — invoices and bills
-scored on amount, date, reference and counterparty — and a card settlement is
-explained by no document at all, being one account paying another. The matcher
-was right to say nothing, and the mechanism that does record it was an
-`<optgroup>` inside a dropdown of unrelated identifications: present, correct,
-and reachable only by somebody who had already been shown it. The fourth
-instance this package of a rule whose door is the part that is missing.
-
-The evidence was on the line all along. «ADEUDO MENSUAL DE TARJETA ...8442
-LIQUIDACION 01/11/2026-30/11/2026» states the period in plain digits, so the
-window is not inferred: the card's own movements inside it are summed and
-compared with what left the bank. A month of purchases adding to the cent to
-the charge that pays for them is not a coincidence, and the card named in the
-concept corroborates it. Neither acts alone — it proposes, a person presses —
-and accepting goes through `markCardSettlement`, the same door the dropdown
-uses, because a proposal with its own route to the same state is two
-implementations of one rule waiting to drift. Falls back to the calendar month
-before the charge when the bank does not spell the period out.
-
-**Merged with the partner again** — assigning somebody to an obra, which no
-screen could do. Re-run whole on the merged tree rather than on either half:
-**740/740**.
-
-**Where a fresh session picks up.** Package 13 is eleven items, all shipped and
+**Where a fresh session picks up.** Package 13 is eighteen items, all shipped and
 pushed; `main` is the only branch and deploys from `site/**`. The oldest open
 item remains iOS parity and TestFlight, deferred by the operator on 04/09 and
 never answered in full. The pattern worth carrying forward is in the S-notes
-above: nine of these eleven were the product being confidently silent rather
-than wrong, and every one was found by a person using it while the suite stayed
+above: most of these were the product being confidently silent rather than
+wrong, and every one was found by a person using it while the suite stayed
 green — because those tests asked the ENGINE what the SCREEN does.

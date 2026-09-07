@@ -8974,3 +8974,345 @@ Two details worth keeping: «Hasta» defaults to EMPTY, because a date defaulted
 to today ends the assignment the same evening and reads as the app not working;
 and the card shows the LIST as well as the form, because an assignment that can
 be created and not seen is the next version of this bug.
+
+**S90 · An address is found by SHAPE and POSITION, not by a label.** Everything
+else the extraction capability reads is announced by a word — a total, a date, a
+tax id all have a caption beside them. A postal address has none: it is four
+lines of text in a block near the top of the page. So the pass anchors on the
+postal code, the one token an address always carries and nothing else on an
+invoice resembles, and takes the block around it — above the recipient boundary,
+which is the same fact that already keeps the issuer's tax id from being
+confused with ours.
+
+The telephone is the exception and takes its label. Nine digits in three groups
+is also the shape of a registry code, and this operator's own document carries
+one two segments away from the phone. A wrong telephone on a supplier record is
+worse than an empty one, because somebody dials it; an empty field is visibly
+empty and gets filled.
+
+Shapes stay in the jurisdiction pack: a postal code here is five digits whose
+first two are a province, 01 to 52, and that sentence is a fact about one
+country, so `jurisdiction-es-es` states it and the capability asks. A profile
+that describes no address loses the six fields, not the document — the reader
+still returns everything else it found.
+
+Six generic keys, named for what they are and not for where they came from:
+`issuerAddress`, `issuerPostcode`, `issuerCity`, `issuerRegion`, `issuerPhone`,
+`issuerEmail`.
+
+**S91 · Two sessions, one numbered list, and the collision it already
+produced.** PROGRESS.md's Package 13 is appended to by both working sessions,
+each numbering its own next entry. Both reached S10 independently: the hours
+redesign wrote «S10 · The hours screen becomes two screens» and this stream
+wrote «S10 · The reader had no fields for half the header», which also landed at
+the END of the file, below Package 14 and the Apple section, where a fresh
+session told to start at Package 13 would never read it.
+
+Moved into Package 13 and renumbered **S12**, which is the most reversible fix
+available: it takes the first free number and renumbers nothing anybody else
+wrote. The next entry from either session is S13.
+
+The deeper fact is that six commits of shipped product work — S83 to S89 in this
+file — are on `main` and not in PROGRESS.md at all, so the file understates the
+tree by three days. Narrating another session's work in its own voice is not
+this one's call, so Package 13 gets an INDEX of those seven entries instead: one
+line each, pointing here. A fresh session that reads Package 13 now learns that
+there is more on `main` than the section describes, which is the failure mode
+that mattered.
+
+**S92 · A precondition nobody can read is a feature nobody can find.**
+Reported from the live workspace: a bank line reading «ADEUDO MENSUAL DE
+TARJETA ***8442 LIQUIDACION 01/11/2026-30/11/2026 … su desglose figura en el
+extracto de tarjeta adjunto», opened in Conciliación, and NOTHING on the panel
+about a card. Propuestas 0, two candidates differing by 1.553 € and 2.879 €,
+and «Marcar sin respaldo» as the only honest-looking way out.
+
+The product models this correctly and has since PK7-B. `markCardSettlement`
+knows the money truth — the PURCHASES on the card are the costs, the bank's
+monthly charge is not, and counting it too counts every purchase twice — and
+the way in is «Identificar como… → Liquidación de tarjeta». But
+`cardSettleGroup` ended `if (!cards.length) return ""`, and the seeded
+workspace ships two bank accounts and no card. So in every workspace that has
+not yet created a card account, the entire answer was suppressed: not disabled,
+not explained, absent. The only way to learn the feature exists was to read the
+source.
+
+Shown refused now, with what it waits for — the recorrido's rule (S77c), which
+is the rule this repo keeps having to rediscover. Disabled, so pressing
+Identificar writes nothing.
+
+**And the gate had the same blind spot the product did.** The e2e suite covered
+this path well — a card created through the product, its statement imported
+through the real file input, the settlement written and classified — but it
+CREATED the card first, so the state every real tenant starts in was the one
+state never exercised. A fixture that builds the precondition before checking
+the screen cannot see a missing precondition. The new check runs at the top of
+the banking suite, before the run's own card exists, because afterwards the
+state is unreachable. Fourth false-green of this shape in a week (S86's
+concatenated chain, S88's empty assignments, the crawl ceilings).
+
+**S93 · The settlement names the card but not WHICH statement, and that is the
+next unit.** The operator's follow-up, and it is right: `cardSettlement` stores
+`{ accountId }` alone, so a report to the accountant can say «Liquidación de
+tarjeta · Visa» and cannot show the movements that charge covers. The data is
+almost there — every imported movement carries `importId`, `importBatches`
+holds `{ accountId, from, to, count }` per statement, and the bank line's own
+concept quotes the period.
+
+The identifier will be the PERIOD on the card account, not the `importId`: an
+importId identifies the file somebody uploaded, which breaks on a re-import, on
+a statement split across two files, and on movements imported before imports
+were batched (those carry no importId at all). A period is what a card
+statement IS, it survives re-import, and it is what is printed on the paper and
+on the bank line. The check worth having falls out of it: the covered purchases
+must foot to the charge, and nothing verifies that today.
+
+**S94 · `cashGroup` has the same closed door, one function below the one just
+fixed.** For money coming IN it returns "" when no withdrawal is open, so a
+deposit of unspent cash entered before the withdrawal was declared offers
+«Devolución de efectivo» nowhere and says nothing. Left standing in this commit
+because it is a different screen state and belongs with the caja-chica register
+S93 needs, not because it is acceptable.
+
+**S95 · An adicional that starts empty can only ADD, and that is the trade.**
+Settled with the operator on 07/09: _"agree"_, against the cost stated in full
+before it was taken. Under the redesign an adicional is its own budget record
+started from scratch, not a clone of the accepted scope, so it cannot modify or
+reduce a line that is already agreed. Reductions become explicit negative
+lines — honest on the customer's paper, and `writeContractAnnex` already
+accepts a negative annex — and editing an agreed line in place goes away.
+
+That capability is the one thing PK12-S13's version model bought and this
+gives back: _"the same partida stays the same partida, so a cost booked to it
+still lands where it was booked"_. It is the right thing to lose. An agreed
+line is a thing the customer signed, and a product that lets it be edited in
+place is a product where the scope somebody agreed to can change without a new
+piece of paper. The decision is recorded here rather than left to be
+rediscovered in phase 2, which is where it would otherwise have surfaced.
+
+**S96 · An annex could be granted and never withdrawn.** `writeContractAnnex`
+was the only thing in the engine that ever touched `con.annexes`. So an
+adicional accepted by mistake stayed in the contract, in the milestones and in
+the completion date permanently, and the only way out was editing the state
+document by hand. Third instance of the shape this repo has now named twice
+(`undoImport`, `clearCashReturn`, S89's assignment): granting and withdrawing
+are one feature, not two.
+
+`removeContractAnnex` takes out everything the annex put in — the row, the
+milestone it appended, the days it added, and the accepted pointer that put its
+partidas in the job. A half-undo is worse than none: remove only the row and
+the job silently keeps the scope and the date of something the contract no
+longer mentions. It refuses on two facts somebody already relied on, an
+invoiced milestone and progress marked on the scope it brought, and both
+refusals name what the operator has to do first.
+
+The operator authorised this on 07/09 — _"eliminate all annex of the project if
+required"_ — as permission to clear rather than migrate. It is built as an
+explicit, guarded, logged verb behind a confirmation that names the three
+consequences, NOT as a migration that runs on load: a silent wipe of scope,
+milestones and dates on a running job is exactly what the plan's own migration
+warning was about, and permission to delete is not permission to delete
+invisibly.
+
+**S96a · The progress guard first refused on scope the annex never brought.**
+An adicional version is a CLONE of the version it revises, ids and progress
+preserved, so reading its whole chapter list found every line of the base scope
+of a job in execution. It reads only the lines absent from `additionalOf`; an
+annex naming a version with no `additionalOf` revised nothing and brought no
+scope of its own.
+
+**S96b · `extendProjectDeadline(-4)` silently did nothing.** It returns null on
+anything at or below zero, correctly — it is the verb for "this extra takes
+longer", and a caller handing it a negative has the direction confused.
+Withdrawal reported `days: 4` in its result while the completion date did not
+move, which is the false-green shape this package keeps meeting. Its own
+private verb now gives the days back, by exactly what the annex moved forward
+and never further.
+
+**S97 · «Justificante: sin adjuntar» was a miss, not an empty slot.** The
+contract's Anexos tab read the motivo and the backing document from
+`state.changes` through `a.changeId`. That register is the LEGACY route:
+PK12-S13 replaced it with the adicional version, whose annexes carry
+`budgetId`, `versionId` and `ref` and leave `changeId` null. So on every annex
+written since, the lookup could not succeed and no upload would ever have shown
+there — which is what the operator photographed, three times on one contract.
+The tab reads the annex's own fields now, with the change record kept as the
+fallback it has become.
+
+**S98 · The annex signature is deliberately NOT the contract's, and it is
+inert.** `signContract` refuses without a document (CON-11) because a job's
+first invoice opens on the strength of it. An annex agreed on site does not
+work that way, and the operator named two options, the second of which has no
+paper. Refusing the verbal one would not produce more signed paper; it would
+produce a blank page scanned to get past the gate, which is worse than the
+truth because it LOOKS like evidence. Both are accepted, the record says which,
+and a verbal one names the person who agreed it — the only field standing in
+for a signature.
+
+It records the fact and moves nothing. Scope, plan and money still arrive on
+acceptance exactly as they do today; moving that gate is the plan's phase 4,
+with the migration that phase needs. Shipping the field first means the paper
+the operator already has can be attached while the rest is built.
+
+**S99 · Acceptance in the budget tool does nothing until the annex is agreed
+on the contract.** The operator, correcting the phasing of the adicionales
+plan: _"Acceptance camming from Budget tool do nothing until we accept it on
+Contracts/Annex. This is key."_ Said twice, the second time pointing at the
+sentence where the previous commit had called the annex signature inert and
+deferred the gate to a later phase. They were right that this is not a later
+phase — it is the point of the redesign, and shipping the screens around an
+unchanged rule would have left the product saying one thing and doing another.
+
+The product used to treat two different events as one. A customer agreeing a
+price and an annex to a signed contract are not the same fact, and acceptance
+moved the scope, the completion date and the money in a single step — so there
+was no state in which an extra was agreed commercially and not yet part of the
+job. That state is most of the life of a real adicional.
+
+Accepting now writes the annex and stops. `_applyContractAnnex` holds
+everything that used to happen on acceptance and runs when the annex is signed;
+`_unapplyContractAnnex` is its exact inverse and is shared by withdrawing a
+signature and removing the annex, because a half-undo is the same bug either
+way. `projectVariations` — the single walk everything chapter-addressed goes
+through — asks whether the annex was agreed, which is why one predicate gates
+Alcance, both progress readers, the cost allocation targets and certification
+at once.
+
+**S99a · The migration dissolved, and that is worth keeping.** `_annexApplied`
+reads an ABSENT `applied` flag as applied. Every annex written before the gate
+existed was applied the moment it was created, so a workspace saved before this
+change keeps every one of them and no data is touched; only rows written from
+here start `false`, which is the only population the gate can safely govern. The
+plan called a stamping migration the single most dangerous part of the work. A
+field that means "applied" by its absence removes the danger rather than
+managing it — a stamping pass could have missed a row; an absent field cannot.
+
+**S99b · Two states keep the old rule, both deliberately.** A job with no
+contract has no annex to sign, so its adicional applies on acceptance as it
+always did — refusing would strand work behind a signature with nowhere to be
+given, which is the principle `writeContractAnnex` already stated when it chose
+to return null rather than throw. And the legacy `state.changes` register keeps
+its one-step approval: half-gating it — an annex with no milestone but its days
+applied two lines later — would have recreated the "half the consequence
+missing" bug that method exists to fix.
+
+**S99c · I wrote the gate and forgot to arm it.** `writeContractAnnex` never set
+`applied: false`, so `_annexApplied` answered true for every new annex and
+`_applyContractAnnex` returned at its first line. Every check still passed
+except the one reading the flag through `contractValue` — the effects were all
+correct because the signature applied them, and nothing was gated because
+nothing was ever unapplied. A gate that is open by construction passes every
+test that only measures what happens when you go through it.
+
+**S99d · A test's comment named the rule it was defending.** `testVariationBudget`
+booked a cost onto a variation's partida under the line "what is NEW is the join
+on acceptance", and broke on «Unknown subpartida» — correct behaviour, obsolete
+test. Rewritten to measure the economics before the signature and after it, so
+it is now the second witness of the gate on the variation-BUDGET route where the
+new checks cover the adicional-VERSION one. Found only by the unfiltered run:
+both targeted suites and every static gate were green with this broken.
+
+**S99e · Nothing yet tells the operator where to go.** After accepting an
+adicional the Gantt and the economics correctly show nothing, and no screen says
+the annex is waiting to be signed. That is the same closed-door shape as the
+card settlement and it is NOT fixed here; it belongs with the register split,
+where the two lists make the pending ones visible. Written down rather than
+left to be rediscovered.
+
+**S100 · Two registers, because one row could not mean two things.** The
+operator's opening complaint — _"I think our way to manage the Adicionales is
+very very unclear"_ — over a list where `PRE-2026-0009 · Adicional ·
+ADI-2026-0001` was the ORIGINAL budget of its job wearing its adicional's badge.
+One record with two lifecycles, an Estado column that could only report one of
+them, and two kinds of row that read identically.
+
+The tab split was impossible while an adicional was a version of the original
+budget, because they are the same record. Making an adicional its own budget is
+what makes the two lists possible, and the lists are why it was worth doing:
+`Nuevos` is budgets with no `variationOf`, `Adicionales` is the rest.
+
+**S100a · The empty builder needed no work.** `createVariationBudget` has always
+produced a fresh budget with one blank version, which is exactly the operator's
+"gives you the Budgeting tool with no lines to start from scratch". The route
+that CLONED the accepted scope was the adicional VERSION, and that is the one
+being retired. The model the redesign wanted already existed and had been hidden
+behind a menu flag.
+
+**S100b · A CONTRACT, not a job.** `createAdicionalBudget` takes a contract id
+and reaches the obra through it. That is substance rather than wording: an
+adicional becomes an annex to a signed document, so naming the document at the
+moment it is created is what stops the two drifting apart — the drift that left
+`writeContractAnnex` keyed on `changeId` and unable to find anything (S97). The
+door refuses a finished or cancelled contract and a closed job, and when there
+is no live contract at all it says so and offers the way to Contratos rather
+than rendering an empty picker.
+
+**S100c · The ADI number survives the move.** It was the one good argument for
+the version model: a customer handed «PRE-2026-0014» reads a re-quote of the
+whole job, and the paper they should receive prices only the extra. That
+argument was always about the PAPER, not the record, so the budget carries an
+`adiNumber` of its own and the register shows it.
+
+**S100d · The days were still applying on acceptance, on both routes.**
+`setVariationScheduleDays` and `setAdditionalScheduleDays` each gated on
+`acceptedVersionId`, which PK13-S15 had made the wrong question — an adicional
+whose price is accepted but whose annex is unsigned is still a proposal as far
+as the job is concerned. Both ask `_annexApplied` now. The number is recorded
+when it is typed and applied when the annex joins. Missed in the gate commit
+because both live far from `acceptVersion` and neither is reached by the paths
+that commit's tests drove.
+
+**S100e · S99e is closed, in the register rather than with a banner.** An
+accepted adicional whose annex is unsigned shows «Anexo sin firmar» beside
+«Aceptado». Reading «Aceptado» alone, with the Gantt and the economics correctly
+showing nothing, was the closed door the gate had left behind.
+
+**S100f · A test asserted a badge; the answer became a register.**
+`testVariationBudget` checked that the row said «Adicional» — the old answer to
+the operator's "it does not identify as an Additional Budget". The new answer is
+a list of its own, so it asserts the adicional is ABSENT from «Nuevos» and
+PRESENT in «Adicionales», which a pill on a shared list could never give. The
+new door is driven end to end through the screen, both ends, because a verb no
+screen reaches is the failure this package has already met twice (S89, S92).
+
+**S101 · The days had to move before the tab could go.** The operator's item 5
+— «we eliminate Adicionales from Contratos» — and the tab could not simply be
+deleted, because «Formalizar un adicional» was the only place two things were
+captured: the days per partida, and the customer's answer. Both had to have a
+home first or the capability would have been removed rather than relocated.
+
+They separate cleanly along the line PK13-S15 drew. The customer's answer
+belongs to the presupuesto and is given there like any other; the days belong to
+the moment they take effect, which is no longer acceptance but the annex. So the
+signing panel asks for them — the operator's own item 4, "select the impact on
+delivery time" as part of agreeing the annex.
+
+`setAnnexScheduleDays` serves both routes so the screen never has to know which
+shape of adicional it is looking at; that is exactly the knowledge the
+two-register split exists to keep out of every caller. The variation BUDGET
+route gained a per-partida breakdown it never had — it only ever carried a
+total — because the schedule consumes one delay per partida through
+`applyChapterDelay`, and an adicional that moves a completion date but not the
+bars underneath it is half a plan.
+
+**S101a · A missing field must never block a signature.** `setAnnexScheduleDays`
+threw «Only an adicional carries days of its own» for an annex whose version is
+not an adicional. It runs on the way to signing, so the throw would have refused
+to AGREE AN ANNEX because of a field that should never have been offered for it.
+Those annexes are now asked for no days and the verb returns null: the guard
+belongs on the offer, not on the save.
+
+**S101b · Switching the signature method wiped the days.** `paint()` re-renders
+the whole drawer on every switch between «Anexo firmado» and «Aprobado
+verbalmente», and the breakdown was read back off `sched` — the values as they
+were when the drawer opened. Type the days, pick verbal, lose the days, and
+nothing says so. It is the rule the evidence field in this same file already
+carries and states: what a person has typed lives in the closure, not in the
+markup that is about to be replaced. Found because the test types the days and
+THEN picks the method, which is the order a person uses; a test that had signed
+first would have passed over it.
+
+**S101c · What «Contratos vigentes» keeps its name.** With the middle tab gone
+the strip is two contract tabs again, and «Vigentes» would read correctly once
+more. It stays as it is: renaming a tab the operator navigates by is a change
+they did not ask for, and the word costs nothing.

@@ -3634,10 +3634,11 @@ async function testVariationBudget(browser, base) {
     /* …and it is identifiable from the REGISTER, not only from inside the
        builder. The operator: it "brings me to the same Budget section, exactly
        the same workflow, but it does not identify as an Additional Budget."
-       True — `variationOf` was printed in the full-screen header and nowhere a
-       list could show it, so two rows meaning very different things read the
-       same. Asserted on the rendered row, and on the days actually reaching
-       the record. */
+
+       PK13-S16 answered that with a REGISTER OF ITS OWN rather than a badge on
+       a shared list, so the assertion is now the split itself: the adicional is
+       absent from «Nuevos» and present in «Adicionales», which is the property
+       a pill on one list could never give. */
     const marked = await pg.evaluate(async (projectId) => {
       const b = erp.state.budgets.find((x) => x.variationOf === projectId);
       /* Out of the builder the way a reader leaves it. Setting the hash is not
@@ -3647,18 +3648,98 @@ async function testVariationBudget(browser, base) {
       const back = document.querySelector("#bBack");
       if (back) back.click();
       await new Promise((r) => setTimeout(r, 700));
-      const row = [...document.querySelectorAll("#view tbody tr")].find((tr) =>
-        tr.textContent.includes(b.number),
-      );
+      const rowFor = () =>
+        [...document.querySelectorAll("#view tbody tr")].find((tr) =>
+          tr.textContent.includes(b.number),
+        );
+      const tabs = [...document.querySelectorAll("#view [data-btab]")].map((x) => x.textContent);
+      const inNuevos = !!rowFor();
+      const adiTab = document.querySelector('#view [data-btab="adicionales"]');
+      if (adiTab) adiTab.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const row = rowFor();
       return {
         days: b.scheduleImpactDays,
+        tabs,
+        inNuevos,
         rowFound: !!row,
-        saysAdicional: row ? /Adicional/i.test(row.textContent) : false,
+        saysAdi: row ? /ADI-/.test(row.textContent) : false,
       };
     }, pid);
-    if (marked.days === 9 && marked.rowFound && marked.saysAdicional)
-      ok("5-6: the register says «Adicional» on the row, and the days reached the record");
-    else bad("5-6: adicional identified in the register", JSON.stringify(marked));
+    if (marked.tabs.length === 2 && !marked.inNuevos && marked.rowFound)
+      ok("PK13-S16: the adicional is out of «Nuevos» and in its own register");
+    else bad("PK13-S16: the two registers", JSON.stringify(marked));
+    if (marked.days === 9) ok("5-6: the days reached the record");
+    else bad("5-6: adicional days on the record", JSON.stringify(marked));
+
+    /* PK13-S16 · «＋ Adicional» ASKS FOR A CONTRACT, and opens an empty
+       builder. The operator's own description of the door, and the reason the
+       old one had to go: it asked for an obra and CLONED the accepted scope,
+       which is what made an adicional a version of the original budget and the
+       two registers impossible. Driven through the screen, both ends —
+       nothing here calls the engine verb directly, because a verb no screen
+       reaches is the failure this package has already met twice. */
+    const door = await pg.evaluate(async () => {
+      go("quotes");
+      await new Promise((r) => setTimeout(r, 700));
+      const adiTab = document.querySelector('#view [data-btab="adicionales"]');
+      if (adiTab) adiTab.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const label = (document.querySelector("#bqNew") || {}).textContent || "";
+      document.querySelector("#bqNew").click();
+      await new Promise((r) => setTimeout(r, 600));
+      const sel = document.getElementById("ad_con");
+      const asksContract = !!sel && sel.options.length > 0;
+      const asksDays = !!document.querySelector("#ad_days");
+      if (!asksContract) return { label, asksContract, asksDays };
+      const before = erp.state.budgets.length;
+      document.getElementById("ad_why").value = "E2E adicional por contrato";
+      document.getElementById("ad_save").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const made = erp.state.budgets[erp.state.budgets.length - 1];
+      const v = made && (made.versions || [])[0];
+      return {
+        label,
+        asksContract,
+        asksDays,
+        created: erp.state.budgets.length === before + 1,
+        isAdi: !!(made && made.variationOf),
+        adiNumber: (made && made.adiNumber) || "",
+        onContract: !!(made && made.adicionalOfContract),
+        emptyScope: !!v && (v.chapters || []).length === 0,
+        openedInBuilder: /quotes/.test(location.hash) && !!document.querySelector("#bBack"),
+      };
+    });
+    if (/Adicional/.test(door.label) && door.asksContract && !door.asksDays)
+      ok("PK13-S16: «＋ Adicional» asks for the contract it amends, and not for the days");
+    else bad("PK13-S16: the adicional door", JSON.stringify(door));
+    if (door.created && door.isAdi && door.onContract && /^ADI-/.test(door.adiNumber))
+      ok(`PK13-S16: it is its own budget, on its contract, numbered ${door.adiNumber}`);
+    else bad("PK13-S16: the record it creates", JSON.stringify(door));
+    if (door.emptyScope && door.openedInBuilder)
+      ok("PK13-S16: and it opens the builder with no lines, to start from scratch");
+    else bad("PK13-S16: empty builder", JSON.stringify(door));
+
+    /* And the old door is GONE from ＋ Presupuesto — the operator asked for
+       exactly that, and leaving it would have kept creating records the new
+       register cannot show. */
+    const oldDoor = await pg.evaluate(async () => {
+      const back = document.querySelector("#bBack");
+      if (back) back.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const nuevos = document.querySelector('#view [data-btab="nuevos"]');
+      if (nuevos) nuevos.click();
+      await new Promise((r) => setTimeout(r, 600));
+      document.querySelector("#bqNew").click();
+      await new Promise((r) => setTimeout(r, 600));
+      const modes = [...document.querySelectorAll('input[name="bnmode"]')].map((x) => x.value);
+      const text = (document.querySelector("#dbody") || document.body).textContent;
+      closeDrawer();
+      return { modes, saysWhere: /pestaña Adicionales/.test(text) };
+    });
+    if (!oldDoor.modes.includes("additional") && oldDoor.saysWhere)
+      ok("PK13-S16: ＋ Presupuesto no longer offers it, and says where it moved to");
+    else bad("PK13-S16: old door removed", JSON.stringify(oldDoor));
 
     /* AND A SENT ADICIONAL CAN BE ANSWERED. The operator sent one to the client
        twice and reported it had disappeared: the answer control was gated on
@@ -3728,8 +3809,14 @@ async function testVariationBudget(browser, base) {
       ok("5-6: an adicional opens an adenda, not a second contract — days asked, money read");
     else bad("5-6: adicional goes to the adenda door", JSON.stringify(doors));
 
-    // Build and accept through the engine — the builder's own UI is already
-    // covered by two suites; what is NEW is the join on acceptance.
+    /* Build and accept through the engine — the builder's own UI is already
+       covered by two suites. What this asserts is the JOIN, and PK13-S15 moved
+       when it happens: acceptance used to put the variation into the job in one
+       step, and the operator's rule is that it does nothing until the annex is
+       agreed on the contract. So the join is measured in two halves here — the
+       economics before the signature and after it — which makes this suite the
+       second witness of the gate, on the variation-BUDGET route, where the
+       PK13-S15 checks cover the adicional-VERSION one. */
     const joined = await pg.evaluate((projectId) => {
       const b = erp.state.budgets.find((x) => x.variationOf === projectId);
       const ch = erp.addChapter(b.id, { name: "Cocina ampliada" }, "bo");
@@ -3748,6 +3835,13 @@ async function testVariationBudget(browser, base) {
       erp.issueVersion(b.id, {}, "bo");
       erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "firmado" }, "bo");
       const v = erp.version(b.id, b.acceptedVersionId);
+      // Accepted and not yet agreed: the money must NOT be in the job.
+      const beforeSign = erp.projectEconomics(projectId).variationRevenueCents;
+      const p = erp.project(projectId);
+      const con = p.contractId && erp.state.contracts.find((x) => x.id === p.contractId);
+      const annex = con && (con.annexes || []).find((a) => a.budgetId === b.id && !a.versionId);
+      if (annex)
+        erp.signContractAnnex(p.contractId, annex.number, { method: "verbal", by: "E2E" }, "bo");
       const ec = erp.projectEconomics(projectId);
       // a cost onto the variation's partida, for the drill-down below
       const sup = erp.state.parties.find((x) =>
@@ -3767,14 +3861,21 @@ async function testVariationBudget(browser, base) {
       return {
         num: v.chapters[0].num,
         vr: ec.variationRevenueCents,
+        beforeSign,
+        hadAnnex: !!annex,
         lineId: ln.id,
       };
     }, pid);
     if (Number(joined.num) > 1 && joined.vr === 60000)
       ok(
-        `5-6: acceptance renumbers into the project (chapter ${joined.num}) and joins the economics (+600,00 €)`,
+        `5-6: agreeing the annex renumbers the variation into the project (chapter ${joined.num}) and joins the economics (+600,00 €)`,
       );
     else bad("5-6: acceptance join", JSON.stringify(joined));
+    if (!joined.hadAnnex)
+      ok("5-6: no contract on this job, so there is no annex to gate on — applied on acceptance");
+    else if (joined.beforeSign === 0)
+      ok("PK13-S15: accepted and unsigned, the variation is NOT in the job's economics");
+    else bad("PK13-S15: variation gated until agreed", JSON.stringify(joined));
 
     // The economics screen: the variation row, its pill, and the drill-down.
     await pg.evaluate((projectId) => {
@@ -6769,6 +6870,51 @@ async function testBankAndCash(browser, base) {
     await bootedShell(pg);
     await pg.waitForTimeout(500);
 
+    /* FIRST, WITH NO CARD IN THE WORKSPACE AT ALL. This is the state the
+       operator reported from the live install: a bank line reading «ADEUDO
+       MENSUAL DE TARJETA … su desglose figura en el extracto de tarjeta
+       adjunto», and nothing anywhere on the panel about a card, because the
+       whole optgroup was suppressed when no card account existed. The answer
+       has to be ON the panel, refused, saying what it waits for — otherwise
+       the only way to learn this product models card settlements is to read
+       its source. Checked HERE, at the top of the suite, because this run
+       creates a card of its own further down and after that the state is
+       unreachable — the seeded workspace ships two bank accounts and no card,
+       which is the shape the report came from. */
+    const noCardYet = await pg.evaluate(async () => {
+      if (erp.state.bankAccounts.some((a) => a.kind === "card")) return { pre: "a card exists" };
+      goTab("banking", "_reconcile");
+      await new Promise((r) => setTimeout(r, 800));
+      for (const row of [...document.querySelectorAll("#rcList tr.click")]) {
+        const m = erp.state.movements.find((x) => x.id === row.dataset.id);
+        if (!m || m.amountCents >= 0) continue;
+        const acc = erp.state.bankAccounts.find((a) => a.id === m.accountId);
+        if (!acc || acc.kind === "card") continue;
+        row.click();
+        await new Promise((r) => setTimeout(r, 350));
+        const sel = document.getElementById("rcDest");
+        if (!sel) continue;
+        const grp = [...sel.querySelectorAll("optgroup")].find(
+          (g) => g.label === "Liquidación de tarjeta",
+        );
+        const opt = grp && grp.querySelector("option");
+        return {
+          shown: !!grp,
+          disabled: !!(opt && opt.disabled),
+          text: opt ? opt.textContent : "",
+        };
+      }
+      return { shown: false, noRow: true };
+    });
+    if (noCardYet.shown && noCardYet.disabled && /Configuración/.test(noCardYet.text))
+      ok(
+        "1C: with no card configured the settlement is still offered, refused, and says where to create one",
+      );
+    else bad("1C: settlement precondition is readable", JSON.stringify(noCardYet));
+    await pg.evaluate(() => closeDrawer());
+    await pg.evaluate(() => goTab("banking", "_bankAccounts"));
+    await pg.waitForTimeout(400);
+
     const cash = await pg.evaluate(() => {
       const w = erp.state.movements.find((m) => m.cashWithdrawal);
       if (!w) return { missing: true };
@@ -8434,41 +8580,48 @@ async function testContract(browser, base) {
     const inactiveRows = await pg.locator("#view table.mlist tr.click").count();
     await pg.locator('[data-ctab="active"]').click();
     await pg.waitForTimeout(500);
-    /* THREE tabs since PK12-S13: the adicionales got one of their own, and
-       «Vigentes» became «Contratos vigentes» because a tab beside it now lists
-       something else that is also in force. Asserted by NAME as well as by
-       count — the split between the two contract tabs is the property that
-       matters, and a third tab that listed contracts again would pass a bare
-       count of three. */
+    /* TWO tabs again. PK12-S13 gave adicionales one of their own here, and
+       PK13-S17 took it back out: an adicional is a presupuesto, it now has its
+       own register beside the ordinary ones, and this screen lists CONTRACTS.
+       Asserted by NAME as well as by count — the split between the two
+       contract tabs is the property that matters, and «Adicionales» must be
+       absent rather than merely outnumbered. */
     if (
-      tabs.length === 3 &&
+      tabs.length === 2 &&
       /Contratos vigentes/.test(tabs[0]) &&
-      /Adicionales/.test(tabs[1]) &&
+      !tabs.some((t) => /Adicionales/.test(t)) &&
       activeRows > 0 &&
       activeRows !== inactiveRows
     )
       ok(
-        `COM-04: three tabs — contracts split in two, adicionales their own (${activeRows}/${inactiveRows})`,
+        `COM-04: two tabs — contracts split in two, and only contracts (${activeRows}/${inactiveRows})`,
       );
     else bad("COM-04: tabs", `${tabs.join("/")} · ${activeRows}/${inactiveRows}`);
 
-    /* …and the adicionales tab is the versions, not a second register. Empty
-       on the demo, which is the honest state: nothing has been revised yet.
-       What must be true is that the tab exists, switches, and offers its own
-       creation door rather than the contract one. */
-    await pg.locator('[data-ctab="adicionales"]').click();
-    await pg.waitForTimeout(500);
-    const adiTab = await pg.evaluate(() => ({
+    /* PK13-S17 · and the screen creates CONTRACTS, only. The adicionales tab
+       carried the one door that formalised an adicional — days and the
+       customer's answer in a single panel, because acceptance was the single
+       moment everything happened at. Both halves moved: the answer is given on
+       the presupuesto like any other, and the days on the annex, where they now
+       take effect. What must be true here is that nothing is left pointing at
+       the removed tab. */
+    const gone = await pg.evaluate(() => ({
+      tab: !!document.querySelector('[data-ctab="adicionales"]'),
       newLabel: (document.querySelector("#conNew") || {}).textContent || "",
+      drawer: typeof newAdditionalDrawer,
       cols: [...document.querySelectorAll("#view table.mlist thead th")].map((t) =>
         t.textContent.trim(),
       ),
     }));
-    if (/Nuevo adicional/.test(adiTab.newLabel) && adiTab.cols.includes("Adicional"))
-      ok("COM-04: the adicionales tab has its own columns and its own creation door");
-    else bad("COM-04: adicionales tab", JSON.stringify(adiTab));
-    await pg.locator('[data-ctab="active"]').click();
-    await pg.waitForTimeout(500);
+    if (
+      !gone.tab &&
+      gone.drawer === "undefined" &&
+      /Nuevo contrato/.test(gone.newLabel) &&
+      gone.cols.includes("Contrato") &&
+      !gone.cols.includes("Adicional")
+    )
+      ok("PK13-S17: Contratos lists contracts and creates contracts — the adicionales tab is gone");
+    else bad("PK13-S17: adicionales tab removed", JSON.stringify(gone));
 
     // The amber column, checked against the engine rather than against a
     // colour: a pill appears exactly where annexes exist.
@@ -8936,6 +9089,287 @@ async function testChangeApprovalEvidence(browser, base) {
       if (viewer.open && (viewer.canvas || viewer.ext))
         ok("anexo evidence: the backup document actually opens");
       else bad("anexo evidence: viewer opens the backup", JSON.stringify(viewer));
+    }
+
+    /* The block above ends with the document viewer OPEN, and it covers the
+       page: every click after it times out against an overlay rather than the
+       control it names. Closed explicitly, because a suite that leaves a modal
+       up is a suite whose next failure describes the wrong thing. */
+    await pg.evaluate(() => closePhotoViewer());
+    await pg.waitForTimeout(300);
+
+    /* ---- PK13-S14: the MODERN annex, which this tab could never read ------
+       Everything above exercises the LEGACY route: a `state.changes` record,
+       found through `a.changeId`. PK12-S13 replaced that with the adicional
+       version, whose annex carries `budgetId`/`versionId`/`ref` and leaves
+       `changeId` null — so the lookup missed, and «Justificante: sin adjuntar»
+       was a miss no upload could fill rather than an empty slot. Reported from
+       a live contract with three of them, and untested here because this suite
+       only ever built the old shape. */
+    const modern = await pg.evaluate(() => {
+      const p = erp.state.projects.find((x) => x.contractId && x.budgetId && x.acceptedVersionId);
+      if (!p) return null;
+      const a = erp.writeContractAnnex(
+        p.id,
+        {
+          valueCents: 50000,
+          budgetId: p.budgetId,
+          versionId: p.acceptedVersionId,
+          ref: "ADI-E2E-9",
+        },
+        "e2e",
+      );
+      render();
+      return a ? { number: a.number, contractId: p.contractId } : null;
+    });
+    if (!modern) bad("anexo moderno: a project with a contract and accepted scope", "none");
+    else {
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(500);
+      const names = await pg.locator("#conBody").innerText();
+      if (/ADI-E2E-9/.test(names))
+        ok("anexo moderno: the tab names which adicional the annex came from");
+      else bad("anexo moderno: annex names its adicional", names.slice(0, 200));
+      if (/Pendiente de firma/.test(names) && /Todavía no está en la obra/.test(names))
+        ok("anexo moderno: and says it is pending, and what that costs the job");
+      else bad("anexo moderno: unsigned pill", names.slice(0, 200));
+
+      // ---- signed, with the document, and the document opens ---------------
+      await pg.evaluate((x) => signAnnexDrawer(x.contractId, x.number), modern);
+      await pg.waitForTimeout(500);
+      await pg.setInputFiles("#anx_ev input[type=file]", {
+        name: "anexo-firmado.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from(minimalPdf(), "latin1"),
+      });
+      await pg.waitForTimeout(700);
+      await pg.click("#anx_go");
+      await pg.waitForTimeout(700);
+      const sig = await pg.evaluate((x) => {
+        const c = erp.state.contracts.find((y) => y.id === x.contractId);
+        const a = (c.annexes || []).find((y) => y.number === x.number);
+        const g = a && a.signature;
+        return g
+          ? {
+              method: g.method,
+              name: (g.document || {}).name || "",
+              key: !!(g.document || {}).storageKey,
+            }
+          : null;
+      }, modern);
+      if (sig && sig.method === "document" && sig.name === "anexo-firmado.pdf" && sig.key)
+        ok("anexo moderno: the signed annex is stored as the real file");
+      else bad("anexo moderno: signature persisted", JSON.stringify(sig));
+
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(500);
+      const signedText = await pg.locator("#conBody").innerText();
+      const opens = await pg.evaluate(
+        () => !!document.querySelector('#conBody [data-evidence*="anexo-firmado"]'),
+      );
+      if (/Anexo firmado/.test(signedText) && opens)
+        ok("anexo moderno: and it is on the tab afterwards, as a document you can open");
+      else bad("anexo moderno: signed document visible", signedText.slice(0, 200));
+
+      /* ---- PK13-S17: THE DAYS ARE ASKED HERE NOW --------------------------
+         They lived on «Formalizar un adicional» in Contratos, beside the
+         customer's answer, because acceptance was the one moment everything
+         happened at. That panel is gone with its tab, so the days had to have a
+         home before it went — and the home is the annex, where they take
+         effect. Driven through the drawer, not the verb, because a field no
+         screen offers is the failure this package keeps meeting. */
+      const daysHere = await pg.evaluate((x) => signAnnexDrawer(x.contractId, x.number), modern);
+      void daysHere;
+      await pg.waitForTimeout(500);
+      const daysField = await pg.evaluate(() => ({
+        total: !!document.querySelector("#anx_days"),
+        perChapter: document.querySelectorAll(".anxDay").length,
+      }));
+      /* This annex was written directly against the job's own accepted version,
+         so there is no adicional behind it and no scope it added — asking for a
+         delivery impact would be a question with no answer. The real one below
+         gets the field. */
+      if (!daysField.total && !daysField.perChapter)
+        ok("PK13-S17: an annex with no adicional behind it is not asked for days");
+      else
+        bad("PK13-S17: days offered with nothing to attribute them to", JSON.stringify(daysField));
+      await pg.evaluate(() => closeDrawer());
+      await pg.waitForTimeout(300);
+
+      // ---- a verbal annex names who agreed it, or is refused ---------------
+      const verbal = await pg.evaluate((x) => {
+        const tries = (f) => {
+          try {
+            f();
+            return "";
+          } catch (e) {
+            return String(e.message || e);
+          }
+        };
+        const noName = tries(() =>
+          erp.signContractAnnex(x.contractId, x.number, { method: "verbal" }, "e2e"),
+        );
+        erp.signContractAnnex(
+          x.contractId,
+          x.number,
+          { method: "verbal", by: "Ignacio F." },
+          "e2e",
+        );
+        const c = erp.state.contracts.find((y) => y.id === x.contractId);
+        const a = (c.annexes || []).find((y) => y.number === x.number);
+        return {
+          noName,
+          method: a.signature.method,
+          by: a.signature.by,
+          doc: a.signature.document,
+        };
+      }, modern);
+      if (
+        /verbalmente/.test(verbal.noName) &&
+        verbal.method === "verbal" &&
+        verbal.by === "Ignacio F." &&
+        !verbal.doc
+      )
+        ok("anexo moderno: a verbal annex needs a name, keeps no document, and says so");
+      else bad("anexo moderno: verbal signature", JSON.stringify(verbal));
+
+      // ---- and it can be taken back out, all of it -------------------------
+      const removed = await pg.evaluate((x) => {
+        const c = erp.state.contracts.find((y) => y.id === x.contractId);
+        const before = {
+          annexes: (c.annexes || []).length,
+          // Appended by the signature above, not by writing the annex.
+          inst: (c.installments || []).filter((i) => i.annexNumber === x.number).length,
+        };
+        const out = erp.removeContractAnnex(x.contractId, x.number, "e2e");
+        return {
+          before,
+          out,
+          annexes: (c.annexes || []).length,
+          inst: (c.installments || []).filter((i) => i.annexNumber === x.number).length,
+          seated: (c.installments || []).every((i, n) => i.idx === n),
+        };
+      }, modern);
+      if (
+        removed.before.inst === 1 &&
+        removed.annexes === removed.before.annexes - 1 &&
+        removed.inst === 0 &&
+        removed.seated
+      )
+        ok("anexo moderno: removing it takes the annex AND the milestone it appended");
+      else bad("anexo moderno: removal", JSON.stringify(removed));
+
+      /* ---- and now the real thing, through the whole chain -----------------
+         The annex above was written directly, which tests the tab but not what
+         removal has to undo on a genuine adicional: the accepted pointer that
+         puts its partidas in the job, and the days it added to the completion
+         date. So one is built the way the product builds them — a new version,
+         a chapter of its own, issued and accepted — and then taken back. */
+      const real = await pg.evaluate(async () => {
+        const p = erp.state.projects.find(
+          (x) => x.contractId && x.budgetId && x.acceptedVersionId && !x.closed,
+        );
+        if (!p) return null;
+        const wasVersion = p.acceptedVersionId;
+        const c0 = erp.state.contracts.find((y) => y.id === p.contractId);
+        const endBefore = p.dates && p.dates.targetEnd;
+        const instBefore = (c0.installments || []).length;
+        // Relative, not absolute: this contract may already carry annexes from
+        // earlier in the suite, and the fact under test is the delta.
+        const pendingBefore = erp.contractValue(p.contractId).pendingAnnexes;
+        const v = erp.createAdditionalVersion(
+          p.budgetId,
+          { reason: "E2E: adicional real", scheduleImpactDays: 4 },
+          "e2e",
+        );
+        const ch = erp.addChapter(p.budgetId, { name: "E2E ampliación" }, "e2e");
+        erp.addLine(p.budgetId, ch.id, {
+          desc: "Partida del adicional",
+          unit: "ud",
+          qtyMilli: 1000,
+          priceCents: 30000,
+        });
+        erp.issueVersion(p.budgetId, {}, "e2e");
+        erp.acceptVersion(p.budgetId, v.id, { evidenceRef: "e2e" }, "e2e");
+        const annex = (c0.annexes || [])[(c0.annexes || []).length - 1];
+        /* THE POINT OF THE WHOLE GATE: the customer has agreed the price and
+           the job has not moved. Scope, milestone and completion date are all
+           still what the signed contract says. */
+        const onAccept = {
+          annex: !!annex,
+          scope: p.acceptedVersionId === wasVersion,
+          inst: (c0.installments || []).length === instBefore,
+          end: (p.dates && p.dates.targetEnd) === endBefore,
+          vigente: erp.contractValue(p.contractId).pendingAnnexes === pendingBefore + 1,
+        };
+        /* THROUGH THE PANEL, because that is what moved. The days used to be
+           typed on «Formalizar un adicional» in Contratos; that door went with
+           its tab, and had the field not arrived here first the capability
+           would have been deleted rather than moved. Two days on the first
+           partida, and the total left to follow the sum. */
+        signAnnexDrawer(p.contractId, annex.number);
+        await new Promise((r) => setTimeout(r, 400));
+        const dayInputs = [...document.querySelectorAll(".anxDay")];
+        const askedDays = dayInputs.length > 0 && !!document.getElementById("anx_days");
+        if (dayInputs.length) {
+          dayInputs[0].value = "2";
+          dayInputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        document.querySelector('input[name="anxhow"][value="verbal"]').click();
+        await new Promise((r) => setTimeout(r, 300));
+        document.getElementById("anx_by").value = "E2E";
+        document.getElementById("anx_go").click();
+        await new Promise((r) => setTimeout(r, 800));
+        const onSign = {
+          askedDays,
+          daysOnRecord: erp.version(p.budgetId, v.id).scheduleImpactDays,
+          scope: p.acceptedVersionId === v.id,
+          inst: (c0.installments || []).length === instBefore + 1,
+          end: (p.dates && p.dates.targetEnd) !== endBefore,
+          vigente: erp.contractValue(p.contractId).pendingAnnexes === pendingBefore,
+        };
+        const out = erp.removeContractAnnex(p.contractId, annex.number, "e2e");
+        return {
+          onAccept,
+          onSign,
+          out,
+          endBack: (p.dates && p.dates.targetEnd) === endBefore,
+          instBack: (c0.installments || []).length === instBefore,
+          backToBase: p.acceptedVersionId === wasVersion,
+          gone: !(c0.annexes || []).some((y) => y.number === annex.number),
+        };
+      });
+      if (!real) bad("anexo real: a running job to revise", "none");
+      else {
+        if (
+          real.onAccept.annex &&
+          real.onAccept.scope &&
+          real.onAccept.inst &&
+          real.onAccept.end &&
+          real.onAccept.vigente
+        )
+          ok(
+            "PK13-S15: accepting an adicional moves NOTHING — no scope, no milestone, no days, not in the importe vigente",
+          );
+        else bad("PK13-S15: acceptance is inert", JSON.stringify(real.onAccept));
+        if (real.onSign.scope && real.onSign.inst && real.onSign.end && real.onSign.vigente)
+          ok("PK13-S15: agreeing the annex on the contract is what puts all four into the job");
+        else bad("PK13-S15: the signature applies it", JSON.stringify(real.onSign));
+        if (real.onSign.askedDays && real.onSign.daysOnRecord === 2)
+          ok("PK13-S17: the days are typed on the signing panel, and signing applies them");
+        else bad("PK13-S17: days through the panel", JSON.stringify(real.onSign));
+        if (real.gone && real.backToBase && real.endBack && real.instBack)
+          ok(
+            `PK13-S15: and withdrawing it gives back the scope, the milestone and the ${real.out.days} days`,
+          );
+        else bad("PK13-S15: withdrawal restores the job", JSON.stringify(real));
+      }
     }
 
     if (errs.length) bad("anexo evidence: no console errors", errs.slice(0, 2).join(" | "));

@@ -844,8 +844,72 @@ window.CANEI_DICT.ca = {
     "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
   "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
+  "Al firmarlo": "En signar-lo",
+  "Sus partidas entran en el alcance de la obra.": "Les seves partides entren a l'abast de l'obra.",
+  "Su hito de pago se añade al contrato.": "La seva fita de pagament s'afegeix al contracte.",
+  "Sus días se suman a la fecha de fin.": "Els seus dies se sumen a la data de fi.",
+  "Todavía no está en la obra: ni sus partidas, ni su hito de pago, ni sus días. Se incorpora al firmarlo.":
+    "Encara no és a l'obra: ni les seves partides, ni la seva fita de pagament, ni els seus dies. S'incorpora en signar-lo.",
+  Nuevos: "Nous",
+  "＋ Adicional": "＋ Addicional",
+  "Nuevo adicional": "Nou addicional",
+  "Crear adicional": "Crear addicional",
+  "Adicional creado": "Addicional creat",
+  "Anexo sin firmar": "Annex sense signar",
+  "Ningún adicional coincide con la búsqueda.": "Cap addicional coincideix amb la cerca.",
+  "Ningún contrato en marcha": "Cap contracte en marxa",
+  "¿A qué contrato?": "A quin contracte?",
+  "Contrato en marcha": "Contracte en marxa",
+  "Cómo sigue": "Com segueix",
+  "Ir a Contratos": "Anar a Contractes",
+  "Los adicionales de obras en marcha. Se crean sobre un contrato y se incorporan a la obra al firmar su anexo.":
+    "Els addicionals d'obres en marxa. Es creen sobre un contracte i s'incorporen a l'obra en signar el seu annex.",
+  "Un adicional modifica un contrato vivo, así que primero hace falta uno con su obra abierta.":
+    "Un addicional modifica un contracte viu, així que primer cal un amb la seva obra oberta.",
+  "Se abre el presupuestador vacío y el adicional se escribe partida a partida.":
+    "S'obre el pressupostador buit i l'addicional s'escriu partida a partida.",
+  "Cuando el cliente lo acepte, aparecerá en el contrato como anexo pendiente de firma.":
+    "Quan el client l'accepti, apareixerà al contracte com a annex pendent de signatura.",
+  "Se incorpora a la obra al firmar ese anexo, con sus días.":
+    "S'incorpora a l'obra en signar aquest annex, amb els seus dies.",
+  "Un adicional de una obra en marcha se crea en la pestaña Adicionales, sobre el contrato que modifica.":
+    "Un addicional d'una obra en marxa es crea a la pestanya Addicionals, sobre el contracte que modifica.",
+  "Anexo firmado": "Annex signat",
+  "✍ Firmar anexo": "✍ Signar l'annex",
+  "Nombre y apellidos": "Nom i cognoms",
+  "Anexo retirado": "Annex retirat",
+  "Aprobado verbalmente": "Aprovat verbalment",
+  "Cambiar la firma": "Canviar la signatura",
+  "El documento firmado": "El document signat",
+  "Firma retirada": "Signatura retirada",
+  "Importe que sale del contrato": "Import que surt del contracte",
+  "Lo aprobó": "Ho va aprovar",
+  "Quién lo aprobó": "Qui ho va aprovar",
+  "Qué se deshace": "Què es desfà",
+  "Quitar anexo": "Treure l'annex",
+  "Quitar la firma": "Treure la signatura",
+  "Quitar todos los anexos": "Treure tots els annexos",
+  "Y con ello": "I amb això",
+  "El documento que firmó el cliente, como el contrato.":
+    "El document que va signar el client, com el contracte.",
+  "Queda registrado como lo que es: sin documento, y con el nombre de quien lo aprobó.":
+    "Queda registrat com el que és: sense document, i amb el nom de qui ho va aprovar.",
+  "El hito de pago que cada anexo añadió.": "La fita de pagament que cada annex va afegir.",
+  "Los días que sumó a la fecha de fin.": "Els dies que va sumar a la data de fi.",
+  "Sus partidas dejan de estar en el alcance de la obra.":
+    "Les seves partides deixen d'estar a l'abast de l'obra.",
+  "Se niega si el hito ya está facturado o si hay avance marcado sobre sus partidas.":
+    "Es nega si la fita ja està facturada o si hi ha avanç marcat sobre les seves partides.",
+  "Un anexo firmado necesita el documento firmado": "Un annex signat necessita el document signat",
+  "Di quién lo aprobó verbalmente": "Digues qui ho va aprovar verbalment",
+  "El hito de este anexo ya se ha facturado. Rectifica la factura antes de quitarlo.":
+    "La fita d'aquest annex ja s'ha facturat. Rectifica la factura abans de treure'l.",
+  "Hay avance marcado sobre las partidas de este anexo. Ponlo a cero antes de quitarlo.":
+    "Hi ha avanç marcat sobre les partides d'aquest annex. Posa'l a zero abans de treure'l.",
   "Cuentas y tarjetas": "Comptes i targetes",
   "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
+  "Primero crea la tarjeta en Configuración › Empresa":
+    "Primer crea la targeta a Configuració › Empresa",
   "Las cuentas y las tarjetas se crean en Configuración › Empresa.":
     "Els comptes i les targetes es creen a Configuració › Empresa.",
   Desactivar: "Desactivar",

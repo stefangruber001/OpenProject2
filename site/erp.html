@@ -15449,18 +15449,108 @@
       // is a flat list; the stage order is still what the baseRows are sorted
       // by, so the same "what's unwritten first, what's closed last" reading
       // survives the search box and the pager.
+      /* TWO REGISTERS, because one row could not mean two things.
+         The operator: «I think our way to manage the Adicionales is very very
+         unclear», looking at a list where `PRE-2026-0009 · Adicional ·
+         ADI-2026-0001` was the ORIGINAL budget of its job wearing its
+         adicional's badge — one record with two lifecycles, an Estado column
+         that could only report one of them, and no way to tell the two kinds of
+         row apart. A tab split is impossible while an adicional is a version of
+         the original budget, because they are the same record; making an
+         adicional its own budget is what makes these two lists possible, and
+         the lists are why it was worth doing.
+
+         `budgetTab` is module state so the tab survives opening a budget and
+         coming back — the way `conTab` does for contracts. */
+      /* «＋ Adicional» asks for the CONTRACT it amends, and nothing else.
+         The operator's own description of the door. A contract rather than a
+         job because an adicional becomes an annex to a signed document, so the
+         document is named the moment it is created rather than inferred later;
+         the obra comes with it. The builder opens EMPTY — a fresh budget with
+         one blank version — which is what «no lines to start from scratch»
+         means and what `createVariationBudget` has always produced.
+
+         The days are NOT asked here. They are chosen when the annex is agreed,
+         which is where they take effect (PK13-S15) and where the operator put
+         them; asking twice for one number is how the old route ended up with
+         two doors onto it and a delta to reconcile. */
+      function newAdicionalDrawer() {
+        const targets = erp.adicionalTargets();
+        const db = openDrawer("Nuevo adicional");
+        if (!targets.length) {
+          db.innerHTML = `<div class="card"><div class="ch"><h3>Ningún contrato en marcha</h3></div>
+          <div class="daylist">
+           <div class="it">Un adicional modifica un contrato vivo, así que primero hace falta uno con su obra abierta.</div>
+           <div class="it"><span style="flex:1"></span><button class="btn sm" id="adNoCon">Ir a Contratos</button></div>
+          </div></div>`;
+          $("#adNoCon").onclick = () => {
+            closeDrawer();
+            go("contracts");
+          };
+          return;
+        }
+        db.innerHTML = `
+         <div class="card"><div class="ch"><h3>¿A qué contrato?</h3></div><div class="daylist" style="gap:9px">
+          <div class="it"><label class="opt">Contrato en marcha
+            <select id="ad_con" style="margin-left:auto">${targets
+              .map(
+                (t) =>
+                  `<option value="${esc(t.contract.id)}">${esc(t.contract.number)} · ${esc(t.project.code)} · ${esc(erp.party(t.contract.partyId).name)}</option>`,
+              )
+              .join("")}</select></label></div>
+          <div class="it"><label class="opt">Motivo
+            <input id="ad_why" placeholder="Ampliación de la instalación eléctrica" style="margin-left:auto"></label></div>
+         </div></div>
+         <div class="card"><div class="ch"><h3>Cómo sigue</h3></div><div class="daylist">
+          <div class="it">Se abre el presupuestador vacío y el adicional se escribe partida a partida.</div>
+          <div class="it">Cuando el cliente lo acepte, aparecerá en el contrato como anexo pendiente de firma.</div>
+          <div class="it">Se incorpora a la obra al firmar ese anexo, con sus días.</div>
+         </div></div>
+         <div style="margin-top:10px"><button class="btn primary" id="ad_save">Crear adicional</button></div>`;
+        $("#ad_save").onclick = () =>
+          mutate(() => {
+            const rec = erp.createAdicionalBudget(
+              $("#ad_con").value,
+              { reason: $("#ad_why").value },
+              "backoffice",
+            );
+            closeDrawer();
+            budgetTab = "adicionales";
+            go("quotes", rec.id);
+            return rec;
+          }, "Adicional creado");
+      }
+      let budgetTab = "nuevos";
       function budgetList(v) {
+        const isAdi = (b) => !!b.variationOf;
         $("#sub").textContent =
-          "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.";
+          budgetTab === "adicionales"
+            ? "Los adicionales de obras en marcha. Se crean sobre un contrato y se incorporan a la obra al firmar su anexo."
+            : "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.";
         const stageIndex = Object.fromEntries(BUD_STAGES.map(([k], i) => [k, i]));
         const stageMeta = Object.fromEntries(BUD_STAGES.map(([k, l, t]) => [k, [l, t]]));
-        const baseRows = erp.state.budgets.slice().sort((a, b) => {
-          const sa = stageIndex[erp.budgetStage(a)] ?? 99,
-            sb = stageIndex[erp.budgetStage(b)] ?? 99;
-          return sa !== sb ? sa - sb : b.number.localeCompare(a.number);
-        });
-        renderMasterList(v, {
-          id: "quotes",
+        const baseRows = erp.state.budgets
+          .filter((b) => (budgetTab === "adicionales" ? isAdi(b) : !isAdi(b)))
+          .sort((a, b) => {
+            const sa = stageIndex[erp.budgetStage(a)] ?? 99,
+              sb = stageIndex[erp.budgetStage(b)] ?? 99;
+            return sa !== sb ? sa - sb : b.number.localeCompare(a.number);
+          });
+        v.innerHTML = `
+         <div class="tabstrip">
+           <button class="tab${budgetTab === "nuevos" ? " on" : ""}" data-btab="nuevos">Nuevos</button>
+           <button class="tab${budgetTab === "adicionales" ? " on" : ""}" data-btab="adicionales">Adicionales</button>
+         </div>
+         <div id="bqList"></div>`;
+        v.querySelectorAll("[data-btab]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              budgetTab = b.dataset.btab;
+              render();
+            }),
+        );
+        renderMasterList($("#bqList"), {
+          id: "quotes-" + budgetTab,
           ids: {
             q: "bqQ",
             size: "bqSize",
@@ -15472,8 +15562,8 @@
             expXlsx: "bqExpXlsx",
             expCsv: "bqExpCsv",
           },
-          newLabel: "＋ Presupuesto",
-          onNew: () => newBudgetDrawer(),
+          newLabel: budgetTab === "adicionales" ? "＋ Adicional" : "＋ Presupuesto",
+          onNew: () => (budgetTab === "adicionales" ? newAdicionalDrawer() : newBudgetDrawer()),
           searchPlaceholder: "Buscar por número o cliente…",
           nounSingular: "presupuesto",
           nounPlural: "presupuestos",
@@ -15503,14 +15593,25 @@
                 );
                 if (!b.variationOf && !adiV) return num;
                 if (adiV && !b.variationOf) {
+                  /* A budget of the LEGACY shape: the adicional is a version
+                     inside it, so this row is the original quote AND carries an
+                     adicional. That shape is retired — nothing creates one any
+                     more — and the badge stays for the ones already in the data,
+                     because a row that silently stopped saying so would lose the
+                     only sign that the version navigator holds an extra. */
                   const prj = erp.state.projects.find((x) => x.budgetId === b.id);
                   return `${num} <span class="pill b">Adicional</span> <span style="color:var(--muted)">${esc(adiV.adiNumber || "")}${prj ? " · " + esc(prj.code) : ""}</span>`;
                 }
+                /* In the Adicionales register every row is one, so the badge
+                   would say the same thing on every line. What the row has to
+                   carry is WHICH job and WHICH extra: the ADI number the
+                   customer's document quotes, and the obra it amends. */
                 let code = "";
                 try {
                   code = erp.project(b.variationOf).code;
                 } catch (e) {}
-                return `${num} <span class="pill b">Adicional</span>${code ? ` <span style="color:var(--muted)">${esc(code)}</span>` : ""}`;
+                const adiNo = b.adiNumber ? ` <b>${esc(b.adiNumber)}</b>` : "";
+                return `${num}${adiNo}${code ? ` <span style="color:var(--muted)">${esc(code)}</span>` : ""}`;
               },
               get: (b) => b.number,
             },
@@ -15559,12 +15660,26 @@
               get: (b) => stageMeta[erp.budgetStage(b)]?.[0] || b.status,
               html: (b) => {
                 const [label, tone] = stageMeta[erp.budgetStage(b)] || [b.status, ""];
-                return `<span class="pill ${tone}">${esc(label)}</span>`;
+                const pill = `<span class="pill ${tone}">${esc(label)}</span>`;
+                /* AND WHERE IT IS WAITING. Accepting an adicional stopped
+                   moving the job (PK13-S15), which is right and left nothing
+                   saying so: the Gantt and the economics correctly showed
+                   nothing and no screen mentioned the annex. An accepted
+                   adicional whose annex is unsigned says that here, in the
+                   register the operator is already looking at, rather than
+                   reading «Aceptado» and appearing to be done. */
+                if (!b.variationOf || !b.acceptedVersionId) return pill;
+                const a = erp.annexOfAdicional(b.id);
+                if (!a || a.applied !== false) return pill;
+                return `${pill} <span class="pill y">Anexo sin firmar</span>`;
               },
             },
           ],
           onRowClick: (id) => openBuilder(id),
-          emptyText: "Ningún presupuesto coincide con la búsqueda.",
+          emptyText:
+            budgetTab === "adicionales"
+              ? "Ningún adicional coincide con la búsqueda."
+              : "Ningún presupuesto coincide con la búsqueda.",
         });
       }
 
@@ -15586,10 +15701,7 @@
                  already accepted, so it starts from the job rather than from a
                  visit or a lead. Offered here because this is where the operator
                  looks when there is a budget to write, whatever kind it is. */
-        const revisable = erp.state.projects.filter(
-          (p) => !p.closed && p.budgetId && p.acceptedVersionId,
-        );
-        let mode = doneVisits.length ? "visit" : openLeads.length ? "lead" : "additional";
+        let mode = doneVisits.length ? "visit" : "lead";
         const db = openDrawer("Nuevo presupuesto");
         const paint = () => {
           db.innerHTML = `
@@ -15610,30 +15722,11 @@
               ? "No hace falta esperar a la visita para preparar el presupuesto."
               : "No hay ningún lead abierto todavía."
           }</div>
-          <div class="it"><label class="opt">
-            <input type="radio" name="bnmode" value="additional" ${mode === "additional" ? "checked" : ""}${revisable.length ? "" : " disabled"}>
-            <span>Adicional de una obra en marcha</span></label></div>
-          <div class="it" style="color:var(--muted);margin-top:-4px">${
-            revisable.length
-              ? "Se copia el alcance aceptado de la obra para modificarlo, ampliarlo o reducirlo. El presupuesto original se conserva."
-              : "No hay ninguna obra con presupuesto aceptado todavía."
-          }</div>
+          <div class="it" style="color:var(--muted);margin-top:2px">Un adicional de una obra en marcha se crea en la pestaña Adicionales, sobre el contrato que modifica.</div>
          </div></div>
          ${
-           mode === "additional"
-             ? `<div class="card"><div class="ch"><h3>Obra</h3></div><div class="daylist" style="gap:9px">
-          <div class="it"><label class="opt">Obra en marcha
-            <select id="bn_prj" style="margin-left:auto">${revisable
-              .map(
-                (p) =>
-                  `<option value="${esc(p.id)}">${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</option>`,
-              )
-              .join("")}</select></label></div>
-          <div class="it"><label class="opt">Motivo
-            <input id="bn_why" placeholder="Ampliación de la instalación eléctrica" style="margin-left:auto"></label></div>
-         </div></div>`
-             : mode === "visit"
-               ? `<div class="card"><div class="ch"><h3>Visita</h3></div><div class="daylist" style="gap:9px">
+           mode === "visit"
+             ? `<div class="card"><div class="ch"><h3>Visita</h3></div><div class="daylist" style="gap:9px">
           <div class="it"><label class="opt">Visita realizada
             <select id="bn_visit" style="margin-left:auto">${doneVisits
               .map((x) => {
@@ -15652,7 +15745,7 @@
               .join("")}</select></label></div>
          </div></div>`
          }
-         <div style="margin-top:10px"><button class="btn primary" id="bn_save"${doneVisits.length || openLeads.length || revisable.length ? "" : " disabled"}>Crear presupuesto</button></div>`;
+         <div style="margin-top:10px"><button class="btn primary" id="bn_save"${doneVisits.length || openLeads.length ? "" : " disabled"}>Crear presupuesto</button></div>`;
           db.querySelectorAll('input[name="bnmode"]').forEach((r) => {
             r.onchange = () => {
               mode = r.value;
@@ -15663,18 +15756,6 @@
         };
         const save = () =>
           mutate(() => {
-            if (mode === "additional") {
-              if (!revisable.length) throw new Error("No hay ninguna obra con alcance aceptado");
-              const prj = revisable.find((x) => x.id === $("#bn_prj").value) || revisable[0];
-              const v = erp.createAdditionalVersion(
-                prj.budgetId,
-                { reason: $("#bn_why").value },
-                "backoffice",
-              );
-              closeDrawer();
-              go("quotes", prj.budgetId);
-              return v;
-            }
             let partyId,
               propertyId,
               visit = null;
@@ -16056,16 +16137,7 @@
                  The origin is remembered when that tab opens one and cleared as soon
                  as it is used, so a budget reached any other way still goes back to
                  the quote register it belongs to. */
-        $("#bBack").onclick = () => {
-          if (budgetBackTo === "adicionales") {
-            budgetBackTo = null;
-            conTab = "adicionales";
-            conWork = null;
-            go("contracts");
-            return;
-          }
-          go("quotes");
-        };
+        $("#bBack").onclick = () => go("quotes");
         const verPick = $("#bVerPick");
         if (verPick)
           // The builder only ever EDITS the current version — v1.0 cannot be
@@ -19856,6 +19928,10 @@
           }, "Extracto importado");
       }
 
+      /* Hoisted out of the template for the reason this file has recorded seven
+               times: a string literal inside a conditional inside a template reads
+               to the source audit as prose with no translation. */
+      const NO_CARD_YET = "Primero crea la tarjeta en Configuración › Empresa";
       /**
        * THE LINE THAT PAYS THE CARD OFF, PROPOSED RATHER THAN HUNTED FOR.
        *
@@ -19948,7 +20024,19 @@
                  point of deactivating it, and for a while it was the whole point of
                  a method nothing called. */
         const cards = erp.activeBankAccounts().filter((a) => a.kind === "card");
-        if (!cards.length) return "";
+        /* AND WHEN THERE IS NO CARD, SAY SO — do not return "". A workspace with
+                 no card account made this whole answer VANISH from the picker: the
+                 operator opened a line that says «ADEUDO MENSUAL DE TARJETA … su
+                 desglose figura en el extracto de tarjeta adjunto», found nothing
+                 about a card anywhere on the panel, and had no way to learn that the
+                 product models this properly and is only missing the account. A
+                 precondition nobody can read is the same closed door package 13 has
+                 now opened four times; the recorrido's rule is the one that applies,
+                 and it is that a verb is never hidden — it is shown refused, with
+                 what it is waiting for. Disabled, so pressing Identificar with it
+                 writes nothing. */
+        if (!cards.length)
+          return `<optgroup label="Liquidación de tarjeta"><option value="" disabled>${esc(NO_CARD_YET)}</option></optgroup>`;
         const opts = cards.map((c) => `<option value="c:${c.id}">${esc(c.name)}</option>`).join("");
         return `<optgroup label="Liquidación de tarjeta">${opts}</optgroup>`;
       }
@@ -21246,45 +21334,7 @@
                    they can all be seen and formalised. Built from the versions
                    rather than from a register, because the versions ARE the record;
                    a second list kept beside them would be a second truth. */
-          /* ACCEPTED ONLY, the way «Contratos vigentes» lists what is in force
-                   rather than every draft ever started. An adicional still out with
-                   the customer is not something the job HAS — it is something
-                   waiting on an answer, and it lives on the budget where the answer
-                   is given. The operator asked for this directly. */
-          const adiRows = erp.state.budgets.flatMap((b) =>
-            (b.versions || [])
-              .filter((v) => v.additional && b.acceptedVersionId === v.id)
-              .map((v) => {
-                const prj = erp.state.projects.find((x) => x.budgetId === b.id);
-                const t = erp.budgetTotals(b.id, v.id);
-                const from = erp.budgetTotals(b.id, v.additionalOf);
-                // Shaped like a contract row: what it is worth, which contract
-                // it joined, and when it was agreed.
-                const con =
-                  prj && prj.contractId
-                    ? erp.state.contracts.find((c) => c.id === prj.contractId)
-                    : null;
-                return {
-                  id: b.id + "|" + v.id,
-                  budgetId: b.id,
-                  versionId: v.id,
-                  number: v.adiNumber || b.number,
-                  party: erp.party(b.partyId).name,
-                  projectCode: prj ? prj.code : "—",
-                  contractNumber: con ? con.number : "—",
-                  deltaCents: t.baseCents - from.baseCents,
-                  days: v.scheduleImpactDays || 0,
-                  daysApplied: !!v.scheduleAppliedToPlan,
-                  acceptedAt: (v.customerResponse && v.customerResponse.date) || v.date || null,
-                  accepted: true,
-                  issued: !!v.issued,
-                };
-              }),
-          );
-          const rows =
-            conTab === "adicionales"
-              ? adiRows
-              : all.filter((c) => (conTab === "active" ? c.active : !c.active));
+          const rows = all.filter((c) => (conTab === "active" ? c.active : !c.active));
           const CST = {
             draft: ["Borrador", ""],
             sent: ["Enviado", "b"],
@@ -21296,7 +21346,6 @@
           v.innerHTML = `
          <div class="tabstrip">
            <button class="tab${conTab === "active" ? " on" : ""}" data-ctab="active">Contratos vigentes</button>
-           <button class="tab${conTab === "adicionales" ? " on" : ""}" data-ctab="adicionales">Adicionales</button>
            <button class="tab${conTab === "inactive" ? " on" : ""}" data-ctab="inactive">Históricos</button>
          </div>
          <div id="conList"></div>`;
@@ -21312,8 +21361,8 @@
             // Package 2 slide 4: there was no way to create a contract at
             // all — not by hand, and not even from an accepted presupuesto.
             // Every contract in the system came from the seed.
-            newLabel: conTab === "adicionales" ? "＋ Nuevo adicional" : "＋ Nuevo contrato",
-            onNew: () => (conTab === "adicionales" ? newAdditionalDrawer() : newContractDrawer()),
+            newLabel: "＋ Nuevo contrato",
+            onNew: () => newContractDrawer(),
             ids: {
               q: "conQ",
               newBtn: "conNew",
@@ -21336,42 +21385,7 @@
                 .join(" ")
                 .toLowerCase()
                 .includes(q),
-            columns:
-              conTab === "adicionales"
-                ? [
-                    { label: "Adicional", primary: true, get: (r) => r.number },
-                    { label: "Cliente", get: (r) => r.party },
-                    { label: "Obra", get: (r) => r.projectCode },
-                    { label: "Contrato", get: (r) => r.contractNumber },
-                    {
-                      label: "Efecto en venta",
-                      html: (r) =>
-                        `<span style="color:${r.deltaCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${r.deltaCents > 0 ? "+" : ""}${eur0(r.deltaCents)}</span>`,
-                      get: (r) => r.deltaCents,
-                    },
-                    {
-                      /* Two different facts in one column, because they are one
-                         question to the reader: how much time it added, and
-                         whether the plan knows. An accepted adicional whose days
-                         never reached the schedule is the failure this package
-                         was opened for, so the row says so rather than showing a
-                         confident number that no bar on the chart agrees with. */
-                      label: "Plazo",
-                      html: (r) => adiPlazoCell(r),
-                      get: (r) => r.days,
-                    },
-                    {
-                      /* The DATE it was agreed, not a state: this tab lists
-                               only accepted adicionales now, so a column that said
-                               «Aceptado» on every row would be a column that says
-                               nothing. What a reader wants beside a settled thing is
-                               when it was settled. */
-                      label: "Aceptado",
-                      get: (r) => r.acceptedAt || "",
-                      html: (r) => (r.acceptedAt ? fmtD(r.acceptedAt) : "—"),
-                    },
-                  ]
-                : [
+            columns: [
                     { label: "Contrato", primary: true, get: (c) => c.number },
                     { label: "Cliente", get: (c) => c.party },
                     { label: "Obra", get: (c) => c.projectCode || "—" },
@@ -21398,17 +21412,8 @@
                         return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
                       },
                     },
-                  ],
+            ],
             onRowClick: (id) => {
-              /* An adicional row opens its BUDGET, because that is what it is.
-                       Sending it to a contract screen would be sending the reader to
-                       the document it will eventually hang off rather than to the
-                       scope they clicked on. */
-              if (conTab === "adicionales") {
-                budgetBackTo = "adicionales";
-                go("quotes", String(id).split("|")[0]);
-                return;
-              }
               conWork = { id, tab: "datos" };
               render();
             },
@@ -26281,117 +26286,182 @@
             closeDrawer();
           }, "Planificación actualizada con los días de los adicionales");
       }
-      /** Where «←» goes from the quote builder, when it is not Presupuestos. */
-      let budgetBackTo = null;
-      function newAdditionalDrawer() {
-        const pending = erp.state.budgets.flatMap((b) =>
-          (b.versions || [])
-            .filter((v) => v.additional && v.issued && b.acceptedVersionId !== v.id)
-            .map((v) => ({ b, v })),
-        );
-        const db = openDrawer("Formalizar un adicional");
-        if (!pending.length) {
-          db.innerHTML = `<div class="card"><div class="ch"><h3>Nada que formalizar</h3></div>
-          <div class="daylist"><div class="it">Un adicional se escribe en Presupuestos — «Nuevo presupuesto» → «Adicional de una obra en marcha» — y se formaliza aquí cuando el cliente responde.</div>
-          <div class="it">Ahora mismo no hay ninguno emitido esperando respuesta.</div></div></div>`;
-          return;
-        }
-        let pick = pending[0];
+      /* ---- The annex signature, and the way back out of one (PK13-S14) ----
+         Two options because the operator named two, and the second one has no
+         paper: «aprobado verbalmente» and «anexo firmado». The verbal one asks
+         WHO instead of a file — an annex agreed on site is a fact about a
+         conversation, and the only thing standing in for a signature is the
+         name of the person who gave it. The signed one takes the file through
+         the same control the contract uses, so it lands in the blob store
+         immediately and can be reopened from the tab afterwards. */
+      function signAnnexDrawer(contractId, annexNumber) {
+        const c = erp.state.contracts.find((x) => x.id === contractId);
+        const a = c && (c.annexes || []).find((x) => x.number === annexNumber);
+        if (!a) return;
+        let how = (a.signature && a.signature.method) || "document";
+        let ev = null;
+        /* THE DAYS ARE ASKED HERE NOW, and this is where they take effect.
+           They used to live on «Formalizar un adicional» in Contratos, beside
+           the customer's answer, because acceptance was the one moment
+           everything happened at. PK13-S15 split those moments; the days belong
+           to the second, so they are chosen where the annex is agreed — the
+           operator's own item 4. Recording them changes no plan until the annex
+           is signed, which is the same rule the figure has always followed. */
+        const sched = erp.annexScheduleChapters(contractId, annexNumber);
+        /* THE DAYS SURVIVE A REPAINT, and they did not. `paint()` re-renders
+           the whole drawer on every switch between «Anexo firmado» and
+           «Aprobado verbalmente», so a breakdown typed before the switch was
+           read back off `sched` — the values as they were when the drawer
+           opened — and silently discarded. Same shape as the rule the evidence
+           field already carries: what a person has typed lives in the closure,
+           not in the markup that is about to be replaced. */
+        const days = Object.assign({}, sched.days);
+        let total = sched.totalDays;
+        let totalTouched = false;
+        const db = openDrawer("Firmar " + annexNumber);
         const paint = () => {
-          const prj = erp.state.projects.find((x) => x.budgetId === pick.b.id);
-          const d = erp.diffVersions(pick.b.id, pick.v.additionalOf, pick.v.id);
-          const chapters = erp
-            .version(pick.b.id, pick.v.id)
-            .chapters.filter((c) => c.section === "base");
-          db.innerHTML = `<div class="card"><div class="ch"><h3>Adicional</h3></div>
+          db.innerHTML = `
+         <div class="card"><div class="ch"><h3>${esc(annexNumber)}</h3><b>${eur(a.valueCents)}</b></div>
           <div class="daylist" style="gap:9px">
-           <div class="it"><label class="opt">Cuál
-             <select id="ad_pick" style="margin-left:auto">${pending
-               .map(
-                 (x) =>
-                   `<option value="${esc(x.v.id)}"${x.v.id === pick.v.id ? " selected" : ""}>${esc(x.v.adiNumber)} · ${esc(erp.party(x.b.partyId).name)}</option>`,
-               )
-               .join("")}</select></label></div>
-           <div class="it"><span style="flex:1">Obra</span><b>${esc(prj ? prj.code : "—")}</b></div>
-           <div class="it"><span style="flex:1">Efecto en venta</span><b>${d.deltaCents > 0 ? "+" : ""}${eur(d.deltaCents)}</b></div>
-           <div class="it"><span style="flex:1">Efecto en coste</span><b>${d.costDeltaCents > 0 ? "+" : ""}${eur(d.costDeltaCents)}</b></div>
-           <div class="it"><span style="flex:1">Margen después</span><b>${d.marginToPct}%</b></div>
+           <div class="it"><label class="opt"><input type="radio" name="anxhow" value="document"${how === "document" ? " checked" : ""}>
+             <span>Anexo firmado</span></label></div>
+           <div class="it" style="color:var(--muted);margin-top:-4px">El documento que firmó el cliente, como el contrato.</div>
+           <div class="it"><label class="opt"><input type="radio" name="anxhow" value="verbal"${how === "verbal" ? " checked" : ""}>
+             <span>Aprobado verbalmente</span></label></div>
+           <div class="it" style="color:var(--muted);margin-top:-4px">Queda registrado como lo que es: sin documento, y con el nombre de quien lo aprobó.</div>
           </div></div>
-         <div class="card"><div class="ch"><h3>Efecto en plazo, por partida</h3></div>
+         ${
+           how === "verbal"
+             ? `<div class="card"><div class="ch"><h3>Quién lo aprobó</h3></div><div class="fgrid" style="padding:12px 16px">
+          <div class="field full"><label>Nombre</label><input id="anx_by" value="${esc((a.signature && a.signature.by) || "")}" placeholder="Nombre y apellidos"></div>
+         </div></div>`
+             : `<div class="card"><div class="ch"><h3>El documento firmado</h3></div><div id="anx_ev" style="padding:12px 16px"></div></div>`
+         }
+         <div class="card"><div class="ch"><h3>Fecha</h3></div><div class="fgrid" style="padding:12px 16px">
+          <div class="field"><label>Firmado el</label><input id="anx_when" type="date" value="${esc((a.signature && a.signature.signedAt) || erp.state.today)}"></div>
+         </div></div>
+         ${
+           sched.chapters.length
+             ? `<div class="card"><div class="ch"><h3>Efecto en plazo, por partida</h3></div>
           <div class="fgrid" style="padding:12px 16px">
-           ${chapters
+           ${sched.chapters
              .map(
-               (c) =>
-                 `<div class="field"><label>${esc(c.num)}. ${esc(c.name)}</label>
-              <input class="adDay" data-chap="${esc(c.num)}" type="number" min="0" step="1" value="${Number((pick.v.scheduleDaysByChapter || {})[c.num]) || 0}"></div>`,
+               (ch) =>
+                 `<div class="field"><label>${esc(ch.num)}. ${esc(ch.name)}</label>
+              <input class="anxDay" data-chap="${esc(ch.num)}" type="number" min="0" step="1" value="${Number(days[ch.num]) || 0}"></div>`,
              )
              .join("")}
            <div class="field full" style="color:var(--muted);font-size:12.5px">El total mueve la fecha de fin. Se propone la suma; cámbielo si las partidas se solapan.</div>
-           <div class="field"><label>Total de días</label><input id="ad_total" type="number" min="0" step="1" value="${Number(pick.v.scheduleImpactDays) || 0}"></div>
-          </div></div>
-         <div class="card"><div class="ch"><h3>Cómo lo aceptó el cliente</h3></div>
-          <div class="daylist" style="gap:9px">
-           <div class="it"><label class="opt">Quién aceptó
-             <input id="ad_who" placeholder="Nombre de quien dio el visto bueno" style="margin-left:auto"></label></div>
-           <div class="it"><label class="opt">Cómo
-             <select id="ad_how" style="margin-left:auto">
-               <option value="adenda">Adenda firmada</option>
-               <option value="email">Correo electrónico</option>
-               <option value="whatsapp">WhatsApp</option>
-               <option value="verbal">De palabra, en obra</option>
-             </select></label></div>
-           <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Justificante</label>
-            <div id="ad_doc"></div></div>
-           <div class="it" style="color:var(--muted)">Una aceptación informal es un hecho como cualquier otro: se registra quién y cómo, y el adicional entra en la obra igual. Sin justificante queda anotado que no lo hay.</div>
-          </div></div>`;
-          const ev = evidenceField($("#ad_doc"), {
-            value: held,
-            prefix: "adi",
-            hint: "Arrastra aquí la adenda firmada, el correo o la captura del WhatsApp.",
-            onChange: (r) => {
-              held = r;
-            },
-          });
-          void ev;
-          $("#ad_pick").onchange = (e) => {
-            pick = pending.find((x) => x.v.id === e.target.value) || pending[0];
-            paint();
-          };
-          // The total follows the sum until somebody says otherwise.
-          db.querySelectorAll(".adDay").forEach((i) => {
-            i.oninput = () => {
-              const sum = [...db.querySelectorAll(".adDay")].reduce(
-                (a, x) => a + (Number(x.value) || 0),
-                0,
-              );
-              $("#ad_total").value = sum;
+           <div class="field"><label>Total de días</label><input id="anx_days" type="number" min="0" step="1" value="${total}"></div>
+          </div></div>`
+             : ""
+         }
+         <div class="card"><div class="ch"><h3>Al firmarlo</h3></div><div class="daylist">
+          <div class="it">Sus partidas entran en el alcance de la obra.</div>
+          <div class="it">Su hito de pago se añade al contrato.</div>
+          <div class="it">Sus días se suman a la fecha de fin.</div>
+         </div></div>
+         <div style="margin-top:10px;display:flex;gap:8px">
+          <button class="btn primary" id="anx_go">Guardar</button>
+          ${a.signature ? '<button class="btn sm" id="anx_clear">Quitar la firma</button>' : ""}
+         </div>`;
+          db.querySelectorAll('input[name="anxhow"]').forEach((r) => {
+            r.onchange = () => {
+              how = r.value;
+              paint();
             };
           });
-          drawerFoot('<button class="btn primary" id="ad_go">Aceptar el adicional</button>');
-          $("#ad_go").onclick = () =>
+          const host = $("#anx_ev");
+          if (host)
+            ev = evidenceField(host, {
+              value: (a.signature && a.signature.document) || null,
+              prefix: "anexo",
+            });
+          /* The total follows the sum while nobody has overridden it, which is
+             what the old panel did and what makes the common case one number
+             instead of two. */
+          const totalEl = $("#anx_days");
+          if (totalEl)
+            totalEl.oninput = () => {
+              totalTouched = true;
+              total = Number(totalEl.value) || 0;
+            };
+          db.querySelectorAll(".anxDay").forEach((el) => {
+            el.oninput = () => {
+              days[el.dataset.chap] = Number(el.value) || 0;
+              if (totalTouched || !totalEl) return;
+              total = Object.values(days).reduce((n, x) => n + (Number(x) || 0), 0);
+              totalEl.value = total;
+            };
+          });
+          $("#anx_go").onclick = () =>
             mutate(() => {
-              const by = {};
-              db.querySelectorAll(".adDay").forEach((i) => {
-                by[i.dataset.chap] = Number(i.value) || 0;
+              db.querySelectorAll(".anxDay").forEach((el) => {
+                days[el.dataset.chap] = Number(el.value) || 0;
               });
-              erp.setAdditionalScheduleDays(
-                pick.b.id,
-                pick.v.id,
-                by,
-                Number($("#ad_total").value) || 0,
-                "backoffice",
-              );
-              erp.acceptVersion(
-                pick.b.id,
-                pick.v.id,
-                { evidence: held, acceptedBy: $("#ad_who").value || null },
+              if (totalEl && totalTouched) total = Number(totalEl.value) || 0;
+              /* Days FIRST, signature second, and the order is the whole
+                 mechanism: signing applies whatever the record says, so a
+                 figure written afterwards would sit there unapplied. */
+              erp.setAnnexScheduleDays(contractId, annexNumber, days, total, "backoffice");
+              erp.signContractAnnex(
+                contractId,
+                annexNumber,
+                {
+                  method: how,
+                  document: ev ? ev.value() : null,
+                  by: how === "verbal" ? ($("#anx_by") || {}).value : null,
+                  date: $("#anx_when").value,
+                },
                 "backoffice",
               );
               closeDrawer();
-            }, "Adicional aceptado — entra en la obra");
+            }, "Anexo firmado");
+          const cl = $("#anx_clear");
+          if (cl)
+            cl.onclick = () =>
+              mutate(() => {
+                erp.clearContractAnnexSignature(contractId, annexNumber, "backoffice");
+                closeDrawer();
+              }, "Firma retirada");
         };
-        let held = null;
         paint();
+      }
+      /* Taking an annex back out, and SAYING WHAT THAT COSTS before it happens.
+         The engine removes everything the annex put in — the milestone, the
+         days, the accepted scope — and refuses when somebody has already relied
+         on it. The confirmation names those three consequences rather than
+         asking «are you sure», because the question a person can actually
+         answer is what they are about to lose. `annexNumber` null means all of
+         them, newest first, which is the order the accepted pointer unwinds. */
+      function removeAnnexAsk(contractId, annexNumber) {
+        const c = erp.state.contracts.find((x) => x.id === contractId);
+        if (!c) return;
+        const list = annexNumber
+          ? (c.annexes || []).filter((x) => x.number === annexNumber)
+          : c.annexes || [];
+        if (!list.length) return;
+        const total = list.reduce((s, x) => s + (x.valueCents || 0), 0);
+        const db = openDrawer(annexNumber ? "Quitar " + annexNumber : "Quitar todos los anexos");
+        db.innerHTML = `
+         <div class="card"><div class="ch"><h3>Qué se deshace</h3><span class="tag">${list.length}</span></div>
+          <div class="daylist">
+           ${list.map((x) => `<div class="it"><span style="flex:1">${esc(x.number)}</span><b>${eur(x.valueCents)}</b></div>`).join("")}
+           <div class="it" style="border-top:1px solid var(--line)"><span style="flex:1">Importe que sale del contrato</span><b>${eur(total)}</b></div>
+          </div></div>
+         <div class="card"><div class="ch"><h3>Y con ello</h3></div><div class="daylist">
+          <div class="it">El hito de pago que cada anexo añadió.</div>
+          <div class="it">Los días que sumó a la fecha de fin.</div>
+          <div class="it">Sus partidas dejan de estar en el alcance de la obra.</div>
+          <div class="it" style="color:var(--muted)">Se niega si el hito ya está facturado o si hay avance marcado sobre sus partidas.</div>
+         </div></div>
+         <div style="margin-top:10px"><button class="btn primary" id="anx_del">Quitar</button></div>`;
+        $("#anx_del").onclick = () =>
+          mutate(() => {
+            if (annexNumber) erp.removeContractAnnex(contractId, annexNumber, "backoffice");
+            else erp.removeAllContractAnnexes(contractId, "backoffice");
+            closeDrawer();
+          }, "Anexo retirado");
       }
       function newContractDrawer(seed, opts) {
         const linkable = erp.state.budgets.filter(
@@ -29271,6 +29341,7 @@
           <div class="who"><b>${esc(d.number)}</b><span>${esc(d.customer.name)}</span></div>
           ${val.differs ? `<span class="pill y">${val.annexes === 1 ? "1 anexo" : val.annexes + " anexos"}</span>` : ""}
           <div class="tot"><span>Importe vigente</span><b>${eur(val.currentCents)}</b></div>
+          ${val.pendingAnnexes ? `<div class="tot"><span>Pendiente de firma</span><b>${eur(val.pendingAnnexCents)}</b></div>` : ""}
           <div class="acts">
            ${
              /* Signing had exactly one door, and it was on the way in: the creation
@@ -29642,43 +29713,108 @@
           return;
         }
         if (conWork.tab === "anexos") {
-          // Package 2 slide 8: a number, a date and an amount proved an anexo
-          // EXISTS but said nothing about what it was or let anyone reopen
-          // its backup — the change record behind each one already carries
-          // both (desc/reason from when it was raised, evidence from when it
-          // was approved), so this reads them rather than adding a second
-          // place to store the same facts.
+          /* WHAT AN ANNEX IS, read off the annex.
+             Package 2 slide 8 asked for more than a number, a date and an
+             amount, and this tab answered it by reading `state.changes` through
+             `a.changeId`. That register is the LEGACY route: PK12-S13 replaced
+             it with the adicional version, whose annexes carry `budgetId`,
+             `versionId` and `ref` and leave `changeId` null. So the lookup
+             could not succeed on anything written since, and «Justificante: sin
+             adjuntar» was not an empty slot waiting for a file — it was a miss
+             that no upload could ever have filled. Reported by the operator
+             from a contract with three of them.
+
+             The annex's own fields first, the change record only as the
+             fallback it now is. */
+          const annexOrigin = (a) => {
+            if (a.changeId) {
+              const chg = erp.state.changes.find((x) => x.id === a.changeId);
+              return chg
+                ? { ref: chg.annexNumber || "", why: chg.desc || "", note: chg.reason || "", chg }
+                : { ref: "", why: "", note: "", chg: null };
+            }
+            const b = a.budgetId ? erp.state.budgets.find((x) => x.id === a.budgetId) : null;
+            const v = b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
+            return {
+              ref: a.ref || (v && v.adiNumber) || (b && b.number) || "",
+              why: (v && v.reason) || (b && b.internalRef) || "",
+              note: b && a.versionId ? b.number : "",
+              chg: null,
+            };
+          };
           host.innerHTML = `<div class="daylist" style="gap:10px">
             ${
               d.annexes
                 .map((a) => {
-                  const chg = erp.state.changes.find((x) => x.id === a.changeId);
-                  return `<div class="card" style="margin:0"><div class="ch"><h3>${esc(a.number)}</h3><b>${eur(a.valueCents)}</b></div>
+                  const o = annexOrigin(a);
+                  const sg = a.signature;
+                  /* Built as statements, not inside the template: a literal
+                     inside a conditional inside a template is what the source
+                     audit reads as prose with no translation. */
+                  /* «Sin firmar» is the state, and the sentence beside it is
+                     the consequence — the fact the operator asked for: an
+                     adicional the customer has agreed a price for is not in
+                     the job until the annex is agreed here. A pill that only
+                     names a state leaves the reader to work out what it costs
+                     them, and this one costs them the scope. */
+                  const signPill = sg
+                    ? sg.method === "verbal"
+                      ? '<span class="pill y">Aprobado verbalmente</span>'
+                      : '<span class="pill g">Anexo firmado</span>'
+                    : '<span class="pill y">Pendiente de firma</span>';
+                  const pendingNote = sg
+                    ? ""
+                    : '<div class="it" style="color:var(--muted)">Todavía no está en la obra: ni sus partidas, ni su hito de pago, ni sus días. Se incorpora al firmarlo.</div>';
+                  const docRow =
+                    sg && sg.method === "document" && sg.document
+                      ? `<div class="it"><span>Anexo firmado</span><span style="flex:1"></span>
+              <b><a href="#" data-evidence="${esc(JSON.stringify(sg.document))}">${esc(sg.document.name || "Ver el documento")}</a></b></div>`
+                      : "";
+                  const byRow =
+                    sg && sg.by
+                      ? `<div class="it"><span>Lo aprobó</span><span style="flex:1"></span><b>${esc(sg.by)}</b></div>`
+                      : "";
+                  const whenRow = sg
+                    ? `<div class="it"><span>Firmado el</span><span style="flex:1"></span><b>${fmtD(sg.signedAt)}</b></div>`
+                    : "";
+                  const legacyDoc =
+                    o.chg && o.chg.evidence && o.chg.evidence.storageKey
+                      ? `<div class="it"><span>Justificante</span><span style="flex:1"></span>
+              <b><a href="#" data-evidence="${esc(JSON.stringify(o.chg.evidence))}">${esc(o.chg.evidence.name || "Ver el documento")}</a></b></div>`
+                      : "";
+                  const photo =
+                    o.chg && o.chg.photoRef
+                      ? `<div class="it"><span>Foto de origen</span><span style="flex:1"></span>
+              <img data-blob="${esc(o.chg.photoRef)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:0"></div>`
+                      : "";
+                  return `<div class="card" style="margin:0"><div class="ch"><h3>${esc(a.number)}</h3>${signPill}<span style="flex:1"></span><b>${eur(a.valueCents)}</b></div>
             <div class="daylist">
+             ${pendingNote}
              <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(a.date)}</b></div>
-             ${chg ? `<div class="it"><span>Motivo</span><span style="flex:1"></span><b>${esc(chg.desc)}</b></div>` : ""}
-             ${chg && chg.reason ? `<div class="it" style="color:var(--muted)">${esc(chg.reason)}</div>` : ""}
-             ${
-               chg && chg.photoRef
-                 ? `<div class="it"><span>Foto de origen</span><span style="flex:1"></span>
-              <img data-blob="${esc(chg.photoRef)}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:0"></div>`
-                 : ""
-             }
-             ${
-               chg && chg.evidence && chg.evidence.storageKey
-                 ? `<div class="it"><span>Justificante</span><span style="flex:1"></span>
-              <b data-evidence="${esc(JSON.stringify(chg.evidence))}">${esc(chg.evidence.name || "Ver el documento")}</b></div>`
-                 : chg && chg.evidenceRef
-                   ? `<div class="it" style="color:var(--muted)"><span>Justificante</span><span style="flex:1"></span><b>${esc(chg.evidenceRef)}</b></div>`
-                   : `<div class="it" style="color:var(--muted)"><span>Justificante</span><span style="flex:1"></span><b>sin adjuntar</b></div>`
-             }
+             ${o.ref ? `<div class="it"><span>Adicional</span><span style="flex:1"></span><b>${esc(o.ref)}${o.note ? ` · ${esc(o.note)}` : ""}</b></div>` : ""}
+             ${o.why ? `<div class="it"><span>Motivo</span><span style="flex:1"></span><b>${esc(o.why)}</b></div>` : ""}
+             ${photo}
+             ${legacyDoc}
+             ${whenRow}${byRow}${docRow}
+             <div class="it"><span style="flex:1"></span>
+              <button class="btn sm" data-annexsign="${esc(a.number)}">${sg ? "Cambiar la firma" : "✍ Firmar anexo"}</button>
+              <button class="btn sm" data-annexdel="${esc(a.number)}">Quitar anexo</button></div>
             </div></div>`;
                 })
                 .join("") ||
               '<div class="card" style="margin:0"><div class="daylist"><div class="it">Sin anexos. El importe vigente es el original.</div></div></div>'
             }
             ${d.annexes.length ? `<div class="it"><span>Total anexos</span><span style="flex:1"></span><b>${eur(val.annexCents)}</b></div>` : ""}
+            ${d.annexes.length ? `<div class="it"><span style="flex:1"></span><button class="btn sm" id="anxWipe">Quitar todos los anexos</button></div>` : ""}
            </div>`;
+          host.querySelectorAll("[data-annexsign]").forEach((b) => {
+            b.onclick = () => signAnnexDrawer(d.id, b.dataset.annexsign);
+          });
+          host.querySelectorAll("[data-annexdel]").forEach((b) => {
+            b.onclick = () => removeAnnexAsk(d.id, b.dataset.annexdel);
+          });
+          const wipe = host.querySelector("#anxWipe");
+          if (wipe) wipe.onclick = () => removeAnnexAsk(d.id, null);
           paintImages(host);
           return;
         }
