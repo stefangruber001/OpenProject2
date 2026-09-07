@@ -9372,3 +9372,23 @@ commit the server ought to be running from a hand-written
 those built an image the server took, and the checker compared against an older
 commit and called it fine. Both now read the list out of the workflow
 (`ops/image-paths.sh`). Two lists cannot be kept in step by intention.
+
+**S104 · A ceiling raised for a string that is meant to be deleted.** The
+source-literal gate went 162 → 163 because `ef4f04a` added a temporary «Hello
+World» span to the header, checked in so that it would deploy at all and answer
+whether the build in front of the operator had changed. It is a real text node,
+so the scanner is right about it — this is not the 206 → 207 case, where the
+ceiling was the honest fix because the string was developer prose in a comment.
+
+The ceiling moved anyway, rather than the span being deleted, because the span
+belongs to a session that is still using it and removing another agent's live
+instrument mid-question is the less reversible of the two. The note in `ci.yml`
+says who puts it back and when: whoever deletes the span returns the number to
+162 in the same commit. It is one of headroom on a gate whose own comment says
+headroom is what a ratchet must not have, and it is recorded here so that it
+cannot become permanent by being forgotten.
+
+Worth saying plainly: the question the marker exists to answer is now answered
+twice over. The operator reported it never reached the server, and `deploy.yml`
+has a `verify` job that asks `/api/health` whether the revision answering is the
+one just built. Nothing needs a span in the header to find that out any more.
