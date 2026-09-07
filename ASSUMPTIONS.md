@@ -9218,3 +9218,59 @@ the annex is waiting to be signed. That is the same closed-door shape as the
 card settlement and it is NOT fixed here; it belongs with the register split,
 where the two lists make the pending ones visible. Written down rather than
 left to be rediscovered.
+
+**S100 · Two registers, because one row could not mean two things.** The
+operator's opening complaint — _"I think our way to manage the Adicionales is
+very very unclear"_ — over a list where `PRE-2026-0009 · Adicional ·
+ADI-2026-0001` was the ORIGINAL budget of its job wearing its adicional's badge.
+One record with two lifecycles, an Estado column that could only report one of
+them, and two kinds of row that read identically.
+
+The tab split was impossible while an adicional was a version of the original
+budget, because they are the same record. Making an adicional its own budget is
+what makes the two lists possible, and the lists are why it was worth doing:
+`Nuevos` is budgets with no `variationOf`, `Adicionales` is the rest.
+
+**S100a · The empty builder needed no work.** `createVariationBudget` has always
+produced a fresh budget with one blank version, which is exactly the operator's
+"gives you the Budgeting tool with no lines to start from scratch". The route
+that CLONED the accepted scope was the adicional VERSION, and that is the one
+being retired. The model the redesign wanted already existed and had been hidden
+behind a menu flag.
+
+**S100b · A CONTRACT, not a job.** `createAdicionalBudget` takes a contract id
+and reaches the obra through it. That is substance rather than wording: an
+adicional becomes an annex to a signed document, so naming the document at the
+moment it is created is what stops the two drifting apart — the drift that left
+`writeContractAnnex` keyed on `changeId` and unable to find anything (S97). The
+door refuses a finished or cancelled contract and a closed job, and when there
+is no live contract at all it says so and offers the way to Contratos rather
+than rendering an empty picker.
+
+**S100c · The ADI number survives the move.** It was the one good argument for
+the version model: a customer handed «PRE-2026-0014» reads a re-quote of the
+whole job, and the paper they should receive prices only the extra. That
+argument was always about the PAPER, not the record, so the budget carries an
+`adiNumber` of its own and the register shows it.
+
+**S100d · The days were still applying on acceptance, on both routes.**
+`setVariationScheduleDays` and `setAdditionalScheduleDays` each gated on
+`acceptedVersionId`, which PK13-S15 had made the wrong question — an adicional
+whose price is accepted but whose annex is unsigned is still a proposal as far
+as the job is concerned. Both ask `_annexApplied` now. The number is recorded
+when it is typed and applied when the annex joins. Missed in the gate commit
+because both live far from `acceptVersion` and neither is reached by the paths
+that commit's tests drove.
+
+**S100e · S99e is closed, in the register rather than with a banner.** An
+accepted adicional whose annex is unsigned shows «Anexo sin firmar» beside
+«Aceptado». Reading «Aceptado» alone, with the Gantt and the economics correctly
+showing nothing, was the closed door the gate had left behind.
+
+**S100f · A test asserted a badge; the answer became a register.**
+`testVariationBudget` checked that the row said «Adicional» — the old answer to
+the operator's "it does not identify as an Additional Budget". The new answer is
+a list of its own, so it asserts the adicional is ABSENT from «Nuevos» and
+PRESENT in «Adicionales», which a pill on a shared list could never give. The
+new door is driven end to end through the screen, both ends, because a verb no
+screen reaches is the failure this package has already met twice (S89, S92).

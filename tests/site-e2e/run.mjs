@@ -3634,10 +3634,11 @@ async function testVariationBudget(browser, base) {
     /* …and it is identifiable from the REGISTER, not only from inside the
        builder. The operator: it "brings me to the same Budget section, exactly
        the same workflow, but it does not identify as an Additional Budget."
-       True — `variationOf` was printed in the full-screen header and nowhere a
-       list could show it, so two rows meaning very different things read the
-       same. Asserted on the rendered row, and on the days actually reaching
-       the record. */
+
+       PK13-S16 answered that with a REGISTER OF ITS OWN rather than a badge on
+       a shared list, so the assertion is now the split itself: the adicional is
+       absent from «Nuevos» and present in «Adicionales», which is the property
+       a pill on one list could never give. */
     const marked = await pg.evaluate(async (projectId) => {
       const b = erp.state.budgets.find((x) => x.variationOf === projectId);
       /* Out of the builder the way a reader leaves it. Setting the hash is not
@@ -3647,18 +3648,98 @@ async function testVariationBudget(browser, base) {
       const back = document.querySelector("#bBack");
       if (back) back.click();
       await new Promise((r) => setTimeout(r, 700));
-      const row = [...document.querySelectorAll("#view tbody tr")].find((tr) =>
-        tr.textContent.includes(b.number),
-      );
+      const rowFor = () =>
+        [...document.querySelectorAll("#view tbody tr")].find((tr) =>
+          tr.textContent.includes(b.number),
+        );
+      const tabs = [...document.querySelectorAll("#view [data-btab]")].map((x) => x.textContent);
+      const inNuevos = !!rowFor();
+      const adiTab = document.querySelector('#view [data-btab="adicionales"]');
+      if (adiTab) adiTab.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const row = rowFor();
       return {
         days: b.scheduleImpactDays,
+        tabs,
+        inNuevos,
         rowFound: !!row,
-        saysAdicional: row ? /Adicional/i.test(row.textContent) : false,
+        saysAdi: row ? /ADI-/.test(row.textContent) : false,
       };
     }, pid);
-    if (marked.days === 9 && marked.rowFound && marked.saysAdicional)
-      ok("5-6: the register says «Adicional» on the row, and the days reached the record");
-    else bad("5-6: adicional identified in the register", JSON.stringify(marked));
+    if (marked.tabs.length === 2 && !marked.inNuevos && marked.rowFound)
+      ok("PK13-S16: the adicional is out of «Nuevos» and in its own register");
+    else bad("PK13-S16: the two registers", JSON.stringify(marked));
+    if (marked.days === 9) ok("5-6: the days reached the record");
+    else bad("5-6: adicional days on the record", JSON.stringify(marked));
+
+    /* PK13-S16 · «＋ Adicional» ASKS FOR A CONTRACT, and opens an empty
+       builder. The operator's own description of the door, and the reason the
+       old one had to go: it asked for an obra and CLONED the accepted scope,
+       which is what made an adicional a version of the original budget and the
+       two registers impossible. Driven through the screen, both ends —
+       nothing here calls the engine verb directly, because a verb no screen
+       reaches is the failure this package has already met twice. */
+    const door = await pg.evaluate(async () => {
+      go("quotes");
+      await new Promise((r) => setTimeout(r, 700));
+      const adiTab = document.querySelector('#view [data-btab="adicionales"]');
+      if (adiTab) adiTab.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const label = (document.querySelector("#bqNew") || {}).textContent || "";
+      document.querySelector("#bqNew").click();
+      await new Promise((r) => setTimeout(r, 600));
+      const sel = document.getElementById("ad_con");
+      const asksContract = !!sel && sel.options.length > 0;
+      const asksDays = !!document.querySelector("#ad_days");
+      if (!asksContract) return { label, asksContract, asksDays };
+      const before = erp.state.budgets.length;
+      document.getElementById("ad_why").value = "E2E adicional por contrato";
+      document.getElementById("ad_save").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const made = erp.state.budgets[erp.state.budgets.length - 1];
+      const v = made && (made.versions || [])[0];
+      return {
+        label,
+        asksContract,
+        asksDays,
+        created: erp.state.budgets.length === before + 1,
+        isAdi: !!(made && made.variationOf),
+        adiNumber: (made && made.adiNumber) || "",
+        onContract: !!(made && made.adicionalOfContract),
+        emptyScope: !!v && (v.chapters || []).length === 0,
+        openedInBuilder: /quotes/.test(location.hash) && !!document.querySelector("#bBack"),
+      };
+    });
+    if (/Adicional/.test(door.label) && door.asksContract && !door.asksDays)
+      ok("PK13-S16: «＋ Adicional» asks for the contract it amends, and not for the days");
+    else bad("PK13-S16: the adicional door", JSON.stringify(door));
+    if (door.created && door.isAdi && door.onContract && /^ADI-/.test(door.adiNumber))
+      ok(`PK13-S16: it is its own budget, on its contract, numbered ${door.adiNumber}`);
+    else bad("PK13-S16: the record it creates", JSON.stringify(door));
+    if (door.emptyScope && door.openedInBuilder)
+      ok("PK13-S16: and it opens the builder with no lines, to start from scratch");
+    else bad("PK13-S16: empty builder", JSON.stringify(door));
+
+    /* And the old door is GONE from ＋ Presupuesto — the operator asked for
+       exactly that, and leaving it would have kept creating records the new
+       register cannot show. */
+    const oldDoor = await pg.evaluate(async () => {
+      const back = document.querySelector("#bBack");
+      if (back) back.click();
+      await new Promise((r) => setTimeout(r, 600));
+      const nuevos = document.querySelector('#view [data-btab="nuevos"]');
+      if (nuevos) nuevos.click();
+      await new Promise((r) => setTimeout(r, 600));
+      document.querySelector("#bqNew").click();
+      await new Promise((r) => setTimeout(r, 600));
+      const modes = [...document.querySelectorAll('input[name="bnmode"]')].map((x) => x.value);
+      const text = (document.querySelector("#dbody") || document.body).textContent;
+      closeDrawer();
+      return { modes, saysWhere: /pestaña Adicionales/.test(text) };
+    });
+    if (!oldDoor.modes.includes("additional") && oldDoor.saysWhere)
+      ok("PK13-S16: ＋ Presupuesto no longer offers it, and says where it moved to");
+    else bad("PK13-S16: old door removed", JSON.stringify(oldDoor));
 
     /* AND A SENT ADICIONAL CAN BE ANSWERED. The operator sent one to the client
        twice and reported it had disappeared: the answer control was gated on

@@ -2336,6 +2336,38 @@ syntax, i18n coverage complete in three languages, source literals 162/162,
 workspace audit 0/0. ASSUMPTIONS S99. Still open, written down rather than
 fixed here: no screen yet says the annex is waiting (S99e).
 
+**S16 · Presupuestos becomes two registers, and the adicional becomes its own
+record.** The operator's items 1 and 2, and the reason the model had to change
+first: in their screenshot `PRE-2026-0009 · Adicional · ADI-2026-0001` WAS the
+original budget of P-2026-0009 wearing its adicional's badge. One record, two
+lifecycles, one Estado column that could only report one of them. A tab split is
+impossible while an adicional is a version of the original budget, because they
+are the same row.
+
+«Nuevos» and «Adicionales», each with its own door. **＋ Adicional asks for the
+contract it amends** — not a job, because an adicional becomes an annex to a
+signed document and naming it at creation is what stops the two drifting apart —
+and then opens the builder EMPTY. That part needed no work at all:
+`createVariationBudget` has always made a fresh budget with one blank version.
+The route that cloned the accepted scope was the version route, and it is the
+one being retired; ＋ Presupuesto no longer offers it and says where it moved.
+
+Each adicional carries an **ADI number of its own** for the customer's document.
+That was the single good argument for the version model — a customer handed a
+PRE number reads a re-quote of the whole job — and it was always about the paper
+rather than the record, so it survives the move.
+
+Two things found on the way, both consequences of S15 that S15 missed: the days
+were still applying on acceptance on BOTH routes, because
+`setVariationScheduleDays` and `setAdditionalScheduleDays` gated on
+`acceptedVersionId` rather than on the annex; and S99e is closed — an accepted
+adicional whose annex is unsigned now says «Anexo sin firmar» in the register,
+instead of reading «Aceptado» while the job correctly showed nothing.
+
+Gates: site E2E **754/754 unfiltered**, site-sync 20/20, iOS routes 7/7,
+boundaries, site syntax, i18n coverage complete in three languages, source
+literals 162/162, workspace audit 0/0. ASSUMPTIONS S100.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they

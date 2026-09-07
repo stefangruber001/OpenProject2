@@ -850,6 +850,30 @@ window.CANEI_DICT.ca = {
   "Sus días se suman a la fecha de fin.": "Els seus dies se sumen a la data de fi.",
   "Todavía no está en la obra: ni sus partidas, ni su hito de pago, ni sus días. Se incorpora al firmarlo.":
     "Encara no és a l'obra: ni les seves partides, ni la seva fita de pagament, ni els seus dies. S'incorpora en signar-lo.",
+  Nuevos: "Nous",
+  "＋ Adicional": "＋ Addicional",
+  "Nuevo adicional": "Nou addicional",
+  "Crear adicional": "Crear addicional",
+  "Adicional creado": "Addicional creat",
+  "Anexo sin firmar": "Annex sense signar",
+  "Ningún adicional coincide con la búsqueda.": "Cap addicional coincideix amb la cerca.",
+  "Ningún contrato en marcha": "Cap contracte en marxa",
+  "¿A qué contrato?": "A quin contracte?",
+  "Contrato en marcha": "Contracte en marxa",
+  "Cómo sigue": "Com segueix",
+  "Ir a Contratos": "Anar a Contractes",
+  "Los adicionales de obras en marcha. Se crean sobre un contrato y se incorporan a la obra al firmar su anexo.":
+    "Els addicionals d'obres en marxa. Es creen sobre un contracte i s'incorporen a l'obra en signar el seu annex.",
+  "Un adicional modifica un contrato vivo, así que primero hace falta uno con su obra abierta.":
+    "Un addicional modifica un contracte viu, així que primer cal un amb la seva obra oberta.",
+  "Se abre el presupuestador vacío y el adicional se escribe partida a partida.":
+    "S'obre el pressupostador buit i l'addicional s'escriu partida a partida.",
+  "Cuando el cliente lo acepte, aparecerá en el contrato como anexo pendiente de firma.":
+    "Quan el client l'accepti, apareixerà al contracte com a annex pendent de signatura.",
+  "Se incorpora a la obra al firmar ese anexo, con sus días.":
+    "S'incorpora a l'obra en signar aquest annex, amb els seus dies.",
+  "Un adicional de una obra en marcha se crea en la pestaña Adicionales, sobre el contrato que modifica.":
+    "Un addicional d'una obra en marxa es crea a la pestanya Addicionals, sobre el contracte que modifica.",
   "Anexo firmado": "Annex signat",
   "✍ Firmar anexo": "✍ Signar l'annex",
   "Nombre y apellidos": "Nom i cognoms",

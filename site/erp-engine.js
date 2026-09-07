@@ -2202,11 +2202,18 @@
       const applied = Math.max(0, Math.round(v.scheduleAppliedDays || 0));
       v.scheduleImpactDays = want;
       const delta = want - applied;
-      /* Only once accepted, for `setVariationScheduleDays`'s reason: a
-         proposal must not move a date the customer has not agreed to. */
-      if (delta !== 0 && b.acceptedVersionId === v.id) {
-        const prj = this.state.projects.find((x) => x.budgetId === budgetId);
-        if (prj && this.extendProjectDeadline(prj.id, delta, v.adiNumber, user))
+      /* Only once the annex is AGREED, for `setVariationScheduleDays`'s reason
+         and with PK13-S15's correction to it: a proposal must not move a date
+         the customer has not agreed to, and after the gate an adicional whose
+         price is accepted but whose annex is unsigned is still a proposal as
+         far as the job is concerned. */
+      const prj = this.state.projects.find((x) => x.budgetId === budgetId);
+      const live =
+        b.acceptedVersionId === v.id &&
+        prj &&
+        this._annexApplied(this._annexForBudget(prj.id, budgetId, v.id));
+      if (delta !== 0 && live) {
+        if (this.extendProjectDeadline(prj.id, delta, v.adiNumber, user))
           v.scheduleAppliedDays = want;
       }
       this._log(user, "setAdditionalScheduleDays", v.adiNumber + " +" + want + "d");
@@ -3061,6 +3068,63 @@
       rec.scheduleImpactDays = Math.max(0, Math.round(scheduleImpactDays || 0));
       this._log(user, "createVariationBudget", p.code + " ← " + rec.number);
       return rec;
+    }
+    /**
+     * An adicional, created against the CONTRACT it amends.
+     *
+     * The operator's own words for the door: «whenever you click on ＋
+     * Adicional, it requires you to select from an Active Contract (Adicional
+     * de una obra en marcha), and then it gives you the Budgeting tool with no
+     * lines to start from scratch».
+     *
+     * A CONTRACT, not a job, and that is the substance rather than the wording:
+     * an adicional becomes an annex to a signed document, so naming the
+     * document it amends at the moment it is created is what stops the two
+     * drifting apart. The job is reached through the contract, never chosen
+     * separately.
+     *
+     * EMPTY, and it already was: `createVariationBudget` makes a fresh budget
+     * with one blank version, which is exactly the "no lines to start from
+     * scratch" this asks for. The route that CLONED the accepted scope is the
+     * adicional VERSION (PK12-S13), and this replaces it — see ASSUMPTIONS S95
+     * for the trade that makes: an adicional can add, and a reduction is an
+     * explicit negative line rather than an edit of something already agreed.
+     *
+     * It carries an ADI number of its own for the customer's document. A
+     * budget handed over as «PRE-2026-0014» reads as a re-quote of the whole
+     * job; the paper the customer should receive says «ADI-2026-0002» and
+     * prices only the extra — the same reasoning the version route was given,
+     * and it survives the move because it was always about the paper.
+     */
+    createAdicionalBudget(contractId, { reason, scheduleImpactDays } = {}, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      if (["completed", "cancelled"].includes(c.status))
+        throw new Error("Un contrato finalizado o anulado no admite adicionales");
+      const p = this.state.projects.find((x) => x.contractId === c.id);
+      if (!p) throw new Error("Ese contrato todavía no tiene obra");
+      if (p.closed) throw new Error("Una obra cerrada no admite adicionales");
+      const rec = this.createVariationBudget(p.id, { reason, scheduleImpactDays }, user);
+      rec.adicionalOfContract = c.id;
+      rec.adiNumber = this.nextNumber("additional");
+      this._log(user, "createAdicionalBudget", c.number + " ← " + rec.adiNumber);
+      return rec;
+    }
+    /** The annex an adicional budget wrote, so a register can say where it waits. */
+    annexOfAdicional(budgetId) {
+      const b = this.state.budgets.find((x) => x.id === budgetId);
+      if (!b || !b.variationOf) return null;
+      return this._annexForBudget(b.variationOf, b.id);
+    }
+    /** The contracts an adicional can be raised against: live, and with a job. */
+    adicionalTargets() {
+      return this.state.contracts
+        .filter((c) => !["completed", "cancelled"].includes(c.status))
+        .map((c) => ({
+          contract: c,
+          project: this.state.projects.find((x) => x.contractId === c.id) || null,
+        }))
+        .filter((x) => x.project && !x.project.closed);
     }
     /**
      * The project's variations that are actually IN the job, oldest first.
@@ -4553,13 +4617,23 @@
     _annexApplied(a) {
       return !a || a.applied !== false;
     }
-    /** The annex a variation budget produced on its project's contract, if any. */
-    _annexForBudget(projectId, budgetId) {
+    /**
+     * The annex an adicional produced on its project's contract, if any.
+     * With a `versionId` it looks for the annex of that adicional VERSION;
+     * without one, for the annex of the variation BUDGET itself — the two
+     * routes write different rows and matching on the budget alone would let
+     * a version's annex answer for its budget.
+     */
+    _annexForBudget(projectId, budgetId, versionId) {
       const p = this.state.projects.find((x) => x.id === projectId);
       if (!p || !p.contractId) return null;
       const c = this.state.contracts.find((x) => x.id === p.contractId);
       if (!c) return null;
-      return (c.annexes || []).find((a) => a.budgetId === budgetId && !a.versionId) || null;
+      return (
+        (c.annexes || []).find((a) =>
+          versionId ? a.versionId === versionId : a.budgetId === budgetId && !a.versionId,
+        ) || null
+      );
     }
     /**
      * The annex JOINS THE JOB — and until this runs, accepting an adicional
@@ -4844,7 +4918,14 @@
       const applied = Math.max(0, Math.round(b.scheduleAppliedDays || 0));
       b.scheduleImpactDays = want;
       const delta = want - applied;
-      if (delta !== 0 && b.acceptedVersionId) {
+      /* Only once the annex is AGREED. Before that the adicional is a proposal,
+         and a proposal must not move a date the customer has not agreed to —
+         which after PK13-S15 includes one they have accepted a price for but
+         nobody has signed the annex of. The number is still recorded; it is
+         applied when the annex joins the job. */
+      const live =
+        b.acceptedVersionId && this._annexApplied(this._annexForBudget(b.variationOf, b.id));
+      if (delta !== 0 && live) {
         /* Only once accepted. Before that the adicional is a proposal, and a
            proposal must not move a date the customer has not agreed to. */
         this.extendProjectDeadline(b.variationOf, delta, b.number, user);
