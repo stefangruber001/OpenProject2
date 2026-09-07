@@ -11,6 +11,19 @@ import type { Cents } from "@repo/kernel";
 export type FieldKey =
   | "issuerName"
   | "issuerTaxId"
+  /* WHERE THE ISSUER IS, AND HOW TO REACH THEM. A received document is the
+     only place this information arrives from, and a party record cannot be
+     completed without it — so a reader that stops at the name and the tax id
+     hands back a record somebody then has to fill in by hand from the same
+     page they just photographed. Generic keys: what a postal address looks
+     like, which digits are a telephone and how a region is written beside a
+     town are all locale knowledge and arrive through the profile. */
+  | "issuerAddress"
+  | "issuerPostcode"
+  | "issuerCity"
+  | "issuerRegion"
+  | "issuerPhone"
+  | "issuerEmail"
   | "docNumber"
   | "issueDate"
   | "dueDate"
@@ -24,6 +37,12 @@ export type FieldKey =
 export const FIELD_KEYS: FieldKey[] = [
   "issuerName",
   "issuerTaxId",
+  "issuerAddress",
+  "issuerPostcode",
+  "issuerCity",
+  "issuerRegion",
+  "issuerPhone",
+  "issuerEmail",
   "docNumber",
   "issueDate",
   "dueDate",

@@ -82,6 +82,13 @@ export interface ExtractionProfile {
     percent: RegExp;
     accountNumber?: RegExp;
     docNumber?: RegExp;
+    /* Optional, and a profile that omits them simply returns nothing for the
+       fields they serve. A postal code's shape, which digit groups are a
+       telephone number and how a region is written beside a town differ by
+       country and belong to whoever knows the country. */
+    postcode?: RegExp;
+    phone?: RegExp;
+    email?: RegExp;
   };
 
   /**

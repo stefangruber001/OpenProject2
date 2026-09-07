@@ -40,6 +40,12 @@ var ErpFactory = (() => {
   var FIELD_KEYS = [
     "issuerName",
     "issuerTaxId",
+    "issuerAddress",
+    "issuerPostcode",
+    "issuerCity",
+    "issuerRegion",
+    "issuerPhone",
+    "issuerEmail",
     "docNumber",
     "issueDate",
     "dueDate",
@@ -193,6 +199,15 @@ var ErpFactory = (() => {
   var FIELD_TOKEN = {
     issuerName: "text",
     issuerTaxId: "taxId",
+    /* Text, but never found by the label pass: an address is not announced by a
+       word, it is a shape in a position. `issuerContact` fills these directly,
+       the way `unlabelledIssuer` fills the name. */
+    issuerAddress: "text",
+    issuerPostcode: "text",
+    issuerCity: "text",
+    issuerRegion: "text",
+    issuerPhone: "text",
+    issuerEmail: "text",
     docNumber: "text",
     issueDate: "date",
     dueDate: "date",
@@ -240,6 +255,8 @@ var ErpFactory = (() => {
         const guessed = this.unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt);
         if (guessed) perField.set("issuerName", [guessed]);
       }
+      for (const [key, cand] of this.issuerContact(lines, pageOf, profile, recipientAt))
+        if (!perField.get(key)?.length) perField.set(key, [cand]);
       const issueDate = best(perField.get("issueDate"))?.value ?? input.assumeIssueDate;
       const taxBreakdown = this.taxBreakdown(lines, pageOf, profile);
       const fields = FIELD_KEYS.map((key) => this.toField(key, perField.get(key) ?? []));
@@ -540,6 +557,137 @@ var ErpFactory = (() => {
         };
       }
       return null;
+    }
+    /**
+     * WHERE THE ISSUER IS, READ OFF THE HEAD OF THE PAGE.
+     *
+     * The operator, having created a supplier from an invoice and found the
+     * address, the town and the telephone all empty on a document that states
+     * every one of them: "it does not read all the information from the doc."
+     * It was not losing them in transit — there were no fields for them at all,
+     * so a party record built from a document arrived incomplete by
+     * construction and had to be finished by hand from the same page.
+     *
+     * A postal address is not announced by a label the way an amount is; it is a
+     * SHAPE in a POSITION. So this does not go through the keyword pass. It
+     * looks above the recipient boundary — everything there belongs to the
+     * issuer, which is the same fact that already keeps their tax id from being
+     * confused with ours — and anchors on the one token an address always
+     * contains and nothing else looks like: the postal code.
+     *
+     * Around that anchor the rest falls out. What follows it on the same segment
+     * is the town, with a region in brackets after it where this locale writes
+     * one; what precedes it is the street. Segments, because a header line is
+     * very often one line with separators in it — a tax id, a registry number,
+     * an address and a telephone divided by bullets — and splitting on those
+     * turns one crowded line into the four facts it is carrying.
+     *
+     * The telephone is the exception and needs its label. Nine digits in three
+     * groups is also what a document number, a registry code and an account
+     * fragment look like, and a wrong telephone on a supplier record is worse
+     * than none: it gets dialled. So it is read only where the page says it is
+     * one. An address that this profile has no postal-code pattern for simply
+     * comes back empty — nothing is guessed.
+     */
+    issuerContact(lines, pageOf, profile, recipientAt) {
+      const out = /* @__PURE__ */ new Map();
+      const head = Math.min(lines.length, recipientAt);
+      const make = (value, line, start, end, why) => ({
+        value,
+        raw: value,
+        // Never green on its own: nothing here is check-summed, and a person
+        // reads it once on the way past.
+        confidence: 0.5,
+        source: { line, text: lines[line] ?? "", start, end, page: pageOf[line] },
+        reasons: [why],
+        labelled: false,
+        validated: false
+      });
+      const pc = profile.patterns.postcode;
+      if (pc) {
+        outer: for (let i = 0; i < head; i++) {
+          const raw = lines[i] ?? "";
+          const segments = raw.split(/\s[·|—–]\s|\t{2,}/g);
+          let consumed = 0;
+          for (const seg of segments) {
+            const at = raw.indexOf(seg, consumed);
+            consumed = at + seg.length;
+            const rx = new RegExp(pc.source, pc.flags);
+            const m = rx.exec(seg);
+            if (!m) continue;
+            const code = m[0].trim();
+            const before = seg.slice(0, m.index).replace(/[\s,;.]+$/u, "").trim();
+            const after = seg.slice(m.index + m[0].length).trim();
+            const bracket = /\(([^)]+)\)/u.exec(after);
+            const town = after.replace(/\([^)]*\)/gu, "").replace(/^[\s,;.-]+/u, "").trim();
+            const base = at + m.index;
+            out.set("issuerPostcode", make(code, i, base, base + m[0].length, "postal code"));
+            if (town)
+              out.set(
+                "issuerCity",
+                make(town, i, base, base + seg.length - m.index, "beside the postal code")
+              );
+            if (bracket && bracket[1])
+              out.set(
+                "issuerRegion",
+                make(bracket[1].trim(), i, base, base + seg.length, "in brackets after the town")
+              );
+            let street = before;
+            if (!street) {
+              for (let k = i - 1; k >= 0 && k >= i - 2; k--) {
+                const prev = (lines[k] ?? "").trim();
+                if (prev.length > 3 && /\p{L}/u.test(prev)) {
+                  street = prev;
+                  break;
+                }
+              }
+            }
+            if (street)
+              out.set(
+                "issuerAddress",
+                make(street, i, at, at + seg.length, "before the postal code")
+              );
+            break outer;
+          }
+        }
+      }
+      const ph = profile.patterns.phone;
+      const phoneWords = (profile.keywords.issuerPhone ?? []).map(fold).filter(Boolean);
+      if (ph && phoneWords.length) {
+        for (let i = 0; i < head && !out.has("issuerPhone"); i++) {
+          const raw = lines[i] ?? "";
+          const segments = raw.split(/\s[·|—–]\s|\t{2,}/g);
+          let consumed = 0;
+          for (const seg of segments) {
+            const at = raw.indexOf(seg, consumed);
+            consumed = at + seg.length;
+            if (!phoneWords.some((w) => fold(seg).includes(w))) continue;
+            const rx = new RegExp(ph.source, ph.flags);
+            const m = rx.exec(seg);
+            if (!m) continue;
+            const v = m[0].trim();
+            out.set(
+              "issuerPhone",
+              make(v, i, at + m.index, at + m.index + m[0].length, "beside a telephone label")
+            );
+            break;
+          }
+        }
+      }
+      const em = profile.patterns.email;
+      if (em) {
+        for (let i = 0; i < head && !out.has("issuerEmail"); i++) {
+          const raw = lines[i] ?? "";
+          const rx = new RegExp(em.source, em.flags);
+          const m = rx.exec(raw);
+          if (m)
+            out.set(
+              "issuerEmail",
+              make(m[0].trim(), i, m.index, m.index + m[0].length, "an address in the issuer block")
+            );
+        }
+      }
+      return out;
     }
     /**
      * The line at which the document stops talking about the issuer.
@@ -945,6 +1093,30 @@ var ErpFactory = (() => {
       withholdingAmount: ["retencion", "irpf", "ret. irpf", "retencion irpf"],
       totalAmount: ["total factura", "total a pagar", "importe total", "total"],
       iban: ["iban", "cuenta", "cta", "domiciliacion"],
+      /* Only the telephone needs its label. The address and the postal code are
+         found by shape and position; nine digits in three groups are also what a
+         registry code and half an account number look like, and a wrong
+         telephone on a supplier record is worse than an empty one because
+         somebody dials it. Catalan sits beside Castilian because the documents
+         do. */
+      issuerPhone: [
+        "tel",
+        "tel.",
+        "telf",
+        "telf.",
+        "telefono",
+        "tel\xE9fono",
+        "tfno",
+        "movil",
+        "m\xF3vil",
+        "mobil",
+        "m\xF2bil"
+      ],
+      issuerAddress: ["direccion", "direcci\xF3n", "domicilio", "adreca", "adre\xE7a"],
+      issuerPostcode: ["c.p.", "cp", "codigo postal", "c\xF3digo postal"],
+      issuerCity: ["poblacion", "poblaci\xF3n", "localidad", "municipio", "poblacio", "poblaci\xF3"],
+      issuerRegion: ["provincia"],
+      issuerEmail: ["email", "e-mail", "correo", "correu"],
       /* What ties a supplier's document to work of ours. «Contrato:» and
          «Presupuesto:» are the two that matter most and were missing entirely —
          a supplier who writes them is handing us the link to the job, the
@@ -978,7 +1150,16 @@ var ErpFactory = (() => {
       taxId: /\b[A-Z][-.\s]?\d{7,8}[-.\s]?[A-Z0-9]?\b|\b\d{8}[-.\s]?[A-Z]\b/g,
       percent: /\b\d{1,2}(?:[.,]\d{1,2})?\s?%/g,
       accountNumber: /\bES\d{2}[\s]?(?:\d{4}[\s]?){5}\b/g,
-      docNumber: /\b[A-Z]{0,4}[-/]?\d{2,}[-/]?\d*\b/g
+      docNumber: /\b[A-Z]{0,4}[-/]?\d{2,}[-/]?\d*\b/g,
+      /* A postal code here is five digits whose first two are a province, 01 to
+         52 — which is what keeps this from matching every five-digit number on
+         an invoice. It must be followed by the name of a town, because a code
+         standing alone beside a figure is a figure. */
+      postcode: /\b(?:0[1-9]|[1-4]\d|5[0-2])\d{3}\b(?=\s+\p{L})/gu,
+      /* Nine digits, written in the groups people actually use, with the
+         country code optional. Read only where a label says telephone. */
+      phone: /(?:\+34[\s.-]?)?(?:\d{3}[\s.-]?\d{3}[\s.-]?\d{3}|\d{3}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2})\b/g,
+      email: /[\w.+-]+@[\w-]+\.[\w.-]{2,}/g
     },
     /* How a company's legal name ends here. The extractor uses these to tell a
        name that wrapped onto a second line from two unrelated lines — «SUMINISTROS
