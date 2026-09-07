@@ -2368,6 +2368,38 @@ Gates: site E2E **754/754 unfiltered**, site-sync 20/20, iOS routes 7/7,
 boundaries, site syntax, i18n coverage complete in three languages, source
 literals 162/162, workspace audit 0/0. ASSUMPTIONS S100.
 
+**S17 · Adicionales leaves Contratos, and the days move to where they take
+effect.** The operator's item 5, and it could not be done by deleting first:
+«Formalizar un adicional» was the only place the days per partida and the
+customer's answer were captured. Both separate cleanly along the line S15 drew —
+the answer belongs to the presupuesto and is given there like any other; the
+days belong to the moment they apply, which is no longer acceptance but the
+annex. So the signing panel asks for them, which is the operator's own item 4.
+
+One verb serves both routes, so the screen never has to know which shape of
+adicional it is looking at. The variation-budget route gained a per-partida
+breakdown it never had: the schedule consumes one delay per partida, and an
+adicional that moves a completion date but not the bars underneath it is half a
+plan.
+
+Then the tab went, with its rows, its columns, its 112-line drawer and the
+back-link special case that existed only to return to it.
+
+Two found by the tests, and the second is one the operator would have hit: the
+days verb THREW on an annex with no adicional behind it, which would have
+refused a SIGNATURE over a field that should never have been offered; and
+switching between «Anexo firmado» and «Aprobado verbalmente» wiped the days
+already typed, because `paint()` re-read them from the values the drawer opened
+with. The second is the rule the evidence field in the same file already states,
+and it was found only because the test types the days and THEN picks the method,
+which is the order a person uses.
+
+With this, all five of the operator's items are in.
+
+Gates: site E2E **756/756 unfiltered**, site-sync 20/20, iOS routes 7/7,
+boundaries, site syntax, i18n coverage complete in three languages, source
+literals 162/162, workspace audit 0/0. ASSUMPTIONS S101.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they

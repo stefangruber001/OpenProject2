@@ -9274,3 +9274,45 @@ a list of its own, so it asserts the adicional is ABSENT from «Nuevos» and
 PRESENT in «Adicionales», which a pill on a shared list could never give. The
 new door is driven end to end through the screen, both ends, because a verb no
 screen reaches is the failure this package has already met twice (S89, S92).
+
+**S101 · The days had to move before the tab could go.** The operator's item 5
+— «we eliminate Adicionales from Contratos» — and the tab could not simply be
+deleted, because «Formalizar un adicional» was the only place two things were
+captured: the days per partida, and the customer's answer. Both had to have a
+home first or the capability would have been removed rather than relocated.
+
+They separate cleanly along the line PK13-S15 drew. The customer's answer
+belongs to the presupuesto and is given there like any other; the days belong to
+the moment they take effect, which is no longer acceptance but the annex. So the
+signing panel asks for them — the operator's own item 4, "select the impact on
+delivery time" as part of agreeing the annex.
+
+`setAnnexScheduleDays` serves both routes so the screen never has to know which
+shape of adicional it is looking at; that is exactly the knowledge the
+two-register split exists to keep out of every caller. The variation BUDGET
+route gained a per-partida breakdown it never had — it only ever carried a
+total — because the schedule consumes one delay per partida through
+`applyChapterDelay`, and an adicional that moves a completion date but not the
+bars underneath it is half a plan.
+
+**S101a · A missing field must never block a signature.** `setAnnexScheduleDays`
+threw «Only an adicional carries days of its own» for an annex whose version is
+not an adicional. It runs on the way to signing, so the throw would have refused
+to AGREE AN ANNEX because of a field that should never have been offered for it.
+Those annexes are now asked for no days and the verb returns null: the guard
+belongs on the offer, not on the save.
+
+**S101b · Switching the signature method wiped the days.** `paint()` re-renders
+the whole drawer on every switch between «Anexo firmado» and «Aprobado
+verbalmente», and the breakdown was read back off `sched` — the values as they
+were when the drawer opened. Type the days, pick verbal, lose the days, and
+nothing says so. It is the rule the evidence field in this same file already
+carries and states: what a person has typed lives in the closure, not in the
+markup that is about to be replaced. Found because the test types the days and
+THEN picks the method, which is the order a person uses; a test that had signed
+first would have passed over it.
+
+**S101c · What «Contratos vigentes» keeps its name.** With the middle tab gone
+the strip is two contract tabs again, and «Vigentes» would read correctly once
+more. It stays as it is: renaming a tab the operator navigates by is a change
+they did not ask for, and the word costs nothing.

@@ -16082,16 +16082,7 @@
                  The origin is remembered when that tab opens one and cleared as soon
                  as it is used, so a budget reached any other way still goes back to
                  the quote register it belongs to. */
-        $("#bBack").onclick = () => {
-          if (budgetBackTo === "adicionales") {
-            budgetBackTo = null;
-            conTab = "adicionales";
-            conWork = null;
-            go("contracts");
-            return;
-          }
-          go("quotes");
-        };
+        $("#bBack").onclick = () => go("quotes");
         const verPick = $("#bVerPick");
         if (verPick)
           // The builder only ever EDITS the current version — v1.0 cannot be
@@ -21210,45 +21201,7 @@
                    they can all be seen and formalised. Built from the versions
                    rather than from a register, because the versions ARE the record;
                    a second list kept beside them would be a second truth. */
-          /* ACCEPTED ONLY, the way «Contratos vigentes» lists what is in force
-                   rather than every draft ever started. An adicional still out with
-                   the customer is not something the job HAS — it is something
-                   waiting on an answer, and it lives on the budget where the answer
-                   is given. The operator asked for this directly. */
-          const adiRows = erp.state.budgets.flatMap((b) =>
-            (b.versions || [])
-              .filter((v) => v.additional && b.acceptedVersionId === v.id)
-              .map((v) => {
-                const prj = erp.state.projects.find((x) => x.budgetId === b.id);
-                const t = erp.budgetTotals(b.id, v.id);
-                const from = erp.budgetTotals(b.id, v.additionalOf);
-                // Shaped like a contract row: what it is worth, which contract
-                // it joined, and when it was agreed.
-                const con =
-                  prj && prj.contractId
-                    ? erp.state.contracts.find((c) => c.id === prj.contractId)
-                    : null;
-                return {
-                  id: b.id + "|" + v.id,
-                  budgetId: b.id,
-                  versionId: v.id,
-                  number: v.adiNumber || b.number,
-                  party: erp.party(b.partyId).name,
-                  projectCode: prj ? prj.code : "—",
-                  contractNumber: con ? con.number : "—",
-                  deltaCents: t.baseCents - from.baseCents,
-                  days: v.scheduleImpactDays || 0,
-                  daysApplied: !!v.scheduleAppliedToPlan,
-                  acceptedAt: (v.customerResponse && v.customerResponse.date) || v.date || null,
-                  accepted: true,
-                  issued: !!v.issued,
-                };
-              }),
-          );
-          const rows =
-            conTab === "adicionales"
-              ? adiRows
-              : all.filter((c) => (conTab === "active" ? c.active : !c.active));
+          const rows = all.filter((c) => (conTab === "active" ? c.active : !c.active));
           const CST = {
             draft: ["Borrador", ""],
             sent: ["Enviado", "b"],
@@ -21260,7 +21213,6 @@
           v.innerHTML = `
          <div class="tabstrip">
            <button class="tab${conTab === "active" ? " on" : ""}" data-ctab="active">Contratos vigentes</button>
-           <button class="tab${conTab === "adicionales" ? " on" : ""}" data-ctab="adicionales">Adicionales</button>
            <button class="tab${conTab === "inactive" ? " on" : ""}" data-ctab="inactive">Históricos</button>
          </div>
          <div id="conList"></div>`;
@@ -21276,8 +21228,8 @@
             // Package 2 slide 4: there was no way to create a contract at
             // all — not by hand, and not even from an accepted presupuesto.
             // Every contract in the system came from the seed.
-            newLabel: conTab === "adicionales" ? "＋ Nuevo adicional" : "＋ Nuevo contrato",
-            onNew: () => (conTab === "adicionales" ? newAdditionalDrawer() : newContractDrawer()),
+            newLabel: "＋ Nuevo contrato",
+            onNew: () => newContractDrawer(),
             ids: {
               q: "conQ",
               newBtn: "conNew",
@@ -21300,42 +21252,7 @@
                 .join(" ")
                 .toLowerCase()
                 .includes(q),
-            columns:
-              conTab === "adicionales"
-                ? [
-                    { label: "Adicional", primary: true, get: (r) => r.number },
-                    { label: "Cliente", get: (r) => r.party },
-                    { label: "Obra", get: (r) => r.projectCode },
-                    { label: "Contrato", get: (r) => r.contractNumber },
-                    {
-                      label: "Efecto en venta",
-                      html: (r) =>
-                        `<span style="color:${r.deltaCents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${r.deltaCents > 0 ? "+" : ""}${eur0(r.deltaCents)}</span>`,
-                      get: (r) => r.deltaCents,
-                    },
-                    {
-                      /* Two different facts in one column, because they are one
-                         question to the reader: how much time it added, and
-                         whether the plan knows. An accepted adicional whose days
-                         never reached the schedule is the failure this package
-                         was opened for, so the row says so rather than showing a
-                         confident number that no bar on the chart agrees with. */
-                      label: "Plazo",
-                      html: (r) => adiPlazoCell(r),
-                      get: (r) => r.days,
-                    },
-                    {
-                      /* The DATE it was agreed, not a state: this tab lists
-                               only accepted adicionales now, so a column that said
-                               «Aceptado» on every row would be a column that says
-                               nothing. What a reader wants beside a settled thing is
-                               when it was settled. */
-                      label: "Aceptado",
-                      get: (r) => r.acceptedAt || "",
-                      html: (r) => (r.acceptedAt ? fmtD(r.acceptedAt) : "—"),
-                    },
-                  ]
-                : [
+            columns: [
                     { label: "Contrato", primary: true, get: (c) => c.number },
                     { label: "Cliente", get: (c) => c.party },
                     { label: "Obra", get: (c) => c.projectCode || "—" },
@@ -21362,17 +21279,8 @@
                         return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
                       },
                     },
-                  ],
+            ],
             onRowClick: (id) => {
-              /* An adicional row opens its BUDGET, because that is what it is.
-                       Sending it to a contract screen would be sending the reader to
-                       the document it will eventually hang off rather than to the
-                       scope they clicked on. */
-              if (conTab === "adicionales") {
-                budgetBackTo = "adicionales";
-                go("quotes", String(id).split("|")[0]);
-                return;
-              }
               conWork = { id, tab: "datos" };
               render();
             },
@@ -26259,6 +26167,24 @@
         if (!a) return;
         let how = (a.signature && a.signature.method) || "document";
         let ev = null;
+        /* THE DAYS ARE ASKED HERE NOW, and this is where they take effect.
+           They used to live on «Formalizar un adicional» in Contratos, beside
+           the customer's answer, because acceptance was the one moment
+           everything happened at. PK13-S15 split those moments; the days belong
+           to the second, so they are chosen where the annex is agreed — the
+           operator's own item 4. Recording them changes no plan until the annex
+           is signed, which is the same rule the figure has always followed. */
+        const sched = erp.annexScheduleChapters(contractId, annexNumber);
+        /* THE DAYS SURVIVE A REPAINT, and they did not. `paint()` re-renders
+           the whole drawer on every switch between «Anexo firmado» and
+           «Aprobado verbalmente», so a breakdown typed before the switch was
+           read back off `sched` — the values as they were when the drawer
+           opened — and silently discarded. Same shape as the rule the evidence
+           field already carries: what a person has typed lives in the closure,
+           not in the markup that is about to be replaced. */
+        const days = Object.assign({}, sched.days);
+        let total = sched.totalDays;
+        let totalTouched = false;
         const db = openDrawer("Firmar " + annexNumber);
         const paint = () => {
           db.innerHTML = `
@@ -26281,6 +26207,22 @@
          <div class="card"><div class="ch"><h3>Fecha</h3></div><div class="fgrid" style="padding:12px 16px">
           <div class="field"><label>Firmado el</label><input id="anx_when" type="date" value="${esc((a.signature && a.signature.signedAt) || erp.state.today)}"></div>
          </div></div>
+         ${
+           sched.chapters.length
+             ? `<div class="card"><div class="ch"><h3>Efecto en plazo, por partida</h3></div>
+          <div class="fgrid" style="padding:12px 16px">
+           ${sched.chapters
+             .map(
+               (ch) =>
+                 `<div class="field"><label>${esc(ch.num)}. ${esc(ch.name)}</label>
+              <input class="anxDay" data-chap="${esc(ch.num)}" type="number" min="0" step="1" value="${Number(days[ch.num]) || 0}"></div>`,
+             )
+             .join("")}
+           <div class="field full" style="color:var(--muted);font-size:12.5px">El total mueve la fecha de fin. Se propone la suma; cámbielo si las partidas se solapan.</div>
+           <div class="field"><label>Total de días</label><input id="anx_days" type="number" min="0" step="1" value="${total}"></div>
+          </div></div>`
+             : ""
+         }
          <div class="card"><div class="ch"><h3>Al firmarlo</h3></div><div class="daylist">
           <div class="it">Sus partidas entran en el alcance de la obra.</div>
           <div class="it">Su hito de pago se añade al contrato.</div>
@@ -26302,8 +26244,33 @@
               value: (a.signature && a.signature.document) || null,
               prefix: "anexo",
             });
+          /* The total follows the sum while nobody has overridden it, which is
+             what the old panel did and what makes the common case one number
+             instead of two. */
+          const totalEl = $("#anx_days");
+          if (totalEl)
+            totalEl.oninput = () => {
+              totalTouched = true;
+              total = Number(totalEl.value) || 0;
+            };
+          db.querySelectorAll(".anxDay").forEach((el) => {
+            el.oninput = () => {
+              days[el.dataset.chap] = Number(el.value) || 0;
+              if (totalTouched || !totalEl) return;
+              total = Object.values(days).reduce((n, x) => n + (Number(x) || 0), 0);
+              totalEl.value = total;
+            };
+          });
           $("#anx_go").onclick = () =>
             mutate(() => {
+              db.querySelectorAll(".anxDay").forEach((el) => {
+                days[el.dataset.chap] = Number(el.value) || 0;
+              });
+              if (totalEl && totalTouched) total = Number(totalEl.value) || 0;
+              /* Days FIRST, signature second, and the order is the whole
+                 mechanism: signing applies whatever the record says, so a
+                 figure written afterwards would sit there unapplied. */
+              erp.setAnnexScheduleDays(contractId, annexNumber, days, total, "backoffice");
               erp.signContractAnnex(
                 contractId,
                 annexNumber,
@@ -26362,118 +26329,6 @@
             else erp.removeAllContractAnnexes(contractId, "backoffice");
             closeDrawer();
           }, "Anexo retirado");
-      }
-      /** Where «←» goes from the quote builder, when it is not Presupuestos. */
-      let budgetBackTo = null;
-      function newAdditionalDrawer() {
-        const pending = erp.state.budgets.flatMap((b) =>
-          (b.versions || [])
-            .filter((v) => v.additional && v.issued && b.acceptedVersionId !== v.id)
-            .map((v) => ({ b, v })),
-        );
-        const db = openDrawer("Formalizar un adicional");
-        if (!pending.length) {
-          db.innerHTML = `<div class="card"><div class="ch"><h3>Nada que formalizar</h3></div>
-          <div class="daylist"><div class="it">Un adicional se escribe en Presupuestos — «Nuevo presupuesto» → «Adicional de una obra en marcha» — y se formaliza aquí cuando el cliente responde.</div>
-          <div class="it">Ahora mismo no hay ninguno emitido esperando respuesta.</div></div></div>`;
-          return;
-        }
-        let pick = pending[0];
-        const paint = () => {
-          const prj = erp.state.projects.find((x) => x.budgetId === pick.b.id);
-          const d = erp.diffVersions(pick.b.id, pick.v.additionalOf, pick.v.id);
-          const chapters = erp
-            .version(pick.b.id, pick.v.id)
-            .chapters.filter((c) => c.section === "base");
-          db.innerHTML = `<div class="card"><div class="ch"><h3>Adicional</h3></div>
-          <div class="daylist" style="gap:9px">
-           <div class="it"><label class="opt">Cuál
-             <select id="ad_pick" style="margin-left:auto">${pending
-               .map(
-                 (x) =>
-                   `<option value="${esc(x.v.id)}"${x.v.id === pick.v.id ? " selected" : ""}>${esc(x.v.adiNumber)} · ${esc(erp.party(x.b.partyId).name)}</option>`,
-               )
-               .join("")}</select></label></div>
-           <div class="it"><span style="flex:1">Obra</span><b>${esc(prj ? prj.code : "—")}</b></div>
-           <div class="it"><span style="flex:1">Efecto en venta</span><b>${d.deltaCents > 0 ? "+" : ""}${eur(d.deltaCents)}</b></div>
-           <div class="it"><span style="flex:1">Efecto en coste</span><b>${d.costDeltaCents > 0 ? "+" : ""}${eur(d.costDeltaCents)}</b></div>
-           <div class="it"><span style="flex:1">Margen después</span><b>${d.marginToPct}%</b></div>
-          </div></div>
-         <div class="card"><div class="ch"><h3>Efecto en plazo, por partida</h3></div>
-          <div class="fgrid" style="padding:12px 16px">
-           ${chapters
-             .map(
-               (c) =>
-                 `<div class="field"><label>${esc(c.num)}. ${esc(c.name)}</label>
-              <input class="adDay" data-chap="${esc(c.num)}" type="number" min="0" step="1" value="${Number((pick.v.scheduleDaysByChapter || {})[c.num]) || 0}"></div>`,
-             )
-             .join("")}
-           <div class="field full" style="color:var(--muted);font-size:12.5px">El total mueve la fecha de fin. Se propone la suma; cámbielo si las partidas se solapan.</div>
-           <div class="field"><label>Total de días</label><input id="ad_total" type="number" min="0" step="1" value="${Number(pick.v.scheduleImpactDays) || 0}"></div>
-          </div></div>
-         <div class="card"><div class="ch"><h3>Cómo lo aceptó el cliente</h3></div>
-          <div class="daylist" style="gap:9px">
-           <div class="it"><label class="opt">Quién aceptó
-             <input id="ad_who" placeholder="Nombre de quien dio el visto bueno" style="margin-left:auto"></label></div>
-           <div class="it"><label class="opt">Cómo
-             <select id="ad_how" style="margin-left:auto">
-               <option value="adenda">Adenda firmada</option>
-               <option value="email">Correo electrónico</option>
-               <option value="whatsapp">WhatsApp</option>
-               <option value="verbal">De palabra, en obra</option>
-             </select></label></div>
-           <div class="it" style="display:block"><label class="opt" style="margin-bottom:6px">Justificante</label>
-            <div id="ad_doc"></div></div>
-           <div class="it" style="color:var(--muted)">Una aceptación informal es un hecho como cualquier otro: se registra quién y cómo, y el adicional entra en la obra igual. Sin justificante queda anotado que no lo hay.</div>
-          </div></div>`;
-          const ev = evidenceField($("#ad_doc"), {
-            value: held,
-            prefix: "adi",
-            hint: "Arrastra aquí la adenda firmada, el correo o la captura del WhatsApp.",
-            onChange: (r) => {
-              held = r;
-            },
-          });
-          void ev;
-          $("#ad_pick").onchange = (e) => {
-            pick = pending.find((x) => x.v.id === e.target.value) || pending[0];
-            paint();
-          };
-          // The total follows the sum until somebody says otherwise.
-          db.querySelectorAll(".adDay").forEach((i) => {
-            i.oninput = () => {
-              const sum = [...db.querySelectorAll(".adDay")].reduce(
-                (a, x) => a + (Number(x.value) || 0),
-                0,
-              );
-              $("#ad_total").value = sum;
-            };
-          });
-          drawerFoot('<button class="btn primary" id="ad_go">Aceptar el adicional</button>');
-          $("#ad_go").onclick = () =>
-            mutate(() => {
-              const by = {};
-              db.querySelectorAll(".adDay").forEach((i) => {
-                by[i.dataset.chap] = Number(i.value) || 0;
-              });
-              erp.setAdditionalScheduleDays(
-                pick.b.id,
-                pick.v.id,
-                by,
-                Number($("#ad_total").value) || 0,
-                "backoffice",
-              );
-              erp.acceptVersion(
-                pick.b.id,
-                pick.v.id,
-                { evidence: held, acceptedBy: $("#ad_who").value || null },
-                "backoffice",
-              );
-              closeDrawer();
-            }, "Adicional aceptado — entra en la obra");
-        };
-        let held = null;
-        paint();
       }
       function newContractDrawer(seed, opts) {
         const linkable = erp.state.budgets.filter(

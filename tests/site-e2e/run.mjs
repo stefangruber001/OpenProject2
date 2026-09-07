@@ -8513,41 +8513,48 @@ async function testContract(browser, base) {
     const inactiveRows = await pg.locator("#view table.mlist tr.click").count();
     await pg.locator('[data-ctab="active"]').click();
     await pg.waitForTimeout(500);
-    /* THREE tabs since PK12-S13: the adicionales got one of their own, and
-       «Vigentes» became «Contratos vigentes» because a tab beside it now lists
-       something else that is also in force. Asserted by NAME as well as by
-       count — the split between the two contract tabs is the property that
-       matters, and a third tab that listed contracts again would pass a bare
-       count of three. */
+    /* TWO tabs again. PK12-S13 gave adicionales one of their own here, and
+       PK13-S17 took it back out: an adicional is a presupuesto, it now has its
+       own register beside the ordinary ones, and this screen lists CONTRACTS.
+       Asserted by NAME as well as by count — the split between the two
+       contract tabs is the property that matters, and «Adicionales» must be
+       absent rather than merely outnumbered. */
     if (
-      tabs.length === 3 &&
+      tabs.length === 2 &&
       /Contratos vigentes/.test(tabs[0]) &&
-      /Adicionales/.test(tabs[1]) &&
+      !tabs.some((t) => /Adicionales/.test(t)) &&
       activeRows > 0 &&
       activeRows !== inactiveRows
     )
       ok(
-        `COM-04: three tabs — contracts split in two, adicionales their own (${activeRows}/${inactiveRows})`,
+        `COM-04: two tabs — contracts split in two, and only contracts (${activeRows}/${inactiveRows})`,
       );
     else bad("COM-04: tabs", `${tabs.join("/")} · ${activeRows}/${inactiveRows}`);
 
-    /* …and the adicionales tab is the versions, not a second register. Empty
-       on the demo, which is the honest state: nothing has been revised yet.
-       What must be true is that the tab exists, switches, and offers its own
-       creation door rather than the contract one. */
-    await pg.locator('[data-ctab="adicionales"]').click();
-    await pg.waitForTimeout(500);
-    const adiTab = await pg.evaluate(() => ({
+    /* PK13-S17 · and the screen creates CONTRACTS, only. The adicionales tab
+       carried the one door that formalised an adicional — days and the
+       customer's answer in a single panel, because acceptance was the single
+       moment everything happened at. Both halves moved: the answer is given on
+       the presupuesto like any other, and the days on the annex, where they now
+       take effect. What must be true here is that nothing is left pointing at
+       the removed tab. */
+    const gone = await pg.evaluate(() => ({
+      tab: !!document.querySelector('[data-ctab="adicionales"]'),
       newLabel: (document.querySelector("#conNew") || {}).textContent || "",
+      drawer: typeof newAdditionalDrawer,
       cols: [...document.querySelectorAll("#view table.mlist thead th")].map((t) =>
         t.textContent.trim(),
       ),
     }));
-    if (/Nuevo adicional/.test(adiTab.newLabel) && adiTab.cols.includes("Adicional"))
-      ok("COM-04: the adicionales tab has its own columns and its own creation door");
-    else bad("COM-04: adicionales tab", JSON.stringify(adiTab));
-    await pg.locator('[data-ctab="active"]').click();
-    await pg.waitForTimeout(500);
+    if (
+      !gone.tab &&
+      gone.drawer === "undefined" &&
+      /Nuevo contrato/.test(gone.newLabel) &&
+      gone.cols.includes("Contrato") &&
+      !gone.cols.includes("Adicional")
+    )
+      ok("PK13-S17: Contratos lists contracts and creates contracts — the adicionales tab is gone");
+    else bad("PK13-S17: adicionales tab removed", JSON.stringify(gone));
 
     // The amber column, checked against the engine rather than against a
     // colour: a pill appears exactly where annexes exist.
@@ -9103,6 +9110,31 @@ async function testChangeApprovalEvidence(browser, base) {
         ok("anexo moderno: and it is on the tab afterwards, as a document you can open");
       else bad("anexo moderno: signed document visible", signedText.slice(0, 200));
 
+      /* ---- PK13-S17: THE DAYS ARE ASKED HERE NOW --------------------------
+         They lived on «Formalizar un adicional» in Contratos, beside the
+         customer's answer, because acceptance was the one moment everything
+         happened at. That panel is gone with its tab, so the days had to have a
+         home before it went — and the home is the annex, where they take
+         effect. Driven through the drawer, not the verb, because a field no
+         screen offers is the failure this package keeps meeting. */
+      const daysHere = await pg.evaluate((x) => signAnnexDrawer(x.contractId, x.number), modern);
+      void daysHere;
+      await pg.waitForTimeout(500);
+      const daysField = await pg.evaluate(() => ({
+        total: !!document.querySelector("#anx_days"),
+        perChapter: document.querySelectorAll(".anxDay").length,
+      }));
+      /* This annex was written directly against the job's own accepted version,
+         so there is no adicional behind it and no scope it added — asking for a
+         delivery impact would be a question with no answer. The real one below
+         gets the field. */
+      if (!daysField.total && !daysField.perChapter)
+        ok("PK13-S17: an annex with no adicional behind it is not asked for days");
+      else
+        bad("PK13-S17: days offered with nothing to attribute them to", JSON.stringify(daysField));
+      await pg.evaluate(() => closeDrawer());
+      await pg.waitForTimeout(300);
+
       // ---- a verbal annex names who agreed it, or is refused ---------------
       const verbal = await pg.evaluate((x) => {
         const tries = (f) => {
@@ -9172,7 +9204,7 @@ async function testChangeApprovalEvidence(browser, base) {
          puts its partidas in the job, and the days it added to the completion
          date. So one is built the way the product builds them — a new version,
          a chapter of its own, issued and accepted — and then taken back. */
-      const real = await pg.evaluate(() => {
+      const real = await pg.evaluate(async () => {
         const p = erp.state.projects.find(
           (x) => x.contractId && x.budgetId && x.acceptedVersionId && !x.closed,
         );
@@ -9209,8 +9241,27 @@ async function testChangeApprovalEvidence(browser, base) {
           end: (p.dates && p.dates.targetEnd) === endBefore,
           vigente: erp.contractValue(p.contractId).pendingAnnexes === pendingBefore + 1,
         };
-        erp.signContractAnnex(p.contractId, annex.number, { method: "verbal", by: "E2E" }, "e2e");
+        /* THROUGH THE PANEL, because that is what moved. The days used to be
+           typed on «Formalizar un adicional» in Contratos; that door went with
+           its tab, and had the field not arrived here first the capability
+           would have been deleted rather than moved. Two days on the first
+           partida, and the total left to follow the sum. */
+        signAnnexDrawer(p.contractId, annex.number);
+        await new Promise((r) => setTimeout(r, 400));
+        const dayInputs = [...document.querySelectorAll(".anxDay")];
+        const askedDays = dayInputs.length > 0 && !!document.getElementById("anx_days");
+        if (dayInputs.length) {
+          dayInputs[0].value = "2";
+          dayInputs[0].dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        document.querySelector('input[name="anxhow"][value="verbal"]').click();
+        await new Promise((r) => setTimeout(r, 300));
+        document.getElementById("anx_by").value = "E2E";
+        document.getElementById("anx_go").click();
+        await new Promise((r) => setTimeout(r, 800));
         const onSign = {
+          askedDays,
+          daysOnRecord: erp.version(p.budgetId, v.id).scheduleImpactDays,
           scope: p.acceptedVersionId === v.id,
           inst: (c0.installments || []).length === instBefore + 1,
           end: (p.dates && p.dates.targetEnd) !== endBefore,
@@ -9243,6 +9294,9 @@ async function testChangeApprovalEvidence(browser, base) {
         if (real.onSign.scope && real.onSign.inst && real.onSign.end && real.onSign.vigente)
           ok("PK13-S15: agreeing the annex on the contract is what puts all four into the job");
         else bad("PK13-S15: the signature applies it", JSON.stringify(real.onSign));
+        if (real.onSign.askedDays && real.onSign.daysOnRecord === 2)
+          ok("PK13-S17: the days are typed on the signing panel, and signing applies them");
+        else bad("PK13-S17: days through the panel", JSON.stringify(real.onSign));
         if (real.gone && real.backToBase && real.endBack && real.instBack)
           ok(
             `PK13-S15: and withdrawing it gives back the scope, the milestone and the ${real.out.days} days`,

@@ -3110,6 +3110,91 @@
       this._log(user, "createAdicionalBudget", c.number + " ← " + rec.adiNumber);
       return rec;
     }
+    /**
+     * The partidas an annex's days can be spread over, and the days on each.
+     *
+     * Whichever route the adicional came by: the chapters of the adicional
+     * VERSION, or of the variation BUDGET's accepted version. The screen asking
+     * for the breakdown should not have to know which shape it is looking at —
+     * that is the knowledge the two-register split exists to stop leaking into
+     * every caller.
+     */
+    annexScheduleChapters(contractId, annexNumber) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      const a = c && (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a || !a.budgetId) return { days: {}, totalDays: 0, chapters: [] };
+      const b = this.state.budgets.find((x) => x.id === a.budgetId);
+      if (!b) return { days: {}, totalDays: 0, chapters: [] };
+      const v = a.versionId
+        ? (b.versions || []).find((x) => x.id === a.versionId)
+        : (b.versions || []).find((x) => x.id === b.acceptedVersionId);
+      if (!v) return { days: {}, totalDays: 0, chapters: [] };
+      /* Only a real adicional carries days. An annex can name a version that is
+         not one — the legacy change register writes annexes with no budget at
+         all, and a row can point at a base version — and offering a delivery
+         impact for scope nobody added would ask a question with no answer. */
+      const isAdicional = a.versionId ? !!v.additional : !!b.variationOf;
+      if (!isAdicional) return { days: {}, totalDays: 0, chapters: [] };
+      const owner = a.versionId ? v : b;
+      return {
+        days: owner.scheduleDaysByChapter || {},
+        totalDays: Math.max(0, Math.round(owner.scheduleImpactDays || 0)),
+        chapters: (v.chapters || [])
+          .filter((ch) => ch.section === "base")
+          .map((ch) => ({ num: String(ch.num), name: ch.name })),
+      };
+    }
+    /**
+     * Set an annex's days — per partida and in total — by whichever route the
+     * adicional came.
+     *
+     * The days moved with the gate. They used to be typed on the «Formalizar un
+     * adicional» panel in Contratos, which was also where the customer's answer
+     * was recorded, because acceptance was the moment everything happened.
+     * PK13-S15 split those two moments apart, and the days belong to the second
+     * one: they are applied when the annex joins the job, so they are asked for
+     * where that is decided. The operator asked for exactly this — the impact
+     * on delivery time chosen as part of signing the annex.
+     *
+     * Recording is not applying. Both underlying verbs write the figure and
+     * only move a date once the annex is agreed, so typing days into an
+     * unsigned annex changes no plan.
+     */
+    setAnnexScheduleDays(contractId, annexNumber, byChapter, totalDays, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      if (!a.budgetId) return null;
+      if (a.versionId) {
+        const vb = this.state.budgets.find((x) => x.id === a.budgetId);
+        const vv = vb && (vb.versions || []).find((x) => x.id === a.versionId);
+        /* Nothing to attribute days to, and that is not an error worth
+           refusing a SIGNATURE over: this runs on the way to signing, so
+           throwing here would block agreeing an annex because of a field it
+           should never have been offered. */
+        if (!vv || !vv.additional) return null;
+        return this.setAdditionalScheduleDays(a.budgetId, a.versionId, byChapter, totalDays, user);
+      }
+      const b = this.budget(a.budgetId);
+      if (!b.variationOf) return null;
+      const clean = {};
+      for (const k of Object.keys(byChapter || {})) {
+        const n = Math.round(Number(byChapter[k]) || 0);
+        if (n) clean[String(k)] = n;
+      }
+      /* The breakdown is stored even on the budget route, which had only ever
+         carried a total. It is what the schedule consumes — one delay per
+         partida through `applyChapterDelay` — and an adicional that can move a
+         completion date but not the bars underneath it is half a plan. */
+      b.scheduleDaysByChapter = clean;
+      const summed = Object.values(clean).reduce((x, n) => x + n, 0);
+      return this.setVariationScheduleDays(
+        a.budgetId,
+        totalDays == null ? summed : totalDays,
+        user,
+      );
+    }
     /** The annex an adicional budget wrote, so a register can say where it waits. */
     annexOfAdicional(budgetId) {
       const b = this.state.budgets.find((x) => x.id === budgetId);
