@@ -8901,3 +8901,43 @@ DECISION — reload on a changed account, on a changed permission for the same
 account, and on a 401; do nothing when unchanged, and nothing when offline. The
 last two matter most: a page that reloaded every minute, or every time a lift
 lost signal, would be worse than the bug.
+
+**S88 · A site account was being sent what its jobs sell for, cost and earn —
+and the test written to prevent that had never been given a job to look at.**
+
+`redactForWorker` passed PROJECTS THROUGH WHOLE. A project carries `baseline`:
+`revenueCents`, `costCents`, `marginCents`, and for every chapter its
+`saleCents` and `costCents`. So any site account assigned to a job received the
+job's revenue, cost and margin and every chapter's sale and cost price, on every
+read — against that same function's docstring, which says everything with money
+in it is removed rather than blanked and that the account never receives the
+number at all. The screens never printed it, which is why nobody saw it.
+
+**The guard existed and was vacuous.** `tests/server-e2e` created the site
+worker and never assigned them to anything, so `assignments` was empty, the
+scoped read carried NO projects, and «not one amount in cents» ran over an empty
+list for as long as it has existed. A fixture that cannot fail is not a test —
+the third false green in three days, after the concatenated string (S86) and the
+crawl ceilings. **When an assertion is about what a collection may contain, the
+fixture must put something in the collection**, and that belongs in the test's
+own comment where the next person will read it.
+
+Projects are now BUILT, not filtered — the rule the top of that function already
+stated and the one place it was not applied. What is left is what the two worker
+screens use: the code, whether the job is open, and the chapters with their
+lines.
+
+**And the lines are why the crew could not book hours at all.** `lineOptionsFor`
+reads a chapter's lines out of the accepted BUDGET, and the budget is not sent —
+it is priced end to end. `erp.version` threw, the catch returned "", and the
+Subpartida select was hidden. Silently: it read as a job with no sub-chapters
+rather than as data that never arrived, and the hours were then booked against a
+chapter with no line, losing exactly the attribution `lineId` exists for. The
+few line fields are lifted onto the baseline chapter, money-free, and the client
+falls back to them when there is no budget.
+
+**One of yesterday's fixes made a message worse.** The «not assigned to any job»
+early return sits ABOVE `horasMine`'s precise «this account is not linked to any
+worker record», so an unlinked account was told to ask for an assignment — which
+would not have helped, because there is nothing to assign to. Two problems the
+office fixes in two different places must not share a sentence.

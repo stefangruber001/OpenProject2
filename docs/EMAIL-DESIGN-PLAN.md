@@ -13,7 +13,7 @@ There are **two email designs in this system, and only one of them is good.**
 | Built by   | `apps/web/lib/invite-mail.ts`                                                                                            | `draftEmailHtml()` in `site/erp.html`                             |
 | Runs on    | the server, TypeScript                                                                                                   | the browser, JavaScript                                           |
 | Looks like | brand header, dark hero with a title and a button, a green credential band, numbered steps, a quiet note, a legal footer | a small logo, a green rule, plain paragraphs, a legal footer line |
-| Covers     | invitation, password reset                                                                                               | quote, invoice, credit note, contract, accountant package         |
+| Covers     | invitation, password reset — two messages                                                                                | every message to a customer or supplier — see the list below      |
 
 So the message a person receives **once**, when their account is created, is the
 polished one; the messages the company sends its **customers**, for money, are
@@ -57,13 +57,27 @@ document total.
 
 ### 3 · What each email carries
 
-| Email                | Hero button          | Data band                                  |
-| -------------------- | -------------------- | ------------------------------------------ |
-| Quote (`PRE-`)       | Open the quote       | number, total, valid until                 |
-| Invoice (`FAC-`)     | Open the invoice     | number, total, due date, payment reference |
-| Credit note (`ABO-`) | Open the credit note | number, amount, the invoice it corrects    |
-| Contract (`CTR-`)    | Read and sign        | number, job, amount, start date            |
-| Accountant package   | Download             | period, what is inside, document count     |
+**Corrected scope.** An earlier draft of this document said "the four business
+emails", taken from an old task label. The catalogue in `erp-engine.js` holds
+**six standard templates**, and `commsTemplates` is tenant data with add and
+edit commands — so the company can define more without a line of code changing.
+
+That makes the shared module of step 1 the requirement rather than the tidy
+option: a template somebody adds next year has to inherit the design, not wait
+to be restyled.
+
+| Template            | Message                     | To       | Hero button          | Data band                                   |
+| ------------------- | --------------------------- | -------- | -------------------- | ------------------------------------------- |
+| `quote-send`        | Envío de presupuesto        | customer | Open the quote       | number, total, valid until                  |
+| `quote-followup`    | Seguimiento de presupuesto  | customer | Open the quote       | number, total, valid until                  |
+| `invoice-reminder`  | Recordatorio de factura     | customer | Open the invoice     | number, amount, due date, payment reference |
+| `works-start`       | Aviso de inicio de obra     | customer | See the job          | job, start date, who to call                |
+| `docs-expired`      | Documentación caducada      | supplier | Send the document    | what expired, trade, the job it blocks      |
+| `warranty-followup` | Seguimiento posventa        | customer | Report something     | job, when it finished                       |
+| _(credit note)_     | Abono                       | customer | Open the credit note | number, amount, the invoice it corrects     |
+| _(contract)_        | Contrato                    | customer | Read and sign        | number, job, amount, start date             |
+| _(accountant)_      | Paquete gestoría            | gestoría | Download             | period, what is inside, document count      |
+| _tenant-added_      | whatever the company writes | either   | optional             | optional — the bands degrade to none        |
 
 The PDF stays attached. The data band is not a replacement for the document —
 it is what lets somebody decide, on a phone, whether to open it now.

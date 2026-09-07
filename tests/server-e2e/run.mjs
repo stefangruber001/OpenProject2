@@ -562,6 +562,7 @@ async function siteWorkerBoundary() {
   // site account is about to be refused.
   let workerId = null;
   let otherWorkerId = null;
+  let assignedProjectId = null;
   {
     const st = await json(await api(`/api/${TENANT}/erp/state`));
     const state = st.state ?? {};
@@ -571,6 +572,21 @@ async function siteWorkerBoundary() {
       ...(state.workers ?? []),
       { id: workerId, name: `E2E Site ${RUN}`, email, active: true },
     ];
+    /* AND ASSIGNED TO A REAL JOB. Until now this suite created the worker and
+       stopped, so `assignments` was empty, the scoped read carried NO projects,
+       and every check below about what a project may contain ran over an empty
+       list. "Not one amount in cents" passed for a year without once being
+       handed a project — while a real assigned worker was being sent the job's
+       revenue, cost and margin and every chapter's sale and cost price.
+
+       A fixture that cannot fail is not a test. This one now has something to
+       redact. */
+    assignedProjectId = (state.projects ?? []).find((p) => !p.closed)?.id ?? null;
+    if (assignedProjectId)
+      state.assignments = [
+        ...(state.assignments ?? []),
+        { workerId, projectId: assignedProjectId, from: null, to: null },
+      ];
     const res = await api(`/api/${TENANT}/erp/state`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -670,8 +686,43 @@ async function siteWorkerBoundary() {
       (s.workers ?? []).every((w) => w.id === workerId),
       `workers=${(s.workers ?? []).map((w) => w.id).join(",") || "(none)"}`,
     );
+    /* THE ASSIGNED JOB IS ACTUALLY THERE, checked before the money is, because
+       everything below is vacuous without it — which is exactly how the cents
+       assertion passed while a leak was live. */
+    check(
+      "the job he is assigned to is in his document",
+      !assignedProjectId || (s.projects ?? []).some((p) => p.id === assignedProjectId),
+      `assigned=${assignedProjectId ?? "(none open)"} got=${(s.projects ?? []).length}`,
+    );
+    /* AND IT CARRIES WHAT THE ENTRY SCREEN NEEDS. Hours are booked against a
+       chapter and a line; the line list lives in the budget, and the budget is
+       not sent. Without these fields lifted onto the chapter, «Subpartida» is
+       empty for ever and the hours lose their attribution. */
+    const scopedProject = (s.projects ?? []).find((p) => p.id === assignedProjectId);
+    const chapters = scopedProject?.baseline?.chapters ?? [];
+    check(
+      "with its chapters named",
+      !assignedProjectId || chapters.some((c) => c.num && c.name),
+      `chapters=${chapters.length}`,
+    );
+    check(
+      "and their line items, so a sub-chapter can be chosen",
+      !assignedProjectId || chapters.some((c) => (c.lines ?? []).some((l) => l.id)),
+      `lines=${chapters.reduce((n, c) => n + (c.lines ?? []).length, 0)}`,
+    );
+
     const money = JSON.stringify(s).match(/"[a-zA-Z]*Cents"/g) ?? [];
     check("and not one amount in cents", money.length === 0, money.slice(0, 6).join(" "));
+    /* Belt and braces on the one that got through: the baseline's own three
+       totals, named, because those are what a project carried in whole. */
+    const baselineMoney = ["revenueCents", "costCents", "marginCents", "saleCents"].filter((k) =>
+      JSON.stringify(s.projects ?? []).includes(`"${k}"`),
+    );
+    check(
+      "and no job revenue, cost or margin",
+      baselineMoney.length === 0,
+      baselineMoney.join(" ") || "clean",
+    );
 
     // --- the other door is shut ------------------------------------------
     //

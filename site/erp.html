@@ -8394,15 +8394,32 @@
                same rule as chapterOptions above. */
       function lineOptionsFor(pid, chapterNum, sel) {
         const p = erp.project(pid);
-        if (!p.budgetId || !p.acceptedVersionId || !chapterNum) return "";
-        let v;
-        try {
-          v = erp.version(p.budgetId, p.acceptedVersionId);
-        } catch {
-          return "";
+        if (!chapterNum) return "";
+        /* TWO SOURCES, ONE LIST. The office holds the whole budget and reads the
+           lines out of the accepted version. A site account does NOT get the
+           budget — it is priced from end to end — so the server lifts the few
+           line fields onto the baseline chapter instead, money-free.
+
+           Falling straight through to the budget was why «Subpartida» was
+           permanently empty for the crew: `erp.version` threw, the catch
+           returned "", and the select was hidden. Silently, so it read as a job
+           with no sub-chapters rather than as data that never arrived — and the
+           hours were then booked against a chapter with no line, losing exactly
+           the attribution that lineId exists for. */
+        let ch = null;
+        if (p.budgetId && p.acceptedVersionId) {
+          try {
+            const v = erp.version(p.budgetId, p.acceptedVersionId);
+            ch = (v.chapters || []).find((c) => String(c.num) === String(chapterNum));
+          } catch {
+            /* No budget in this document — a scoped read. Fall through. */
+          }
         }
-        const ch = (v.chapters || []).find((c) => String(c.num) === String(chapterNum));
-        if (!ch || !ch.lines.length) return "";
+        if (!ch)
+          ch = ((p.baseline && p.baseline.chapters) || []).find(
+            (c) => String(c.num) === String(chapterNum),
+          );
+        if (!ch || !(ch.lines || []).length) return "";
         return ch.lines
           .map(
             (l) =>
@@ -9592,6 +9609,18 @@
            question, and the answer they need is one sentence away. */
         if (!erp.state.projects.length) {
           if (isSiteWorker()) {
+            /* TWO DIFFERENT PROBLEMS, and the office fixes them in two
+               different places, so they must not share a sentence.
+
+               No worker record with this address → the account is attached to
+               nobody, and `horasMine` already says so precisely. This early
+               return was added yesterday ABOVE that check and swallowed it, so
+               an unlinked account was told to ask for an assignment — which
+               would not have helped, because there is nothing to assign to.
+
+               A worker with no open job → genuinely unassigned, and that IS
+               the sentence below. */
+            if (!myWorkerId()) return void (v.innerHTML = horasMine());
             /* ONE literal, not two concatenated. Split across a `+` it is
                invisible to `source-audit.mjs` — which read this file and
                reported no new untranslated string, wrongly — and it would also
