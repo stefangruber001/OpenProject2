@@ -9412,3 +9412,36 @@ every image published so far carries an empty public address. That is a separate
 question from the deploy — it governs absolute links and preview cards, not
 whether the server updates — but it is the same missing setting, and setting the
 variable fixes both. Noted rather than chased here.
+
+**S105 · The engine moved and its simulation stayed.** `main` was red for about
+twenty hours on six manageability checks (503/509), and not one of them was a
+defect. PK12-S13 deliberately split one event into two on the operator's own
+instruction — _«Acceptance coming from Budget tool do nothing until we accept it
+on Contracts/Annex. This is key.»_ — so accepting an adicional now writes the
+annex and stops, and `_applyContractAnnex` moves the scope, the baseline, the
+milestone and the completion date when the annex is SIGNED. The four commits
+that made that change (`d943eec`, `d18d3f3`, `3295f47`, `475af39`) each touched
+`site/erp-engine.js`. None touched `tests/simulation/manageability-sim.mjs`,
+which went on asserting the behaviour they had just removed.
+
+The six assertions are now twelve, split across the gate: what must NOT have
+moved after acceptance, then what must have moved after signing. That order is
+the point. A test written only against the second half would pass against an
+engine that applied everything at acceptance — that is, against exactly the bug
+the change was made to remove — so each property is asserted false and then
+true. 513/513, and `site/erp-engine.js` is untouched.
+
+**S105a · The legacy change register keeps its one-step behaviour, and that is
+not an inconsistency.** Approving a change still moves the date immediately, and
+its own comment in `approveChange` says why: `state.changes` is the route this
+work replaced and the menu already hides, so half-gating it would leave an annex
+with no milestone and its days applied two lines below. The tests assert both
+rules because the product has both.
+
+**S105b · A doc-comment that now says the opposite of its code.** The block above
+`signContractAnnex` still reads _«Inert for now, on purpose: it records the fact
+and moves nothing… still arrives on acceptance, exactly as it does today»_, while
+the function beneath it calls `_applyContractAnnex`. Left alone deliberately —
+this session did not write that feature and the change is one line of prose in
+another session's area — but flagged here, because a comment asserting the
+reverse of its own function is a trap for whoever reads it next.
