@@ -1216,13 +1216,6 @@
          this query rendered the chart AND the list at once — the same failure
          the builder's phone tab bar had the first time it shipped. */
       @media (max-width: 700px) {
-        /* The deploy marker is desktop-only. On a phone the header is a single
-           row by design and the suite measures exactly that — adding fourteen
-           characters to it pushed the row height to 56 px twice over, which the
-           mobile check caught on the full run. Temporary, like the span itself. */
-        #deployMark {
-          display: none;
-        }
         .gwrap,
         .gtools,
         .glegend {
@@ -5231,20 +5224,6 @@
       </div>
       <span class="tsp"></span>
       <div class="gactions">
-        <!-- TEMPORARY DEPLOY MARKER, and nothing else. It exists to answer one
-             question from the outside — has the build in front of me actually
-             changed? — because several reports this package turned out to be a
-             screen that was already fixed and not yet published, and there was
-             no way to tell those apart by looking. `translate="no"` keeps it out
-             of the dictionary: it is not product text and must not be treated
-             as any. Delete this span and its comment once the question is
-             answered; it is checked in only so that it deploys at all. -->
-        <span
-          id="deployMark"
-          translate="no"
-          style="font-size: 12px; color: var(--muted); margin-right: 8px; align-self: center"
-          >Hello World</span
-        >
         <div class="menuwrap">
           <button class="btn primary sm" id="btnCreate" aria-haspopup="true" aria-expanded="false">
             ＋ Crear
@@ -24150,13 +24129,12 @@
                   : [["Pendiente de cobro", eur0(recvOpen)]],
                 recvOpen > 0
                   ? {
-                      lab: "Registrar cobro",
-                      run: () => {
-                        const due = invoices
-                          .filter((i) => erp.invoiceOutstandingCents(i.id) > 0)
-                          .sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0];
-                        if (due) invoiceDrawer(due.number);
-                      },
+                      /* Walks to Conciliación, not to the invoice: the form
+                         that used to live on that drawer is gone, and a verb
+                         that opens a screen which can no longer do the thing
+                         it is named after is worse than no verb. */
+                      lab: "Ir a Conciliación",
+                      run: () => goTab("banking", "_reconcile"),
                     }
                   : null,
               )
@@ -26434,7 +26412,12 @@
       function signAnnexDrawer(contractId, annexNumber) {
         const c = erp.state.contracts.find((x) => x.id === contractId);
         const a = c && (c.annexes || []).find((x) => x.number === annexNumber);
-        if (!a) return;
+        /* THROWS RATHER THAN RETURNING. A silent return is what made a wiring
+           mistake look like a dead button: the drawer opened empty and nothing
+           anywhere said why. `mutate` and the console both report a throw, so
+           the next time an id arrives wrong it is visible in a second instead
+           of a screenshot. */
+        if (!a) throw new Error("No encuentro ese anexo");
         let how = (a.signature && a.signature.method) || "document";
         let ev = null;
         /* THE DAYS ARE ASKED HERE NOW, and this is where they take effect.
@@ -26573,7 +26556,7 @@
          them, newest first, which is the order the accepted pointer unwinds. */
       function removeAnnexAsk(contractId, annexNumber) {
         const c = erp.state.contracts.find((x) => x.id === contractId);
-        if (!c) return;
+        if (!c) throw new Error("No encuentro ese contrato");
         const list = annexNumber
           ? (c.annexes || []).filter((x) => x.number === annexNumber)
           : c.annexes || [];
@@ -29310,15 +29293,24 @@
            <div class="it"><span>Saldo</span><span style="flex:1"></span><b>${out > 0 ? eur(out) : "—"}</b></div>
           </div></div>
          ${
+           /* «Registrar cobro» IS GONE, and this says where it went. Money
+              arriving is a fact of the bank, not a form: it is matched to the
+              invoice in Conciliación, against a line that actually exists on a
+              statement. Typing it here wrote a collection nobody could point at
+              — the same reason `payBills` lost its screen in package 12, and
+              what the operator asked for: no Registro de Cobro here, because
+              it is done on bank reconciliation. (Written with no apostrophes:
+              the source audit pairs them as quotes, which is how a comment
+              becomes a user-visible string it cannot translate.)
+
+              A door that is removed says where it moved to; leaving a Saldo with
+              nothing beside it would read as a screen that cannot do anything. */
            out > 0
-             ? `<div class="card"><div class="ch"><h3>Registrar cobro</h3></div>
-          <div class="fgrid" style="padding:10px 12px 12px">
-            <div class="field"><label>Importe (€)</label><input id="iv_amt" type="number" step="0.01" value="${(out / 100).toFixed(2)}"></div>
-            <div class="field"><label>Forma</label><select id="iv_m">
-              <option value="transfer">Transferencia</option><option value="cash">Efectivo</option></select></div>
-            <div class="field full"><button class="btn primary" id="iv_go">Registrar cobro</button></div>
+             ? `<div class="card"><div class="ch"><h3>Cómo se cobra</h3></div>
+          <div class="daylist">
+            <div class="it" style="color:var(--muted)">El cobro se registra al conciliar el movimiento del banco con esta factura, no a mano desde aquí.</div>
+            <div class="it"><span style="flex:1"></span><button class="btn sm" id="iv_bank">Ir a Conciliación</button></div>
           </div>
-          <div class="daylist"><div class="it" style="color:var(--muted)">Un cobro parcial deja el resto pendiente y el contador de vencido lo sigue contando.</div></div>
          </div>`
              : ""
          }
@@ -29356,23 +29348,12 @@
             closeDrawer();
             invOpen(inv.projectId, { rectifies: inv.id });
           };
-        const go = $("#iv_go");
-        if (go)
-          go.onclick = () =>
-            mutate(() => {
-              const amt = Math.round(Number(String($("#iv_amt").value).replace(",", ".")) * 100);
-              if (!(amt > 0)) throw new Error("Indica el importe cobrado");
-              erp.recordCollection(
-                {
-                  partyId: inv.partyId,
-                  amountCents: amt,
-                  method: $("#iv_m").value,
-                  allocations: [{ invoiceId: inv.id, amountCents: amt }],
-                },
-                "backoffice",
-              );
-              closeDrawer();
-            }, "Cobro registrado");
+        const bank = $("#iv_bank");
+        if (bank)
+          bank.onclick = () => {
+            closeDrawer();
+            goTab("banking", "_reconcile");
+          };
       }
 
       /* ================= COM-04 · the contract, full screen (S9) ================
@@ -29944,14 +29925,21 @@
             ${d.annexes.length ? `<div class="it"><span>Total anexos</span><span style="flex:1"></span><b>${eur(val.annexCents)}</b></div>` : ""}
             ${d.annexes.length ? `<div class="it"><span style="flex:1"></span><button class="btn sm" id="anxWipe">Quitar todos los anexos</button></div>` : ""}
            </div>`;
+          /* `conWork.id`, NOT `d.id`. `d` is `renderContractDoc(...)` — the
+             printable DOCUMENT, which carries a number, a date and a customer
+             and no id at all. So these three buttons were handing `undefined`
+             to a lookup that then found nothing, and both drawers returned at
+             their first guard: the button clicked, a drawer opened, and it was
+             empty. Every other handler on this screen already uses
+             `conWork.id`; these were the only three that did not. */
           host.querySelectorAll("[data-annexsign]").forEach((b) => {
-            b.onclick = () => signAnnexDrawer(d.id, b.dataset.annexsign);
+            b.onclick = () => signAnnexDrawer(conWork.id, b.dataset.annexsign);
           });
           host.querySelectorAll("[data-annexdel]").forEach((b) => {
-            b.onclick = () => removeAnnexAsk(d.id, b.dataset.annexdel);
+            b.onclick = () => removeAnnexAsk(conWork.id, b.dataset.annexdel);
           });
           const wipe = host.querySelector("#anxWipe");
-          if (wipe) wipe.onclick = () => removeAnnexAsk(d.id, null);
+          if (wipe) wipe.onclick = () => removeAnnexAsk(conWork.id, null);
           paintImages(host);
           return;
         }

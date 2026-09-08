@@ -7979,19 +7979,40 @@ async function testInvoicing(browser, base) {
       return r ? r.number : null;
     });
     if (target) {
+      /* PK13-S21 · THE COLLECTION FORM IS GONE FROM HERE. Money arriving is a
+         fact of the bank, matched to the invoice in Conciliación against a line
+         that exists on a statement; typing it on the invoice wrote a collection
+         nobody could point at. The operator's instruction, and the same reason
+         `payBills` lost its screen in package 12.
+
+         What must be true is BOTH halves: the form is absent, and the drawer
+         says where the thing moved to. A door removed in silence reads as a
+         screen that cannot do anything — which is the report that opened this
+         package. */
       await pg.fill("#invQ", target);
       await pg.waitForTimeout(500);
       await pg.locator("#view table.mlist tr.click").first().click();
       await pg.waitForTimeout(500);
-      await pg.locator("#iv_go").click();
-      await pg.waitForTimeout(700);
-      const after = await pg.evaluate(() => ({
-        outstanding: erp.invoicingSummary().outstanding.amountCents,
-        drawerClosed: !document.querySelector("#drawer").classList.contains("on"),
+      const collect = await pg.evaluate(() => ({
+        form: !!document.getElementById("iv_go"),
+        amount: !!document.getElementById("iv_amt"),
+        route: !!document.getElementById("iv_bank"),
+        says: /Conciliación/.test(document.querySelector("#dbody")?.textContent || ""),
       }));
-      if (after.outstanding < before && after.drawerClosed)
-        ok("ADM-01: recording a collection moves the counters straight away");
-      else bad("ADM-01: collection updates the strip", `${before} → ${after.outstanding}`);
+      if (!collect.form && !collect.amount && collect.route && collect.says)
+        ok("PK13-S21: the invoice no longer collects by hand, and says where it is done");
+      else bad("PK13-S21: collection moved to the bank", JSON.stringify(collect));
+
+      await pg.locator("#iv_bank").click();
+      await pg.waitForTimeout(800);
+      const landed = await pg.evaluate(() => ({
+        hash: location.hash,
+        queue: !!document.getElementById("rcList"),
+      }));
+      if (/banking/.test(landed.hash) && landed.queue)
+        ok("PK13-S21: and «Ir a Conciliación» actually lands on the queue");
+      else bad("PK13-S21: route to the queue", JSON.stringify(landed));
+      void before;
     } else {
       ok(
         "ADM-01: nothing outstanding in the period, and the screen says so rather than inventing a row",
@@ -8028,6 +8049,65 @@ async function testInvoicing(browser, base) {
     )
       ok("ADM-01: an issued invoice offers «Rectificar…», which opens the credit note naming it");
     else bad("ADM-01: rectificar", JSON.stringify(rectify));
+
+    /* PK13-S20 · AN ABONO REDUCES WHAT IS OWED, AND IS IN THE REGISTER.
+       Reported from the live workspace: an invoice of 1.628 € showing 2.068 €
+       outstanding after two credit notes of 220 €, and the abono itself on no
+       screen that lists issued documents.
+
+       Two faults, one root. Nothing ever forced a sign on a credit note —
+       `issueInvoice` takes whatever the lines sum to — so an abono typed with
+       negative amounts turned `- credited` into `- (-220)`, ADDING the money
+       back; and `invoiceRegister` opened with a filter that excluded credit
+       notes outright, so a numbered, immutable fiscal document was issued and
+       then appeared nowhere.
+
+       Asserted with a NEGATIVE abono, which is the shape that was broken and
+       the shape the operator typed. */
+    const abono = await pg.evaluate(() => {
+      const inv = erp.state.invoices.find(
+        (i) => i.kind !== "creditNote" && erp.invoiceOutstandingCents(i.id) > 0,
+      );
+      if (!inv) return { skipped: true };
+      const before = erp.invoiceOutstandingCents(inv.id);
+      /* The draft is a plain object, exactly as the invoice screen builds one
+         for `basis === "credit"`: the kind, the invoice it rectifies, its
+         reason, and one negative line. */
+      const note = erp.issueInvoice(
+        {
+          projectId: inv.projectId,
+          billToPartyId: inv.partyId,
+          kind: "creditNote",
+          rectifies: inv.id,
+          rectifyReason: "E2E: signo del abono",
+          lines: [{ desc: "Rectificación E2E", amountCents: -10000 }],
+          vatBp: 0,
+          irpfBp: 0,
+        },
+        "e2e",
+      );
+      const after = erp.invoiceOutstandingCents(inv.id);
+      const reg = erp.invoiceRegister();
+      return {
+        before,
+        after,
+        noteTotal: note.totalCents,
+        drop: before - after,
+        inRegister: reg.some((r) => r.number === note.number),
+        noteOutstanding: erp.invoiceOutstandingCents(note.id),
+      };
+    });
+    if (abono.skipped) ok("PK13-S20: no outstanding invoice to credit — skipped");
+    else {
+      if (abono.drop === Math.abs(abono.noteTotal))
+        ok(
+          `PK13-S20: a credit note REDUCES the outstanding by its amount (${abono.before} → ${abono.after})`,
+        );
+      else bad("PK13-S20: credit note direction", JSON.stringify(abono));
+      if (abono.inRegister && abono.noteOutstanding === 0)
+        ok("PK13-S20: and the abono is in the register, owing nothing itself");
+      else bad("PK13-S20: abono in the register", JSON.stringify(abono));
+    }
 
     const notOnCredit = await pg.evaluate(async () => {
       const credit = erp.state.invoices.find((i) => i.kind === "creditNote");
@@ -9137,9 +9217,29 @@ async function testChangeApprovalEvidence(browser, base) {
         ok("anexo moderno: and says it is pending, and what that costs the job");
       else bad("anexo moderno: unsigned pill", names.slice(0, 200));
 
-      // ---- signed, with the document, and the document opens ---------------
-      await pg.evaluate((x) => signAnnexDrawer(x.contractId, x.number), modern);
-      await pg.waitForTimeout(500);
+      /* ---- signed, with the document, and the document opens --------------
+         OPENED BY CLICKING THE BUTTON, never by calling the function. This
+         suite used to do `pg.evaluate(() => signAnnexDrawer(id, number))`,
+         which supplies the arguments the SCREEN is supposed to supply — so it
+         proved the drawer works and said nothing about whether anything
+         reaches it. The screen was passing `d.id` from `renderContractDoc`, a
+         document object with no id at all, so every one of these buttons
+         opened an empty drawer in production while this suite stayed green.
+         Drive the door, not the room behind it. */
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(600);
+      await pg.click(`#conBody [data-annexsign="${modern.number}"]`);
+      await pg.waitForTimeout(600);
+      const opened = await pg.evaluate(() => ({
+        form: !!document.getElementById("anx_go"),
+        methods: document.querySelectorAll('input[name="anxhow"]').length,
+      }));
+      if (opened.form && opened.methods === 2)
+        ok("PK13-S18: the «Firmar anexo» BUTTON opens the signing drawer");
+      else bad("PK13-S18: sign button reaches the drawer", JSON.stringify(opened));
       await pg.setInputFiles("#anx_ev input[type=file]", {
         name: "anexo-firmado.pdf",
         mimeType: "application/pdf",
@@ -9240,6 +9340,27 @@ async function testChangeApprovalEvidence(browser, base) {
       else bad("anexo moderno: verbal signature", JSON.stringify(verbal));
 
       // ---- and it can be taken back out, all of it -------------------------
+      /* The other two buttons, by click as well: they carried the same bad id. */
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(600);
+      await pg.click(`#conBody [data-annexdel="${modern.number}"]`);
+      await pg.waitForTimeout(600);
+      const delOpened = await pg.evaluate(() => !!document.getElementById("anx_del"));
+      if (delOpened) ok("PK13-S18: the «Quitar anexo» BUTTON opens its confirmation");
+      else bad("PK13-S18: remove button reaches the drawer", "no #anx_del");
+      await pg.evaluate(() => closeDrawer());
+      await pg.waitForTimeout(400);
+      await pg.click("#conBody #anxWipe");
+      await pg.waitForTimeout(600);
+      const wipeOpened = await pg.evaluate(() => !!document.getElementById("anx_del"));
+      if (wipeOpened) ok("PK13-S18: and «Quitar todos los anexos» opens its own");
+      else bad("PK13-S18: wipe button reaches the drawer", "no #anx_del");
+      await pg.evaluate(() => closeDrawer());
+      await pg.waitForTimeout(400);
+
       const removed = await pg.evaluate((x) => {
         const c = erp.state.contracts.find((y) => y.id === x.contractId);
         const before = {

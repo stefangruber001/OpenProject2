@@ -2433,6 +2433,81 @@ before the charge when the bank does not spell the period out.
 screen could do. Re-run whole on the merged tree rather than on either half:
 **740/740**.
 
+**S19 · Three annex buttons that could never have worked.** «I cant sign annex
+or delete annex», from the live server, on the screens S14–S17 built. The
+contract panel is built from `renderContractDoc(...)` — the printable document,
+which has a number, a date and a customer and no id at all — and the three annex
+buttons passed `d.id`. Every click called the drawer with `undefined`, the
+lookup found no contract, and the function returned at its first guard: a drawer
+opened, empty, silently. `conWork.id` is what every other handler on that screen
+already used.
+
+Both drawers throw now instead of returning, so the next id that resolves to
+nothing says so.
+
+**And the suite was green through all of it**, because it opened the drawer by
+calling the function with the arguments the screen was supposed to supply. It
+clicks the buttons now, and the checks were verified by putting the bug back and
+watching them fail. Third instance in this package of one shape — a function
+that exists with no working way in.
+
+The temporary deploy marker went with it, and the literal ceiling it bought:
+`ci.yml` asked whoever removed the span to put 163 back to 162 in the same
+commit, and this is that commit.
+
+Gates: site E2E **762/762 unfiltered**, `pnpm test` 173/173, manageability
+simulation **513/513**, site-sync 20/20, boundaries, site syntax, i18n coverage
+complete in three languages, source literals **162/162** against the restored
+ceiling, workspace audit 0/0. ASSUMPTIONS S107.
+
+**S20 · The credit note was adding to the debt.** «I have emitted this invoice
+to correct the other one with the amount but it does not appear in the list of
+Ingresos» — and behind that report, a worse figure the operator had not asked
+about: `FAC-2026-0003`, total 1.628 €, showing **2.068 €** outstanding. The gap
+was exactly twice its two abonos.
+
+One root, two faults. Nothing has ever forced a sign on a credit note —
+`issueInvoice` takes whatever the lines sum to — so an abono typed negative, as
+a rectificativa reads, met two consumers that subtract and therefore assume
+positive. `invoiceOutstandingCents` turned `- credited` into `- (-220)` and
+handed the money back to the debt; the certification path's `billedBase` did the
+same to what had been billed. Both read the MAGNITUDE now, which is a deliberate
+departure from the instruction to flip the signs: flipping fixes an abono
+entered negative and breaks one entered positive, and the data holds both
+because no rule ever settled it.
+
+And `invoiceRegister` opened with a filter that excluded credit notes, so a
+numbered, gapless, immutable document was issued and appeared on no register.
+They are listed now, owing nothing themselves, and «emitido» nets.
+
+Verified against the bug rather than only against the fix: the old code reports
+`198040 → 208040`, the new one `198040 → 188040`.
+
+Gates: site E2E **764/764 unfiltered**, `pnpm test` 173/173 across 27 tasks,
+manageability simulation 513/513, site-sync 20/20, boundaries, i18n complete in
+three languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S108.
+
+**S21 · The invoice stops collecting money.** «we don't need Registro de Cobro
+because this is done on Bank Conciliation» — and it is the same fault `payBills`
+was removed for in package 12, at the other end of the same journey: a form that
+wrote a receipt against no bank line. A collection is recorded now by matching a
+statement movement to the invoice in Conciliación, where the money actually
+appears. `recordCollection` stays in the engine because the bank matcher calls
+it; what went is the manual door.
+
+The drawer keeps a card that names Conciliación and offers the route, and the
+check asserts both halves — the form absent, and the button actually landing on
+the queue. A control removed in silence reads as a screen that cannot do
+anything, which is the report this package opened on.
+
+The recorrido's phase 11 needed it too: its verb was labelled «Registrar cobro»
+and opened the invoice drawer, which after this change is named after something
+that drawer can no longer do. It walks to Conciliación.
+
+Gates: site E2E **765/765 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 162/162 in both, workspace audit 0/0. ASSUMPTIONS S109.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they
@@ -2739,4 +2814,4 @@ repository variable `APP_URL`, and trigger a TestFlight build — the installed
 app predates the tab-bar fix, which Part 2 above makes harmless rather than
 merely untidy in the meantime.
 
-See ASSUMPTIONS S107, S107a, S107b, S107c, S107d.
+See ASSUMPTIONS S110, S110a, S110b, S110c, S110d.

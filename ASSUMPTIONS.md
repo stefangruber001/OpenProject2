@@ -9472,7 +9472,106 @@ gap still reports behind, with the commit count, exactly as before. Content is
 what a deploy promises — the SHA was only ever a proxy for it, and the proxy
 broke the moment a push carried more than one commit.
 
-**S107 · The write had no door, and the product said it did.** A site worker
+**S107 · Three buttons that called a function with an id that does not
+exist.** The operator, on the live server: «I cant sign annex or delete annex».
+The contract screen builds its panel from `d = renderContractDoc(conWork.id)` —
+the PRINTABLE DOCUMENT, which carries a number, a date, a customer and its
+milestones, and no `id` at all. The three annex buttons passed `d.id`, so every
+click called `signAnnexDrawer(undefined, "CTR-…-A2")`, the contract lookup found
+nothing, and the function returned at its first guard. A drawer opened, empty,
+and nothing anywhere said why. Every other handler on that screen already used
+`conWork.id`; these three were the only ones that did not.
+
+**S107a · And a silent return is what made it look like a dead button.** Both
+drawers now THROW when the id resolves to nothing. `mutate` and the console both
+report a throw, so the next wiring mistake of this shape is visible in a second
+rather than in a screenshot taken by the operator two days later.
+
+**S107b · The test could not have caught it, by construction.** The suite opened
+the drawer with `pg.evaluate(() => signAnnexDrawer(contractId, number))` — it
+supplied the arguments THE SCREEN is supposed to supply. So it proved the drawer
+works and said nothing about whether anything reaches it, and stayed green
+through every one of the three broken buttons. It clicks them now, and the check
+was verified the only way a regression test can be: the old code was put back
+and it failed (`form:false, methods:0`), then passed on the fix.
+
+That is the third instance of this exact shape in this package — S89's
+`assignWorkerDrawer` with no caller, S92's suppressed optgroup, and now a caller
+with the wrong argument. The rule the suite keeps having to relearn: drive the
+door, not the room behind it.
+
+**S107c · The deploy marker is gone, and its ceiling with it.** `ci.yml` said in
+so many words: «Whoever removes that span puts this back to 162 in the same
+commit.» The span, its mobile CSS rule, the comment and the 163 are all removed
+together; the audit measures 162 exactly. The two new error strings are in both
+dictionaries, and the annex one dropped its concatenated number so the literal
+the audit extracts is the literal the dictionary holds.
+
+**S108 · An abono was ADDING to the debt, and was on no register at all.**
+Reported from the live workspace as an invoice of 1.628 € showing 2.068 €
+outstanding — the difference exactly twice its two credit notes of 220 € — and
+as a rectificativa the operator had issued and could not find anywhere.
+
+Two faults with one root: **nothing in this product has ever forced a sign on a
+credit note.** `issueInvoice` takes whatever the lines sum to, so an abono typed
+with negative amounts — which is how a rectificativa reads, and what the
+operator typed — is stored negative, while two consumers both subtract and
+therefore both assume positive. `invoiceOutstandingCents` turned `- credited`
+into `- (-220)` and gave the money back to the debt; `billedBase` in the
+certification path did the same to what had been billed.
+
+Fixed BY MAGNITUDE rather than by flipping the sign, which is a deliberate
+departure from the operator's own instruction («store negative and flip the two
+subtractions»). Flipping would have corrected a negative abono and broken a
+positive one, and both exist in the data precisely because no rule ever settled
+it. Only the magnitude was ever meaningful: a credit note reduces what is owed
+by its amount, whichever way it was entered. The sign convention itself is left
+open — settling it is a data question, not a code one, and this stops the
+arithmetic depending on the answer.
+
+**S108a · And `invoiceRegister` excluded credit notes outright.** Its first line
+was `.filter((i) => i.kind !== "creditNote")`, so a numbered, gapless, immutable
+fiscal document was issued and then appeared on no screen that lists issued
+documents. They are in the register now; their own outstanding is zero, so no
+chase list changes, and `emitido` nets the way a register reads.
+
+**S108b · The regression test was verified against the bug.** With the old
+arithmetic it reports `198040 → 208040` — the debt growing by the credit note —
+and with the fix `198040 → 188040`. A test for a sign error that has only ever
+been run against the corrected code proves nothing about the direction.
+
+**S109 · «Registrar cobro» leaves the invoice, because money arriving is a fact
+of the bank.** The operator: «we don't need Registro de Cobro because this is
+done on Bank Conciliation». Typing a collection on the invoice wrote a receipt
+against no bank line — the same fault `payBills` was removed for in package 12,
+at the other end of the same journey. It is recorded now only by matching a
+statement movement to the invoice in Conciliación, where the money actually
+appears.
+
+`recordCollection` STAYS in the engine, untouched: it is what the bank matcher
+calls (`matchMovement` and `matchMovementSplit`). What went is the manual door,
+not the verb.
+
+**S109a · And the door says where it moved to.** A removed control that leaves
+nothing behind reads as a screen that cannot do anything — the report this whole
+package opened on. The invoice drawer keeps a card, «Cómo se cobra», that names
+Conciliación and offers the route; the check asserts both the absence of the
+form AND that the button lands on the queue, because a route that names a screen
+it does not reach is the same failure wearing a label.
+
+**S109b · The recorrido's phase 11 pointed at the form.** Its verb was labelled
+«Registrar cobro» and opened the invoice drawer — after this change, a verb named
+after something the screen it opens can no longer do. It walks to Conciliación
+now.
+
+**S109c · The literal audit read my own comment.** The comment explaining this
+change quoted the operator with apostrophes — «the operator's own instruction
+(«we don't need…»)» — and the source audit pairs apostrophes as quotes, so a
+fragment of a code comment was counted as an untranslated user-visible string.
+CLAUDE.md records this exact trap, and it caught a comment written to explain a
+fix while the fix was being written. Rewritten without them.
+
+**S110 · The write had no door, and the product said it did.** A site worker
 could not record hours at all, and was told they were saved.
 `site/erp-store.js` refuses to PUT a redacted document back — correctly, since
 that would blank the company — and its comment said the site worker's writes
@@ -9492,7 +9591,7 @@ exists and the three worker handlers call it; the office keeps its
 whole-document PUT, deliberately, because rerouting that is a different change
 from fixing this one.
 
-**S107a · Building the obvious client would have opened a leak.** The endpoint's
+**S110a · Building the obvious client would have opened a leak.** The endpoint's
 own doc-comment recommends `?include=state` for an interactive client, and that
 branch returned `erp.toJSON()` unredacted to anybody allowed to run a command —
 which now includes a site worker. He would have received every invoice, every
@@ -9504,7 +9603,7 @@ then `redactForWorker` — tested on the permission and not on the role name, so
 the two paths cannot drift into disagreeing about who sees what. Fixed in the
 same commit as the client, on purpose.
 
-**S107b · The third door, and no view has a lock.** Three paths set the current
+**S110b · The third door, and no view has a lock.** Three paths set the current
 screen: `go()` clamps a site worker to `labour`, `hashchange` clamps, and
 `boot()` did not. The shell keeps one long-lived web view per tab, each loaded
 at its own URL from `site/nav.json`, so every tab boots straight into its own
@@ -9530,7 +9629,7 @@ hours screen"_ — which was false when it was written, and is why the crew's
 installed build is harmless rather than merely untidy until TestFlight catches
 up.
 
-**S107c · Four refusals and no admission is not a boundary.** Every gate that
+**S110c · Four refusals and no admission is not a boundary.** Every gate that
 should have caught the above passed. `tests/server-e2e` had four negative
 checks on the site worker (another's hours, an unassigned site, approving a
 week, PUTting the document) and not one positive: nothing asserted that a
@@ -9544,7 +9643,7 @@ RELOADED, and the row has to still be there — then deleted again, so the suite
 leaves the register as it found it. A boundary is two statements; only one of
 them had been written down.
 
-**S107d · `mutate`'s toast still fires before the office's save lands, and that
+**S110d · `mutate`'s toast still fires before the office's save lands, and that
 is left alone.** The plan for S107 also proposed making `mutate`'s success
 message conditional on the write having happened. It is not, and the reason is
 that the lie was specific: `saveState` resolving `null` for a redacted document
