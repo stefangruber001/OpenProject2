@@ -9506,3 +9506,36 @@ commit.» The span, its mobile CSS rule, the comment and the 163 are all removed
 together; the audit measures 162 exactly. The two new error strings are in both
 dictionaries, and the annex one dropped its concatenated number so the literal
 the audit extracts is the literal the dictionary holds.
+
+**S108 · An abono was ADDING to the debt, and was on no register at all.**
+Reported from the live workspace as an invoice of 1.628 € showing 2.068 €
+outstanding — the difference exactly twice its two credit notes of 220 € — and
+as a rectificativa the operator had issued and could not find anywhere.
+
+Two faults with one root: **nothing in this product has ever forced a sign on a
+credit note.** `issueInvoice` takes whatever the lines sum to, so an abono typed
+with negative amounts — which is how a rectificativa reads, and what the
+operator typed — is stored negative, while two consumers both subtract and
+therefore both assume positive. `invoiceOutstandingCents` turned `- credited`
+into `- (-220)` and gave the money back to the debt; `billedBase` in the
+certification path did the same to what had been billed.
+
+Fixed BY MAGNITUDE rather than by flipping the sign, which is a deliberate
+departure from the operator's own instruction («store negative and flip the two
+subtractions»). Flipping would have corrected a negative abono and broken a
+positive one, and both exist in the data precisely because no rule ever settled
+it. Only the magnitude was ever meaningful: a credit note reduces what is owed
+by its amount, whichever way it was entered. The sign convention itself is left
+open — settling it is a data question, not a code one, and this stops the
+arithmetic depending on the answer.
+
+**S108a · And `invoiceRegister` excluded credit notes outright.** Its first line
+was `.filter((i) => i.kind !== "creditNote")`, so a numbered, gapless, immutable
+fiscal document was issued and then appeared on no screen that lists issued
+documents. They are in the register now; their own outstanding is zero, so no
+chase list changes, and `emitido` nets the way a register reads.
+
+**S108b · The regression test was verified against the bug.** With the old
+arithmetic it reports `198040 → 208040` — the debt growing by the credit note —
+and with the fix `198040 → 188040`. A test for a sign error that has only ever
+been run against the corrected code proves nothing about the direction.

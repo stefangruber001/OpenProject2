@@ -2460,6 +2460,33 @@ simulation **513/513**, site-sync 20/20, boundaries, site syntax, i18n coverage
 complete in three languages, source literals **162/162** against the restored
 ceiling, workspace audit 0/0. ASSUMPTIONS S107.
 
+**S20 · The credit note was adding to the debt.** «I have emitted this invoice
+to correct the other one with the amount but it does not appear in the list of
+Ingresos» — and behind that report, a worse figure the operator had not asked
+about: `FAC-2026-0003`, total 1.628 €, showing **2.068 €** outstanding. The gap
+was exactly twice its two abonos.
+
+One root, two faults. Nothing has ever forced a sign on a credit note —
+`issueInvoice` takes whatever the lines sum to — so an abono typed negative, as
+a rectificativa reads, met two consumers that subtract and therefore assume
+positive. `invoiceOutstandingCents` turned `- credited` into `- (-220)` and
+handed the money back to the debt; the certification path's `billedBase` did the
+same to what had been billed. Both read the MAGNITUDE now, which is a deliberate
+departure from the instruction to flip the signs: flipping fixes an abono
+entered negative and breaks one entered positive, and the data holds both
+because no rule ever settled it.
+
+And `invoiceRegister` opened with a filter that excluded credit notes, so a
+numbered, gapless, immutable document was issued and appeared on no register.
+They are listed now, owing nothing themselves, and «emitido» nets.
+
+Verified against the bug rather than only against the fix: the old code reports
+`198040 → 208040`, the new one `198040 → 188040`.
+
+Gates: site E2E **764/764 unfiltered**, `pnpm test` 173/173 across 27 tasks,
+manageability simulation 513/513, site-sync 20/20, boundaries, i18n complete in
+three languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S108.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they

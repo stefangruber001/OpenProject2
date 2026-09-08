@@ -6207,9 +6207,11 @@
           invs.filter((i) => i.kind !== "creditNote"),
           (i) => i.baseCents,
         ) -
+        // Magnitude, for `invoiceOutstandingCents`'s reason: an abono entered
+        // negative made this subtraction ADD, overstating what had been billed.
         sum(
           invs.filter((i) => i.kind === "creditNote"),
-          (i) => i.baseCents,
+          (i) => Math.abs(cents(i.baseCents)),
         );
       const prog = this.chapterProgress(p.id);
       const chapters = (p.baseline.chapters || [])
@@ -6617,9 +6619,20 @@
           (a) => a.amountCents,
         ),
       );
+      /* BY MAGNITUDE, never by the stored sign. A credit note REDUCES what is
+         owed, and this line used to subtract the stored total: an abono issued
+         with negative amounts — which is how a rectificativa reads, and what
+         the operator typed — made `- credited` into `- (-220)` and ADDED the
+         money back. Reported from the live workspace as an invoice of 1.628 €
+         showing 2.068 € outstanding, its two abonos each counted the wrong way.
+
+         `Math.abs` rather than flipping the sign, because both conventions
+         exist in the data: nothing ever forced one, so a workspace can hold
+         abonos entered positive and abonos entered negative, and only the
+         magnitude is meaningful in both. */
       const credited = sum(
         this.state.invoices.filter((i) => i.rectifies === invId),
-        (i) => i.totalCents,
+        (i) => Math.abs(cents(i.totalCents)),
       );
       if (inv.kind === "creditNote") return 0;
       return inv.totalCents - collected - credited - sum(inv.writeOffs || [], (w) => w.amountCents);
@@ -6636,22 +6649,28 @@
      */
     invoiceRegister() {
       const t = this.state.today;
-      return this.state.invoices
-        .filter((i) => i.kind !== "creditNote")
-        .map((i) => {
-          const out = this.invoiceOutstandingCents(i.id);
-          return {
-            number: i.number,
-            partyId: i.partyId,
-            party: this.party(i.partyId).name,
-            contact: this.party(i.partyId).mobile || this.party(i.partyId).email,
-            projectId: i.projectId,
-            totalCents: i.totalCents,
-            outstandingCents: out,
-            dueDate: i.dueDate,
-            daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
-          };
-        });
+      /* ABONOS ARE IN THE REGISTER. They were filtered out, so a rectificativa
+         — a fiscal document, numbered without gaps, immutable once issued —
+         was issued and then appeared on no screen that lists issued documents.
+         The operator raised one to correct an invoice and could not find it.
+
+         Its own outstanding is zero (an abono is not owed), so it changes no
+         chase list; what it changes is `emitido`, which now nets the way the
+         register reads. */
+      return this.state.invoices.map((i) => {
+        const out = this.invoiceOutstandingCents(i.id);
+        return {
+          number: i.number,
+          partyId: i.partyId,
+          party: this.party(i.partyId).name,
+          contact: this.party(i.partyId).mobile || this.party(i.partyId).email,
+          projectId: i.projectId,
+          totalCents: i.totalCents,
+          outstandingCents: out,
+          dueDate: i.dueDate,
+          daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
+        };
+      });
     }
     /**
      * ADM-01's four counters: emitido · cobrado · pendiente · vencido.

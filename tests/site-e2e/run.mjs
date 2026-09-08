@@ -8029,6 +8029,65 @@ async function testInvoicing(browser, base) {
       ok("ADM-01: an issued invoice offers «Rectificar…», which opens the credit note naming it");
     else bad("ADM-01: rectificar", JSON.stringify(rectify));
 
+    /* PK13-S20 · AN ABONO REDUCES WHAT IS OWED, AND IS IN THE REGISTER.
+       Reported from the live workspace: an invoice of 1.628 € showing 2.068 €
+       outstanding after two credit notes of 220 €, and the abono itself on no
+       screen that lists issued documents.
+
+       Two faults, one root. Nothing ever forced a sign on a credit note —
+       `issueInvoice` takes whatever the lines sum to — so an abono typed with
+       negative amounts turned `- credited` into `- (-220)`, ADDING the money
+       back; and `invoiceRegister` opened with a filter that excluded credit
+       notes outright, so a numbered, immutable fiscal document was issued and
+       then appeared nowhere.
+
+       Asserted with a NEGATIVE abono, which is the shape that was broken and
+       the shape the operator typed. */
+    const abono = await pg.evaluate(() => {
+      const inv = erp.state.invoices.find(
+        (i) => i.kind !== "creditNote" && erp.invoiceOutstandingCents(i.id) > 0,
+      );
+      if (!inv) return { skipped: true };
+      const before = erp.invoiceOutstandingCents(inv.id);
+      /* The draft is a plain object, exactly as the invoice screen builds one
+         for `basis === "credit"`: the kind, the invoice it rectifies, its
+         reason, and one negative line. */
+      const note = erp.issueInvoice(
+        {
+          projectId: inv.projectId,
+          billToPartyId: inv.partyId,
+          kind: "creditNote",
+          rectifies: inv.id,
+          rectifyReason: "E2E: signo del abono",
+          lines: [{ desc: "Rectificación E2E", amountCents: -10000 }],
+          vatBp: 0,
+          irpfBp: 0,
+        },
+        "e2e",
+      );
+      const after = erp.invoiceOutstandingCents(inv.id);
+      const reg = erp.invoiceRegister();
+      return {
+        before,
+        after,
+        noteTotal: note.totalCents,
+        drop: before - after,
+        inRegister: reg.some((r) => r.number === note.number),
+        noteOutstanding: erp.invoiceOutstandingCents(note.id),
+      };
+    });
+    if (abono.skipped) ok("PK13-S20: no outstanding invoice to credit — skipped");
+    else {
+      if (abono.drop === Math.abs(abono.noteTotal))
+        ok(
+          `PK13-S20: a credit note REDUCES the outstanding by its amount (${abono.before} → ${abono.after})`,
+        );
+      else bad("PK13-S20: credit note direction", JSON.stringify(abono));
+      if (abono.inRegister && abono.noteOutstanding === 0)
+        ok("PK13-S20: and the abono is in the register, owing nothing itself");
+      else bad("PK13-S20: abono in the register", JSON.stringify(abono));
+    }
+
     const notOnCredit = await pg.evaluate(async () => {
       const credit = erp.state.invoices.find((i) => i.kind === "creditNote");
       if (!credit) return { skipped: true };
