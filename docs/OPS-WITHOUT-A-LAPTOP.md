@@ -29,6 +29,14 @@ ERP end to end, and only then moves the `main` tag. The server checks for a new
 image every 60 seconds and restarts itself when it finds one. Nothing logs into
 the machine; the machine pulls.
 
+**That is the design, and it has silently stopped being true.** The server once
+sat 25 hours on an image 19 commits behind `main` while six consecutive deploys
+went green: the pipeline ends at the registry, and nothing was watching the
+machine. Two things now watch it — the `verify` job at the end of `deploy.yml`
+fails when the revision answering is not the one just built, and `status` below
+says which of the three causes it is. So "push and forget" is still the
+procedure; it is no longer an act of faith.
+
 Two consequences worth knowing:
 
 - Work pushed to a feature branch is **built and tested but not released**. Only
@@ -73,10 +81,26 @@ access can still start one; they cannot complete one without you.
 
 ### If the key is gone
 
-Generate a new pair from the Hetzner web console (Console → log in as root →
-`ssh-keygen -t ed25519 -f /root/.ssh/newkey -N ""`, then append
-`/root/.ssh/newkey.pub` to `/root/.ssh/authorized_keys` and copy the private
-half out). Paste that as `SERVER_SSH_KEY`.
+Expect this rather than treating it as an accident: provisioning ends by telling
+you to copy the secrets into a password manager and `rm -rf ops/.provisioned`,
+so the private key is designed not to survive on anybody's laptop.
+
+**Step 0, and it is not optional: give root a password.** Nothing in this
+repository ever sets one — there is no `users:`, `chpasswd` or `ssh_pwauth` in
+`ops/cloud-init.yaml`, and Debian's cloud image ships root locked. Hetzner only
+mails a generated password when a server is created with no SSH key, and
+provisioning attaches one. So the web console shows a `login:` prompt that
+nothing satisfies, and every instruction below it used to be unreachable.
+
+**console.hetzner.com → the server → Rescue → Reset root password.** It shows
+the password once — write it down before closing it — and it **reboots the
+machine**, which is a real interruption to a live ERP. Do it when you need it,
+not to be tidy.
+
+Then: **Console → log in as `root` →
+`ssh-keygen -t ed25519 -f /root/.ssh/newkey -N ""`**, append
+`/root/.ssh/newkey.pub` to `/root/.ssh/authorized_keys`, copy the private half
+out, and paste it as `SERVER_SSH_KEY`.
 
 ---
 
@@ -84,14 +108,59 @@ half out). Paste that as `SERVER_SSH_KEY`.
 
 **Actions → Ops (run from a browser) → Run workflow → pick one → Run.**
 
-| Action             | What it tells you                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `status`           | Everything: server up, backups enabled, SSH narrow, containers running, database connected, tenant isolation real, timers armed, dumps present, disk headroom |
-| `backup-now`       | Runs the nightly backup immediately and lists the dumps on disk                                                                                               |
-| `list-ssh-allowed` | Which addresses may reach SSH right now                                                                                                                       |
+This table lists **every** action the workflow offers. It once listed three of
+the six, and the missing one was `deploy-now` — so when the server stopped
+taking releases, the button that fixes it was in the menu and in nobody's head.
+A button nobody is told about is a button that does not exist. If you add an
+option to `ops.yml`, add its row here in the same commit.
+
+| Action             | What it is for                                                                                                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `status`           | Everything: server up, backups enabled, SSH narrow, containers running, database connected, tenant isolation real, timers armed, dumps present, disk headroom, and which commit is actually answering               |
+| `deploy-now`       | **The server is not running the latest release.** Pulls the current images, restarts, and proves it arrived by comparing the running revision against the newest commit that builds one — it fails if they disagree |
+| `sync-server`      | The compose file, the Caddyfile and the ops scripts ON THE MACHINE. These are not in the image, so a release can update the application while the stack definition stays where it was                               |
+| `backup-now`       | Runs the nightly backup immediately and lists the dumps on disk                                                                                                                                                     |
+| `set-email`        | Connects the company mailbox so the ERP can file its drafts in it                                                                                                                                                   |
+| `list-ssh-allowed` | Which addresses may reach SSH right now                                                                                                                                                                             |
 
 Read the log. Every line is a `✓`, a `!`, or a `✗`, and the ones that are not
 `✓` say what to do.
+
+### The server is stuck on an old release
+
+The symptom is that a change you pushed is not on the screen in front of you,
+and `/api/health` (open it in any browser — it is public and says which commit
+is answering) reports a revision older than `main`. The pipeline will look
+perfectly green, because it ends at the registry.
+
+Run **`status`** first and read which of these it prints. Each has one answer:
+
+| What `status` says                                                               | What happened                                                                                                         | What to do                                                                                                                                                                                |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `✗ Running <old>, but <new> is released — N commits behind`, everything else `✓` | the machine simply has not pulled                                                                                     | run **`deploy-now`**                                                                                                                                                                      |
+| `✗ Auto-deploy timer is inactive`                                                | somebody stopped the timer and did not start it again — see the rollback in HANDOVER-OPS, which stops it deliberately | run **`deploy-now`** to land the release, then re-arm the timer (`systemctl enable --now canei-deploy.timer`)                                                                             |
+| `✗ Stack is PINNED to …:sha-…`                                                   | a rollback pinned `IMAGE_APP` to one commit, so it can never move                                                     | **`deploy-now` cannot fix this** — the `.env` on the machine has to be edited; see below                                                                                                  |
+| `✗ Last auto-deploy run ended '…'`                                               | the pull itself is failing, most often an expired registry token                                                      | `./ops/set-ghcr-token.sh`, which needs a terminal — it is deliberately not on the button, because a token passed as a workflow input would sit in the run log for anyone with read access |
+
+Finish by reloading `/api/health`. A `deploy-now` that went green has already
+compared the revision for you and would have failed if it disagreed, so this is
+confirmation rather than the check itself.
+
+**Editing a pinned `.env`.** This is the one case with no browser answer. Get
+into the machine (Rescue → Reset root password, then Console — see "If the key
+is gone" above for why, and for the reboot it costs), then:
+
+```
+cd /opt/canei-erp
+grep IMAGE_ .env          # both lines must end in :main, all lowercase
+nano .env                 # IMAGE_APP=ghcr.io/stefangruber001/openproject2/app:main
+                          # IMAGE_MIGRATE=ghcr.io/stefangruber001/openproject2/migrate:main
+systemctl enable --now canei-deploy.timer
+systemctl start canei-deploy.service
+```
+
+A capital letter anywhere in that path makes every pull fail while the timer
+stays green, which is the same silence this whole section exists to break.
 
 ### What it does to the firewall, and why
 
