@@ -10660,19 +10660,166 @@ async function testProcurement(browser, base) {
     const mineEntry = await pg.evaluate(() => ({
       tabs: [...document.querySelectorAll("[data-hmtab]")].map((t) => t.dataset.hmtab),
       week: document.querySelectorAll(".weekbar .hday").length,
-      form: !!document.querySelector(".mform #me_p") || !!document.querySelector(".mform"),
+      /* WHICH OF THE TWO SHAPES, and not «either will do». This read used to be
+         `(form || approved)`, with `form` falling back to any `.mform` on the
+         page — so the empty state answered it, and it stayed green while the
+         form's save button led nowhere. The office half of this suite approves
+         the current week thirty lines above, so the shape that belongs here is
+         not in doubt and the test can say which one it is. */
       approved: !!document.querySelector(".card .empty"),
+      form: !!document.querySelector(".mform #me_p"),
       text: document.querySelector("#view").innerText,
     }));
     if (
       mineEntry.tabs.join() === "enter,mine" &&
       mineEntry.week === 7 &&
-      (mineEntry.form || mineEntry.approved)
+      mineEntry.approved &&
+      !mineEntry.form
     )
-      ok("ADM-04: the worker's own screen offers a week and one place to type");
+      ok("ADM-04: the week the office has just approved offers the person nothing to change");
     else bad("ADM-04: worker entry screen", JSON.stringify(mineEntry).slice(0, 200));
     if (!/€/.test(mineEntry.text)) ok("ADM-04: and not one euro sign on it");
     else bad("ADM-04: the worker's entry screen shows money", mineEntry.text.slice(0, 160));
+
+    /* AND THEN THE BUTTON IS PRESSED. Nothing in this repository had ever
+       pressed it — `#me_save` appears in no test and `#me_h` was filled by
+       nobody — so the entire write path was covered by the observation that a
+       form exists.
+
+       It did not work. The save mutated memory, redrew the row from memory and
+       announced «Horas guardadas»; the round trip that would have shown the row
+       was never made, because no client had ever called `POST /erp/command`.
+       The only assertion that can catch that is this one: save it, LOAD THE
+       PAGE AGAIN, and look for it.
+
+       Two things have to be arranged first, and both are the product's own
+       rules rather than test scaffolding. The person must be ON a job that day
+       — the seed's assignments all expired in July — and the week must not be
+       one the office has approved, which the half of this suite above has just
+       done to the current one. So: assign them through the drawer the office
+       actually uses, and type into next week. Both are undone at the end, so
+       the suite leaves the register as it found it. */
+    const target = await pg.evaluate(() => {
+      /* A job whose partidas offer subpartidas: the engine refuses hours on a
+         budgeted job that name no subpartida, so a job with none would fail
+         this test for a reason that has nothing to do with saving. */
+      const open = (erp.state.projects || []).filter((x) => !x.closed);
+      for (const p of open)
+        for (const c of (p.baseline || {}).chapters || [])
+          if (lineOptionsFor(p.id, c.num, "")) return p.id;
+      return (open[0] || {}).id || "";
+    });
+    const meName = await pg.evaluate(() => (erp.state.workers[0] || {}).name || "");
+    const openWorkerDrawer = async () => {
+      await pg.evaluate(() => (location.hash = "staff"));
+      await pg.waitForTimeout(500);
+      await pg.locator("#stfQ").fill(meName);
+      await pg.waitForTimeout(400);
+      await pg.locator("tbody tr.click").first().click();
+      await pg.waitForTimeout(400);
+    };
+    await openWorkerDrawer();
+    const asgBefore = await pg.evaluate(() => (erp.state.assignments || []).length);
+    await pg.locator("#w_asg_p").selectOption(target);
+    await pg.locator("#w_asg_save").click();
+    await pg.waitForTimeout(500);
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(300);
+
+    await pg.evaluate(() => (location.hash = "labour"));
+    await pg.waitForTimeout(600);
+    await pg.locator('[data-hgrp="mine"]').click();
+    await pg.waitForTimeout(600);
+    await pg.click("#hNext");
+    await pg.waitForTimeout(600);
+
+    if ((await pg.locator("#me_save").count()) === 0) {
+      bad(
+        "ADM-04: no open week to record hours in",
+        `assigned=${target} · ${await pg.locator("#view").innerText()}`.slice(0, 200),
+      );
+    } else {
+      const dayRows = () => pg.locator(".rlist [data-medel]").count();
+      const before = await dayRows();
+      /* A partida that actually offers subpartidas. The handler refuses the
+         save without one whenever the select is shown, and «— ninguna —» is
+         not one of them. */
+      const chapterCount = await pg.locator("#me_c option").count();
+      let needsLine = false;
+      for (let i = 0; i < chapterCount; i++) {
+        await pg.selectOption("#me_c", { index: i });
+        await pg.waitForTimeout(200);
+        needsLine = await pg.evaluate(() => {
+          const w = document.querySelector("#me_lwrap");
+          return !!w && w.style.display !== "none";
+        });
+        if (needsLine) break;
+      }
+      if (needsLine) await pg.selectOption("#me_l", { index: 1 });
+      const day = await pg.evaluate(() => {
+        const on = document.querySelector(".weekbar .hday.on");
+        return (on && on.dataset.hday) || "";
+      });
+      await pg.click("#me_save");
+      await pg.waitForTimeout(800);
+      const drawn = await dayRows();
+
+      await pg.goto(`${base}/erp.html#labour`, { waitUntil: "networkidle" });
+      await bootedShell(pg);
+      await pg.waitForTimeout(700);
+      await pg.locator('[data-hgrp="mine"]').click();
+      await pg.waitForTimeout(600);
+      /* THE SAME DAY, FOUND AND NAMED. A reload puts `hDay` back on the
+         document's today, and the office half of this suite has been walking
+         the week strip about before that — so «forward one week» does not land
+         on the day that was typed into, and the row would be reported missing
+         while sitting one column away. Walk until the strip carries the column,
+         then ask for it. */
+      let hops = 0;
+      while (hops < 4 && (await pg.locator(`[data-hday="${day}"]`).count()) === 0) {
+        await pg.click("#hNext");
+        await pg.waitForTimeout(500);
+        hops++;
+      }
+      const reachable = (await pg.locator(`[data-hday="${day}"]`).count()) > 0;
+      if (reachable) {
+        await pg.locator(`[data-hday="${day}"]`).click();
+        await pg.waitForTimeout(500);
+      }
+      const survived = reachable ? await dayRows() : -1;
+      if (drawn === before + 1 && survived === before + 1)
+        ok(`ADM-04: hours typed in by hand are still there after a reload (${day})`);
+      else
+        bad(
+          "ADM-04: the worker's hours did not survive a reload",
+          `day=${day} before=${before} drawn=${drawn} reloaded=${survived} hops=${hops} strip=${(
+            await pg.locator("[data-hday]").evaluateAll((n) => n.map((x) => x.dataset.hday))
+          ).join(",")}`,
+        );
+
+      if (survived === before + 1) {
+        await pg.locator(".rlist [data-medel]").last().click();
+        await pg.waitForTimeout(800);
+        const removed = await dayRows();
+        if (removed === before) ok("ADM-04: and can be taken out again from the same screen");
+        else bad("ADM-04: deleting the entry", `before=${before} after delete=${removed}`);
+      }
+    }
+
+    // Off the job again: the fixture is not allowed to outlive the assertion.
+    await openWorkerDrawer();
+    await pg.locator("#drawer [data-wunassign]").last().click();
+    await pg.waitForTimeout(500);
+    const asgAfter = await pg.evaluate(() => (erp.state.assignments || []).length);
+    if (asgAfter === asgBefore) ok("ADM-04: and the job assignment it needed is given back");
+    else bad("ADM-04: assignment fixture left behind", `before=${asgBefore} after=${asgAfter}`);
+    await pg.locator("#dClose").click();
+    await pg.waitForTimeout(300);
+    // Back where the rest of this suite expects to be standing.
+    await pg.evaluate(() => (location.hash = "labour"));
+    await pg.waitForTimeout(600);
+    await pg.locator('[data-hgrp="mine"]').click();
+    await pg.waitForTimeout(600);
 
     /* THE SHELL AROUND THOSE SCREENS, which is what the crew actually got.
        The screens above were right all along; what a site account received was

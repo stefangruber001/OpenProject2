@@ -797,6 +797,79 @@ async function siteWorkerBoundary() {
         `HTTP ${res.status}`,
       );
     }
+
+    // --- AND THE DOOR HE IS MEANT TO WALK THROUGH ACTUALLY OPENS ----------
+    //
+    // Four refusals above and not one admission, which is the shape of a suite
+    // that passes just as well against an endpoint refusing a site worker
+    // everything — and that is precisely what shipped. The permission was
+    // granted, the rule was right, the endpoint answered; no client ever called
+    // it. A crew member's hours were held in memory, drawn on screen, announced
+    // as saved, and gone on the next reload.
+    //
+    // A boundary is two statements. This is the second one.
+    const chapter = chapters.find((c) => (c.lines ?? []).some((l) => l.id));
+    const line = (chapter?.lines ?? []).find((l) => l.id);
+    /* Guarded on the LINE and not merely on the project, because a budgeted job
+       whose partida names no subpartida is refused by the engine — and this
+       block would then be reporting the wrong thing about the endpoint. The two
+       reads above already assert that the chapters and their lines arrive; if
+       they do not, the failure belongs to them. */
+    if (assignedProjectId && chapter && line) {
+      const res = await command(
+        {
+          command: "recordHours",
+          args: [
+            {
+              workerId,
+              projectId: assignedProjectId,
+              chapterNum: chapter.num,
+              lineId: line.id,
+              date: "2026-09-07",
+              hoursMilli: 8000,
+              kind: "normal",
+            },
+          ],
+          expectedVersion: st.version,
+        },
+        "?include=state",
+      );
+      const body = await json(res);
+      check(
+        "but he MAY record his own hours on the site he is assigned to",
+        res.status === 200,
+        `HTTP ${res.status} ${JSON.stringify(body).slice(0, 200)}`,
+      );
+
+      /* AND THE RECEIPT IS SCOPED LIKE EVERY OTHER READ. `?include=state` is
+         what an interactive client asks for — it renders from the document, so
+         this response is the widest thing a site account is ever handed. It
+         used to be the company file entire: every invoice, every bank line and
+         everybody's pay, returned as the answer to saving one's own timesheet.
+         Unreachable only for as long as no client existed, and the client that
+         makes the endpoint useful is the same change that would have made the
+         leak live. */
+      check(
+        "and the state that comes back with it is scoped",
+        body.scoped === true,
+        `scoped=${body.scoped}`,
+      );
+      const back = body.state ?? {};
+      const backMoney = JSON.stringify(back).match(/"[a-zA-Z]*Cents"/g) ?? [];
+      check("carrying no amount in cents", backMoney.length === 0, backMoney.slice(0, 6).join(" "));
+      check(
+        "nor anybody else's worker record",
+        (back.workers ?? []).every((w) => w.id === workerId),
+        `workers=${(back.workers ?? []).map((w) => w.id).join(",") || "(none)"}`,
+      );
+      check(
+        "and the hours he just recorded are in it",
+        (back.labour ?? []).some(
+          (l) => l.workerId === workerId && l.projectId === assignedProjectId,
+        ),
+        `labour=${(back.labour ?? []).length}`,
+      );
+    }
   });
 }
 

@@ -23,6 +23,8 @@ import { requireUser } from "@/lib/session";
 import { tenantFor } from "@/lib/access";
 import { guarded, json } from "@/lib/api";
 import { FactoryError } from "@repo/kernel";
+import { may } from "@/lib/user-admin";
+import { redactForWorker, workerIdIn } from "@/lib/erp-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +64,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ tenant: string
     // Re-read rather than reuse the in-memory engine, so what the client
     // renders is what the database actually holds.
     const { erp } = await loadErp(tenant);
-    return json({ tenant, ...outcome, state: erp.toJSON() });
+    const full = erp.toJSON();
+    /* AND SENT UNDER THE SAME RULE AS THE GET.
+       This branch returned the whole document to anybody allowed to run a
+       command — which includes a site worker, who holds `erp.write.site` and
+       may record his own hours. He would have received every invoice, every
+       bank line and everybody's pay as the RESPONSE TO SAVING HIS OWN
+       TIMESHEET. It was never reachable, only because no client had been
+       written yet; the client that makes this endpoint useful is the same
+       change that would have made the leak live.
+       The test is the permission, not the role name, exactly as in the GET, so
+       the two paths cannot drift into disagreeing about who sees what. */
+    const scoped = !(await may(tenant, user, "erp.read.all"));
+    const state = scoped ? redactForWorker(full, workerIdIn(full, user)) : full;
+    return json({ tenant, ...outcome, scoped, state });
   });
 }

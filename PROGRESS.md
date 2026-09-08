@@ -2694,3 +2694,49 @@ when this was written and this session cannot reach the host. `./ops/deploy-now.
 from a checkout with `ops/provision.conf`, or the three commands in S103.
 
 See ASSUMPTIONS S102, S102a, S103, S103a.
+
+## S13 · The crew's hours could not be saved, and nothing said so
+
+The operator signed in as a site worker. Three faults, of which only two are
+visible in a screenshot.
+
+**The write had no door.** `#me_save` mutated memory, drew the row, and said
+«Horas guardadas». `ErpStore.saveState` refuses to PUT a redacted document —
+correctly — and its comment claimed the worker's writes went through
+`POST /erp/command`; no client had ever called it, and `ErpStore` had no
+`command` method. The row was gone on the next reload. `ErpStore.command()` now
+exists and the three worker handlers (save, Cambiar, Eliminar) go through it;
+the office keeps its whole-document PUT, deliberately.
+
+**Its `?include=state` receipt was the whole company file.** The branch returned
+`erp.toJSON()` unredacted to anyone allowed to run a command, which now includes
+a site worker — so saving a timesheet would have answered with every invoice,
+every bank line and everybody's pay. Unreachable only while no client existed.
+Scoped in the same commit as the client, by the state route's own rule and on
+the permission rather than the role name.
+
+**`boot()` was a third door with no lock.** `go()` and `hashchange` clamp a site
+worker to the hours screen; `boot()` did not, and the shell loads every tab at
+its own hash, so neither of the other two ever fires. The office's screens
+rendered over the redacted document — `0 €`, "0 clients", "No projects yet".
+Clamped in `boot()`, in `toggleSection`, and as a backstop in `render()`, which
+is the single point every door leads to.
+
+**And the gates that let all of it through are now two-sided.**
+`tests/server-e2e` had four refusals for the site worker and no admission — it
+passed just as well against an endpoint that refused him everything, which is
+what shipped. It now asserts the legitimate `recordHours` returns 200 and that
+the state coming back with it carries no amount in cents and nobody else's
+record. `tests/site-e2e` asserted `(form || approved)`, which the empty state
+satisfies, and pressed `#me_save` nowhere. It now fills the form, presses the
+button, RELOADS THE PAGE, requires the row to still be there, and deletes it
+again.
+
+Not done here, and only the operator can do it: put the worker's sign-in address
+in the worker record's **Email** field (Master data → Personal), assign that
+worker to an open job (**Obras asignadas → ＋ Asignar a la obra**), set the
+repository variable `APP_URL`, and trigger a TestFlight build — the installed
+app predates the tab-bar fix, which Part 2 above makes harmless rather than
+merely untidy in the meantime.
+
+See ASSUMPTIONS S107, S107a, S107b, S107c, S107d.

@@ -9471,3 +9471,88 @@ with no content difference is content-current and is reported as such; a real
 gap still reports behind, with the commit count, exactly as before. Content is
 what a deploy promises — the SHA was only ever a proxy for it, and the proxy
 broke the moment a push carried more than one commit.
+
+**S107 · The write had no door, and the product said it did.** A site worker
+could not record hours at all, and was told they were saved.
+`site/erp-store.js` refuses to PUT a redacted document back — correctly, since
+that would blank the company — and its comment said the site worker's writes
+"go through `POST /erp/command`". They did not. A repo-wide search for
+`erp/command` in the client returned only comments describing a call nobody had
+written; `ErpStore` had no `command` method at all. So `#me_save` mutated the
+in-memory engine, `persist()` got `Promise.resolve(null)` and swallowed it,
+`render()` redrew the row from memory, and the toast said «Horas guardadas».
+On the next reload the server sent the real document and the row was gone.
+
+The server half had been finished for weeks: the endpoint, the three commands
+whitelisted at `erp.write.site`, and `refuseOutsideOwnHours` narrowing them to
+own hours, on an assigned site, in an unapproved week. This is S89 again — a
+feature is not shipped when its functions exist — on the write side, where the
+cost is lost work rather than an unreachable screen. `ErpStore.command()` now
+exists and the three worker handlers call it; the office keeps its
+whole-document PUT, deliberately, because rerouting that is a different change
+from fixing this one.
+
+**S107a · Building the obvious client would have opened a leak.** The endpoint's
+own doc-comment recommends `?include=state` for an interactive client, and that
+branch returned `erp.toJSON()` unredacted to anybody allowed to run a command —
+which now includes a site worker. He would have received every invoice, every
+bank line and everybody's pay AS THE ANSWER TO SAVING HIS OWN TIMESHEET. It was
+unreachable only for as long as no client existed, so the change that makes the
+endpoint useful is the same change that would have made the leak live. The
+branch is now scoped by the state route's own rule — `may(…, "erp.read.all")`,
+then `redactForWorker` — tested on the permission and not on the role name, so
+the two paths cannot drift into disagreeing about who sees what. Fixed in the
+same commit as the client, on purpose.
+
+**S107b · The third door, and no view has a lock.** Three paths set the current
+screen: `go()` clamps a site worker to `labour`, `hashchange` clamps, and
+`boot()` did not. The shell keeps one long-lived web view per tab, each loaded
+at its own URL from `site/nav.json`, so every tab boots straight into its own
+hash — `hashchange` never fires and `go()` is never called. The role arrives
+from the session fetch AFTER `cur` is set, so the chrome hid correctly while the
+office's own screens rendered over the redacted document: Control tower at
+`0 €`, Customers at "0 clients", Sites at "No projects yet". None of that is a
+leak — the wire was correct — but "0 clients" is not a refusal, it reads as a
+statement that the company has no customers.
+
+Clamped in `boot()` after the session resolves (not where `cur` is assigned,
+where `SESSION.role` is still the permissive default; the hash is corrected too,
+so the address bar and the screen agree), in `toggleSection` — once, on the
+callee's side, because the shell's two entry points arrive without passing
+through `go()` — and, the one that matters, as a backstop in `render()` itself,
+the single point every door leads to. A rule that each door has to remember is
+one new door away from being broken again. With the backstop, a fourth door
+opening later lands on the hours screen instead of on a screen of zeros that
+reads as fact. It also makes true the premise `ios/…/NavManifest.swift:36-39`
+gives
+for falling back to the six-tab bar — _"the web app resolves every route to the
+hours screen"_ — which was false when it was written, and is why the crew's
+installed build is harmless rather than merely untidy until TestFlight catches
+up.
+
+**S107c · Four refusals and no admission is not a boundary.** Every gate that
+should have caught the above passed. `tests/server-e2e` had four negative
+checks on the site worker (another's hours, an unassigned site, approving a
+week, PUTting the document) and not one positive: nothing asserted that a
+legitimate `recordHours` returns 200, so the whole suite passed just as well
+against an endpoint that refused a site worker everything — which is what
+shipped. `tests/site-e2e` asserted `(mineEntry.form || mineEntry.approved)`,
+which the empty state satisfies, and `#me_save` was pressed by nothing in the
+repository. Both are now two-sided: the positive write and its scoped receipt on
+the server, and on the browser side the button is actually pressed, the page is
+RELOADED, and the row has to still be there — then deleted again, so the suite
+leaves the register as it found it. A boundary is two statements; only one of
+them had been written down.
+
+**S107d · `mutate`'s toast still fires before the office's save lands, and that
+is left alone.** The plan for S107 also proposed making `mutate`'s success
+message conditional on the write having happened. It is not, and the reason is
+that the lie was specific: `saveState` resolving `null` for a redacted document
+returned a SUCCESS that no banner followed. The office's path is different —
+`persist()` debounces and swallows deliberately (a toast per keystroke is
+unreadable, and `persistNow` exists for the one screen that asks in so many
+words), and a real failure raises the store's own «could not save» banner over
+the toast. Making the toast wait would turn every mutation in the application
+into an awaited network round trip, which is a far larger change than this fault
+justifies and touches the write path of a live invoice register. Recorded here
+rather than done.

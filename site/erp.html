@@ -5706,6 +5706,31 @@
           const w0 = erp.state.workers[0];
           if (w0) SESSION = { ...SESSION, workerId: w0.id };
         }
+        /* THE THIRD DOOR, AND IT HAD NO LOCK.
+           `go()` and the `hashchange` listener both send a site account to its
+           hours screen. Boot does not go through either: it reads the screen
+           straight out of the URL hash, hundreds of lines above, where
+           `SESSION.role` is still the permissive «admin» default because the
+           session has not been fetched yet.
+
+           That is not a corner case in the app — it is the NORMAL path. The
+           shell keeps one web view per tab, each loaded at its own address
+           (#tower, #customers, #progress, from nav.json), and every one of them
+           loads at launch. So a site worker got the office's control tower,
+           customer register and job list, rendered over the redacted document:
+           «0 €», «0 clients», «No projects yet». Not a leak — the server sends
+           them nothing — but a screen that reads as a statement about the
+           company rather than as a refusal.
+
+           Clamped here, where the role is finally known and before the first
+           render. The hash goes with it, so the address bar and the screen do
+           not disagree. */
+        if (isSiteWorker() && cur !== "labour") {
+          cur = "labour";
+          if (location.hash && location.hash.slice(1) !== "labour") {
+            history.replaceState(null, "", location.pathname + "#labour");
+          }
+        }
         measureTopbar();
         buildPeriodControls();
         paintUserBadge();
@@ -5896,6 +5921,57 @@
           toast("⚠ " + e.message);
         }
       }
+
+      /**
+       * A write for an account whose document is redacted.
+       *
+       * `mutate` above changes the document in memory and asks the store to
+       * save the whole thing. For a site account the store REFUSES that by
+       * design — sending a redacted document back would blank the company — so
+       * `saveState` resolves null, the screen still redraws from memory with the
+       * new row on it, and the toast says «guardadas». The crew were being told
+       * their hours were saved and losing them on the next reload.
+       *
+       * This is the path that was missing: one command, checked by the server on
+       * its own, and the document it returns becomes the document on screen.
+       * Nothing is applied locally first — what is drawn is what the database
+       * actually holds, so a refusal cannot leave a row behind that only this
+       * phone believes in.
+       *
+       * The office keeps `mutate`: its whole-document PUT is allowed and is a
+       * far larger change to unpick. This is only for the writes that had no
+       * door at all.
+       */
+      async function commandMutate(name, args, msg) {
+        if (!(ErpStore.isRemote() && ErpStore.isScoped())) {
+          return mutate(() => COMMAND_LOCAL[name](args), msg);
+        }
+        try {
+          const res = await ErpStore.command(name, args);
+          /* Reassigned, the same way boot does it (`ERP.from`) — the engine
+             has no in-place load, and `from` also backfills collections a
+             newer build expects. */
+          if (res && res.state) erp = ErpEngine.ERP.from(res.state);
+          render();
+          if (msg) toast(msg);
+        } catch (e) {
+          /* `ErpStore.command` has already shown the server's own sentence for a
+             refusal or a lost connection. Anything reaching here without one is
+             worth saying out loud rather than swallowing. */
+          if (!/^command refused/.test((e && e.message) || "")) {
+            toast("⚠ " + ((e && e.message) || ""));
+          }
+        }
+      }
+
+      /* The same three commands run against the in-memory engine, for the local
+         copy that has no server to ask. Keyed by the name the server knows them
+         by, so the two paths cannot drift apart in their argument order. */
+      const COMMAND_LOCAL = {
+        recordHours: (a) => erp.recordHours(a[0], a[1]),
+        correctHours: (a) => erp.correctHours(a[0], a[1], a[2]),
+        deleteHours: (a) => erp.deleteHours(a[0], a[1]),
+      };
 
       /**
        * Where a creation form goes once it has created something.
@@ -6358,6 +6434,16 @@
          has just photographed and not yet filed, and a mistaken tab tap must not
          be what throws that away. */
       function toggleSection(secKey) {
+        /* The shell's two entry points — caneiOpenSection and
+           caneiToggleSection — arrive here without passing through `go()`, so
+           the clamp has to be on this side of them. Clamped once here rather
+           than twice there: a rule enforced at each caller is a rule that the
+           next caller will not know about. */
+        if (isSiteWorker()) {
+          closeSection();
+          go("labour");
+          return;
+        }
         if (openSec === secKey) {
           closeSection();
           return;
@@ -6490,6 +6576,20 @@
 
       /* =============================== render =============================== */
       function render() {
+        /* THE BACKSTOP, AND THE REASON IT EXISTS.
+           Three separate paths choose a screen and each one had to remember the
+           site-worker rule for itself. Two did; boot did not, and a crew member
+           spent a day looking at the company's control tower. A rule that has to
+           be remembered at every door is a rule that is one new door away from
+           being broken again — so it is also enforced here, at the single point
+           every door leads to.
+
+           Their own screen, not an empty one. The redacted document renders the
+           office's views as «0 €» and «0 clients», which reads as a fact about
+           the company rather than as «this is not yours» — so whatever goes
+           wrong upstream, what is drawn is the one screen whose numbers are
+           theirs and are true. */
+        if (isSiteWorker() && cur !== "labour") cur = "labour";
         buildSections();
         if (openSec) buildSubs(openSec);
         const meta = SUBMAP[cur] || { lab: "—", sec: { lab: "ERP" } };
@@ -10001,21 +10101,20 @@
             if (!$("#me_p").value) return toast("Elige la obra");
             if ($("#me_lwrap").style.display !== "none" && !$("#me_l").value)
               return toast("Las horas de obra necesitan partida y subpartida");
-            mutate(
-              () =>
-                erp.recordHours(
-                  {
-                    workerId: myWorkerId(),
-                    projectId: $("#me_p").value,
-                    chapterNum: $("#me_c").value || null,
-                    lineId:
-                      $("#me_lwrap").style.display !== "none" ? $("#me_l").value || null : null,
-                    kind: $("#me_k").value,
-                    hoursMilli: Math.round(hrs * 1000),
-                    date: hDay,
-                  },
-                  SESSION.email || "site",
-                ),
+            commandMutate(
+              "recordHours",
+              [
+                {
+                  workerId: myWorkerId(),
+                  projectId: $("#me_p").value,
+                  chapterNum: $("#me_c").value || null,
+                  lineId: $("#me_lwrap").style.display !== "none" ? $("#me_l").value || null : null,
+                  kind: $("#me_k").value,
+                  hoursMilli: Math.round(hrs * 1000),
+                  date: hDay,
+                },
+                SESSION.email || "site",
+              ],
               "Horas guardadas",
             );
           };
@@ -10024,8 +10123,9 @@
           .forEach(
             (b) =>
               (b.onclick = () =>
-                mutate(
-                  () => erp.deleteHours(b.dataset.medel, SESSION.email || "site"),
+                commandMutate(
+                  "deleteHours",
+                  [b.dataset.medel, SESSION.email || "site"],
                   "Apunte eliminado",
                 )),
           );
@@ -10048,15 +10148,15 @@
               );
               if (r === null) return;
               const hrs = Number(String(r.h).replace(",", "."));
-              mutate(() => {
-                if (!(hrs > 0)) erp.deleteHours(l.id, SESSION.email || "site");
-                else
-                  erp.correctHours(
-                    l.id,
-                    { hoursMilli: Math.round(hrs * 1000) },
-                    SESSION.email || "site",
-                  );
-              }, "Apunte corregido");
+              if (!(hrs > 0)) {
+                commandMutate("deleteHours", [l.id, SESSION.email || "site"], "Apunte corregido");
+              } else {
+                commandMutate(
+                  "correctHours",
+                  [l.id, { hoursMilli: Math.round(hrs * 1000) }, SESSION.email || "site"],
+                  "Apunte corregido",
+                );
+              }
             }),
         );
       }

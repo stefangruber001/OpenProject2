@@ -90,6 +90,10 @@
     return REMOTE + "/api/" + SELF_TENANT + "/erp/state";
   }
 
+  function commandUrl() {
+    return REMOTE + "/api/" + SELF_TENANT + "/erp/command?include=state";
+  }
+
   /**
    * Notice when somebody else changed the register.
    *
@@ -520,6 +524,78 @@
     return put(KV, STATE_KEY, state);
   }
 
+  /**
+   * Run ONE command against the stored document, and get the document back.
+   *
+   * THE OTHER HALF OF `saveState` ABOVE, AND IT WAS NEVER WRITTEN. That comment
+   * has said since the boundary shipped that a site account's writes "go
+   * through POST /erp/command". They did not: nothing in this file, or in
+   * erp.html, ever called that endpoint — the only mentions of it anywhere in
+   * the client were comments describing a call that did not exist. So the crew
+   * pressed Guardar, `saveState` resolved null by the rule above, the row was
+   * already in the in-memory document so the screen redrew WITH IT, and the
+   * toast said it was saved. It was not. It was gone on the next reload.
+   *
+   * The server side was complete the whole time — the route, the allow-list,
+   * and the own-hours-only narrowing. Only the door was missing.
+   *
+   * `include=state` because this client renders from the whole document: the
+   * alternative is a GET straight after every command, the same bytes over two
+   * round trips. The response is redacted under the same rule as the GET (see
+   * the route), so what comes back here is what this account may see.
+   */
+  function command(name, args) {
+    if (REMOTE === null) return Promise.reject(new Error("No server to command."));
+    return fetch(commandUrl(), {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        command: name,
+        args: args || [],
+        expectedVersion: remoteVersion,
+      }),
+    })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          return { ok: r.ok, status: r.status, body: body };
+        });
+      })
+      .then(function (res) {
+        if (res.ok) {
+          remoteVersion = res.body.version;
+          if (res.body.scoped === true || res.body.scoped === false) {
+            scoped = res.body.scoped === true;
+          }
+          return res.body;
+        }
+        if (res.status === 409) {
+          saveFailed(
+            "Somebody else saved before you.",
+            "Reload to see their changes, then enter yours again.",
+          );
+        } else if (res.status === 401) {
+          saveFailed("Your session has expired.", "Please sign in again.");
+        } else if (res.status === 403) {
+          /* The server's own sentence, not one invented here. It already says
+             the useful thing — whose hours, which site, which week. */
+          saveFailed(
+            "This account may not do that.",
+            (res.body && res.body.message) || "Ask an administrator.",
+          );
+        } else {
+          saveFailed("Could not save to the server.", (res.body && res.body.message) || "");
+        }
+        throw new Error("command refused: HTTP " + res.status);
+      })
+      .catch(function (e) {
+        if (e && /^command refused/.test(e.message || "")) throw e;
+        saveFailed("No connection to the server.", "");
+        throw e;
+      });
+  }
+
   /* ------------------------------------------------------------------ *
    * One-way import of the legacy master-data store
    * ------------------------------------------------------------------ */
@@ -747,6 +823,20 @@
     open: open,
     loadState: loadState,
     saveState: saveState,
+    /** One checked command, for the writes the whole-document PUT cannot carry. */
+    command: command,
+    /**
+     * True when the document in hand is a REDACTED one, so the whole-document
+     * PUT is closed and writes must go one command at a time.
+     *
+     * The server said so (`scoped` on the state response); it is not inferred
+     * from the role here. Those two agree today, and the day a fifth role holds
+     * `erp.read.all` without being an administrator they would stop agreeing —
+     * and the one that decides what may be SENT is the server's.
+     */
+    isScoped: function () {
+      return REMOTE !== null && scoped === true;
+    },
     putBlob: function (k, blob) {
       return REMOTE !== null ? remotePutBlob(k, blob) : put(BLOBS, k, blob);
     },
