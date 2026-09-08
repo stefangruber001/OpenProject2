@@ -28705,7 +28705,17 @@
        * a projection below money that is spent, or below an order that is
        * placed and cannot be unplaced, is not a forecast, it is a wish.
        */
-      function ecoForecastRows(projectId, tableRows, names, variationNums, pend) {
+      /**
+       * The figures behind the projection view — computed once, read twice.
+       *
+       * Split from the rendering because the SCREEN needs two of its answers
+       * before it can build a header: whether this obra has any commitment at
+       * all (which decides a column) and whether any partida is being floored
+       * (which decides a footnote). Handing those back through the renderer was
+       * the first shape of this and it was a side channel on a function object —
+       * correct only while the template happened to read it after calling it.
+       */
+      function ecoForecastModel(projectId, tableRows) {
         const committed = erp.committedByChapter(projectId);
         const progress = {};
         try {
@@ -28713,37 +28723,85 @@
             progress[String(c.num)] = c.progressPct || 0;
           });
         } catch (err) {}
-        const cell = (cents) => `<td class="num">${eur0(cents)}</td>`;
-        const dev = (cents) =>
-          `<td class="${devCellClass(cents)}">${cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
-        const signed = (cents) =>
-          `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
         const rows = tableRows.map((c) => {
           const pctDone = progress[String(c.chapter)] || 0;
-          const toGo = Math.round((c.budgetCents * (100 - pctDone)) / 100);
           const com = committed[c.chapter] || committed[String(c.chapter)] || 0;
-          const projected = Math.max(c.actualCents + toGo, c.actualCents, com);
+          /* A PARTIDA WITH COST AND NO RECORDED PROGRESS IS NOT FORECAST.
+                   The formula reads the avance as fact, so a partida that had spent
+                   2.123 against a budget of 1.860 while still registering nought per
+                   cent was told that ALL of the budgeted work was still to come, and
+                   projected 2.123 + 1.860. That is the most damaging answer available
+                   and it is almost never the true one: nought beside real money means
+                   nobody recorded the progress, not that nothing was built. On the
+                   operator's own screen that single row carried 1.860 of a 4.722
+                   deviation.
+
+                   So a row in that state reports a FLOOR — the greater of what was
+                   budgeted and what is already spent — and says on its face that it is
+                   one. A floor understates a partida that genuinely has work left, and
+                   that is the right way to be wrong here: the mark tells the reader the
+                   figure is provisional, and the remedy, recording the avance, is the
+                   same thing that makes the whole column mean something. */
+          const noProgress = pctDone === 0 && c.actualCents > 0;
+          const toGo = Math.round((c.budgetCents * (100 - pctDone)) / 100);
+          const projected = noProgress
+            ? Math.max(c.budgetCents, c.actualCents, com)
+            : Math.max(c.actualCents + toGo, c.actualCents, com);
           return {
             ...c,
             pctDone,
+            noProgress,
             committedCents: com,
             projectedCents: projected,
             devCents: projected - c.budgetCents,
             marginFcastCents: c.saleCents - projected,
           };
         });
-        const out = rows.map(
-          (r) =>
-            `<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${variationNums.has(String(r.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
+        return {
+          rows,
+          /* THE COLUMN APPEARS WHEN THERE IS SOMETHING TO PUT IN IT. The operator
+                     stopped using purchase orders, and the only other source of a
+                     commitment is a subcontract award — so on their obras this column
+                     could print nothing but zero, for ever, in a table already short of
+                     width. A column that can only ever be empty is worse than no column:
+                     it takes the space and implies the data exists.
+
+                     Hidden rather than deleted, and computed rather than configured: the
+                     day an award names a partida the column comes back on its own, with
+                     no setting to remember and nothing to migrate. */
+          showCommitted: rows.some((r) => r.committedCents > 0),
+          anyFloor: rows.some((r) => r.noProgress),
+        };
+      }
+
+      function ecoForecastRows(model, names, variationNums, pend) {
+        const { rows, showCommitted } = model;
+        const cell = (cents) => `<td class="num">${eur0(cents)}</td>`;
+        const dev = (cents) =>
+          `<td class="${devCellClass(cents)}">${cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
+        const signed = (cents) =>
+          `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
+        const nil = `<td class="num">—</td>`;
+        /* The two pills, each in its own statement. Written as one expression they
+                 put a greater-than and a less-than either side of the code between them,
+                 which the source audit reads as a tag pair and reports as a sentence
+                 nobody translated — the seventh variant of that trap in this file. */
+        const VAR_PILL = ' <span class="pill b">variación</span>';
+        const FLOOR_PILL = ' <span class="pill y">sin avance</span>';
+        const out = rows.map((r) => {
+          const varTag = variationNums.has(String(r.chapter)) ? VAR_PILL : "";
+          const floorTag = r.noProgress ? FLOOR_PILL : "";
+          const tags = varTag + floorTag;
+          const body =
             cell(r.budgetCents) +
-            cell(r.committedCents) +
+            (showCommitted ? cell(r.committedCents) : "") +
             cell(r.actualCents) +
             `<td class="num" translate="no">${r.pctDone}%</td>` +
             cell(r.projectedCents) +
             dev(r.devCents) +
-            signed(r.marginFcastCents) +
-            `</tr>`,
-        );
+            signed(r.marginFcastCents);
+          return `<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${tags}</td>${body}</tr>`;
+        });
         /* The money that names no partida is projected at exactly itself: it is
                  already spent, and nothing about it is still to come. Leaving it out
                  would make the total below disagree with the card above by the one
@@ -28751,20 +28809,20 @@
         const pendCents = (pend || []).reduce((a, r) => a + r.amountCents, 0);
         if (pendCents) {
           const spent = cell(pendCents);
-          const nil = `<td class="num">—</td>`;
+          const com = showCommitted ? nil : "";
           out.push(
-            `<tr><td class="k"><span class="pill y">Sin partida</span></td>${nil}${nil}${spent}${nil}${spent}${nil}${nil}</tr>`,
+            `<tr><td class="k"><span class="pill y">Sin partida</span></td>${nil}${com}${spent}${nil}${spent}${nil}${nil}</tr>`,
           );
         }
         if (!out.length)
-          return `<tr><td colspan="8"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`;
+          return `<tr><td colspan="${showCommitted ? 8 : 7}"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`;
         const tot = (pick) => rows.reduce((a, r) => a + r[pick], 0);
         const totProjected = tot("projectedCents") + pendCents;
         const totCells =
           cell(tot("budgetCents")) +
-          cell(tot("committedCents")) +
+          (showCommitted ? cell(tot("committedCents")) : "") +
           cell(tot("actualCents") + pendCents) +
-          `<td class="num">—</td>` +
+          nil +
           cell(totProjected) +
           dev(totProjected - tot("budgetCents")) +
           signed(tot("saleCents") - totProjected);
@@ -28927,6 +28985,19 @@
                  sat 45 € short of the card above it. It is a footer of the table it
                  makes a claim about now, which is closer to the figures it is
                  about than the separate card ever was. */
+        /* Built before the page, because the header depends on it: whether the
+                 commitment column has anything to show and whether any partida is being
+                 floored are answers about the DATA, and a template cannot ask a question
+                 whose answer it also has to print above itself. The two notes are built
+                 unconditionally and shown conditionally — a literal inside a conditional
+                 inside a template is what the source audit reads as untranslated prose. */
+        const fcast = ecoForecastModel(id, tableRows);
+        const fcastCommittedNote = fcast.showCommitted
+          ? `<div class="it" style="color:var(--muted)">Comprometido es lo ya pedido o adjudicado, esté facturado o no, y el proyectado nunca baja de ahí.</div>`
+          : "";
+        const fcastFloorNote = fcast.anyFloor
+          ? `<div class="it" style="color:var(--muted)">Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.</div>`
+          : "";
         const agreeNote = tableAgrees
           ? `<div class="it"><span class="pill g">Cuadra</span><span style="flex:1;margin-left:8px">Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.</span></div>`
           : `<div class="it"><span class="pill r">No cuadra</span>
@@ -28964,14 +29035,16 @@
            </tbody></table></div>
            <div class="daylist">${agreeNote}<div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y el botón de documentos de una subpartida para ver lo que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>`
                : `<div class="scroll"><table><thead><tr>
-             <th>Partida</th><th class="num">Presupuestado</th><th class="num">Comprometido</th>
+             <th>Partida</th><th class="num">Presupuestado</th>${fcast.showCommitted ? '<th class="num">Comprometido</th>' : ""}
              <th class="num">Acumulado real</th><th class="num">Avance</th>
              <th class="num">Proyectado</th><th class="num">Desviación</th>
              <th class="num">Margen previsto</th></tr></thead><tbody>
-           ${ecoForecastRows(id, tableRows, names, variationNums, pend)}
+           ${ecoForecastRows(fcast, names, variationNums, pend)}
            </tbody></table></div>
            <div class="daylist">
-            <div class="it" style="color:var(--muted)">Comprometido es lo ya pedido o adjudicado, esté facturado o no. Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda, y nunca por debajo de lo real ni de lo comprometido. Desviación es proyectado menos presupuestado.</div>
+            <div class="it" style="color:var(--muted)">Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda. Desviación es proyectado menos presupuestado.</div>
+            ${fcastCommittedNote}
+            ${fcastFloorNote}
             <div class="it" style="color:var(--muted)">Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.</div>
            </div>`
            }

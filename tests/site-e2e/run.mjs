@@ -4126,14 +4126,106 @@ async function testVariationBudget(browser, base) {
         noCollapser: !document.querySelector("#ecoAll"),
       };
     });
-    if (fc && fc.cols === 8 && /Comprometido/.test(fc.heads) && /Proyectado/.test(fc.heads))
-      ok(`5-6: the projection view carries commitment and cost at completion (${fc.heads})`);
-    else bad("5-6: projection columns", JSON.stringify(fc));
-    if (fc && fc.committedShown && fc.hasTotal && fc.noCollapser)
+    /* PK13-S26 · THE COLUMN APPEARS WHEN THERE IS SOMETHING TO PUT IN IT. The
+       operator stopped raising purchase orders, so on their obras Comprometido
+       could only ever print zero — a column that takes width and implies a data
+       source nobody feeds. It is hidden when the obra has no commitment at all
+       and comes back on its own the day an award names a partida, so the check
+       asks the ENGINE which state this fixture is in rather than expecting one. */
+    const wantCommitted = await pg.evaluate(() =>
+      Object.values(erp.committedByChapter(gProject)).some((v) => v > 0),
+    );
+    if (fc && fc.cols === (wantCommitted ? 8 : 7) && /Proyectado/.test(fc.heads))
       ok(
-        "5-6: …with the engine's own committed figure, a total row, and no drill-down it cannot honour",
+        `5-6: the projection view carries cost at completion, and commitment only when there is any (${fc.heads})`,
       );
-    else bad("5-6: projection content", JSON.stringify(fc));
+    else bad("5-6: projection columns", JSON.stringify({ ...fc, wantCommitted }));
+    if (fc && /Comprometido/.test(fc.heads) === wantCommitted && fc.hasTotal && fc.noCollapser)
+      ok("5-6: …with a total row, and no drill-down it cannot honour");
+    else bad("5-6: projection content", JSON.stringify({ ...fc, wantCommitted }));
+
+    /* …and the hiding itself, PROVEN rather than inferred. This fixture has
+       commitments, so the branch the operator actually lives in — no purchase
+       orders, no awards, the column structurally empty — is never rendered by the
+       run above. Stubbed for one render and put back, because a branch nothing
+       exercises is a branch that breaks quietly. */
+    const hidden = await pg.evaluate(async () => {
+      const real = erp.committedByChapter.bind(erp);
+      erp.committedByChapter = () => ({});
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const heads = [...document.querySelectorAll("#view thead th")].map((x) =>
+        x.textContent.trim(),
+      );
+      const widths = [...document.querySelectorAll("#view tbody tr")].map(
+        (r) => r.querySelectorAll("td").length,
+      );
+      erp.committedByChapter = real;
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        cols: heads.length,
+        says: heads.includes("Comprometido"),
+        // Every row narrows with the header — a stale colspan is how a table
+        // that hides a column comes out one cell short of its own headings.
+        ragged: widths.filter((w) => w !== heads.length && w !== 1).length,
+        backAgain: [...document.querySelectorAll("#view thead th")].some(
+          (x) => x.textContent.trim() === "Comprometido",
+        ),
+      };
+    });
+    if (hidden.cols === 7 && !hidden.says && hidden.ragged === 0 && hidden.backAgain)
+      ok("5-6: …an obra with no orders and no awards drops the column entirely, and gets it back");
+    else bad("5-6: commitment column hides itself", JSON.stringify(hidden));
+
+    /* PK13-S26 · AND A PARTIDA WITH COST AND NO RECORDED PROGRESS IS NOT
+       FORECAST. `real + presupuestado × (1 − avance)` reads the avance as fact,
+       so nought per cent beside real money projected the whole budget on top of
+       money already spent — the most damaging answer available, and the one that
+       carried 1.860 of the 4.722 deviation on the operator's own screen. Such a
+       row reports the floor, `max(presupuestado, real)`, and is marked.
+
+       Measured against the engine, not against a number typed here: whichever
+       rows are in that state, their projection must be the floor and no other. */
+    const floors = await pg.evaluate(() => {
+      const prog = {};
+      erp.chapterProgress(gProject).forEach((c) => {
+        prog[String(c.num)] = c.progressPct || 0;
+      });
+      const com = erp.committedByChapter(gProject);
+      const eco = erp.chapterEconomics(gProject);
+      const stale = eco.filter((c) => c.actualCents > 0 && (prog[String(c.num)] || 0) === 0);
+      const rowsText = [...document.querySelectorAll("#view tbody tr")].map((r) => r.innerText);
+      return {
+        stale: stale.length,
+        // Every floored partida says so on its face.
+        marked: stale.every((c) =>
+          rowsText.some((t) => t.startsWith(c.num + ".") && /sin avance/.test(t)),
+        ),
+        // …and prints the floor, not budget-plus-spend.
+        floored: stale.every((c) => {
+          const want = Math.max(
+            c.budgetCostCents,
+            c.actualCents,
+            com[c.num] || com[String(c.num)] || 0,
+          );
+          const bad = c.actualCents + c.budgetCostCents;
+          const t = rowsText.find((x) => x.startsWith(c.num + "."));
+          return !!t && t.includes(eur0(want)) && (want === bad || !t.includes(eur0(bad)));
+        }),
+        // The footnote is printed only when a row is in that state.
+        note: /sin avance registrado no se puede proyectar/.test(
+          document.querySelector("#view").innerText,
+        ),
+      };
+    });
+    if (floors.stale === 0)
+      ok("5-6: no partida has cost without recorded progress in this fixture — nothing to floor");
+    else if (floors.marked && floors.floored && floors.note)
+      ok(
+        `5-6: …and ${floors.stale} partida(s) with cost and no recorded avance report a marked floor, not budget plus spend`,
+      );
+    else bad("5-6: unforecastable partidas are floored and marked", JSON.stringify(floors));
 
     /* The deviation colour, measured on a made-up pair rather than on whatever
        this fixture happens to hold: a saving must not be painted as a warning. */

@@ -993,10 +993,6 @@ window.CANEI_DICT = {
       "The documents below do not add up to this sub-line item's accumulated cost.",
     ],
     [
-      "Comprometido es lo ya pedido o adjudicado, esté facturado o no. Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda, y nunca por debajo de lo real ni de lo comprometido. Desviación es proyectado menos presupuestado.",
-      "Committed is what has already been ordered or awarded, invoiced or not. Forecast is where the line item is heading at this rate: what has been spent plus the budget for the work still to do, and never below what is real or what is committed. Deviation is forecast minus budget.",
-    ],
-    [
       "Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.",
       "This view stops at the line item and does not go down to the sub-line item: an order and an award are signed against a line item, and splitting them across sub-line items would invent data nobody recorded.",
     ],
@@ -1035,6 +1031,19 @@ window.CANEI_DICT = {
     [
       "Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.",
       "A cash withdrawal is explained by the receipts it paid for and by what goes back to the bank. Open it to attach its documents; whatever is left over goes back by identifying the deposit as a cash return.",
+    ],
+    ["sin avance", "no progress"],
+    [
+      "Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda. Desviación es proyectado menos presupuestado.",
+      "Forecast is where the line item is heading at this rate: what has been spent plus the budget for the work still to do. Deviation is forecast minus budget.",
+    ],
+    [
+      "Comprometido es lo ya pedido o adjudicado, esté facturado o no, y el proyectado nunca baja de ahí.",
+      "Committed is what has already been ordered or awarded, invoiced or not, and the forecast never goes below it.",
+    ],
+    [
+      "Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.",
+      "A line item with cost and no recorded progress cannot be forecast: what is shown is the floor, the greater of budgeted and spent, marked «no progress». Record the progress in Physical progress so the forecast means something.",
     ],
     ["Motivo del adicional", "Reason for the additional"],
     ["Días de plazo que añade", "Days it adds to the schedule"],

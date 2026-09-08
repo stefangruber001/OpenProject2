@@ -2076,7 +2076,7 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Twenty-five reports from the operator against the live workspace, arriving
+Twenty-six reports from the operator against the live workspace, arriving
 faster than they could be batched, and almost every one of them a screen that
 was silent rather than wrong. One commit per report or per pair, each one green
 on the unfiltered browser run before it was made.
@@ -2642,6 +2642,42 @@ now.
 Gates: site E2E **776/776 unfiltered**, `pnpm test` 27/27 tasks, manageability
 513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
 literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S115, S115a–S115c.
+
+**S26 · A column that could only print zero, and a forecast that trusted a figure
+nobody had entered.** «we are not using Purchase orders anymore. That is why I am
+telling you that is difficult to forecast. We only can have the Budget against
+that has been spend.» Half right, and the wrong half was the more useful one.
+
+**Comprometido was structurally empty for this operator.** `committedByChapter`
+reads purchase orders and subcontract awards and nothing else, so with no orders
+the column could print zero for ever, in a table already short of width. It is
+hidden when the obra has no commitment at all — computed, not configured, so the
+day an award names a partida it comes back on its own with nothing to migrate.
+
+**But the forecast never depended on it.** The missing input was the avance, and
+that one they do have. On their own screen, partida 3 had spent 2.123 against a
+budget of 1.860 while still registering 0%, and `real + presupuestado × (1 −
+avance)` added the whole budget on top of money already spent: 3.983 €, of which
+1.860 was phantom, out of a 4.722 total deviation — from one row.
+
+Nought per cent beside real money means nobody recorded the progress, not that
+nothing was built. Such a partida now reports a **floor**, the greater of budgeted
+and spent, and carries a «sin avance» pill saying so. A floor understates a
+partida that really does have work left, and that is the right way to be wrong:
+the mark says the figure is provisional, and the remedy — recording the avance —
+is the same act that makes the column mean anything.
+
+Structurally, `ecoForecastModel` now computes and `ecoForecastRows` renders: the
+header has to know whether the column shows and whether anything is floored, and a
+template cannot ask a question whose answer it prints above itself.
+
+**Both checks verified against their faults**, and the branch the operator lives
+in — no orders, no awards — does not exist in the fixture, so it is stubbed for one
+render and put back: the column goes, the rows narrow with it, and it returns.
+
+Gates: site E2E **778/778 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S116, S116a–S116c.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

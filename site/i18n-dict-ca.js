@@ -1003,8 +1003,6 @@ window.CANEI_DICT.ca = {
     "Els documents de sota sumen exactament l'acumulat d'aquesta subpartida.",
   "Los documentos de abajo no suman el acumulado de esta subpartida.":
     "Els documents de sota no sumen l'acumulat d'aquesta subpartida.",
-  "Comprometido es lo ya pedido o adjudicado, esté facturado o no. Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda, y nunca por debajo de lo real ni de lo comprometido. Desviación es proyectado menos presupuestado.":
-    "Compromès és el que ja s'ha demanat o adjudicat, estigui facturat o no. Projectat és cap a on va la partida a aquest ritme: el gastat més el pressupost de la feina que queda, i mai per sota del real ni del compromès. Desviació és projectat menys pressupostat.",
   "Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.":
     "Aquesta vista arriba fins a la partida i no baixa a la subpartida: una comanda i una adjudicació es signen contra una partida, i repartir-les entre subpartides seria inventar una dada que ningú ha registrat.",
   "El coste se asigna a la subpartida desde Gastos y desde Horas; desde aquí solo se consulta.":
@@ -1035,6 +1033,13 @@ window.CANEI_DICT.ca = {
   devuelto: "retornat",
   "Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.":
     "Un reintegrament s'explica amb els tiquets que va pagar i amb el que torna al banc. Obri'l per adjuntar-hi els seus documents; el que sobri es torna identificant l'ingrés com a devolució d'efectiu.",
+  "sin avance": "sense avanç",
+  "Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda. Desviación es proyectado menos presupuestado.":
+    "Projectat és cap a on va la partida a aquest ritme: el gastat més el pressupost de la feina que queda. Desviació és projectat menys pressupostat.",
+  "Comprometido es lo ya pedido o adjudicado, esté facturado o no, y el proyectado nunca baja de ahí.":
+    "Compromès és el que ja s'ha demanat o adjudicat, estigui facturat o no, i el projectat mai no baixa d'aquí.",
+  "Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.":
+    "Una partida amb despesa i sense avanç registrat no es pot projectar: es mostra el terra, el més gran entre el pressupostat i el gastat, i es marca «sense avanç». Registra l'avanç a Avanç físic perquè la projecció signifiqui alguna cosa.",
   "Motivo del adicional": "Motiu de l'addicional",
   "Días de plazo que añade": "Dies de termini que afegeix",
   "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",

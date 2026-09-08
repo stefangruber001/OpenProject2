@@ -9893,3 +9893,64 @@ nothing looked like a row that worked. Caught only because the fault was actuall
 restored and the check run against it. Reads `.drawer.on #dbody` now, which cannot
 pass unless a panel is genuinely open. The rule this pays for again: a regression
 check is not written until it has been seen to FAIL.
+
+**S116 · A column that could only ever print zero, and a forecast that trusted a
+figure nobody had entered.** The operator, on the projection view: they are not
+using purchase orders any more, and that is why forecasting is difficult —
+budget against spend is all there is. Half right, and the half that was wrong is
+the more useful half.
+
+**Comprometido was structurally empty for them.** `committedByChapter` reads two
+things and only two: purchase orders and subcontract awards, both required to name
+a partida. No orders means the column can print nothing but zero for ever, in a
+table already short of width. A column that can only ever be empty is worse than
+no column — it takes the space and implies the data exists.
+
+Hidden when the obra has no commitment at all, **computed rather than configured**:
+the day an award names a partida it comes back on its own, with no setting to
+remember and nothing to migrate. Not deleted, because the rule is still right for
+an obra that does award work.
+
+**But the forecast never depended on it.** The missing input was the AVANCE, and
+that one they do have. On their own screen, partida 3 had spent 2.123 against a
+budget of 1.860 while still registering 0%, and `real + presupuestado × (1 −
+avance)` dutifully added the entire budget on top of money that had demonstrably
+already been spent building something: **3.983 €, of which 1.860 was phantom, out
+of a 4.722 total deviation from one row.**
+
+Nought per cent beside real money means nobody recorded the progress, not that
+nothing was built. So a partida in that state now reports a **floor** — the greater
+of budgeted and spent — and carries a «sin avance» pill saying that is what it is.
+A floor understates a partida that genuinely has work left, and that is the right
+way to be wrong: the mark tells the reader the figure is provisional, and the
+remedy is the same act that makes the whole column mean something.
+
+**The honest summary of the operator's constraint**, which belongs here because it
+will be asked again: with budget, spend and progress a reforma forecasts perfectly
+well. What cannot be forecast is a partida nobody has told the system anything
+about, and the table now says which of the two it is looking at.
+
+**S116a · The model split from the rendering, because a header cannot ask a
+question it also has to print.** Whether the column shows and whether any row is
+floored are answers about the DATA, needed above the table. The first shape of this
+handed them back through the renderer as a property on the function object —
+correct only while the template happened to read it after calling it.
+`ecoForecastModel` computes; `ecoForecastRows` renders.
+
+**S116b · Both checks verified against their own faults, and one branch stubbed
+into existence.** Forcing `noProgress` false and `showCommitted` true reports
+`{stale:2, marked:false, floored:false, note:false}` and `{cols:8, says:true}`.
+And the fixture HAS commitments, so the branch the operator actually lives in —
+no orders, no awards, column empty — was never rendered by the run: it is stubbed
+for exactly one render and put back, asserting the column goes, the rows narrow
+with it (a stale colspan is how a table that hides a column comes out a cell short
+of its own headings), and it returns. A branch nothing exercises is a branch that
+breaks quietly.
+
+**S116c · Seventh variant of the literal trap, this time two pills.** The
+variación and «sin avance» tags were one expression, which put a greater-than and
+a less-than either side of the code between them; the audit read that as a tag
+pair and reported the code as a sentence awaiting translation. Each pill is its
+own statement now. The old combined footer paragraph was retired from both
+dictionaries rather than left behind, because the notes are printed conditionally
+now and a dead entry is a thing that drifts.
