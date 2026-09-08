@@ -9445,3 +9445,29 @@ the function beneath it calls `_applyContractAnnex`. Left alone deliberately —
 this session did not write that feature and the change is one line of prose in
 another session's area — but flagged here, because a comment asserting the
 reverse of its own function is a trap for whoever reads it next.
+
+**S106 · A deploy that arrived, reported as one that hadn't.** After the
+token fix (S103b/S103c's `set-ghcr-token`), the operator ran `deploy-now` and
+it reported the server "25 commit(s) behind" — `running revision 6f1ab3be,
+this checkout is fb54acba`. It was not behind. Run 227 had already built,
+smoke-tested and promoted an image from `6f1ab3be` — the actual `main` HEAD —
+twelve minutes before the token was even fixed, and `6f1ab3be` is a direct
+descendant of `fb54acba`, so the promoted image already carried everything the
+comparison thought was missing.
+
+The bug was in the yardstick, not the server. "The newest commit that builds
+an image" was computed per commit (`git log -1 -- IMAGE_PATHS`), and a push
+had landed two commits together — one touching `ops/**`, the next touching
+only docs. GitHub's own trigger works at the PUSH, so it built from the push's
+tip (`6f1ab3be`) regardless; the local computation, walking commits one at a
+time, never credited the docs-only tip with carrying the change forward, and
+named the earlier commit as "wanted" instead.
+
+Fixed in both `ops/deploy-now.sh` and `ops/status.sh`: before calling a
+mismatch "behind", they now ask whether anything the image is actually BUILT
+FROM differs between the running revision and the current checkout
+(`git diff --quiet "$RUNNING" HEAD -- "${IMAGE_PATHS[@]}"`). A SHA mismatch
+with no content difference is content-current and is reported as such; a real
+gap still reports behind, with the commit count, exactly as before. Content is
+what a deploy promises — the SHA was only ever a proxy for it, and the proxy
+broke the moment a push carried more than one commit.

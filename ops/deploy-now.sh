@@ -117,6 +117,15 @@ if [ -z "$RUNNING" ]; then
   warn "Falling back to checking the served files below."
 elif [ "$RUNNING" = "$WANT" ]; then
   info "running revision ${RUNNING:0:8} — matches this checkout"
+elif git cat-file -e "${RUNNING}^{commit}" 2>/dev/null \
+     && git diff --quiet "${RUNNING}" HEAD -- "${IMAGE_PATHS[@]}" 2>/dev/null; then
+  # RUNNING and WANT differ as SHAs, but nothing the image is BUILT FROM has
+  # changed between them. This is the ordinary shape when a push lands several
+  # commits together and the last one (github.sha, what got built) touches
+  # nothing in IMAGE_PATHS by itself — WANT, computed commit-by-commit, then
+  # names an EARLIER commit and calls a fully current server "behind". Content,
+  # not the SHA, is what a deploy actually promises.
+  info "running revision ${RUNNING:0:8} — no image-relevant change since then (current)"
 else
   warn "running revision ${RUNNING:0:8}, this checkout is ${WANT:0:8}"
   warn "The server is NOT on your latest commit. Usual causes, in order:"

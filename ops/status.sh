@@ -194,6 +194,13 @@ elif [ -z "$WANTREV" ]; then
   ok "Running revision ${RUNREV:0:8} (no origin/main here to compare it with)"
 elif [ "$RUNREV" = "$WANTREV" ]; then
   ok "Running the newest released commit (${RUNREV:0:8})"
+elif git cat-file -e "${RUNREV}^{commit}" 2>/dev/null \
+     && git diff --quiet "${RUNREV}" origin/main -- "${IMGP[@]}" 2>/dev/null; then
+  # RUNREV and WANTREV differ as SHAs, but nothing the image is built from
+  # changed between them — a later push landed a commit that does not itself
+  # touch IMGP (a docs fix, say) on top of one that does, and WANTREV, found
+  # commit-by-commit, named the earlier one. The running box is current.
+  ok "Running revision ${RUNREV:0:8} — no image-relevant change since then (current)"
 else
   BEHIND="$(git rev-list --count "${RUNREV}..${WANTREV}" 2>/dev/null || echo "?")"
   bad "Running ${RUNREV:0:8}, but ${WANTREV:0:8} is released — ${BEHIND} commit(s) behind"
