@@ -12366,6 +12366,108 @@ async function testAdmin(browser, base) {
       else bad("1G: docs in archive", JSON.stringify(zipCheck));
     }
 
+    /* PK13-S24 · THE QUARTER THAT HAS DOCUMENTS AND NO STATEMENT.
+       The check above deliberately picks the quarter with the MOST bank
+       movements, so it could never have found what the operator found: a
+       workbook with one tab, the reconciliation, built from movements alone.
+       A quarter whose statement has not been imported shipped a header row and
+       nothing under it, sitting beside a docs/ folder holding three real
+       supplier invoices — the documents travelled and the register naming them
+       did not.
+
+       So this one takes the opposite quarter: bills and invoices, no movements.
+       It asserts the two document tabs exist and carry a row per document, and
+       that the empty reconciliation tab SAYS it is empty rather than being
+       blank. Verified against the fault as well as the fix — with the old
+       single-sheet workbook it reports `sheets:1` and no invoice tab. */
+    const emptyQ = await pg.evaluate(async () => {
+      const qOf = (d) => {
+        const [y, m] = String(d).split("-").map(Number);
+        return y + "-Q" + Math.ceil(m / 3);
+      };
+      const movQ = new Set(erp.state.movements.map((m) => qOf(m.accountingDate)));
+      const docQ = {};
+      for (const b of erp.state.bills) docQ[qOf(b.date)] = (docQ[qOf(b.date)] || 0) + 1;
+      for (const i of erp.state.invoices) docQ[qOf(i.date)] = (docQ[qOf(i.date)] || 0) + 1;
+      let q = Object.keys(docQ).find((k) => !movQ.has(k));
+      /* No such quarter in the fixture? MAKE one, rather than skipping the
+             check — the state the operator hit has to be reachable on demand or
+             this regression can come back on a workspace we never sample. */
+      if (!q) {
+        const src = erp.state.bills[0];
+        if (!src) return { skip: "no bills at all" };
+        const far = "2019-02-15";
+        q = qOf(far);
+        erp.state.bills.push({ ...src, id: "bill_e2e_s24", number: "E2E-S24", date: far });
+      }
+      for (const x of erp.exceptionsWithStatus(q).filter((r) => !r.accepted))
+        erp.acceptException(q, x.key, "e2e", "bo");
+      const pkg = erp.quarterlyPackage(q, { recipient: "E2E" }, "bo");
+      const z = await buildAccountantZip(q, pkg);
+      const bytes = new Uint8Array(await z.blob.arrayBuffer());
+      const dir = ErpImport.zip.centralDirectory(bytes);
+      const book = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
+      const bookBytes = book.buffer ? book : new Uint8Array(book);
+      const inner = ErpImport.zip.centralDirectory(bookBytes);
+      const sheets = Object.keys(inner).filter((n) => /worksheets\/sheet\d+\.xml$/.test(n));
+      const readSheet = async (n) => {
+        try {
+          return await ErpImport.parseXlsxRows(bookBytes, n);
+        } catch {
+          return [];
+        }
+      };
+      const bodyOf = (rows, headerCell) => {
+        const at = rows.findIndex((r) => (r || []).includes(headerCell));
+        if (at < 0) return null;
+        const out = [];
+        for (const r of rows.slice(at + 1)) {
+          if (!(r || []).some((c) => String(c || "").trim())) break;
+          out.push(r);
+        }
+        return out;
+      };
+      const conc = await readSheet(1);
+      const bills = await readSheet(2);
+      const invs = await readSheet(3);
+      const summary = await readSheet(4);
+      const billBody = bodyOf(bills, "Nº factura");
+      const invBody = bodyOf(invs, "Nº factura");
+      const concText = conc.flat().join(" ");
+      return {
+        q,
+        sheets: sheets.length,
+        movements: pkg.bankMovements.length,
+        billRows: billBody ? billBody.length : null,
+        modelBills: pkg.receivedBills.length,
+        invRows: invBody ? invBody.length : null,
+        modelInvoices: pkg.issuedInvoices.length,
+        // The empty tab explains itself instead of being a bare header.
+        emptySaysWhy: /Sin movimientos de banco/.test(concText),
+        // The counterparty's tax id travels on BOTH halves now.
+        billsHaveTaxId: !!billBody && billBody.some((r) => /[A-Z]?\d{7,}/.test(String(r[3] || ""))),
+        hasSummary: summary.flat().some((c) => /IVA/.test(String(c || ""))),
+        warned: !z.rows && z.bills + z.invoices > 0,
+      };
+    });
+    if (emptyQ.skip) bad("1G: PK13-S24 fixture", JSON.stringify(emptyQ));
+    else if (
+      emptyQ.sheets === 4 &&
+      emptyQ.movements === 0 &&
+      emptyQ.billRows === emptyQ.modelBills &&
+      emptyQ.invRows === emptyQ.modelInvoices &&
+      emptyQ.billsHaveTaxId
+    )
+      ok(
+        `1G: a quarter with documents and no statement still ships them — ${emptyQ.sheets} tabs, ${emptyQ.billRows} bills, ${emptyQ.invRows} issued (${emptyQ.q})`,
+      );
+    else bad("1G: documents reach the workbook", JSON.stringify(emptyQ));
+    if (emptyQ.emptySaysWhy && emptyQ.warned && emptyQ.hasSummary)
+      ok(
+        "1G: …the empty reconciliation tab says why, the download says so too, and the quarter is summarised",
+      );
+    else bad("1G: empty tab explains itself", JSON.stringify(emptyQ));
+
     if (errs.length === 0) ok("administración: no console errors");
     else bad("administración: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {

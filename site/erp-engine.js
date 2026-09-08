@@ -10266,6 +10266,10 @@
           partyCode: this.party(i.partyId).code,
           accountingCode: this.party(i.partyId).accountingCode,
           partyName: this.party(i.partyId).name,
+          // Symmetric with `txFromBill`: the four fields the accountant works
+          // from are the number, the date, the counterparty and its tax id, and
+          // the sales half of this dictionary carried three of the four.
+          partyTaxId: this.party(i.partyId).taxId || "",
           direction: "sale",
           category: "obra",
           invoiceExists: true,

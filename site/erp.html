@@ -14154,8 +14154,19 @@
        * something that looks like a database dump.
        */
       function xlsxBlob(sheetName, rows, opts) {
+        return xlsxWorkbookBlob([{ name: sheetName, rows, opts }]);
+      }
+
+      /**
+       * One sheet's XML, its column widths and its frozen pane.
+       *
+       * Lifted out of `xlsxBlob` unchanged so a workbook can hold more than one
+       * of them. Everything a sheet decides for itself — its identity block, the
+       * row it freezes at, the style of each row — stays here, per sheet; only
+       * the parts a workbook shares (the styles, the content types) moved out.
+       */
+      function xlsxSheetPart(rows, opts) {
         opts = opts || {};
-        const enc = new TextEncoder();
         const iss = typeof erp !== "undefined" && erp._issuerBlock ? erp._issuerBlock() : {};
         const title = opts.title || iss.tradeName || iss.legalName || "";
         const subtitle = opts.subtitle || "";
@@ -14234,34 +14245,88 @@
             `<pane ySplit="${splitAt}" topLeftCell="A${splitAt + 1}" activePane="bottomLeft" state="frozen"/>` +
             "</sheetView></sheetViews>"
           : `<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>`;
+        return { sheet, cols, freeze };
+      }
+
+      /**
+       * A workbook of one or more sheets — `[{ name, rows, opts }, …]`.
+       *
+       * WHY MORE THAN ONE. The accountant's quarterly package shipped a workbook
+       * with a single tab, the bank reconciliation, because that was the only
+       * thing the export had ever been asked for. A quarter with three supplier
+       * invoices and no imported statement therefore handed the gestor a sheet
+       * with a header row and nothing under it, next to a folder holding the
+       * three PDFs. The documents existed, the export had nowhere to put them.
+       *
+       * Sheet names are what Excel shows on the tab, and it refuses a workbook
+       * whose names collide, exceed 31 characters or contain any of `[]:*?/\` —
+       * so they are cleaned here rather than trusted from the caller.
+       */
+      function xlsxWorkbookBlob(sheets) {
+        const enc = new TextEncoder();
+        const list = (sheets || []).filter(Boolean);
+        if (!list.length) list.push({ name: "Hoja", rows: [] });
+        const used = new Set();
+        const tabName = (raw, i) => {
+          let n = String(raw || "")
+            .replace(/[[\]:*?/\\]/g, " ")
+            .trim()
+            .slice(0, 31);
+          if (!n) n = "Hoja " + (i + 1);
+          let cand = n;
+          let k = 2;
+          while (used.has(cand.toLowerCase())) cand = n.slice(0, 28) + " " + k++;
+          used.add(cand.toLowerCase());
+          return cand;
+        };
+        const parts = list.map((sh) => xlsxSheetPart(sh.rows || [], sh.opts));
+        const names = list.map((sh, i) => tabName(sh.name, i));
 
         const f = (path, xml) => ({
           path,
           bytes: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + xml),
         });
-        return zipStore([
+        const CT = "application/vnd.openxmlformats-officedocument.spreadsheetml";
+        const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        const overrides = parts
+          .map(
+            (p, i) =>
+              `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="${CT}.worksheet+xml"/>`,
+          )
+          .join("");
+        const sheetTags = names
+          .map((n, i) => `<sheet name="${xmlEsc(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+          .join("");
+        const sheetRels = parts
+          .map(
+            (p, i) =>
+              `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+          )
+          .join("");
+        const files = [
           f(
             "[Content_Types].xml",
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+            `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="${CT}.sheet.main+xml"/>${overrides}<Override PartName="/xl/styles.xml" ContentType="${CT}.styles+xml"/></Types>`,
           ),
           f(
             "_rels/.rels",
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+            `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
           ),
           f(
             "xl/workbook.xml",
-            `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName).slice(0, 31)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+            `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetTags}</sheets></workbook>`,
           ),
           f(
             "xl/_rels/workbook.xml.rels",
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+            `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheetRels}<Relationship Id="rIdSty" Type="${REL}/styles" Target="styles.xml"/></Relationships>`,
           ),
           f("xl/styles.xml", XLSX_STYLES),
-          f(
-            "xl/worksheets/sheet1.xml",
-            `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${freeze}${cols}<sheetData>${sheet}</sheetData></worksheet>`,
-          ),
-        ]);
+        ];
+        parts.forEach((p, i) => {
+          const xml = `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${p.freeze}${p.cols}<sheetData>${p.sheet}</sheetData></worksheet>`;
+          files.push(f("xl/worksheets/sheet" + (i + 1) + ".xml", xml));
+        });
+        return zipStore(files);
       }
       function downloadBlob(blob, filename) {
         const a = document.createElement("a");
@@ -20725,18 +20790,171 @@
             ownDoc || matchedBillDoc,
           ]);
         }
-        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, {
-          subtitle: "Conciliación " + quarter,
-        });
+        /* A SHEET THAT IS EMPTY SAYS WHY IT IS EMPTY. The reconciliation table
+                 is one row per bank movement of the quarter, so a quarter whose
+                 statement has not been imported yet produces a header and nothing
+                 under it — which is what the gestor opened, next to a folder holding
+                 three real invoices. The row below is not data; it is the sheet
+                 telling its reader that the absence is a state of the workspace and
+                 not a fault of the export. */
+        const conciliationRows = rows.slice();
+        if (rows.length === 1)
+          conciliationRows.push([
+            "",
+            "",
+            "Sin movimientos de banco en este trimestre — importe el extracto en Conciliación. Las facturas del trimestre están en las otras hojas.",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+          ]);
+
+        const pctTxt = (bp) => (bp == null ? "" : (bp / 100).toFixed(2).replace(".", ",") + " %");
+        const docOfNumber = {};
+        for (const b of erp.state.bills)
+          if (billDocName[b.id]) docOfNumber[b.number] = billDocName[b.id];
+
+        /* THE DOCUMENTS OF THE QUARTER, WHICH THE WORKBOOK NEVER CARRIED. The
+                 package has always computed them — `receivedBills` and `issuedInvoices`
+                 are the two halves of the GES-02 transaction dictionary — and the
+                 export put neither in a cell. The PDFs travelled and the register that
+                 names them did not, so the gestor received a folder of files with no
+                 sheet saying what they were, from whom, for how much, or with what
+                 tax on them. */
+        const billRows = [
+          [
+            "Fecha",
+            "Nº factura",
+            "Proveedor",
+            "NIF",
+            "Base (€)",
+            "IVA",
+            "Cuota IVA (€)",
+            "IRPF",
+            "Retención (€)",
+            "Total (€)",
+            "Categoría",
+            "Presupuesto",
+            "Vencimiento",
+            "Pagado (€)",
+            "Justificante",
+          ],
+        ];
+        for (const t of pkg.receivedBills)
+          billRows.push([
+            t.date,
+            t.invoiceNumber || "",
+            t.partyName || "",
+            t.partyTaxId || "",
+            eurTxt(t.baseCents),
+            pctTxt(t.vatBp),
+            eurTxt(t.vatCents),
+            pctTxt(t.irpfBp),
+            eurTxt(t.irpfCents),
+            eurTxt(t.totalCents),
+            t.category || "",
+            t.budgetRef || "",
+            t.dueDate || "",
+            eurTxt(t.paidCents),
+            docOfNumber[t.invoiceNumber] || "",
+          ]);
+
+        const invoiceRows = [
+          [
+            "Fecha",
+            "Nº factura",
+            "Cliente",
+            "NIF",
+            "Base (€)",
+            "IVA",
+            "Cuota IVA (€)",
+            "IRPF",
+            "Retención (€)",
+            "Total (€)",
+            "Presupuesto",
+            "Vencimiento",
+            "Cobrado (€)",
+          ],
+        ];
+        for (const t of pkg.issuedInvoices)
+          invoiceRows.push([
+            t.date,
+            t.invoiceNumber || "",
+            t.partyName || "",
+            t.partyTaxId || "",
+            eurTxt(t.baseCents),
+            pctTxt(t.vatBp),
+            eurTxt(t.vatCents),
+            pctTxt(t.irpfBp),
+            eurTxt(t.irpfCents),
+            eurTxt(t.totalCents),
+            t.budgetRef || "",
+            t.dueDate || "",
+            eurTxt(t.paidCents),
+          ]);
+
+        /* The two figures the quarter is actually filed on, reconciled to the
+                 registers above them rather than typed again: `vatSummary` and
+                 `irpfSummary` are what the tax screens already read. */
+        const sumRows = [["Concepto", "Base (€)", "Cuota (€)"]];
+        const sumStyle = [null];
+        const pushSum = (label, base, cuota, style) => {
+          sumRows.push([label, base, cuota]);
+          sumStyle.push(style === undefined ? null : style);
+        };
+        pushSum("IVA repercutido por tipo", "", "", 7);
+        for (const [bp, r] of Object.entries(pkg.vat.byRate))
+          pushSum(pctTxt(Number(bp)), eurTxt(r.outputBaseCents), eurTxt(r.outputVatCents));
+        pushSum("IVA soportado por tipo", "", "", 7);
+        for (const [bp, r] of Object.entries(pkg.vat.byRate))
+          pushSum(pctTxt(Number(bp)), eurTxt(r.inputBaseCents), eurTxt(r.inputVatCents));
+        pushSum("Repercutido", "", eurTxt(pkg.vat.outputVatCents), 8);
+        pushSum("Soportado", "", eurTxt(pkg.vat.inputVatCents), 8);
+        pushSum("Resultado del trimestre", "", eurTxt(pkg.vat.netCents), 10);
+        pushSum("IRPF", "", "", 7);
+        pushSum("Practicada a terceros", "", eurTxt(pkg.irpf.retainedCents), 8);
+        pushSum("Soportada por clientes", "", eurTxt(pkg.irpf.sufferedCents), 8);
+
+        const book = xlsxWorkbookBlob([
+          {
+            name: "Conciliacion " + quarter,
+            rows: conciliationRows,
+            opts: { subtitle: "Conciliación " + quarter },
+          },
+          {
+            name: "Facturas recibidas",
+            rows: billRows,
+            opts: { subtitle: "Facturas recibidas · " + quarter },
+          },
+          {
+            name: "Facturas emitidas",
+            rows: invoiceRows,
+            opts: { subtitle: "Facturas emitidas · " + quarter },
+          },
+          {
+            name: "Resumen",
+            rows: sumRows,
+            opts: {
+              subtitle: "Resumen del trimestre · " + quarter,
+              freezeAt: 0,
+              styleOf: (i) => sumStyle[i],
+            },
+          },
+        ]);
         files.unshift({
           path: "conciliacion.xlsx",
-          bytes: new Uint8Array(await xlsx.arrayBuffer()),
+          bytes: new Uint8Array(await book.arrayBuffer()),
         });
         return {
           blob: zipStore(files),
           entries: files.map((f) => f.path),
           missing,
           rows: rows.length - 1,
+          bills: pkg.receivedBills.length,
+          invoices: pkg.issuedInvoices.length,
         };
       }
 
@@ -23132,6 +23350,14 @@
                 say(
                   z.missing.length +
                     " justificante(s) sin archivo detrás — el ZIP los nombra pero no puede incluirlos.",
+                );
+              /* SAID AT THE DOOR, NOT ONLY INSIDE THE FILE. A quarter with
+                       documents and no imported statement produced a reconciliation
+                       tab with a header and nothing under it, and the operator found
+                       that out by opening the workbook. */
+              else if (!z.rows && z.bills + z.invoices > 0)
+                say(
+                  "El trimestre no tiene movimientos de banco todavía, así que la hoja de conciliación va vacía. Las facturas del trimestre sí van, en sus propias hojas.",
                 );
             };
         },

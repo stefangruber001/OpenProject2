@@ -2076,7 +2076,7 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Twenty-three reports from the operator against the live workspace, arriving
+Twenty-four reports from the operator against the live workspace, arriving
 faster than they could be batched, and almost every one of them a screen that
 was silent rather than wrong. One commit per report or per pair, each one green
 on the unfiltered browser run before it was made.
@@ -2563,6 +2563,44 @@ Gates: site E2E **772/772 unfiltered**, `pnpm test` 27/27 tasks, `check-types`
 29/29, manageability 513/513, site-sync 20/20, boundaries, i18n complete in three
 languages, source literals 162/162 in both, workspace audit 0/0, iOS routes 9/9.
 ASSUMPTIONS S112, S113, S113a.
+
+**S24 · The accountant's workbook carried the movements and not the documents.**
+«Whenever I download the Report for the Gestoría, the excel is empty but we have
+three invoices.» Both halves true at once, and the second explains the first: the
+spreadsheet had exactly one loop feeding it, over `pkg.bankMovements`. The
+package carries five things — movements, facturas recibidas, facturas emitidas,
+IVA and IRPF — and four of the five never reached a cell. The bills had one job
+in that function, copying their PDFs into `docs/`, so the archive was exactly
+what the operator saw: three real invoices in the folder, a header row and
+nothing under it in the sheet, because that quarter has no imported statement.
+
+The gestor was receiving a folder of files with no sheet saying what they were,
+from whom, for how much, or with what tax on them.
+
+One workbook, four tabs now — **Conciliación** (as before), **Facturas
+recibidas**, **Facturas emitidas**, **Resumen** (IVA repercutido y soportado por
+tipo, resultado del trimestre, IRPF). The document tabs name the PDF of each
+document, so the sheet points at the folder instead of the folder standing alone.
+An empty reconciliation tab now says why it is empty, and the download says so
+too — the operator found this out by opening the file.
+
+Underneath: `xlsxBlob` could only ever write one sheet, so it split into a
+per-sheet builder and a workbook packer with every existing caller untouched;
+`parseXlsxRows` learned an optional sheet index; and `txFromInvoice` gained the
+client's **NIF**, which the supplier half of the same dictionary already carried.
+
+**And the check could not have found it.** The existing assertion picks the
+quarter with the MOST movements — it guaranteed itself a non-empty sheet. The new
+one takes the opposite quarter, and there was one in the fixture all along:
+2024-Q3, two bills, three issued invoices, no movements. Put the single-sheet
+build back and it reports `sheets:1, billRows:null, modelBills:2` — the
+screenshot in JSON. Fourth time in two packages a gate passed by sampling the
+case that works.
+
+Gates: site E2E **774/774 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals **161/161** in both with the CI ceiling ratcheted down to match,
+workspace audit 0/0. ASSUMPTIONS S114, S114a–S114d.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

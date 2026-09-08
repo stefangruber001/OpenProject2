@@ -9768,3 +9768,64 @@ the second one this session — the other being a `.join()` sitting between two
 template literals in the new panel. Fixed by indexing an array with
 `Math.sign(cents) + 1`, which removes both operators, and by building every
 fragment of the panel before the page rather than inside it.
+
+**S114 · The gestoría package shipped the documents and not the register that
+names them.** The operator: whenever they download the report for the gestoría
+the Excel is empty although there are three invoices. Both halves of that were
+true at once, and the second is what explains the first.
+
+`buildAccountantZip` had exactly one loop feeding the spreadsheet —
+`for (const m of pkg.bankMovements)`. The package `quarterlyPackage` hands it
+carries five things: `bankMovements`, `receivedBills`, `issuedInvoices`, `vat`
+and `irpf`. **Four of the five never reached a cell.** The bills had one job in
+that function, copying their PDFs into `docs/`, which is why the archive looked
+exactly as reported: three real supplier invoices in the folder, and a sheet with
+a header row and nothing under it, because the quarter has no imported bank
+movement yet.
+
+So the gestor received a folder of files with no sheet saying what they were,
+from whom, for how much, or with what tax on them. The deliverable of §5.6 is
+the quarter's books; what it shipped was a reconciliation of a statement that had
+not been imported.
+
+**One workbook, four tabs** — Conciliación (as before), Facturas recibidas,
+Facturas emitidas, Resumen (IVA repercutido y soportado por tipo, resultado del
+trimestre, IRPF). The document tabs name the file of each PDF in `docs/`, so the
+sheet points at the folder rather than the folder standing alone.
+
+**An empty sheet says why it is empty.** A quarter with no movements now carries
+one line explaining that the statement has not been imported and that the
+invoices are on the other tabs, and the download says the same thing at the door
+— the operator found this out by opening the file.
+
+**S114a · `xlsxBlob` could only ever write one sheet.** `sheet1.xml` was
+hard-coded in three places — the content types, the workbook and its
+relationships. Split into `xlsxSheetPart` (unchanged, per sheet) and
+`xlsxWorkbookBlob` (the package), with `xlsxBlob` kept as a one-sheet wrapper so
+not one of its existing callers changes. `parseXlsxRows` takes an optional
+1-based sheet index for the same reason, defaulting to the first.
+
+**S114b · The sales half of the transaction dictionary had no tax id.**
+`txFromBill` carried `partyTaxId` and `txFromInvoice` carried the name and the
+code and not the NIF. The four fields an accountant works from are the number,
+the date, the counterparty and its tax id; the purchase side knew that and the
+sales side did not.
+
+**S114c · The check could not have found it, by construction.** The existing 1G
+assertion picks the quarter with the MOST bank movements — it guaranteed itself a
+non-empty sheet. The new one takes the opposite quarter, documents and no
+statement, and there was one sitting in the fixture the whole time: **2024-Q3,
+two bills and three issued invoices, zero movements**. Verified against the fault
+— with the single-sheet build restored it reports `sheets:1, billRows:null,
+modelBills:2, modelInvoices:3`, which is the operator's screenshot in JSON.
+
+Fourth time in two packages that a gate passed because it sampled the case that
+works. The rule this repository keeps re-learning: **choose the fixture that
+would embarrass the feature, not the one that flatters it.**
+
+**S114d · Source literals 162 → 161, and the ceiling follows it down.** The sheet
+path stopped being the literal `xl/worksheets/sheet1.xml` and became a built one,
+so a code fragment the audit had always counted as prose left the list. Every
+string the four sheets print got an entry in both dictionaries in the same
+commit. `ci.yml` moves to 161 because the ceiling is the measurement, not a
+budget — a spare slot is where the next untranslated label hides.
