@@ -84,6 +84,10 @@ echo "TENANTS=$($C exec -T db psql -U "${POSTGRES_USER:-canei}" -d "${POSTGRES_D
 echo "DEPLOYTIMER=$(systemctl is-active canei-deploy.timer 2>/dev/null)"
 echo "DEPLOYRESULT=$(systemctl show canei-deploy.service -p Result --value 2>/dev/null)"
 echo "DEPLOYWHEN=$(systemctl show canei-deploy.service -p ExecMainExitTimestamp --value 2>/dev/null)"
+# The lines that say WHY, on one line so `val` can carry them. Reported only
+# when the run failed: this check used to name a command for the operator to go
+# and run, which needs the terminal the failure has just cost them.
+echo "DEPLOYWHY=$(journalctl -u canei-deploy.service -n 40 --no-pager 2>/dev/null | grep -Eio '(unauthorized|denied|authentication required|manifest unknown|not found|no space left|permission denied|timeout)[^|]{0,60}' | tail -2 | tr '\n' '|')"
 echo "IMAGECONF=$(sed -n 's/^IMAGE_APP=//p' .env 2>/dev/null | tr -d '\"' | head -1)"
 echo "BACKUPTIMER=$(systemctl is-active canei-backup.timer 2>/dev/null)"
 echo "LASTBACKUP=$(ls -t backups/*.age 2>/dev/null | head -1)"
@@ -149,8 +153,18 @@ fi
 case "$(val DEPLOYRESULT)" in
   success|"") ok "Last auto-deploy run finished cleanly$([ -n "$(val DEPLOYWHEN)" ] && echo " ($(val DEPLOYWHEN))")" ;;
   *) bad "Last auto-deploy run ended '$(val DEPLOYRESULT)' — the pull or the restart is failing"
-     printf '      %sjournalctl -u canei-deploy.service -n 50 --no-pager%s\n' "$DIM" "$OFF"
-     printf '      %sMost often an expired registry token: ./ops/set-ghcr-token.sh%s\n' "$DIM" "$OFF" ;;
+     WHY="$(val DEPLOYWHY)"
+     if [ -n "$WHY" ]; then
+       printf '      %sthe machine says: %s%s\n' "$DIM" "${WHY%|}" "$OFF"
+     fi
+     case "$WHY" in
+       *[Uu]nauthorized* | *denied* | *authentication*)
+         printf '      %sThat is the registry refusing the token. Fix it from a browser:%s\n' "$DIM" "$OFF"
+         printf '      %sActions → Ops → Run workflow → set-ghcr-token (needs the GHCR_TOKEN secret)%s\n' "$DIM" "$OFF" ;;
+       *)
+         printf '      %sjournalctl -u canei-deploy.service -n 50 --no-pager%s\n' "$DIM" "$OFF"
+         printf '      %sMost often an expired registry token: Ops → set-ghcr-token%s\n' "$DIM" "$OFF" ;;
+     esac ;;
 esac
 
 IMGCONF="$(val IMAGECONF)"

@@ -48,10 +48,22 @@ IP="$(curl -sS -H "Authorization: Bearer $HCLOUD_TOKEN" \
 [ -n "$IP" ] || die "No server named '${SERVER_NAME}'."
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i "$KEY")
 
-say "New registry token"
-info "Paste the token and press Enter. Nothing appears as you type."
-read -r -s TOKEN
-printf '\n'
+# Two ways in. A person at a terminal is prompted, as before. A workflow passes
+# GHCR_TOKEN_NEW, because the one thing this script fixes — an expired token —
+# is exactly the failure that leaves somebody with no terminal and a server that
+# will not update. The value must be a repository SECRET, never a workflow
+# input: GitHub masks secrets in logs and never puts them in a box on a page,
+# and that distinction is the whole reason this was kept off the ops button
+# until now (see the note on set-email in .github/workflows/ops.yml).
+if [ -n "${GHCR_TOKEN_NEW:-}" ]; then
+  say "New registry token (supplied by the caller)"
+  TOKEN="$GHCR_TOKEN_NEW"
+else
+  say "New registry token"
+  info "Paste the token and press Enter. Nothing appears as you type."
+  read -r -s TOKEN
+  printf '\n'
+fi
 [ -n "$TOKEN" ] || die "No token entered — nothing was changed."
 case "$TOKEN" in
   ghp_* | github_pat_*) ;;

@@ -30,6 +30,7 @@ on:
         options:
           - status
           - deploy-now
+          - set-ghcr-token
           - sync-server
           - backup-now
           - set-email
@@ -153,6 +154,40 @@ jobs:
           # it is already current costs a few seconds.
           bash ops/sync-server.sh
           bash ops/set-email.sh "${{ vars.ERP_MAIL_ADDRESS || 'if@2iberia.com' }}"
+
+      # THE ONE THAT COULD NOT BE FIXED FROM A PHONE, UNTIL IT HAD TO BE.
+      #
+      # This was deliberately left off the button, for the reason given above:
+      # a token travelling through a workflow INPUT persists in the run log for
+      # anyone with read access. That objection is about inputs, and it still
+      # stands. A repository SECRET is the other thing — masked in logs, never
+      # in a box on a page — which is precisely the distinction `set-email`
+      # already draws for the mailbox password.
+      #
+      # What changed the balance: an expired registry token is the failure that
+      # STRANDS you. The pipeline stays green, the image is published, the timer
+      # runs every minute — and the machine serves the old version for as long
+      # as nobody notices. It cost this project 25 commits and two days, and the
+      # only remedy needed a laptop nobody had. A recovery path that requires
+      # the thing the incident takes away is not a recovery path.
+      - name: set-ghcr-token
+        if: inputs.action == 'set-ghcr-token'
+        env:
+          GHCR_TOKEN_NEW: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          if [ -z "$GHCR_TOKEN_NEW" ]; then
+            echo "::error::Repository secret GHCR_TOKEN is not set."
+            echo "::error::Make one at github.com -> Settings -> Developer settings ->"
+            echo "::error::Personal access tokens -> Tokens (classic) -> Generate new token,"
+            echo "::error::ticking ONLY read:packages. Then add it under Settings ->"
+            echo "::error::Secrets and variables -> Actions as GHCR_TOKEN and run this again."
+            exit 1
+          fi
+          # The script stores it AND proves it by logging in and pulling. A
+          # stored token that cannot pull is indistinguishable from a working
+          # one until a release silently fails to arrive — which is the whole
+          # shape of this incident.
+          bash ops/set-ghcr-token.sh
 
       - name: backup-now
         if: inputs.action == 'backup-now'
