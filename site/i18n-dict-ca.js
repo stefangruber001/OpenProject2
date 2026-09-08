@@ -876,6 +876,10 @@ window.CANEI_DICT.ca = {
     "Un addicional d'una obra en marxa es crea a la pestanya Addicionals, sobre el contracte que modifica.",
   "No encuentro ese anexo": "No trobo aquest annex",
   "No encuentro ese contrato": "No trobo aquest contracte",
+  "Cómo se cobra": "Com es cobra",
+  "Ir a Conciliación": "Anar a Conciliació",
+  "El cobro se registra al conciliar el movimiento del banco con esta factura, no a mano desde aquí.":
+    "El cobrament es registra en conciliar el moviment del banc amb aquesta factura, no a mà des d'aquí.",
   "Anexo firmado": "Annex signat",
   "✍ Firmar anexo": "✍ Signar l'annex",
   "Nombre y apellidos": "Nom i cognoms",

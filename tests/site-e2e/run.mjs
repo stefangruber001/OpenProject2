@@ -7979,19 +7979,40 @@ async function testInvoicing(browser, base) {
       return r ? r.number : null;
     });
     if (target) {
+      /* PK13-S21 · THE COLLECTION FORM IS GONE FROM HERE. Money arriving is a
+         fact of the bank, matched to the invoice in Conciliación against a line
+         that exists on a statement; typing it on the invoice wrote a collection
+         nobody could point at. The operator's instruction, and the same reason
+         `payBills` lost its screen in package 12.
+
+         What must be true is BOTH halves: the form is absent, and the drawer
+         says where the thing moved to. A door removed in silence reads as a
+         screen that cannot do anything — which is the report that opened this
+         package. */
       await pg.fill("#invQ", target);
       await pg.waitForTimeout(500);
       await pg.locator("#view table.mlist tr.click").first().click();
       await pg.waitForTimeout(500);
-      await pg.locator("#iv_go").click();
-      await pg.waitForTimeout(700);
-      const after = await pg.evaluate(() => ({
-        outstanding: erp.invoicingSummary().outstanding.amountCents,
-        drawerClosed: !document.querySelector("#drawer").classList.contains("on"),
+      const collect = await pg.evaluate(() => ({
+        form: !!document.getElementById("iv_go"),
+        amount: !!document.getElementById("iv_amt"),
+        route: !!document.getElementById("iv_bank"),
+        says: /Conciliación/.test(document.querySelector("#dbody")?.textContent || ""),
       }));
-      if (after.outstanding < before && after.drawerClosed)
-        ok("ADM-01: recording a collection moves the counters straight away");
-      else bad("ADM-01: collection updates the strip", `${before} → ${after.outstanding}`);
+      if (!collect.form && !collect.amount && collect.route && collect.says)
+        ok("PK13-S21: the invoice no longer collects by hand, and says where it is done");
+      else bad("PK13-S21: collection moved to the bank", JSON.stringify(collect));
+
+      await pg.locator("#iv_bank").click();
+      await pg.waitForTimeout(800);
+      const landed = await pg.evaluate(() => ({
+        hash: location.hash,
+        queue: !!document.getElementById("rcList"),
+      }));
+      if (/banking/.test(landed.hash) && landed.queue)
+        ok("PK13-S21: and «Ir a Conciliación» actually lands on the queue");
+      else bad("PK13-S21: route to the queue", JSON.stringify(landed));
+      void before;
     } else {
       ok(
         "ADM-01: nothing outstanding in the period, and the screen says so rather than inventing a row",

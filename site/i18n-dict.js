@@ -816,6 +816,12 @@ window.CANEI_DICT = {
     ],
     ["No encuentro ese anexo", "Cannot find that annex"],
     ["No encuentro ese contrato", "Cannot find that contract"],
+    ["Cómo se cobra", "How it gets collected"],
+    ["Ir a Conciliación", "Go to Reconciliation"],
+    [
+      "El cobro se registra al conciliar el movimiento del banco con esta factura, no a mano desde aquí.",
+      "The collection is recorded by reconciling the bank movement against this invoice, not by hand from here.",
+    ],
     ["Anexo firmado", "Signed annex"],
     ["✍ Firmar anexo", "✍ Sign annex"],
     ["Nombre y apellidos", "Full name"],

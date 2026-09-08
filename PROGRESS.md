@@ -2487,6 +2487,27 @@ Gates: site E2E **764/764 unfiltered**, `pnpm test` 173/173 across 27 tasks,
 manageability simulation 513/513, site-sync 20/20, boundaries, i18n complete in
 three languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S108.
 
+**S21 · The invoice stops collecting money.** «we don't need Registro de Cobro
+because this is done on Bank Conciliation» — and it is the same fault `payBills`
+was removed for in package 12, at the other end of the same journey: a form that
+wrote a receipt against no bank line. A collection is recorded now by matching a
+statement movement to the invoice in Conciliación, where the money actually
+appears. `recordCollection` stays in the engine because the bank matcher calls
+it; what went is the manual door.
+
+The drawer keeps a card that names Conciliación and offers the route, and the
+check asserts both halves — the form absent, and the button actually landing on
+the queue. A control removed in silence reads as a screen that cannot do
+anything, which is the report this package opened on.
+
+The recorrido's phase 11 needed it too: its verb was labelled «Registrar cobro»
+and opened the invoice drawer, which after this change is named after something
+that drawer can no longer do. It walks to Conciliación.
+
+Gates: site E2E **765/765 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 162/162 in both, workspace audit 0/0. ASSUMPTIONS S109.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they

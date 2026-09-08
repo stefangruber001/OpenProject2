@@ -9539,3 +9539,34 @@ chase list changes, and `emitido` nets the way a register reads.
 arithmetic it reports `198040 → 208040` — the debt growing by the credit note —
 and with the fix `198040 → 188040`. A test for a sign error that has only ever
 been run against the corrected code proves nothing about the direction.
+
+**S109 · «Registrar cobro» leaves the invoice, because money arriving is a fact
+of the bank.** The operator: «we don't need Registro de Cobro because this is
+done on Bank Conciliation». Typing a collection on the invoice wrote a receipt
+against no bank line — the same fault `payBills` was removed for in package 12,
+at the other end of the same journey. It is recorded now only by matching a
+statement movement to the invoice in Conciliación, where the money actually
+appears.
+
+`recordCollection` STAYS in the engine, untouched: it is what the bank matcher
+calls (`matchMovement` and `matchMovementSplit`). What went is the manual door,
+not the verb.
+
+**S109a · And the door says where it moved to.** A removed control that leaves
+nothing behind reads as a screen that cannot do anything — the report this whole
+package opened on. The invoice drawer keeps a card, «Cómo se cobra», that names
+Conciliación and offers the route; the check asserts both the absence of the
+form AND that the button lands on the queue, because a route that names a screen
+it does not reach is the same failure wearing a label.
+
+**S109b · The recorrido's phase 11 pointed at the form.** Its verb was labelled
+«Registrar cobro» and opened the invoice drawer — after this change, a verb named
+after something the screen it opens can no longer do. It walks to Conciliación
+now.
+
+**S109c · The literal audit read my own comment.** The comment explaining this
+change quoted the operator with apostrophes — «the operator's own instruction
+(«we don't need…»)» — and the source audit pairs apostrophes as quotes, so a
+fragment of a code comment was counted as an untranslated user-visible string.
+CLAUDE.md records this exact trap, and it caught a comment written to explain a
+fix while the fix was being written. Rewritten without them.
