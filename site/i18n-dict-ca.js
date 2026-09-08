@@ -1030,6 +1030,11 @@ window.CANEI_DICT.ca = {
     "Sense moviments de banc en aquest trimestre — importi l'extracte a Conciliació. Les factures del trimestre són a les altres pestanyes.",
   "El trimestre no tiene movimientos de banco todavía, así que la hoja de conciliación va vacía. Las facturas del trimestre sí van, en sus propias hojas.":
     "El trimestre encara no té moviments de banc, així que el full de conciliació va buit. Les factures del trimestre sí que hi van, en fulls propis.",
+  "Efectivo pendiente de justificar": "Efectiu pendent de justificar",
+  justificado: "justificat",
+  devuelto: "retornat",
+  "Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.":
+    "Un reintegrament s'explica amb els tiquets que va pagar i amb el que torna al banc. Obri'l per adjuntar-hi els seus documents; el que sobri es torna identificant l'ingrés com a devolució d'efectiu.",
   "Motivo del adicional": "Motiu de l'addicional",
   "Días de plazo que añade": "Dies de termini que afegeix",
   "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",

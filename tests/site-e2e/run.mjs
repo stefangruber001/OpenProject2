@@ -7080,20 +7080,38 @@ async function testBankAndCash(browser, base) {
       ok("PK12-S7: over-returning, the wrong sign and a non-withdrawal are all refused");
     else bad("PK12-S7: cash refusals", JSON.stringify(cashRefusals));
 
-    /* And the SCREEN says it. The picker offers the withdrawal on money going
-       out, the state card prints the remainder, and neither exists because a
-       method exists — they are read off the rendered drawer. */
-    const cashScreen = await pg.evaluate(async () => {
-      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+    /* And the SCREEN says it — REACHED THE WAY THE OPERATOR REACHES IT.
+
+       PK13-S25 · This check used to call `matchDrawer(w.id)` from `pg.evaluate`,
+       handing the panel the argument the screen is supposed to supply. It proved
+       the panel renders and said nothing about whether anything can open it, and
+       the answer was no: declaring a line a reintegro classifies it (allocated,
+       out of the profit and loss), `unreconciledMovements` wants neither, so the
+       withdrawal leaves the queue whose rows are the only callers of
+       `matchDrawer`. The receipts it paid for could never be attached, and the
+       remainder could only go down by putting cash back in the bank.
+
+       So the door is PRESSED. Fourth time in two packages that a gate passed by
+       exercising the room instead of the way in. */
+    const cashDoor = await pg.evaluate(async () => {
       goTab("banking", "_reconcile");
-      await new Promise((r) => setTimeout(r, 700));
-      matchDrawer(w.id);
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 800));
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      const open = erp.openCashWithdrawals(w.accountId);
+      // The withdrawal is NOT in the queue — that is correct and is the reason
+      // the card below has to exist.
+      const inQueue = erp.unreconciledMovements(null, null, null).some((m) => m.id === w.id);
+      const btn = document.querySelector(`[data-cashopen="${w.id}"]`);
+      if (!btn) return { noDoor: true, inQueue, openCount: open.length };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 600));
       const body = document.querySelector("#dbody");
       const txt = body ? body.innerText : "";
       const st = erp.cashWithdrawalState(w.id);
       return {
-        card: /Reintegro de efectivo/.test(txt),
+        inQueue,
+        openCount: open.length,
+        opened: !!body && /Reintegro de efectivo/.test(txt),
         showsOutstanding: txt.includes(eur(st.outstandingCents)),
         // Already a withdrawal, so the option to declare it again is not offered.
         noRedeclare: !/>Reintegro de efectivo</.test(
@@ -7101,9 +7119,78 @@ async function testBankAndCash(browser, base) {
         ),
       };
     });
-    if (cashScreen.card && cashScreen.showsOutstanding && cashScreen.noRedeclare)
-      ok("PK12-S7: the drawer prints what is still in cash, and will not redeclare a withdrawal");
-    else bad("PK12-S7: withdrawal on screen", JSON.stringify(cashScreen));
+    if (
+      cashDoor.opened &&
+      cashDoor.showsOutstanding &&
+      cashDoor.noRedeclare &&
+      cashDoor.inQueue === false
+    )
+      ok(
+        `PK13-S25: a declared withdrawal is out of the queue and still has a door — ${cashDoor.openCount} open, opened by pressing it`,
+      );
+    else bad("PK13-S25: door into an open withdrawal", JSON.stringify(cashDoor));
+
+    /* AND THE RECEIPTS ACTUALLY LAND. The old arithmetic check asserted the
+       returned cash and the remainder and never once asserted that anything was
+       DOCUMENTED — so a withdrawal that could never be justified satisfied it.
+       This one matches a real open bill from inside the panel and requires
+       `documentedCents` to move by that amount and the remainder to fall. */
+    const cashJustify = await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      const before = erp.cashWithdrawalState(w.id);
+      const cands = erp.reconciliationCandidates(w.id);
+      const pick = cands.find((c) => c.outstandingCents <= before.outstandingCents);
+      if (!pick) return { noCandidate: true, outstanding: before.outstandingCents };
+      const btn = document.querySelector(`[data-pick="${pick.id}"]`);
+      if (!btn) return { noPickButton: true, ref: pick.reference };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const after = erp.cashWithdrawalState(w.id);
+      const m = erp.state.movements.find((x) => x.id === w.id);
+      return {
+        took: pick.outstandingCents,
+        documentedBefore: before.documentedCents,
+        documentedAfter: after.documentedCents,
+        outstandingBefore: before.outstandingCents,
+        outstandingAfter: after.outstandingCents,
+        adds:
+          after.totalCents === after.documentedCents + after.returnedCents + after.outstandingCents,
+        // A matched withdrawal is still the company moving its own money.
+        stillTransfer: m.class === "internalTransfer" && m.excludedFromPL === true,
+      };
+    });
+    if (
+      cashJustify.documentedAfter === cashJustify.documentedBefore + cashJustify.took &&
+      cashJustify.outstandingAfter === cashJustify.outstandingBefore - cashJustify.took &&
+      cashJustify.adds &&
+      cashJustify.stillTransfer
+    )
+      ok(
+        `PK13-S25: …and a receipt matched from it reduces what is still in cash (${cashJustify.outstandingBefore}c → ${cashJustify.outstandingAfter}c), without turning the withdrawal into a cost`,
+      );
+    else bad("PK13-S25: receipts justify the withdrawal", JSON.stringify(cashJustify));
+
+    /* An explained movement can be opened again. It is the general form of the
+       fault above — the list of what is explained offered exactly one verb, undo,
+       so a line needing a SECOND document had to lose the first. */
+    const explainedDoor = await pg.evaluate(async () => {
+      closeDrawer();
+      goTab("banking", "_reconciled");
+      await new Promise((r) => setTimeout(r, 800));
+      const row = document.querySelector("#rdList tbody tr");
+      if (!row) return { noRow: true };
+      row.click();
+      await new Promise((r) => setTimeout(r, 600));
+      /* `.drawer.on`, not `#dbody`. The panel element stays in the document when
+             it is closed, so reading `#dbody` reads the LAST drawer that was opened
+             and a row that does nothing at all looks like a row that worked — which
+             is exactly what this check reported when it was first run against the
+             fault it exists to catch. */
+      const panel = document.querySelector(".drawer.on #dbody");
+      return { opened: !!panel && /Candidatos/.test(panel.innerText) };
+    });
+    if (explainedDoor.opened) ok("PK13-S25: …and an explained movement opens its panel again");
+    else bad("PK13-S25: explained row opens", JSON.stringify(explainedDoor));
     await pg.evaluate(() => closeDrawer());
     await pg.waitForTimeout(300);
     /* Back to the accounts tab EXPLICITLY — the same rule written a few

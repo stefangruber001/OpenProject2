@@ -1029,6 +1029,13 @@ window.CANEI_DICT = {
       "El trimestre no tiene movimientos de banco todavía, así que la hoja de conciliación va vacía. Las facturas del trimestre sí van, en sus propias hojas.",
       "The quarter has no bank movements yet, so the reconciliation sheet goes out empty. The quarter's invoices do go, on tabs of their own.",
     ],
+    ["Efectivo pendiente de justificar", "Cash still to be accounted for"],
+    ["justificado", "documented"],
+    ["devuelto", "returned"],
+    [
+      "Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.",
+      "A cash withdrawal is explained by the receipts it paid for and by what goes back to the bank. Open it to attach its documents; whatever is left over goes back by identifying the deposit as a cash return.",
+    ],
     ["Motivo del adicional", "Reason for the additional"],
     ["Días de plazo que añade", "Days it adds to the schedule"],
     ["Ampliación de la instalación eléctrica", "Extending the electrical installation"],

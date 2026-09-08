@@ -7346,6 +7346,30 @@
         .filter((m) => m.cashWithdrawal && quarterOf(m.accountingDate) === quarter)
         .map((m) => ({ ...m, cash: this.cashWithdrawalState(m.id) }));
     }
+    /**
+     * Every withdrawal that still owes an explanation, newest first.
+     *
+     * NOT filtered by period, deliberately. Cash in somebody's pocket does not
+     * respect a quarter boundary — money taken out in March is spent in April
+     * and the receipts arrive in May — so a list scoped to the period on screen
+     * would hide exactly the withdrawals that have been open longest, which are
+     * the ones worth chasing. The account filter stays, because the queue beside
+     * it is worked one account at a time.
+     *
+     * This exists because the withdrawal LEAVES the reconciliation queue the
+     * moment it is declared: `markCashWithdrawal` classifies it, `classifyMovement`
+     * marks it allocated and out of the profit and loss, and `unreconciledMovements`
+     * wants neither. That is right — a declared withdrawal is not an unexplained
+     * line — but it left the only list that could open the panel where its
+     * receipts are attached, so the receipts could never be attached at all.
+     */
+    openCashWithdrawals(accountId) {
+      return this.state.movements
+        .filter((m) => m.cashWithdrawal && (!accountId || m.accountId === accountId))
+        .map((m) => ({ ...m, cash: this.cashWithdrawalState(m.id) }))
+        .filter((m) => m.cash.outstandingCents > 0)
+        .sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)));
+    }
 
     /* ============ PK7-D — a transfer is a PAIR, and the product must hold it ==
        `findInternalTransfers` has always proposed pairs and the bulk button
@@ -8272,6 +8296,14 @@
         );
         m.class = "customerReceipt";
       }
+      /* A DECLARED WITHDRAWAL KEEPS ITS CLASS. The two branches above set the
+         class to what the match means — a project cost, a customer receipt — and
+         for a cash withdrawal both are wrong: the receipts it paid for are the
+         cost, and the line itself is the company moving its own money into a
+         pocket. `excludedFromPL` already survives this call, so nothing was ever
+         counted twice, but the class and the flag disagreed and a report keyed on
+         either would have told a different story. */
+      if (m.cashWithdrawal) m.class = "internalTransfer";
       // What it settled, all of it — not the last one considered.
       m.matched = { documents: list.map((s) => ({ ...s })) };
       m.status = "matched";

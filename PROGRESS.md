@@ -2076,7 +2076,7 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Twenty-four reports from the operator against the live workspace, arriving
+Twenty-five reports from the operator against the live workspace, arriving
 faster than they could be batched, and almost every one of them a screen that
 was silent rather than wrong. One commit per report or per pair, each one green
 on the unfiltered browser run before it was made.
@@ -2601,6 +2601,47 @@ Gates: site E2E **774/774 unfiltered**, `pnpm test` 27/27 tasks, manageability
 513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
 literals **161/161** in both with the CI ceiling ratcheted down to match,
 workspace audit 0/0. ASSUMPTIONS S114, S114a–S114d.
+
+**S25 · Caja chica: the two ends worked and the middle had no door.** «how it
+works the withdrawal, expense and deposite of the difference[?]» Declaring the
+reintegro worked. Declaring the devolución worked. Attaching the receipts could
+not be done at all.
+
+`markCashWithdrawal` classifies the line, `classifyMovement` marks it allocated
+and out of the profit and loss — both correct — and `unreconciledMovements` wants
+neither, so the withdrawal leaves the queue the instant it is declared. And
+`matchDrawer`, the only screen with Candidatos, the split matcher and the
+withdrawal card, had exactly one caller: that queue's `onRowClick`. The
+Conciliados list showed the row and did nothing with it.
+
+So `documentedCents` could never move. A withdrawal spent entirely on tickets read
+100% «en efectivo todavía» forever, and since that figure is the `cashOutstanding`
+exception, every quarter holding one would have blocked the gestoría archive over
+a number nobody could bring down.
+
+Two doors: a **Conciliados row opens its panel** (the general form — any explained
+line needing a second document had to lose the first), and Conciliación grows an
+**«Efectivo pendiente de justificar»** card listing each open withdrawal with what
+is left and a button in. The queue is deliberately untouched: putting a withdrawal
+back in it would block sealing the quarter over cash in somebody's pocket, which
+the operator has already called ordinary. And the card ignores the period, because
+money taken out in March is spent in April.
+
+Also: `matchMovementSplit` was setting the class to `projectCost` on a matched
+withdrawal. `excludedFromPL` survived, so nothing double-counted, but the class
+and the flag disagreed; it keeps `internalTransfer` now.
+
+**And the check pressed the room, not the door.** It called `matchDrawer(w.id)`
+directly, and asserted the cash returned and the remainder while never asserting
+anything was documented. It clicks now and requires the figure to move — 14.000c →
+3.110c. Verified against the fault, where it reports `noDoor:true` and
+`documented 0 → 0`. One of the three new checks PASSED against the fault on its
+first run, because `#dbody` survives a closed drawer; it reads `.drawer.on #dbody`
+now.
+
+Gates: site E2E **776/776 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S115, S115a–S115c.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

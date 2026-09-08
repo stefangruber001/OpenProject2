@@ -9829,3 +9829,67 @@ so a code fragment the audit had always counted as prose left the list. Every
 string the four sheets print got an entry in both dictionaries in the same
 commit. `ci.yml` moves to 161 because the ceiling is the measurement, not a
 budget — a spare slot is where the next untranslated label hides.
+
+**S115 · Caja chica: the two ends worked and the middle had no door.** The
+operator asked how the withdrawal, the expenses and the deposit of the difference
+work now. Declaring the withdrawal worked; declaring the return worked; attaching
+the receipts could not be done at all, and the reason is a closed door of exactly
+the shape this package keeps finding.
+
+`markCashWithdrawal` calls `classifyMovement`, which sets `status = "allocated"`
+and `excludedFromPL = true`. Both are RIGHT — a declared withdrawal is not an
+unexplained line, and at the moment the cash comes out nothing has been bought.
+But `unreconciledMovements` wants `status === "unallocated" && !excludedFromPL`,
+so the line leaves the queue the instant it is declared; and `matchDrawer` — the
+only screen carrying Candidatos, the split matcher and the withdrawal card with
+its three figures — had exactly one caller, `onRowClick` on that queue. The
+Conciliados list showed the row and its `onRowClick` was `() => {}`.
+
+So `m.matched.documents`, which is what `cashWithdrawalState` counts as
+`documentedCents`, could never be written after the declaration. **A withdrawal
+spent entirely on receipts read 100% «en efectivo todavía» forever**, and the only
+thing that could reduce it was putting cash back in the bank. Worse, that figure
+is the `cashOutstanding` exception, and `quarterlyPackage` refuses to build while
+an exception is unjustified — so every quarter with a withdrawal would have
+blocked the archive over a number nobody could bring down.
+
+**Two doors, not a change to the queue.** The Conciliados row opens its panel —
+the general form of the fault, since any explained line that later needs a second
+document had to lose the first. And Conciliación grows a card,
+«Efectivo pendiente de justificar», listing every open withdrawal with what is
+left on it and a button in.
+
+**The queue is deliberately NOT changed.** A withdrawal is literally a line that
+is not yet explained, so putting it back in the queue is tempting and wrong: it
+would block `closeBankPeriod` on cash sitting in somebody's pocket, and the
+operator has already said that state is ordinary rather than a fault.
+
+**And the card is not scoped to the period.** Money taken out in March is spent in
+April and its receipts arrive in May; a list respecting the period on screen would
+hide the withdrawals open longest, which are the ones worth chasing.
+`openCashWithdrawals(accountId)` filters by account and by nothing else.
+
+**S115a · A matched withdrawal stopped being a transfer.** `matchMovementSplit`
+sets the class to what the match means — `projectCost` or `customerReceipt` — and
+for a cash withdrawal both are wrong: the receipts are the cost, and the line is
+the company moving its own money into a pocket. `excludedFromPL` survived the
+call, so nothing was ever counted twice, but the class and the flag disagreed and
+a report keyed on either would have told a different story. It keeps
+`internalTransfer` now, asserted.
+
+**S115b · The check exercised the room and not the way in.** It called
+`matchDrawer(w.id)` from `pg.evaluate`, handing the panel the argument the SCREEN
+is supposed to supply — so it proved the panel renders and said nothing about
+whether anything opens it, and stayed green with no door at all. It also asserted
+`returned > 0` and `outstanding > 0` and never once asserted that anything was
+DOCUMENTED, which is the whole middle step. Now it presses the button, matches a
+real bill from inside the panel, and requires `documentedCents` to move by that
+amount: 14.000c → 3.110c on the fixture. Fourth instance in two packages.
+
+**S115c · A check that passed against the fault it was written for.** The
+explained-row assertion read `#dbody` — and the drawer element STAYS IN THE
+DOCUMENT when it is closed, so it read the previous drawer and a row that did
+nothing looked like a row that worked. Caught only because the fault was actually
+restored and the check run against it. Reads `.drawer.on #dbody` now, which cannot
+pass unless a panel is genuinely open. The rule this pays for again: a regression
+check is not written until it has been seen to FAIL.

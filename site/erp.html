@@ -12257,6 +12257,10 @@
         const open = erp.unreconciledMovements(r.from, r.to, bankAcc);
         const allOpen = erp.unreconciledMovements(null, null, bankAcc);
         const transfers = R ? R.internalTransfers(erp, r.from, r.to) : [];
+        /* Not scoped to the period, on purpose — see `openCashWithdrawals`.
+                 Money taken out in March is spent in April, and a list that respected
+                 the period would hide the withdrawals open longest. */
+        const openCash = erp.openCashWithdrawals(bankAcc);
         const openIds = new Set(open.map((m) => m.id));
         for (const id of [...rcSel]) if (!openIds.has(id)) rcSel.delete(id);
 
@@ -12267,6 +12271,7 @@
            <button class="btn sm" id="rcClose" title="Bloquea el trimestre; exige que todo en él esté asignado">🔒 Bloquear trimestre</button>
          </div></div>
          ${transferCard(transfers)}
+         ${cashOpenCard(openCash)}
          ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
          <div id="rcSelBar"></div>
          <div id="rcList"></div>
@@ -12337,6 +12342,9 @@
           ],
           onRowClick: (id) => matchDrawer(id),
         });
+        v.querySelectorAll("[data-cashopen]").forEach(
+          (b) => (b.onclick = () => matchDrawer(b.dataset.cashopen)),
+        );
         /* The checkbox's own click handler stops the event there — without
                  this, ticking a box would also fire the row's onclick and open the
                  matching panel underneath it. */
@@ -12710,6 +12718,40 @@
               closeDrawer();
             }, "Trimestre bloqueado");
       }
+      /**
+       * The cash that is still out, and the way back into it.
+       *
+       * THIS CARD EXISTS BECAUSE THE WITHDRAWAL LEAVES THE QUEUE. Declaring a
+       * bank line to be a reintegro classifies it — allocated, out of the profit
+       * and loss — and `unreconciledMovements` wants neither of those, so the
+       * line vanishes from the only list whose rows open `matchDrawer`. That is
+       * the panel carrying Candidatos, the split matcher and the withdrawal card
+       * with its three figures; without a door to it, the receipts a withdrawal
+       * paid for could never be attached and the remainder could only ever go
+       * down by putting cash back in the bank.
+       *
+       * It is NOT the queue. An open withdrawal is not an unexplained line and
+       * must not block sealing the quarter — cash in a pocket at the end of a
+       * week is ordinary, and the operator said so. It is a list of work, beside
+       * the queue, with a button into each item.
+       */
+      function cashOpenCard(list) {
+        if (!list.length) return "";
+        const note =
+          '<div class="it" style="color:var(--muted)">Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.</div>';
+        const rows = list
+          .map((m) => {
+            const detail = `<span class="sub">${eur(m.cash.totalCents)} · <span>justificado</span> ${eur(m.cash.documentedCents)} · <span>devuelto</span> ${eur(m.cash.returnedCents)}</span>`;
+            return `<div class="it"><span style="color:var(--muted)" translate="no">${fmtD(m.accountingDate)}</span>
+             <span style="flex:1;margin-left:8px">${movWho(m)}<br>${detail}</span>
+             <b style="color:var(--amber)" translate="no">${eur(m.cash.outstandingCents)}</b>
+             <button class="btn sm" data-cashopen="${esc(m.id)}">Justificar</button></div>`;
+          })
+          .join("");
+        return `<div class="card"><div class="ch"><h3>Efectivo pendiente de justificar</h3>
+           <span class="tag" translate="no">${list.length}</span></div>
+          <div class="daylist" style="padding:10px 14px">${note}${rows}</div></div>`;
+      }
       function transferCard(transfers) {
         if (!transfers.length) return "";
         const line = (id) => {
@@ -12836,7 +12878,13 @@
             },
             { label: "", get: () => "", html: (m) => undoCell(m) },
           ],
-          onRowClick: () => {},
+          /* A ROW OPENS ITS MOVEMENT. This was `() => {}` — the list showed what
+                   had been explained and offered exactly one verb, undo. So a line that
+                   was explained and then needed a second document (a cash withdrawal is
+                   the ordinary case: it is declared first and justified afterwards) had
+                   no way back to the panel that could take one, short of undoing the
+                   explanation it already had. */
+          onRowClick: (id) => matchDrawer(id),
         });
 
         v.querySelectorAll("[data-undo]").forEach(
