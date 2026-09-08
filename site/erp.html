@@ -1401,6 +1401,10 @@
       td.good {
         color: var(--greenDeep);
       }
+      tr.ecototal td {
+        font-weight: 600;
+        border-top: 2px solid var(--line);
+      }
       .adj {
         font: 600 10px var(--sans);
         color: var(--amber);
@@ -15851,7 +15855,7 @@
               })
               .join("")}</select></label></div>
          </div></div>`
-               : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
+             : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
           <div class="it"><label class="opt">Lead abierto
             <select id="bn_lead" style="margin-left:auto">${openLeads
               .map(
@@ -21502,32 +21506,32 @@
                 .toLowerCase()
                 .includes(q),
             columns: [
-                    { label: "Contrato", primary: true, get: (c) => c.number },
-                    { label: "Cliente", get: (c) => c.party },
-                    { label: "Obra", get: (c) => c.projectCode || "—" },
-                    { label: "Importe original", html: (c) => eur0(c.originalCents) },
-                    {
-                      label: "Importe vigente",
-                      html: (c) =>
-                        c.differs
-                          ? `<span class="pill y">${eur0(c.currentCents)}</span>`
-                          : eur0(c.currentCents),
-                    },
-                    { label: "Anexos", get: (c) => c.annexes || "—" },
-                    {
-                      label: "Firma",
-                      html: (c) =>
-                        c.signed
-                          ? '<span class="pill g">Firmado</span>'
-                          : '<span class="pill r">Sin firmar</span>',
-                    },
-                    {
-                      label: "Estado",
-                      html: (c) => {
-                        const l = CST[c.status] || [c.status, ""];
-                        return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
-                      },
-                    },
+              { label: "Contrato", primary: true, get: (c) => c.number },
+              { label: "Cliente", get: (c) => c.party },
+              { label: "Obra", get: (c) => c.projectCode || "—" },
+              { label: "Importe original", html: (c) => eur0(c.originalCents) },
+              {
+                label: "Importe vigente",
+                html: (c) =>
+                  c.differs
+                    ? `<span class="pill y">${eur0(c.currentCents)}</span>`
+                    : eur0(c.currentCents),
+              },
+              { label: "Anexos", get: (c) => c.annexes || "—" },
+              {
+                label: "Firma",
+                html: (c) =>
+                  c.signed
+                    ? '<span class="pill g">Firmado</span>'
+                    : '<span class="pill r">Sin firmar</span>',
+              },
+              {
+                label: "Estado",
+                html: (c) => {
+                  const l = CST[c.status] || [c.status, ""];
+                  return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
+                },
+              },
             ],
             onRowClick: (id) => {
               conWork = { id, tab: "datos" };
@@ -28243,6 +28247,26 @@
                opened. Keys are prefixed so a partida and a subpartida can never
                collide on a shared number. */
       const ecoOpen = new Set();
+      /* WHICH OF THE TWO QUESTIONS THE TABLE IS ANSWERING. «Ejecutado» is what
+               has been spent — the columns the operator dictated word for word, kept
+               exactly as they settled them. «Proyección» is the forward-looking cost
+               report the same operator then asked for: what is already committed,
+               what the partida is heading for at this rate, and what margin is left
+               if it gets there.
+
+               Two views rather than one row of eleven columns. They answer different
+               questions, they are read at different moments, and a construction cost
+               report that puts spent and forecast side by side on a phone is a
+               report nobody finishes reading. */
+      let ecoView = "actual";
+      /* The class of a deviation cell — by index, not by a chain of comparisons.
+               A greater-than and a less-than in one expression is exactly what the
+               source audit reads as a tag pair, and it reported the code between them
+               as a sentence awaiting translation. `Math.sign` maps under / dead on /
+               over to 0 / 1 / 2 and the operators disappear with the false positive.
+               Sixth variant of that trap in this file. */
+      const DEV_CELL = ["num good", "num", "num warn"];
+      const devCellClass = (cents) => DEV_CELL[Math.sign(cents) + 1];
       /**
        * The per-partida table, three levels deep and all of it one table.
        *
@@ -28266,8 +28290,20 @@
        * claim about exactly that a few lines further down.
        */
       function ecoTreeRows(projectId, tableRows, names, variationNums, pend) {
-        const money = (cents, warn) =>
-          `<td class="num${warn ? " warn" : ""}">${warn && cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
+        const money = (cents) => `<td class="num">${eur0(cents)}</td>`;
+        /* THE COLOUR FOLLOWS THE SIGN. This cell used to be `money(cents, true)`,
+                 and `warn` was applied whether the figure was positive or negative —
+                 so a partida twenty-four euros UNDER budget printed in danger red and
+                 bold, exactly like one four hundred over. The operator pointed at
+                 these two columns: the plus and the minus said one thing and the
+                 colour said another, on the one screen whose job is to tell those two
+                 states apart.
+
+                 Over budget is red and carries its plus; under budget is the green the
+                 margin columns already use; dead on is neither, because a deviation of
+                 zero is not an achievement to paint. */
+        const deviation = (cents) =>
+          `<td class="${devCellClass(cents)}">${cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
         const signed = (cents) =>
           `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
         const pct = (bp) =>
@@ -28277,17 +28313,6 @@
                  how two cells on one row come to disagree. */
         const signedPct = (cents, bp) =>
           `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${bp === null ? "—" : (bp / 100).toFixed(1) + "%"}</td>`;
-        const SRC2 = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
-        /* What the money bought, in the words the cost was booked under. Built
-                 as a lookup rather than a chain of ternaries between quoted strings,
-                 which is the shape the source audit reads as a sentence. */
-        const KIND_LABEL = {
-          material: "Material",
-          labour: "Mano de obra",
-          subcontract: "Subcontrata",
-          equipment: "Maquinaria",
-          other: "Otros",
-        };
         const out = [];
         for (const c of tableRows) {
           const key = "c:" + c.chapter;
@@ -28297,7 +28322,7 @@
             `<tr class="click" data-chcosts="${c.chapter}" data-ecotoggle="${esc(key)}"><td class="k"><span translate="no">${caret}</span> ${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
               money(c.budgetCents) +
               money(c.actualCents) +
-              money(c.varianceCents, true) +
+              deviation(c.varianceCents) +
               pct(c.spentBp) +
               signed(c.marginCents) +
               signedPct(c.marginCents, c.marginBp) +
@@ -28309,13 +28334,16 @@
             out.push(
               `<tr><td colspan="7" style="padding-left:26px;color:var(--muted)">Esta partida no tiene subpartidas en su línea base.</td></tr>`,
             );
+          /* Counted once for the whole partida rather than once per subpartida:
+                   `chapterCosts` walks every cost row of the job, and calling it
+                   inside the loop below turned an open partida into one full walk
+                   per line for a number printed on a button. */
+          const chDocs = erp.chapterCosts(projectId, c.chapter);
           for (const l of lines) {
             /* `lineId`, not `id` — `lineEconomics` returns {lineId, num, name,
                      …} and reading the wrong key made every subpartida key on its
                      number alone and every document filter match nothing, so a
                      subpartida showing 1.330 € reported no documents behind it. */
-            const lkey = "l:" + c.chapter + ":" + (l.lineId || l.num || "x");
-            const lopen = ecoOpen.has(lkey);
             const dev = l.actualCents - l.budgetCostCents;
             const mg = l.saleCents - l.actualCents;
             const spentBp = l.budgetCostCents
@@ -28325,49 +28353,39 @@
             const label = l.unassigned
               ? '<span class="pill y">sin subpartida</span>'
               : esc(l.num + " · " + l.name);
+            const nDocs = chDocs.filter((r) =>
+              l.unassigned ? !r.lineId : r.lineId === l.lineId,
+            ).length;
+            /* THE DOCUMENTS MOVED OUT OF THE TABLE, and this button is where they
+                     went. They used to be a third level of rows indented under this
+                     one, and the comment that lived here argued for it: the amount sat
+                     in the same column as the subtotal above, so the eye could check
+                     that the documents added up to the line they hang off.
+
+                     The operator overruled it on sight, and the geometry is why. A
+                     document row carries a supplier, a tax id and a date, and not one
+                     of those is a budget, an actual or a margin — so under a header of
+                     seven money columns they landed in columns that already meant
+                     something else, and the screen printed a supplier's name under
+                     «Presupuestado». Reported as unreadable, which it was.
+
+                     The check the old shape bought is not lost, it is stated: the panel
+                     foots its own documents and prints this subpartida's accumulated
+                     cost beside the sum, so a disagreement is a sentence rather than a
+                     column the reader has to line up by eye. */
+            const door = nDocs
+              ? `<button class="btn sm" style="margin-left:8px" data-ecodocs="${esc(String(c.chapter))}" data-ecoline="${esc(l.lineId || "")}">Documentos</button> <span class="tag" translate="no">${nDocs}</span>`
+              : `<span class="tag" style="margin-left:8px;color:var(--muted)">Sin documentos</span>`;
             out.push(
-              `<tr class="click" data-ecotoggle="${esc(lkey)}"><td style="padding-left:26px"><span translate="no">${lopen ? "▾" : "▸"}</span> ${label}</td>` +
+              `<tr data-ecosub="${esc("l:" + c.chapter + ":" + (l.lineId || l.num || "x"))}"><td style="padding-left:26px">${label}${door}</td>` +
                 money(l.budgetCostCents) +
                 money(l.actualCents) +
-                money(dev, true) +
+                deviation(dev) +
                 pct(spentBp) +
                 signed(mg) +
                 signedPct(mg, mgBp) +
                 `</tr>`,
             );
-            if (!lopen) continue;
-            const docs = erp
-              .chapterCosts(projectId, c.chapter)
-              .filter((r) => (l.unassigned ? !r.lineId : r.lineId === l.lineId));
-            if (!docs.length)
-              out.push(
-                `<tr><td colspan="7" style="padding-left:52px;color:var(--muted)">Sin documentos todavía.</td></tr>`,
-              );
-            /* THE WHOLE EXPENSE, NOT A NUMBER WITH A DATE. The operator, on the
-                     documents behind a subpartida: "it should open the full expenses
-                     list, with all the important details: supplier name, NIF, invoice,
-                     amount, date, etc." What it showed was the kind, the reference, the
-                     amount and the date — the counterparty was in the template and never
-                     rendered, because `chapterCosts` dropped `party` on its way out of
-                     `projectCostRows`.
-
-                     It stays IN the table rather than opening a drawer: this drill-down
-                     is deliberately the table itself, and the amount sits in the same
-                     column as the subtotal above it so the eye can check that the
-                     documents add up to the line they hang off. */
-            for (const r of docs) {
-              const who = r.party ? esc(r.party) : "—";
-              const nif = r.taxId ? esc(r.taxId) : "—";
-              const what = KIND_LABEL[r.kind] || "";
-              out.push(
-                `<tr><td style="padding-left:52px;color:var(--muted)">${esc(SRC2[r.source] || r.source)} · ${esc(r.ref || "—")}</td>` +
-                  `<td style="color:var(--muted)">${who}</td>` +
-                  `<td class="num">${eur0(r.amountCents)}</td>` +
-                  `<td style="color:var(--muted)" translate="no">${nif}</td>` +
-                  `<td style="color:var(--muted)">${r.date ? fmtD(r.date) : "—"}</td>` +
-                  `<td colspan="2" style="color:var(--muted)">${esc(what)}</td></tr>`,
-              );
-            }
           }
         }
         /* The money that names no partida, at the foot and in the same table.
@@ -28389,6 +28407,178 @@
           `<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`
         );
       }
+      /**
+       * The projection view of the same partidas — the forward half of a cost
+       * report, at chapter level.
+       *
+       * WHY THE PROJECTION IS COMPUTED AND CANNOT BE TYPED. The screen used to
+       * carry an «Ajustar» button over `setForecastOverride`, and the operator
+       * removed it: the budget is fixed, and the only thing that moves it is an
+       * adicional to the contract. That ruling settles this column too. Nothing
+       * here writes; every figure is derived from what is already recorded, so
+       * there is no second place a chapter's number can be changed.
+       *
+       * THE FORMULA, AND WHY THIS ONE. Cost at completion is
+       * `real + presupuestado × (1 − avance)` — spend to date plus the budget
+       * for the work still to do. The obvious alternative, `real ÷ avance`,
+       * assumes every future euro will be as inefficient as every past one, and
+       * on a partida that buys its material on day one it reports a catastrophe
+       * at five per cent progress and recants at fifty. This one degrades
+       * gracefully: at nought per cent it is the budget, at a hundred it is the
+       * real cost, and in between it moves by what actually overran.
+       *
+       * Then floored at what is already real and at what is already committed:
+       * a projection below money that is spent, or below an order that is
+       * placed and cannot be unplaced, is not a forecast, it is a wish.
+       */
+      function ecoForecastRows(projectId, tableRows, names, variationNums, pend) {
+        const committed = erp.committedByChapter(projectId);
+        const progress = {};
+        try {
+          erp.chapterProgress(projectId).forEach((c) => {
+            progress[String(c.num)] = c.progressPct || 0;
+          });
+        } catch (err) {}
+        const cell = (cents) => `<td class="num">${eur0(cents)}</td>`;
+        const dev = (cents) =>
+          `<td class="${devCellClass(cents)}">${cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
+        const signed = (cents) =>
+          `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
+        const rows = tableRows.map((c) => {
+          const pctDone = progress[String(c.chapter)] || 0;
+          const toGo = Math.round((c.budgetCents * (100 - pctDone)) / 100);
+          const com = committed[c.chapter] || committed[String(c.chapter)] || 0;
+          const projected = Math.max(c.actualCents + toGo, c.actualCents, com);
+          return {
+            ...c,
+            pctDone,
+            committedCents: com,
+            projectedCents: projected,
+            devCents: projected - c.budgetCents,
+            marginFcastCents: c.saleCents - projected,
+          };
+        });
+        const out = rows.map(
+          (r) =>
+            `<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${variationNums.has(String(r.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
+            cell(r.budgetCents) +
+            cell(r.committedCents) +
+            cell(r.actualCents) +
+            `<td class="num" translate="no">${r.pctDone}%</td>` +
+            cell(r.projectedCents) +
+            dev(r.devCents) +
+            signed(r.marginFcastCents) +
+            `</tr>`,
+        );
+        /* The money that names no partida is projected at exactly itself: it is
+                 already spent, and nothing about it is still to come. Leaving it out
+                 would make the total below disagree with the card above by the one
+                 figure this screen already has a pill for. */
+        const pendCents = (pend || []).reduce((a, r) => a + r.amountCents, 0);
+        if (pendCents) {
+          const spent = cell(pendCents);
+          const nil = `<td class="num">—</td>`;
+          out.push(
+            `<tr><td class="k"><span class="pill y">Sin partida</span></td>${nil}${nil}${spent}${nil}${spent}${nil}${nil}</tr>`,
+          );
+        }
+        if (!out.length)
+          return `<tr><td colspan="8"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`;
+        const tot = (pick) => rows.reduce((a, r) => a + r[pick], 0);
+        const totProjected = tot("projectedCents") + pendCents;
+        const totCells =
+          cell(tot("budgetCents")) +
+          cell(tot("committedCents")) +
+          cell(tot("actualCents") + pendCents) +
+          `<td class="num">—</td>` +
+          cell(totProjected) +
+          dev(totProjected - tot("budgetCents")) +
+          signed(tot("saleCents") - totProjected);
+        out.push(`<tr class="ecototal"><td class="k">Total</td>${totCells}</tr>`);
+        return out.join("");
+      }
+
+      /**
+       * The documents behind ONE subpartida of Avance económico, in a panel.
+       *
+       * A cost document answers a different question from the row it hangs off.
+       * The row is four money columns and two percentages; the document is who
+       * issued it, under what tax id, on what day, and for how much. Putting the
+       * second under the header of the first is what the operator saw and
+       * rejected: the supplier name sat in the column labelled with the budget,
+       * the tax id under the deviation, the date under the percentage.
+       *
+       * What the in-table shape bought was a vertical check — the amounts under
+       * the subtotal. That is kept as a printed claim instead: the sum of these
+       * documents and the subpartida accumulated cost are shown side by side,
+       * with a pill that says whether they agree. A footing that is asserted
+       * beats one the reader has to perform.
+       */
+      function lineCostsDrawer(projectId, chapterNum, lineId) {
+        const SRC2 = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
+        /* What the money bought, in the words the cost was booked under. Built
+           as a lookup rather than a chain of ternaries between quoted strings,
+           which is the shape the source audit reads as a sentence. */
+        const KIND_LABEL = {
+          material: "Material",
+          labour: "Mano de obra",
+          subcontract: "Subcontrata",
+          equipment: "Maquinaria",
+          other: "Otros",
+        };
+        const lines = erp.lineEconomics(projectId, chapterNum);
+        const line = lines.find((l) => (lineId ? l.lineId === lineId : l.unassigned));
+        const docs = erp
+          .chapterCosts(projectId, chapterNum)
+          .filter((r) => (lineId ? r.lineId === lineId : !r.lineId));
+        const label = line && !line.unassigned ? line.num + " · " + line.name : String(chapterNum);
+        const sum = docs.reduce((a, r) => a + r.amountCents, 0);
+        const actual = line ? line.actualCents : sum;
+        const agrees = sum === actual;
+        /* EVERY PIECE BUILT BEFORE THE PAGE, none of them beside another inside
+                 it. A template literal that ends where the next one begins — the two
+                 arms of a ternary, a `.join()` between two backticks — is read by the
+                 source audit as one string running through the code between them, and
+                 the code then arrives in the miss ledger as a sentence to translate.
+                 Recorded five times in this repository already; this drawer had two of
+                 them at once. */
+        const rowsHtml = docs
+          .map((r) => {
+            const cells =
+              `<td>${r.date ? fmtD(r.date) : "—"}</td>` +
+              `<td>${esc(SRC2[r.source] || r.source)}</td>` +
+              `<td translate="no">${esc(r.ref || "—")}</td>` +
+              `<td>${r.party ? esc(r.party) : "—"}</td>` +
+              `<td translate="no">${r.taxId ? esc(r.taxId) : "—"}</td>` +
+              `<td>${esc(KIND_LABEL[r.kind] || "—")}</td>` +
+              `<td class="num" translate="no">${eur(r.amountCents)}</td>`;
+            return `<tr>${cells}</tr>`;
+          })
+          .join("");
+        const emptyHtml = `<tr><td colspan="7"><div class="empty">Esta subpartida no tiene documentos todavía.</div></td></tr>`;
+        const agreeHtml = agrees
+          ? `<span class="pill g">Cuadra</span><span style="flex:1;margin-left:8px">Los documentos de abajo suman exactamente el acumulado de esta subpartida.</span>`
+          : `<span class="pill r">No cuadra</span><span style="flex:1;margin-left:8px">Los documentos de abajo no suman el acumulado de esta subpartida.</span><b translate="no">${eur(sum)}</b>`;
+        const heading = line && line.unassigned ? "Costes sin subpartida" : "Esta subpartida";
+        const b = openDrawer("Documentos · " + label);
+        b.innerHTML = `
+          <div class="card"><div class="ch"><h3>${esc(heading)}</h3><span class="tag" translate="no">${esc(String(chapterNum))}</span></div>
+           <div class="daylist">
+            <div class="it"><span style="flex:1">Presupuestado</span><b translate="no">${eur(line ? line.budgetCostCents : 0)}</b></div>
+            <div class="it"><span style="flex:1">Acumulado real</span><b translate="no">${eur(actual)}</b></div>
+            <div class="it">${agreeHtml}</div>
+           </div></div>
+
+          <div class="card"><div class="ch"><h3>Documentos</h3><span class="tag" translate="no">${docs.length}</span></div>
+           <div class="scroll"><table><thead><tr>
+             <th>Fecha</th><th>Origen</th><th>Referencia</th><th>Proveedor</th>
+             <th>NIF</th><th>Tipo</th><th class="num">Importe</th></tr></thead><tbody>
+           ${rowsHtml || emptyHtml}
+           </tbody></table></div>
+           <div class="daylist"><div class="it" style="color:var(--muted)">El coste se asigna a la subpartida desde Gastos y desde Horas; desde aquí solo se consulta.</div></div>
+          </div>`;
+      }
+
       function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
@@ -28481,14 +28671,36 @@
 
           <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3>
             <span style="flex:1"></span>
-            <button class="btn sm" id="ecoAll">${ecoOpen.size ? "Contraer todo" : "Desplegar todo"}</button></div>
-           <div class="scroll"><table><thead><tr>
+            ${
+              ecoView === "actual"
+                ? `<button class="btn sm" id="ecoAll">${ecoOpen.size ? "Contraer todo" : "Desplegar todo"}</button>`
+                : ""
+            }</div>
+           <div class="tabstrip" style="padding:0 12px">
+             <button class="tab${ecoView === "actual" ? " on" : ""}" data-ecoview="actual">Ejecutado</button>
+             <button class="tab${ecoView === "forecast" ? " on" : ""}" data-ecoview="forecast">Proyección</button>
+           </div>
+           ${
+             ecoView === "actual"
+               ? `<div class="scroll"><table><thead><tr>
              <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
              <th class="num">Desviación</th><th class="num">%</th>
              <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
            ${ecoTreeRows(id, tableRows, names, variationNums, pend)}
            </tbody></table></div>
-           <div class="daylist">${agreeNote}<div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>
+           <div class="daylist">${agreeNote}<div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y el botón de documentos de una subpartida para ver lo que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>`
+               : `<div class="scroll"><table><thead><tr>
+             <th>Partida</th><th class="num">Presupuestado</th><th class="num">Comprometido</th>
+             <th class="num">Acumulado real</th><th class="num">Avance</th>
+             <th class="num">Proyectado</th><th class="num">Desviación</th>
+             <th class="num">Margen previsto</th></tr></thead><tbody>
+           ${ecoForecastRows(id, tableRows, names, variationNums, pend)}
+           </tbody></table></div>
+           <div class="daylist">
+            <div class="it" style="color:var(--muted)">Comprometido es lo ya pedido o adjudicado, esté facturado o no. Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda, y nunca por debajo de lo real ni de lo comprometido. Desviación es proyectado menos presupuestado.</div>
+            <div class="it" style="color:var(--muted)">Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.</div>
+           </div>`
+           }
           </div>
           </div>`;
 
@@ -28510,6 +28722,24 @@
               const k = row.dataset.ecotoggle;
               if (ecoOpen.has(k)) ecoOpen.delete(k);
               else ecoOpen.add(k);
+              render();
+            }),
+        );
+        /* The third level is a panel now, so it needs a door of its own —
+                 `stopPropagation` because the button sits inside a row that toggles,
+                 and a click that both opened the documents and collapsed the partida
+                 they belong to is a click that undoes itself. */
+        body.querySelectorAll("[data-ecodocs]").forEach(
+          (btn) =>
+            (btn.onclick = (ev) => {
+              ev.stopPropagation();
+              lineCostsDrawer(id, btn.dataset.ecodocs, btn.dataset.ecoline || null);
+            }),
+        );
+        body.querySelectorAll("[data-ecoview]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              ecoView = b.dataset.ecoview;
               render();
             }),
         );
@@ -29852,7 +30082,8 @@
                 : { ref: "", why: "", note: "", chg: null };
             }
             const b = a.budgetId ? erp.state.budgets.find((x) => x.id === a.budgetId) : null;
-            const v = b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
+            const v =
+              b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
             return {
               ref: a.ref || (v && v.adiNumber) || (b && b.number) || "",
               why: (v && v.reason) || (b && b.internalRef) || "",

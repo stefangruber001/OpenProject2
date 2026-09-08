@@ -2076,10 +2076,10 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Nine reports from the operator against the live workspace, arriving faster than
-they could be batched, and every one of them a screen that was silent rather
-than wrong. Four shipped commits, each one green on the unfiltered browser run
-before it was made.
+Twenty-three reports from the operator against the live workspace, arriving
+faster than they could be batched, and almost every one of them a screen that
+was silent rather than wrong. One commit per report or per pair, each one green
+on the unfiltered browser run before it was made.
 
 **S1 · «Where is the button?»** The `＋ Días de los adicionales` control rendered
 only when a breakdown per partida had already been typed, and the only screen
@@ -2507,6 +2507,62 @@ that drawer can no longer do. It walks to Conciliación.
 Gates: site E2E **765/765 unfiltered**, `pnpm test` 27/27 tasks, manageability
 513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
 literals 162/162 in both, workspace audit 0/0. ASSUMPTIONS S109.
+
+**S22 · A supplier's name printed under «Presupuestado».** «The information in
+read shoudl appear in a different window/popup or whatever you think is better,
+becasue as it is I don't see it correct.» The documents behind a subpartida were
+a third level of rows in the per-partida table, and a cost document has nothing
+to put in a header of seven money columns: the supplier landed under
+«Presupuestado», the tax id under «Desviación», the date under «%». The header
+made a claim about every cell beneath it and was wrong about five of the seven.
+
+They open in a panel of their own now, with the columns they actually have —
+fecha, origen, referencia, proveedor, NIF, tipo, importe. The subpartida row
+stops being a toggle and carries a button with the count.
+
+What the old shape bought was a vertical check: the amounts sat under the
+subtotal, so the eye could confirm they added up. That is kept as a printed
+claim rather than a geometry — the panel foots its own documents against the
+subpartida's accumulated cost and says whether they agree. And the check PRESSES
+THE BUTTON instead of calling the panel with the arguments the screen is meant
+to supply, which is the lesson S19 paid for.
+
+**S23 · A saving printed in the same red as an overrun.** «Can you see this
+columns (- or + signs) and look for best practice on project economic control? I
+need to improve this further.» The first thing behind that question was a defect:
+the deviation cell applied the danger class whether the figure was positive or
+negative, so a partida twenty-four euros UNDER budget printed red and bold,
+exactly like one four hundred over — on the one screen whose job is to tell those
+two states apart. Over budget is red and keeps its plus; under budget takes the
+green the margin columns already use; dead on is neither.
+
+Then the missing half. The table showed spend only — presupuestado, real,
+desviación, margen — and a cost report that shows only spend cannot answer the
+question it is opened for: where does this partida end up. A second view,
+**«Proyección»**, beside the existing **«Ejecutado»**: comprometido (orders and
+awards, invoiced or not), avance, proyectado, the deviation against budget, the
+margin that survives it, and a total row.
+
+Two views rather than eleven columns on one row: they answer different questions,
+are read at different moments, and a report that puts spend and forecast
+side by side on a phone is a report nobody finishes.
+
+The projection is **computed and cannot be typed** — that was settled when the
+operator removed the «Ajustar» button, because the budget is fixed and only an
+adicional to the contract moves it. Cost at completion is
+`real + presupuestado × (1 − avance)`, floored at what is already spent and at
+what is already committed. The obvious alternative, `real ÷ avance`, assumes
+every future euro is as inefficient as every past one and reports a catastrophe
+at five per cent progress on any partida that buys its material on day one.
+
+It stops at the partida and says so on screen: an order and an award are signed
+against a partida, and splitting them across subpartidas would invent a figure
+nobody recorded.
+
+Gates: site E2E **772/772 unfiltered**, `pnpm test` 27/27 tasks, `check-types`
+29/29, manageability 513/513, site-sync 20/20, boundaries, i18n complete in three
+languages, source literals 162/162 in both, workspace audit 0/0, iOS routes 9/9.
+ASSUMPTIONS S112, S113, S113a.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

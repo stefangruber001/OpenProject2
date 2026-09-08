@@ -3996,8 +3996,11 @@ async function testVariationBudget(browser, base) {
       const rows = [...document.querySelectorAll("#view tbody tr")];
       const model = erp.lineEconomics(gProject, num);
       const chapter = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
-      // The subpartida rows of THIS partida are the ones its toggle key names.
-      const subRows = rows.filter((r) => (r.dataset.ecotoggle || "").startsWith("l:" + num + ":"));
+      /* The subpartida rows of THIS partida are the ones its own key names.
+             `data-ecosub`, not `data-ecotoggle`: the subpartida stopped being a
+             toggle when its documents moved to a panel, so it names itself for the
+             sake of being found rather than to open anything. */
+      const subRows = rows.filter((r) => (r.dataset.ecosub || "").startsWith("l:" + num + ":"));
       return {
         drawerOpen,
         cols: ths.length,
@@ -4020,44 +4023,135 @@ async function testVariationBudget(browser, base) {
       );
     else bad("5-6: subpartidas sum to the partida", JSON.stringify(subLevel));
 
-    /* THE DOCUMENTS, a third level down and in the same table. Opening a
-       subpartida shows what is behind its figure — the drill-down whose
-       absence meant a total could only be believed, never checked. */
+    /* PK13-S22 · THE DOCUMENTS MOVED OUT OF THE TABLE, AND THE BUTTON IS PRESSED.
+       They used to be a third level of rows under the subpartida, sharing a header
+       of seven money columns with nothing money-shaped to put in them — a supplier
+       under «Presupuestado», a tax id under «Desviación», a date under «%». The
+       operator, on that screen: the information should appear in a different
+       window because as it is they cannot read it.
+
+       So the check PRESSES THE BUTTON the screen offers rather than calling the
+       drawer with the arguments the screen is supposed to supply. That distinction
+       is the one this package learned three times over: a drawer proved correct in
+       isolation says nothing about whether anything reaches it. */
     const drill = await pg.evaluate(async (num) => {
-      const sub = [...document.querySelectorAll("#view tbody tr")].find((r) =>
-        (r.dataset.ecotoggle || "").startsWith("l:" + num + ":"),
-      );
-      if (!sub) return null;
-      sub.click();
+      const btn = document.querySelector("#view [data-ecodocs]");
+      if (!btn) return { noButton: true };
+      const wanted = { chapter: btn.dataset.ecodocs, line: btn.dataset.ecoline || null };
+      btn.click();
       await new Promise((r) => setTimeout(r, 500));
-      const text = document.querySelector("#view").innerText;
+      const panel = document.querySelector(".drawer.on");
+      const text = panel ? panel.innerText : "";
+      const heads = panel
+        ? [...panel.querySelectorAll("thead th")].map((x) => x.textContent.trim())
+        : [];
       /* PK13-S4 · WHAT A COST ROW HAS TO SAY. The operator: "it should open the
            full expenses list, with all the important details: supplier name, NIF,
-           invoice, amount, date". It named the document and the amount and left
-           the counterparty blank on every row — `chapterCosts` dropped `party`
-           one line after `projectCostRows` had resolved it. Asserted against the
-           supplier's own record so the check fails if the name stops travelling
-           with the cost, not merely if a cell is empty. */
-      const row = [...document.querySelectorAll("#view tbody tr")].find((r) =>
-        /E2E-VB/.test(r.innerText),
-      );
+           invoice, amount, date". Asserted against the supplier's own record so the
+           check fails if the name stops travelling with the cost, not merely if a
+           cell is empty. */
+      const row = panel
+        ? [...panel.querySelectorAll("tbody tr")].find((r) => /E2E-VB/.test(r.innerText))
+        : null;
       const sup = erp.state.parties.find((x) =>
         (x.roles || []).some((k) => ["supplier", "subcontractor", "selfEmployed"].includes(k)),
       );
+      /* The footing the in-table shape used to buy by geometry is now a printed
+             claim, so it is asserted as one: the panel adds its own documents up and
+             says whether they equal the subpartida the button hangs off. */
+      const model = erp.lineEconomics(gProject, wanted.chapter);
+      const line = model.find((l) => (wanted.line ? l.lineId === wanted.line : l.unassigned));
+      const docs = erp
+        .chapterCosts(gProject, wanted.chapter)
+        .filter((r) => (wanted.line ? r.lineId === wanted.line : !r.lineId));
       return {
+        openedPanel: !!panel,
+        // The rows left the table: no cost document is loose among the tree rows.
+        goneFromTable: ![...document.querySelectorAll("#view tbody tr")].some((r) =>
+          /E2E-VB/.test(r.innerText),
+        ),
+        heads: heads.join("|"),
         named: /E2E-VB/.test(text),
-        stillNoDrawer: !document.querySelector(".drawer.on .card"),
         saysSupplier: !!row && row.innerText.includes(sup.name),
         saysTaxId: !!row && !!sup.taxId && row.innerText.includes(sup.taxId),
         saysDate: !!row && /\d{2}\/\d{2}\/\d{4}/.test(row.innerText),
+        agrees: /Cuadra/.test(text) && !/No cuadra/.test(text),
+        modelAgrees: !!line && docs.reduce((a, r) => a + r.amountCents, 0) === line.actualCents,
       };
     }, joined.num);
-    if (drill && drill.named && drill.stillNoDrawer)
-      ok("5-6: opening a subpartida lists the documents behind it, in place");
+    if (drill && drill.openedPanel && drill.named && drill.goneFromTable)
+      ok(`5-6: the documents button opens them in a panel of their own (${drill.heads})`);
     else bad("5-6: cost drill-down", JSON.stringify(drill));
     if (drill && drill.saysSupplier && drill.saysTaxId && drill.saysDate)
       ok("5-6: …and each document names its supplier, its NIF and its date, not just a figure");
     else bad("5-6: cost row detail", JSON.stringify(drill));
+    if (drill && drill.agrees === drill.modelAgrees)
+      ok(
+        "5-6: …and the panel states whether they foot to the subpartida, agreeing with the engine",
+      );
+    else bad("5-6: cost panel footing claim", JSON.stringify(drill));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    /* PK13-S23 · THE PROJECTION VIEW, and the sign that used to be painted
+       against itself. The operator asked to see these columns against best
+       practice on project economic control. What was there was spend only —
+       budget, actual, deviation — with no commitment and no cost at completion,
+       and the deviation cell wore the danger colour whether it was over or under,
+       so a partida twenty-four euros UNDER budget printed red and bold.
+
+       Both halves are asserted: the forward columns exist and carry the engine's
+       own committed figure, and a negative deviation is NOT painted as a warning. */
+    const fc = await pg.evaluate(async () => {
+      const tab = [...document.querySelectorAll("[data-ecoview]")].find(
+        (b) => b.dataset.ecoview === "forecast",
+      );
+      if (!tab) return { noTab: true };
+      tab.click();
+      await new Promise((r) => setTimeout(r, 400));
+      const heads = [...document.querySelectorAll("#view thead th")].map((x) =>
+        x.textContent.trim(),
+      );
+      const committed = erp.committedByChapter(gProject);
+      const rows = [...document.querySelectorAll("#view tbody tr")];
+      return {
+        heads: heads.join("|"),
+        cols: heads.length,
+        // Committed is not a repeat of actual: it comes from orders and awards.
+        committedShown: Object.keys(committed).length
+          ? rows.some((r) => r.innerText.includes(eur0(Object.values(committed)[0])))
+          : true,
+        hasTotal: !!document.querySelector("#view tr.ecototal"),
+        // No expander in this view — it stops at the partida on purpose.
+        noCollapser: !document.querySelector("#ecoAll"),
+      };
+    });
+    if (fc && fc.cols === 8 && /Comprometido/.test(fc.heads) && /Proyectado/.test(fc.heads))
+      ok(`5-6: the projection view carries commitment and cost at completion (${fc.heads})`);
+    else bad("5-6: projection columns", JSON.stringify(fc));
+    if (fc && fc.committedShown && fc.hasTotal && fc.noCollapser)
+      ok(
+        "5-6: …with the engine's own committed figure, a total row, and no drill-down it cannot honour",
+      );
+    else bad("5-6: projection content", JSON.stringify(fc));
+
+    /* The deviation colour, measured on a made-up pair rather than on whatever
+       this fixture happens to hold: a saving must not be painted as a warning. */
+    const sign = await pg.evaluate(() =>
+      typeof devCellClass === "function"
+        ? { under: devCellClass(-2400), over: devCellClass(48300), flat: devCellClass(0) }
+        : { unreachable: true },
+    );
+    if (sign.under === "num good" && sign.over === "num warn" && sign.flat === "num")
+      ok("5-6: …and a deviation under budget is a saving, not a warning painted red");
+    else bad("5-6: deviation colour follows its sign", JSON.stringify(sign));
+
+    await pg.evaluate(() => {
+      [...document.querySelectorAll("[data-ecoview]")]
+        .find((b) => b.dataset.ecoview === "actual")
+        .click();
+    });
+    await pg.waitForTimeout(400);
 
     // Revenue click-through: lands on the invoice register filtered to the job.
     const jump = await pg.evaluate((projectId) => {

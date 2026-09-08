@@ -974,8 +974,35 @@ window.CANEI_DICT = {
       "The table does not agree with the project's cost.",
     ],
     [
-      "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.",
-      "These figures are the real ones: budgeted, spent, and the difference between them. Click a line item to see its sub-line items, and a sub-line item to see the documents behind it. The budget is not adjusted here — it changes through a contract variation, which is what modifies it.",
+      "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y el botón de documentos de una subpartida para ver lo que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.",
+      "These figures are the real ones: budgeted, spent, and the difference between them. Click a line item to see its sub-line items, and a sub-line item's documents button to see what is behind it. The budget is not adjusted here — it changes through a contract variation, which is what modifies it.",
+    ],
+    ["Proyección", "Forecast"],
+    ["Proyectado", "Forecast"],
+    ["Documentos ·", "Documents ·"],
+    ["Esta subpartida", "This sub-line item"],
+    ["Costes sin subpartida", "Costs with no sub-line item"],
+    ["Sin documentos", "No documents"],
+    ["Esta subpartida no tiene documentos todavía.", "This sub-line item has no documents yet."],
+    [
+      "Los documentos de abajo suman exactamente el acumulado de esta subpartida.",
+      "The documents below add up exactly to this sub-line item's accumulated cost.",
+    ],
+    [
+      "Los documentos de abajo no suman el acumulado de esta subpartida.",
+      "The documents below do not add up to this sub-line item's accumulated cost.",
+    ],
+    [
+      "Comprometido es lo ya pedido o adjudicado, esté facturado o no. Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda, y nunca por debajo de lo real ni de lo comprometido. Desviación es proyectado menos presupuestado.",
+      "Committed is what has already been ordered or awarded, invoiced or not. Forecast is where the line item is heading at this rate: what has been spent plus the budget for the work still to do, and never below what is real or what is committed. Deviation is forecast minus budget.",
+    ],
+    [
+      "Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.",
+      "This view stops at the line item and does not go down to the sub-line item: an order and an award are signed against a line item, and splitting them across sub-line items would invent data nobody recorded.",
+    ],
+    [
+      "El coste se asigna a la subpartida desde Gastos y desde Horas; desde aquí solo se consulta.",
+      "Cost is assigned to the sub-line item from Expenses and from Hours; here it is only read.",
     ],
     ["Motivo del adicional", "Reason for the additional"],
     ["Días de plazo que añade", "Days it adds to the schedule"],

@@ -9694,3 +9694,77 @@ can only be repaired by a shell, and a shell ships on Apple's clock, not ours.**
 Which is the argument for the rule the new build already follows: the native bar
 must be able to widen as readily as it narrows, because the narrowing is the half
 that strands somebody.
+
+**S112 · The documents behind a subpartida left the table, because seven money
+columns had nothing to put in them.** The operator, on the third level of Avance
+económico: the information should appear in a different window, because as it is
+they cannot read it. They were right about the cause as well as the symptom. A
+partida row is four money columns and two percentages; a cost document is a
+supplier, a tax id, a date and an amount. Rendered as a third level of the same
+table, the supplier landed under «Presupuestado», the tax id under «Desviación»
+and the date under «%» — the header made a claim about every cell beneath it and
+was wrong about five of the seven.
+
+The comment that lived there argued the opposite, and its argument is worth
+recording because it was a real one: the amount sat in the same column as the
+subtotal above it, so the eye could check that the documents added up to the line
+they hang off. That check is not lost, it is **stated**: the panel foots its own
+documents and prints the subpartida's accumulated cost beside the sum with a
+pill that says whether they agree. A footing asserted in words beats one the
+reader has to perform, and it fails loudly when it stops being true.
+
+The subpartida row stops being a toggle and gets a button, and the check PRESSES
+IT rather than calling the panel with the arguments the screen is supposed to
+supply — the lesson `983cda6` paid for three times in this package.
+
+**S113 · A saving printed in the same red as an overrun.** The operator asked to
+see the columns of the economic-control table against best practice, pointing at
+the plus and minus signs. The first thing there was a defect, not a design
+question: the deviation cell was `money(cents, true)`, and `warn` was applied
+whether the figure was positive or negative — so a partida twenty-four euros
+UNDER budget printed in danger red and bold, exactly like one four hundred over.
+On the one screen whose job is to tell those two states apart. Over budget is
+red and carries its plus; under budget takes the green the margin columns
+already use; dead on is neither.
+
+Then the missing half. What the table showed was spend — budget, actual,
+deviation, margin — and a construction cost report that shows only spend cannot
+answer the question it is opened for: where is this partida going to end up.
+Added as a second view, «Proyección», beside the existing «Ejecutado»:
+comprometido (orders and awards, invoiced or not), avance, proyectado, the
+deviation against budget and the margin that survives it, with a total row.
+
+**Two views rather than eleven columns on one row.** They answer different
+questions and are read at different moments, and a report that puts spend and
+forecast side by side on a phone is a report nobody finishes.
+
+**The projection is computed and cannot be typed, and that was already settled.**
+This screen used to carry an «Ajustar» button over `setForecastOverride`; the
+operator removed it because the budget is fixed and the only thing that moves it
+is an adicional to the contract. That ruling decides this column too — nothing in
+the new view writes, so there is still exactly one place a chapter's number
+changes.
+
+**The formula, and why this one.** Cost at completion is
+`real + presupuestado × (1 − avance)`: spend to date plus the budget for the work
+still to do. The obvious alternative, `real ÷ avance`, assumes every future euro
+will be as inefficient as every past one, and on a partida that buys its material
+on day one it reports a catastrophe at five per cent progress and recants at
+fifty. This one is the budget at nought per cent, the real cost at a hundred, and
+in between it moves by what actually overran. Floored at what is already spent
+and at what is already committed: a forecast below an order that cannot be
+unplaced is a wish.
+
+**It stops at the partida.** A purchase order and a subcontract award are signed
+against a partida and `committedByChapter` is keyed that way; splitting them
+across subpartidas would invent a figure nobody recorded. The view says so on
+screen rather than showing a column of dashes.
+
+**S113a · A greater-than and a less-than in one expression are a tag pair to the
+source audit.** `(cents > 0 ? "num warn" : cents < 0 ? …)` was reported as a
+user-visible string running from the first operator to the second, because the
+audit's markup rule matches `>…<`. Sixth variant of that trap in this file, and
+the second one this session — the other being a `.join()` sitting between two
+template literals in the new panel. Fixed by indexing an array with
+`Math.sign(cents) + 1`, which removes both operators, and by building every
+fragment of the panel before the page rather than inside it.
