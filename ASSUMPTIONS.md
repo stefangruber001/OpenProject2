@@ -9655,3 +9655,42 @@ the toast. Making the toast wait would turn every mutation in the application
 into an awaited network round trip, which is a far larger change than this fault
 justifies and touches the write path of a live invoice register. Recorded here
 rather than done.
+
+**S111 · The administrator's one tab: a bar that can be narrowed and never
+widened, in a binary two days too old.** The operator, signed in as
+`stefan@caneisubirats.com` with ADMINISTRATOR on the profile card, had a single
+«Horas» tab. Nothing about it is a permission fault and nothing about it is new
+— it is the shape of the build that is installed, read out of that commit's own
+source rather than inferred:
+
+- `Config.erpRole` at `8830f42` is a GETTER ONLY, and the message handler beside
+  it writes `canei_role` under `if !role.isEmpty` — so a role can be recorded and
+  can never be cleared. Signing out leaves the last account's role on the device.
+- `Config.tabs` is a `static let`, so the bar is computed ONCE PER LAUNCH and the
+  running process cannot change its mind.
+
+So testing the crew's hours screen on this phone wrote `canei_role = "site"`, the
+next launch built `roleTabs["site"]` — one tab — and signing back in as an
+administrator did overwrite the stored value with `"admin"` while the bar, being
+a `static let`, stayed exactly where it was. **The remedy on the installed build
+is to force-quit and reopen**: the stored role is already correct, so the next
+launch reads `"admin"`, finds no `roleTabs` entry for it, and draws the full six.
+
+The durable fix has existed since `53bda8f` (7 Sep) and had never been built.
+`AppState` owns the tabs as published state and rebuilds them when a page reports
+a different role; `Config.erpRole` REMOVES the key on an empty role instead of
+ignoring it; and the page announces on every session recheck, not only on a full
+boot. The last TestFlight run was #24 from `8830f42` on 5 September — two days
+before that landed — so the fix has been sitting on `main` unshipped for a day.
+Triggered from `main` at `95f6d82`, which `iOS · compiles` #40 had already built.
+
+**S111a · The web layer's own safety net cannot fire on the build that needs
+it.** `syncNativeNav()` gives the section rail back when the shell drew one tab
+for an account that is not a site worker — written for exactly this. It reads
+`window.__caneiTabs`, which the shell injects, and `8830f42` does not inject it:
+the net is dark on every build old enough to need it. That is not fixable from
+the web side, and it is the general shape worth remembering — **a shell fault
+can only be repaired by a shell, and a shell ships on Apple's clock, not ours.**
+Which is the argument for the rule the new build already follows: the native bar
+must be able to widen as readily as it narrows, because the narrowing is the half
+that strands somebody.
