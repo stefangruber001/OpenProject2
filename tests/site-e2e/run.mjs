@@ -9137,9 +9137,29 @@ async function testChangeApprovalEvidence(browser, base) {
         ok("anexo moderno: and says it is pending, and what that costs the job");
       else bad("anexo moderno: unsigned pill", names.slice(0, 200));
 
-      // ---- signed, with the document, and the document opens ---------------
-      await pg.evaluate((x) => signAnnexDrawer(x.contractId, x.number), modern);
-      await pg.waitForTimeout(500);
+      /* ---- signed, with the document, and the document opens --------------
+         OPENED BY CLICKING THE BUTTON, never by calling the function. This
+         suite used to do `pg.evaluate(() => signAnnexDrawer(id, number))`,
+         which supplies the arguments the SCREEN is supposed to supply — so it
+         proved the drawer works and said nothing about whether anything
+         reaches it. The screen was passing `d.id` from `renderContractDoc`, a
+         document object with no id at all, so every one of these buttons
+         opened an empty drawer in production while this suite stayed green.
+         Drive the door, not the room behind it. */
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(600);
+      await pg.click(`#conBody [data-annexsign="${modern.number}"]`);
+      await pg.waitForTimeout(600);
+      const opened = await pg.evaluate(() => ({
+        form: !!document.getElementById("anx_go"),
+        methods: document.querySelectorAll('input[name="anxhow"]').length,
+      }));
+      if (opened.form && opened.methods === 2)
+        ok("PK13-S18: the «Firmar anexo» BUTTON opens the signing drawer");
+      else bad("PK13-S18: sign button reaches the drawer", JSON.stringify(opened));
       await pg.setInputFiles("#anx_ev input[type=file]", {
         name: "anexo-firmado.pdf",
         mimeType: "application/pdf",
@@ -9240,6 +9260,27 @@ async function testChangeApprovalEvidence(browser, base) {
       else bad("anexo moderno: verbal signature", JSON.stringify(verbal));
 
       // ---- and it can be taken back out, all of it -------------------------
+      /* The other two buttons, by click as well: they carried the same bad id. */
+      await pg.evaluate((cid) => {
+        conWork = { id: cid, tab: "anexos" };
+        render();
+      }, modern.contractId);
+      await pg.waitForTimeout(600);
+      await pg.click(`#conBody [data-annexdel="${modern.number}"]`);
+      await pg.waitForTimeout(600);
+      const delOpened = await pg.evaluate(() => !!document.getElementById("anx_del"));
+      if (delOpened) ok("PK13-S18: the «Quitar anexo» BUTTON opens its confirmation");
+      else bad("PK13-S18: remove button reaches the drawer", "no #anx_del");
+      await pg.evaluate(() => closeDrawer());
+      await pg.waitForTimeout(400);
+      await pg.click("#conBody #anxWipe");
+      await pg.waitForTimeout(600);
+      const wipeOpened = await pg.evaluate(() => !!document.getElementById("anx_del"));
+      if (wipeOpened) ok("PK13-S18: and «Quitar todos los anexos» opens its own");
+      else bad("PK13-S18: wipe button reaches the drawer", "no #anx_del");
+      await pg.evaluate(() => closeDrawer());
+      await pg.waitForTimeout(400);
+
       const removed = await pg.evaluate((x) => {
         const c = erp.state.contracts.find((y) => y.id === x.contractId);
         const before = {

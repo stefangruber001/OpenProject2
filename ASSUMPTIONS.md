@@ -9471,3 +9471,38 @@ with no content difference is content-current and is reported as such; a real
 gap still reports behind, with the commit count, exactly as before. Content is
 what a deploy promises — the SHA was only ever a proxy for it, and the proxy
 broke the moment a push carried more than one commit.
+
+**S107 · Three buttons that called a function with an id that does not
+exist.** The operator, on the live server: «I cant sign annex or delete annex».
+The contract screen builds its panel from `d = renderContractDoc(conWork.id)` —
+the PRINTABLE DOCUMENT, which carries a number, a date, a customer and its
+milestones, and no `id` at all. The three annex buttons passed `d.id`, so every
+click called `signAnnexDrawer(undefined, "CTR-…-A2")`, the contract lookup found
+nothing, and the function returned at its first guard. A drawer opened, empty,
+and nothing anywhere said why. Every other handler on that screen already used
+`conWork.id`; these three were the only ones that did not.
+
+**S107a · And a silent return is what made it look like a dead button.** Both
+drawers now THROW when the id resolves to nothing. `mutate` and the console both
+report a throw, so the next wiring mistake of this shape is visible in a second
+rather than in a screenshot taken by the operator two days later.
+
+**S107b · The test could not have caught it, by construction.** The suite opened
+the drawer with `pg.evaluate(() => signAnnexDrawer(contractId, number))` — it
+supplied the arguments THE SCREEN is supposed to supply. So it proved the drawer
+works and said nothing about whether anything reaches it, and stayed green
+through every one of the three broken buttons. It clicks them now, and the check
+was verified the only way a regression test can be: the old code was put back
+and it failed (`form:false, methods:0`), then passed on the fix.
+
+That is the third instance of this exact shape in this package — S89's
+`assignWorkerDrawer` with no caller, S92's suppressed optgroup, and now a caller
+with the wrong argument. The rule the suite keeps having to relearn: drive the
+door, not the room behind it.
+
+**S107c · The deploy marker is gone, and its ceiling with it.** `ci.yml` said in
+so many words: «Whoever removes that span puts this back to 162 in the same
+commit.» The span, its mobile CSS rule, the comment and the 163 are all removed
+together; the audit measures 162 exactly. The two new error strings are in both
+dictionaries, and the annex one dropped its concatenated number so the literal
+the audit extracts is the literal the dictionary holds.

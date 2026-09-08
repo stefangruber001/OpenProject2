@@ -814,6 +814,8 @@ window.CANEI_DICT = {
       "Un adicional de una obra en marcha se crea en la pestaña Adicionales, sobre el contrato que modifica.",
       "A variation to a job in progress is created on the Variations tab, against the contract it amends.",
     ],
+    ["No encuentro ese anexo", "Cannot find that annex"],
+    ["No encuentro ese contrato", "Cannot find that contract"],
     ["Anexo firmado", "Signed annex"],
     ["✍ Firmar anexo", "✍ Sign annex"],
     ["Nombre y apellidos", "Full name"],

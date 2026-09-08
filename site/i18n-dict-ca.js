@@ -874,6 +874,8 @@ window.CANEI_DICT.ca = {
     "S'incorpora a l'obra en signar aquest annex, amb els seus dies.",
   "Un adicional de una obra en marcha se crea en la pestaña Adicionales, sobre el contrato que modifica.":
     "Un addicional d'una obra en marxa es crea a la pestanya Addicionals, sobre el contracte que modifica.",
+  "No encuentro ese anexo": "No trobo aquest annex",
+  "No encuentro ese contrato": "No trobo aquest contracte",
   "Anexo firmado": "Annex signat",
   "✍ Firmar anexo": "✍ Signar l'annex",
   "Nombre y apellidos": "Nom i cognoms",

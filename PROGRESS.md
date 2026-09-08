@@ -2433,6 +2433,33 @@ before the charge when the bank does not spell the period out.
 screen could do. Re-run whole on the merged tree rather than on either half:
 **740/740**.
 
+**S19 · Three annex buttons that could never have worked.** «I cant sign annex
+or delete annex», from the live server, on the screens S14–S17 built. The
+contract panel is built from `renderContractDoc(...)` — the printable document,
+which has a number, a date and a customer and no id at all — and the three annex
+buttons passed `d.id`. Every click called the drawer with `undefined`, the
+lookup found no contract, and the function returned at its first guard: a drawer
+opened, empty, silently. `conWork.id` is what every other handler on that screen
+already used.
+
+Both drawers throw now instead of returning, so the next id that resolves to
+nothing says so.
+
+**And the suite was green through all of it**, because it opened the drawer by
+calling the function with the arguments the screen was supposed to supply. It
+clicks the buttons now, and the checks were verified by putting the bug back and
+watching them fail. Third instance in this package of one shape — a function
+that exists with no working way in.
+
+The temporary deploy marker went with it, and the literal ceiling it bought:
+`ci.yml` asked whoever removed the span to put 163 back to 162 in the same
+commit, and this is that commit.
+
+Gates: site E2E **762/762 unfiltered**, `pnpm test` 173/173, manageability
+simulation **513/513**, site-sync 20/20, boundaries, site syntax, i18n coverage
+complete in three languages, source literals **162/162** against the restored
+ceiling, workspace audit 0/0. ASSUMPTIONS S107.
+
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
 boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they
