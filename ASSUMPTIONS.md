@@ -9695,7 +9695,320 @@ Which is the argument for the rule the new build already follows: the native bar
 must be able to widen as readily as it narrows, because the narrowing is the half
 that strands somebody.
 
-**S112 · Both halves green, against two different contracts.** The crew's first
+**S112 · The documents behind a subpartida left the table, because seven money
+columns had nothing to put in them.** The operator, on the third level of Avance
+económico: the information should appear in a different window, because as it is
+they cannot read it. They were right about the cause as well as the symptom. A
+partida row is four money columns and two percentages; a cost document is a
+supplier, a tax id, a date and an amount. Rendered as a third level of the same
+table, the supplier landed under «Presupuestado», the tax id under «Desviación»
+and the date under «%» — the header made a claim about every cell beneath it and
+was wrong about five of the seven.
+
+The comment that lived there argued the opposite, and its argument is worth
+recording because it was a real one: the amount sat in the same column as the
+subtotal above it, so the eye could check that the documents added up to the line
+they hang off. That check is not lost, it is **stated**: the panel foots its own
+documents and prints the subpartida's accumulated cost beside the sum with a
+pill that says whether they agree. A footing asserted in words beats one the
+reader has to perform, and it fails loudly when it stops being true.
+
+The subpartida row stops being a toggle and gets a button, and the check PRESSES
+IT rather than calling the panel with the arguments the screen is supposed to
+supply — the lesson `983cda6` paid for three times in this package.
+
+**S113 · A saving printed in the same red as an overrun.** The operator asked to
+see the columns of the economic-control table against best practice, pointing at
+the plus and minus signs. The first thing there was a defect, not a design
+question: the deviation cell was `money(cents, true)`, and `warn` was applied
+whether the figure was positive or negative — so a partida twenty-four euros
+UNDER budget printed in danger red and bold, exactly like one four hundred over.
+On the one screen whose job is to tell those two states apart. Over budget is
+red and carries its plus; under budget takes the green the margin columns
+already use; dead on is neither.
+
+Then the missing half. What the table showed was spend — budget, actual,
+deviation, margin — and a construction cost report that shows only spend cannot
+answer the question it is opened for: where is this partida going to end up.
+Added as a second view, «Proyección», beside the existing «Ejecutado»:
+comprometido (orders and awards, invoiced or not), avance, proyectado, the
+deviation against budget and the margin that survives it, with a total row.
+
+**Two views rather than eleven columns on one row.** They answer different
+questions and are read at different moments, and a report that puts spend and
+forecast side by side on a phone is a report nobody finishes.
+
+**The projection is computed and cannot be typed, and that was already settled.**
+This screen used to carry an «Ajustar» button over `setForecastOverride`; the
+operator removed it because the budget is fixed and the only thing that moves it
+is an adicional to the contract. That ruling decides this column too — nothing in
+the new view writes, so there is still exactly one place a chapter's number
+changes.
+
+**The formula, and why this one.** Cost at completion is
+`real + presupuestado × (1 − avance)`: spend to date plus the budget for the work
+still to do. The obvious alternative, `real ÷ avance`, assumes every future euro
+will be as inefficient as every past one, and on a partida that buys its material
+on day one it reports a catastrophe at five per cent progress and recants at
+fifty. This one is the budget at nought per cent, the real cost at a hundred, and
+in between it moves by what actually overran. Floored at what is already spent
+and at what is already committed: a forecast below an order that cannot be
+unplaced is a wish.
+
+**It stops at the partida.** A purchase order and a subcontract award are signed
+against a partida and `committedByChapter` is keyed that way; splitting them
+across subpartidas would invent a figure nobody recorded. The view says so on
+screen rather than showing a column of dashes.
+
+**S113a · A greater-than and a less-than in one expression are a tag pair to the
+source audit.** `(cents > 0 ? "num warn" : cents < 0 ? …)` was reported as a
+user-visible string running from the first operator to the second, because the
+audit's markup rule matches `>…<`. Sixth variant of that trap in this file, and
+the second one this session — the other being a `.join()` sitting between two
+template literals in the new panel. Fixed by indexing an array with
+`Math.sign(cents) + 1`, which removes both operators, and by building every
+fragment of the panel before the page rather than inside it.
+
+**S114 · The gestoría package shipped the documents and not the register that
+names them.** The operator: whenever they download the report for the gestoría
+the Excel is empty although there are three invoices. Both halves of that were
+true at once, and the second is what explains the first.
+
+`buildAccountantZip` had exactly one loop feeding the spreadsheet —
+`for (const m of pkg.bankMovements)`. The package `quarterlyPackage` hands it
+carries five things: `bankMovements`, `receivedBills`, `issuedInvoices`, `vat`
+and `irpf`. **Four of the five never reached a cell.** The bills had one job in
+that function, copying their PDFs into `docs/`, which is why the archive looked
+exactly as reported: three real supplier invoices in the folder, and a sheet with
+a header row and nothing under it, because the quarter has no imported bank
+movement yet.
+
+So the gestor received a folder of files with no sheet saying what they were,
+from whom, for how much, or with what tax on them. The deliverable of §5.6 is
+the quarter's books; what it shipped was a reconciliation of a statement that had
+not been imported.
+
+**One workbook, four tabs** — Conciliación (as before), Facturas recibidas,
+Facturas emitidas, Resumen (IVA repercutido y soportado por tipo, resultado del
+trimestre, IRPF). The document tabs name the file of each PDF in `docs/`, so the
+sheet points at the folder rather than the folder standing alone.
+
+**An empty sheet says why it is empty.** A quarter with no movements now carries
+one line explaining that the statement has not been imported and that the
+invoices are on the other tabs, and the download says the same thing at the door
+— the operator found this out by opening the file.
+
+**S114a · `xlsxBlob` could only ever write one sheet.** `sheet1.xml` was
+hard-coded in three places — the content types, the workbook and its
+relationships. Split into `xlsxSheetPart` (unchanged, per sheet) and
+`xlsxWorkbookBlob` (the package), with `xlsxBlob` kept as a one-sheet wrapper so
+not one of its existing callers changes. `parseXlsxRows` takes an optional
+1-based sheet index for the same reason, defaulting to the first.
+
+**S114b · The sales half of the transaction dictionary had no tax id.**
+`txFromBill` carried `partyTaxId` and `txFromInvoice` carried the name and the
+code and not the NIF. The four fields an accountant works from are the number,
+the date, the counterparty and its tax id; the purchase side knew that and the
+sales side did not.
+
+**S114c · The check could not have found it, by construction.** The existing 1G
+assertion picks the quarter with the MOST bank movements — it guaranteed itself a
+non-empty sheet. The new one takes the opposite quarter, documents and no
+statement, and there was one sitting in the fixture the whole time: **2024-Q3,
+two bills and three issued invoices, zero movements**. Verified against the fault
+— with the single-sheet build restored it reports `sheets:1, billRows:null,
+modelBills:2, modelInvoices:3`, which is the operator's screenshot in JSON.
+
+Fourth time in two packages that a gate passed because it sampled the case that
+works. The rule this repository keeps re-learning: **choose the fixture that
+would embarrass the feature, not the one that flatters it.**
+
+**S114d · Source literals 162 → 161, and the ceiling follows it down.** The sheet
+path stopped being the literal `xl/worksheets/sheet1.xml` and became a built one,
+so a code fragment the audit had always counted as prose left the list. Every
+string the four sheets print got an entry in both dictionaries in the same
+commit. `ci.yml` moves to 161 because the ceiling is the measurement, not a
+budget — a spare slot is where the next untranslated label hides.
+
+**S115 · Caja chica: the two ends worked and the middle had no door.** The
+operator asked how the withdrawal, the expenses and the deposit of the difference
+work now. Declaring the withdrawal worked; declaring the return worked; attaching
+the receipts could not be done at all, and the reason is a closed door of exactly
+the shape this package keeps finding.
+
+`markCashWithdrawal` calls `classifyMovement`, which sets `status = "allocated"`
+and `excludedFromPL = true`. Both are RIGHT — a declared withdrawal is not an
+unexplained line, and at the moment the cash comes out nothing has been bought.
+But `unreconciledMovements` wants `status === "unallocated" && !excludedFromPL`,
+so the line leaves the queue the instant it is declared; and `matchDrawer` — the
+only screen carrying Candidatos, the split matcher and the withdrawal card with
+its three figures — had exactly one caller, `onRowClick` on that queue. The
+Conciliados list showed the row and its `onRowClick` was `() => {}`.
+
+So `m.matched.documents`, which is what `cashWithdrawalState` counts as
+`documentedCents`, could never be written after the declaration. **A withdrawal
+spent entirely on receipts read 100% «en efectivo todavía» forever**, and the only
+thing that could reduce it was putting cash back in the bank. Worse, that figure
+is the `cashOutstanding` exception, and `quarterlyPackage` refuses to build while
+an exception is unjustified — so every quarter with a withdrawal would have
+blocked the archive over a number nobody could bring down.
+
+**Two doors, not a change to the queue.** The Conciliados row opens its panel —
+the general form of the fault, since any explained line that later needs a second
+document had to lose the first. And Conciliación grows a card,
+«Efectivo pendiente de justificar», listing every open withdrawal with what is
+left on it and a button in.
+
+**The queue is deliberately NOT changed.** A withdrawal is literally a line that
+is not yet explained, so putting it back in the queue is tempting and wrong: it
+would block `closeBankPeriod` on cash sitting in somebody's pocket, and the
+operator has already said that state is ordinary rather than a fault.
+
+**And the card is not scoped to the period.** Money taken out in March is spent in
+April and its receipts arrive in May; a list respecting the period on screen would
+hide the withdrawals open longest, which are the ones worth chasing.
+`openCashWithdrawals(accountId)` filters by account and by nothing else.
+
+**S115a · A matched withdrawal stopped being a transfer.** `matchMovementSplit`
+sets the class to what the match means — `projectCost` or `customerReceipt` — and
+for a cash withdrawal both are wrong: the receipts are the cost, and the line is
+the company moving its own money into a pocket. `excludedFromPL` survived the
+call, so nothing was ever counted twice, but the class and the flag disagreed and
+a report keyed on either would have told a different story. It keeps
+`internalTransfer` now, asserted.
+
+**S115b · The check exercised the room and not the way in.** It called
+`matchDrawer(w.id)` from `pg.evaluate`, handing the panel the argument the SCREEN
+is supposed to supply — so it proved the panel renders and said nothing about
+whether anything opens it, and stayed green with no door at all. It also asserted
+`returned > 0` and `outstanding > 0` and never once asserted that anything was
+DOCUMENTED, which is the whole middle step. Now it presses the button, matches a
+real bill from inside the panel, and requires `documentedCents` to move by that
+amount: 14.000c → 3.110c on the fixture. Fourth instance in two packages.
+
+**S115c · A check that passed against the fault it was written for.** The
+explained-row assertion read `#dbody` — and the drawer element STAYS IN THE
+DOCUMENT when it is closed, so it read the previous drawer and a row that did
+nothing looked like a row that worked. Caught only because the fault was actually
+restored and the check run against it. Reads `.drawer.on #dbody` now, which cannot
+pass unless a panel is genuinely open. The rule this pays for again: a regression
+check is not written until it has been seen to FAIL.
+
+**S116 · A column that could only ever print zero, and a forecast that trusted a
+figure nobody had entered.** The operator, on the projection view: they are not
+using purchase orders any more, and that is why forecasting is difficult —
+budget against spend is all there is. Half right, and the half that was wrong is
+the more useful half.
+
+**Comprometido was structurally empty for them.** `committedByChapter` reads two
+things and only two: purchase orders and subcontract awards, both required to name
+a partida. No orders means the column can print nothing but zero for ever, in a
+table already short of width. A column that can only ever be empty is worse than
+no column — it takes the space and implies the data exists.
+
+Hidden when the obra has no commitment at all, **computed rather than configured**:
+the day an award names a partida it comes back on its own, with no setting to
+remember and nothing to migrate. Not deleted, because the rule is still right for
+an obra that does award work.
+
+**But the forecast never depended on it.** The missing input was the AVANCE, and
+that one they do have. On their own screen, partida 3 had spent 2.123 against a
+budget of 1.860 while still registering 0%, and `real + presupuestado × (1 −
+avance)` dutifully added the entire budget on top of money that had demonstrably
+already been spent building something: **3.983 €, of which 1.860 was phantom, out
+of a 4.722 total deviation from one row.**
+
+Nought per cent beside real money means nobody recorded the progress, not that
+nothing was built. So a partida in that state now reports a **floor** — the greater
+of budgeted and spent — and carries a «sin avance» pill saying that is what it is.
+A floor understates a partida that genuinely has work left, and that is the right
+way to be wrong: the mark tells the reader the figure is provisional, and the
+remedy is the same act that makes the whole column mean something.
+
+**The honest summary of the operator's constraint**, which belongs here because it
+will be asked again: with budget, spend and progress a reforma forecasts perfectly
+well. What cannot be forecast is a partida nobody has told the system anything
+about, and the table now says which of the two it is looking at.
+
+**S116a · The model split from the rendering, because a header cannot ask a
+question it also has to print.** Whether the column shows and whether any row is
+floored are answers about the DATA, needed above the table. The first shape of this
+handed them back through the renderer as a property on the function object —
+correct only while the template happened to read it after calling it.
+`ecoForecastModel` computes; `ecoForecastRows` renders.
+
+**S116b · Both checks verified against their own faults, and one branch stubbed
+into existence.** Forcing `noProgress` false and `showCommitted` true reports
+`{stale:2, marked:false, floored:false, note:false}` and `{cols:8, says:true}`.
+And the fixture HAS commitments, so the branch the operator actually lives in —
+no orders, no awards, column empty — was never rendered by the run: it is stubbed
+for exactly one render and put back, asserting the column goes, the rows narrow
+with it (a stale colspan is how a table that hides a column comes out a cell short
+of its own headings), and it returns. A branch nothing exercises is a branch that
+breaks quietly.
+
+**S116c · Seventh variant of the literal trap, this time two pills.** The
+variación and «sin avance» tags were one expression, which put a greater-than and
+a less-than either side of the code between them; the audit read that as a tag
+pair and reported the code as a sentence awaiting translation. Each pill is its
+own statement now. The old combined footer paragraph was retired from both
+dictionaries rather than left behind, because the notes are printed conditionally
+now and a dead entry is a thing that drifts.
+
+**S117 · Tres pantallas señaladas a la vez, y las tres tenían razón.** El operador
+marcó en verde, rojo y naranja tres partes de la misma zona de Maestros. Las tres
+resultaron ser el mismo tipo de fallo con distinta cara.
+
+**El catálogo era el único registro sin paginar.** Doscientas nueve subpartidas
+dibujaban doscientas nueve filas: tabla escrita a mano, buscador propio, sin
+tamaño de página y sin forma de avanzar — mientras Clientes, Proveedores, Personal
+y la cola de conciliación comparten `renderMasterList` desde hace tres paquetes.
+Ahora lo comparte también, y gana lo que ese primitivo trae de serie: filas por
+pantalla, anterior y siguiente, y exportación a xlsx/csv que no tenía. El id de la
+lista lleva el capítulo dentro, así que cambiar de partida no hereda ni la página
+ni la búsqueda de la anterior — la misma regla que sigue la cola con la cuenta.
+
+**Y `renderMasterList` no sabía de columnas numéricas.** Coste, Precio y Margen
+habrían quedado alineados a la izquierda. Una línea en el primitivo, y la ganan
+todas las listas del producto.
+
+**S117a · Los paquetes de trabajo estaban muertos por los dos extremos.** Ninguna
+pantalla podía crear uno: `addWorkPackage` solo se llama desde el seed y desde las
+simulaciones. Y `packageCostCents` no alimentaba nada — su único consumidor eran
+las dos tablas que lo imprimían. Ni puerta de entrada ni consumidor: la definición
+exacta de código que ocupa sitio y no hace nada. Se van las dos tarjetas.
+
+**Los métodos del motor se quedan**, y esto es una decisión, no un olvido: los
+afirma `manageability-sim` y retirarlos tocaría 513 comprobaciones a cambio de
+nada visible. Quedan sin puerta, que es el patrón que este paquete lleva
+encontrando toda la semana; anotado aquí para que la próxima sesión lo vea escrito
+en vez de volver a descubrirlo.
+
+**S117b · Subcontratas eran dos cosas con un solo nombre, y el operador leía la
+que sobraba.** `Maestros > Subcontratas` era un filtro por rol sobre el MISMO
+`state.parties` que Proveedores: dos pantallas, una colección. Retirada.
+`Obra > Subcontratos` no es eso: son las adjudicaciones, con certificado,
+retención y documentación obligatoria con caducidad, y es lo que alimenta la
+columna Comprometido de Proyección. Esa se queda.
+
+**Y retirarla abría una trampa que casi se cuela.** La lista de Proveedores
+nombraba `supplier` y `selfEmployed` y su alta FIJABA `supplier`. Sin la pantalla
+de Maestros, un industrial se habría quedado sin registro Y sin forma de darse de
+alta — mientras `supplierOptions`, el selector que les adjudica obra, llevaba
+leyendo los tres roles desde siempre. Tres sitios y tres respuestas distintas
+sobre qué es un proveedor. Ahora Proveedores lee `SUPPLIER_ROLES`, y
+`newPartyDrawer` acepta `roleChoices` para que una pantalla ofrezca los roles de
+los que trata sin fijar uno. La comprobación afirma las dos mitades: que el
+industrial se lista y que se puede crear.
+
+**S117c · Dos comprobaciones cayeron por el cambio, y las dos decían algo.** La
+del idioma buscaba DEM-101 en la primera página, y en un registro paginado y
+ordenado por código eso está muy lejos de la fila veinticinco: ahora lo BUSCA, que
+es lo que hace una persona, y de paso ejerce el buscador de la lista. La de la
+forma del shell fijaba 31 subsecciones y ahora son 30; repinchada con el motivo al
+lado, que es para lo que sirve fijarla.
+
+**S118 · Both halves green, against two different contracts.** The crew's first
 real attempt to save hours was refused by the server: _«"recordHours" (record
 hours) takes 1 argument(s), got 2. Your latest changes are NOT saved.»_ The
 client S110 shipped sent the acting user as a trailing argument. It must not.
@@ -9711,7 +10024,7 @@ appends the user itself, because the local copy has no session to read; that
 asymmetry is the point rather than an oversight, and it is stated where the table
 is defined.
 
-**S112a · Neither gate could see it, and both were green.** This is the sharper
+**S118a · Neither gate could see it, and both were green.** This is the sharper
 half. The two suites test the two halves of one contract against two different
 ideas of what it is:
 

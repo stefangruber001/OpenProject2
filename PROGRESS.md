@@ -2076,10 +2076,10 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Nine reports from the operator against the live workspace, arriving faster than
-they could be batched, and every one of them a screen that was silent rather
-than wrong. Four shipped commits, each one green on the unfiltered browser run
-before it was made.
+Twenty-seven reports from the operator against the live workspace, arriving
+faster than they could be batched, and almost every one of them a screen that
+was silent rather than wrong. One commit per report or per pair, each one green
+on the unfiltered browser run before it was made.
 
 **S1 · «Where is the button?»** The `＋ Días de los adicionales` control rendered
 only when a breakdown per partida had already been typed, and the only screen
@@ -2507,6 +2507,207 @@ that drawer can no longer do. It walks to Conciliación.
 Gates: site E2E **765/765 unfiltered**, `pnpm test` 27/27 tasks, manageability
 513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
 literals 162/162 in both, workspace audit 0/0. ASSUMPTIONS S109.
+
+**S22 · A supplier's name printed under «Presupuestado».** «The information in
+read shoudl appear in a different window/popup or whatever you think is better,
+becasue as it is I don't see it correct.» The documents behind a subpartida were
+a third level of rows in the per-partida table, and a cost document has nothing
+to put in a header of seven money columns: the supplier landed under
+«Presupuestado», the tax id under «Desviación», the date under «%». The header
+made a claim about every cell beneath it and was wrong about five of the seven.
+
+They open in a panel of their own now, with the columns they actually have —
+fecha, origen, referencia, proveedor, NIF, tipo, importe. The subpartida row
+stops being a toggle and carries a button with the count.
+
+What the old shape bought was a vertical check: the amounts sat under the
+subtotal, so the eye could confirm they added up. That is kept as a printed
+claim rather than a geometry — the panel foots its own documents against the
+subpartida's accumulated cost and says whether they agree. And the check PRESSES
+THE BUTTON instead of calling the panel with the arguments the screen is meant
+to supply, which is the lesson S19 paid for.
+
+**S23 · A saving printed in the same red as an overrun.** «Can you see this
+columns (- or + signs) and look for best practice on project economic control? I
+need to improve this further.» The first thing behind that question was a defect:
+the deviation cell applied the danger class whether the figure was positive or
+negative, so a partida twenty-four euros UNDER budget printed red and bold,
+exactly like one four hundred over — on the one screen whose job is to tell those
+two states apart. Over budget is red and keeps its plus; under budget takes the
+green the margin columns already use; dead on is neither.
+
+Then the missing half. The table showed spend only — presupuestado, real,
+desviación, margen — and a cost report that shows only spend cannot answer the
+question it is opened for: where does this partida end up. A second view,
+**«Proyección»**, beside the existing **«Ejecutado»**: comprometido (orders and
+awards, invoiced or not), avance, proyectado, the deviation against budget, the
+margin that survives it, and a total row.
+
+Two views rather than eleven columns on one row: they answer different questions,
+are read at different moments, and a report that puts spend and forecast
+side by side on a phone is a report nobody finishes.
+
+The projection is **computed and cannot be typed** — that was settled when the
+operator removed the «Ajustar» button, because the budget is fixed and only an
+adicional to the contract moves it. Cost at completion is
+`real + presupuestado × (1 − avance)`, floored at what is already spent and at
+what is already committed. The obvious alternative, `real ÷ avance`, assumes
+every future euro is as inefficient as every past one and reports a catastrophe
+at five per cent progress on any partida that buys its material on day one.
+
+It stops at the partida and says so on screen: an order and an award are signed
+against a partida, and splitting them across subpartidas would invent a figure
+nobody recorded.
+
+Gates: site E2E **772/772 unfiltered**, `pnpm test` 27/27 tasks, `check-types`
+29/29, manageability 513/513, site-sync 20/20, boundaries, i18n complete in three
+languages, source literals 162/162 in both, workspace audit 0/0, iOS routes 9/9.
+ASSUMPTIONS S112, S113, S113a.
+
+**S24 · The accountant's workbook carried the movements and not the documents.**
+«Whenever I download the Report for the Gestoría, the excel is empty but we have
+three invoices.» Both halves true at once, and the second explains the first: the
+spreadsheet had exactly one loop feeding it, over `pkg.bankMovements`. The
+package carries five things — movements, facturas recibidas, facturas emitidas,
+IVA and IRPF — and four of the five never reached a cell. The bills had one job
+in that function, copying their PDFs into `docs/`, so the archive was exactly
+what the operator saw: three real invoices in the folder, a header row and
+nothing under it in the sheet, because that quarter has no imported statement.
+
+The gestor was receiving a folder of files with no sheet saying what they were,
+from whom, for how much, or with what tax on them.
+
+One workbook, four tabs now — **Conciliación** (as before), **Facturas
+recibidas**, **Facturas emitidas**, **Resumen** (IVA repercutido y soportado por
+tipo, resultado del trimestre, IRPF). The document tabs name the PDF of each
+document, so the sheet points at the folder instead of the folder standing alone.
+An empty reconciliation tab now says why it is empty, and the download says so
+too — the operator found this out by opening the file.
+
+Underneath: `xlsxBlob` could only ever write one sheet, so it split into a
+per-sheet builder and a workbook packer with every existing caller untouched;
+`parseXlsxRows` learned an optional sheet index; and `txFromInvoice` gained the
+client's **NIF**, which the supplier half of the same dictionary already carried.
+
+**And the check could not have found it.** The existing assertion picks the
+quarter with the MOST movements — it guaranteed itself a non-empty sheet. The new
+one takes the opposite quarter, and there was one in the fixture all along:
+2024-Q3, two bills, three issued invoices, no movements. Put the single-sheet
+build back and it reports `sheets:1, billRows:null, modelBills:2` — the
+screenshot in JSON. Fourth time in two packages a gate passed by sampling the
+case that works.
+
+Gates: site E2E **774/774 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals **161/161** in both with the CI ceiling ratcheted down to match,
+workspace audit 0/0. ASSUMPTIONS S114, S114a–S114d.
+
+**S25 · Caja chica: the two ends worked and the middle had no door.** «how it
+works the withdrawal, expense and deposite of the difference[?]» Declaring the
+reintegro worked. Declaring the devolución worked. Attaching the receipts could
+not be done at all.
+
+`markCashWithdrawal` classifies the line, `classifyMovement` marks it allocated
+and out of the profit and loss — both correct — and `unreconciledMovements` wants
+neither, so the withdrawal leaves the queue the instant it is declared. And
+`matchDrawer`, the only screen with Candidatos, the split matcher and the
+withdrawal card, had exactly one caller: that queue's `onRowClick`. The
+Conciliados list showed the row and did nothing with it.
+
+So `documentedCents` could never move. A withdrawal spent entirely on tickets read
+100% «en efectivo todavía» forever, and since that figure is the `cashOutstanding`
+exception, every quarter holding one would have blocked the gestoría archive over
+a number nobody could bring down.
+
+Two doors: a **Conciliados row opens its panel** (the general form — any explained
+line needing a second document had to lose the first), and Conciliación grows an
+**«Efectivo pendiente de justificar»** card listing each open withdrawal with what
+is left and a button in. The queue is deliberately untouched: putting a withdrawal
+back in it would block sealing the quarter over cash in somebody's pocket, which
+the operator has already called ordinary. And the card ignores the period, because
+money taken out in March is spent in April.
+
+Also: `matchMovementSplit` was setting the class to `projectCost` on a matched
+withdrawal. `excludedFromPL` survived, so nothing double-counted, but the class
+and the flag disagreed; it keeps `internalTransfer` now.
+
+**And the check pressed the room, not the door.** It called `matchDrawer(w.id)`
+directly, and asserted the cash returned and the remainder while never asserting
+anything was documented. It clicks now and requires the figure to move — 14.000c →
+3.110c. Verified against the fault, where it reports `noDoor:true` and
+`documented 0 → 0`. One of the three new checks PASSED against the fault on its
+first run, because `#dbody` survives a closed drawer; it reads `.drawer.on #dbody`
+now.
+
+Gates: site E2E **776/776 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S115, S115a–S115c.
+
+**S26 · A column that could only print zero, and a forecast that trusted a figure
+nobody had entered.** «we are not using Purchase orders anymore. That is why I am
+telling you that is difficult to forecast. We only can have the Budget against
+that has been spend.» Half right, and the wrong half was the more useful one.
+
+**Comprometido was structurally empty for this operator.** `committedByChapter`
+reads purchase orders and subcontract awards and nothing else, so with no orders
+the column could print zero for ever, in a table already short of width. It is
+hidden when the obra has no commitment at all — computed, not configured, so the
+day an award names a partida it comes back on its own with nothing to migrate.
+
+**But the forecast never depended on it.** The missing input was the avance, and
+that one they do have. On their own screen, partida 3 had spent 2.123 against a
+budget of 1.860 while still registering 0%, and `real + presupuestado × (1 −
+avance)` added the whole budget on top of money already spent: 3.983 €, of which
+1.860 was phantom, out of a 4.722 total deviation — from one row.
+
+Nought per cent beside real money means nobody recorded the progress, not that
+nothing was built. Such a partida now reports a **floor**, the greater of budgeted
+and spent, and carries a «sin avance» pill saying so. A floor understates a
+partida that really does have work left, and that is the right way to be wrong:
+the mark says the figure is provisional, and the remedy — recording the avance —
+is the same act that makes the column mean anything.
+
+Structurally, `ecoForecastModel` now computes and `ecoForecastRows` renders: the
+header has to know whether the column shows and whether anything is floored, and a
+template cannot ask a question whose answer it prints above itself.
+
+**Both checks verified against their faults**, and the branch the operator lives
+in — no orders, no awards — does not exist in the fixture, so it is stubbed for one
+render and put back: the column goes, the rows narrow with it, and it returns.
+
+Gates: site E2E **778/778 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S116, S116a–S116c.
+
+**S27 · Tres pantallas señaladas a la vez.** El operador marcó en verde, rojo y
+naranja tres partes de Maestros, y las tres resultaron ser el mismo fallo con
+distinta cara: algo que no comparte el primitivo que todos los demás comparten.
+
+**Verde — el catálogo era el único registro sin paginar.** 209 subpartidas
+dibujaban 209 filas, con tabla propia y sin tamaño de página, mientras Clientes y
+Proveedores usan `renderMasterList` desde hace tres paquetes. Ahora lo usa: filas
+por pantalla, anterior/siguiente y exportación que no tenía. Y el primitivo
+aprendió columnas numéricas, que no soportaba, para que Coste, Precio y Margen
+sigan alineados — lo ganan todas las listas.
+
+**Rojo — los paquetes de trabajo, muertos por los dos extremos.** Ninguna pantalla
+podía crear uno y `packageCostCents` no alimentaba nada salvo las dos tablas que
+lo imprimían. Retiradas. Los métodos del motor se quedan porque los afirma la
+simulación, sin puerta y anotado como tal.
+
+**Naranja — dos cosas con un nombre.** `Maestros > Subcontratas` era un filtro por
+rol sobre el mismo `parties` que Proveedores: retirada. `Obra > Subcontratos` son
+las adjudicaciones, con certificaciones y documentación con caducidad, y alimentan
+la columna Comprometido: se queda.
+
+**Y retirarla abría una trampa.** Proveedores nombraba dos de los tres roles y su
+alta fijaba `supplier`, así que un industrial se habría quedado sin registro y sin
+forma de crearse — mientras el selector que les adjudica obra leía los tres desde
+siempre. Proveedores lee `SUPPLIER_ROLES` y el alta ofrece los tres roles.
+
+Gates: site E2E **780/780 unfiltered**, `pnpm test` 27/27, manageability 513/513,
+site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
+workspace audit 0/0, rutas iOS 9/9. ASSUMPTIONS S117, S117a–S117c.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

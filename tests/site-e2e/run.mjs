@@ -2188,8 +2188,8 @@ async function testShell(browser, base) {
     if (sections === 6 && subsOpen === 0) ok("shell: 6 sections, subsection panel collapsed");
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
-    // The count, asserted rather than assumed: six secciones, thirty-one
-    // subsecciones declared, four of them hidden (Part 2 · item 3 — hidden,
+    // The count, asserted rather than assumed: six secciones, thirty
+    // subsecciones declared, five of them hidden (Part 2 · item 3 — hidden,
     // never deleted, so SECTIONS still declares them and their routes live).
     // Pinned so both a thirty-second sub and a fifth hidden entry arrive
     // deliberately rather than by drift. It went from 30 to 31 when
@@ -2207,11 +2207,15 @@ async function testShell(browser, base) {
       // (PRY-04, Proyectos). It carried `href` and the ↗ while it was a page of
       // its own; it is a screen of this shell now, so it carries neither — the
       // count is the same because the entry never went anywhere.
-      shape.subs === 31 &&
+      // 30 again since PK13-S27 folded Maestros > Subcontratas into Proveedores:
+      // they were two screens over the same `parties` collection separated by a
+      // role, and the operator read them as one thing. The role survives on the
+      // record and in the creation door; only the duplicate register went.
+      shape.subs === 30 &&
       shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
-      ok("shell: 6 secciones × 31 declared subs, 5 hidden by name");
-    else bad("shell: 6×31 (5 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 30 declared subs, 5 hidden by name");
+    else bad("shell: 6x30 (5 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -2937,6 +2941,12 @@ async function testBudgetBuilder(browser, base) {
     const readCatalogueRow = async () => {
       await pg.evaluate(() => go("items"));
       await pg.waitForTimeout(800);
+      /* SEARCH FOR IT. The catalogue is a paginated register now, and DEM-101
+             sorts well past the first page of two hundred subpartidas — reading row
+             one of page one found nothing. Typing the code is what a person does
+             anyway, and it exercises the list's own search while it is at it. */
+      await pg.locator("#catQ").fill("DEM-101");
+      await pg.waitForTimeout(500);
       return pg.evaluate(() => {
         const row = [...document.querySelectorAll("#view table.mlist tbody tr.click")].find((tr) =>
           /DEM-101/.test(tr.textContent),
@@ -3996,8 +4006,11 @@ async function testVariationBudget(browser, base) {
       const rows = [...document.querySelectorAll("#view tbody tr")];
       const model = erp.lineEconomics(gProject, num);
       const chapter = erp.chapterEconomics(gProject).find((c) => String(c.num) === String(num));
-      // The subpartida rows of THIS partida are the ones its toggle key names.
-      const subRows = rows.filter((r) => (r.dataset.ecotoggle || "").startsWith("l:" + num + ":"));
+      /* The subpartida rows of THIS partida are the ones its own key names.
+             `data-ecosub`, not `data-ecotoggle`: the subpartida stopped being a
+             toggle when its documents moved to a panel, so it names itself for the
+             sake of being found rather than to open anything. */
+      const subRows = rows.filter((r) => (r.dataset.ecosub || "").startsWith("l:" + num + ":"));
       return {
         drawerOpen,
         cols: ths.length,
@@ -4020,44 +4033,227 @@ async function testVariationBudget(browser, base) {
       );
     else bad("5-6: subpartidas sum to the partida", JSON.stringify(subLevel));
 
-    /* THE DOCUMENTS, a third level down and in the same table. Opening a
-       subpartida shows what is behind its figure — the drill-down whose
-       absence meant a total could only be believed, never checked. */
+    /* PK13-S22 · THE DOCUMENTS MOVED OUT OF THE TABLE, AND THE BUTTON IS PRESSED.
+       They used to be a third level of rows under the subpartida, sharing a header
+       of seven money columns with nothing money-shaped to put in them — a supplier
+       under «Presupuestado», a tax id under «Desviación», a date under «%». The
+       operator, on that screen: the information should appear in a different
+       window because as it is they cannot read it.
+
+       So the check PRESSES THE BUTTON the screen offers rather than calling the
+       drawer with the arguments the screen is supposed to supply. That distinction
+       is the one this package learned three times over: a drawer proved correct in
+       isolation says nothing about whether anything reaches it. */
     const drill = await pg.evaluate(async (num) => {
-      const sub = [...document.querySelectorAll("#view tbody tr")].find((r) =>
-        (r.dataset.ecotoggle || "").startsWith("l:" + num + ":"),
-      );
-      if (!sub) return null;
-      sub.click();
+      const btn = document.querySelector("#view [data-ecodocs]");
+      if (!btn) return { noButton: true };
+      const wanted = { chapter: btn.dataset.ecodocs, line: btn.dataset.ecoline || null };
+      btn.click();
       await new Promise((r) => setTimeout(r, 500));
-      const text = document.querySelector("#view").innerText;
+      const panel = document.querySelector(".drawer.on");
+      const text = panel ? panel.innerText : "";
+      const heads = panel
+        ? [...panel.querySelectorAll("thead th")].map((x) => x.textContent.trim())
+        : [];
       /* PK13-S4 · WHAT A COST ROW HAS TO SAY. The operator: "it should open the
            full expenses list, with all the important details: supplier name, NIF,
-           invoice, amount, date". It named the document and the amount and left
-           the counterparty blank on every row — `chapterCosts` dropped `party`
-           one line after `projectCostRows` had resolved it. Asserted against the
-           supplier's own record so the check fails if the name stops travelling
-           with the cost, not merely if a cell is empty. */
-      const row = [...document.querySelectorAll("#view tbody tr")].find((r) =>
-        /E2E-VB/.test(r.innerText),
-      );
+           invoice, amount, date". Asserted against the supplier's own record so the
+           check fails if the name stops travelling with the cost, not merely if a
+           cell is empty. */
+      const row = panel
+        ? [...panel.querySelectorAll("tbody tr")].find((r) => /E2E-VB/.test(r.innerText))
+        : null;
       const sup = erp.state.parties.find((x) =>
         (x.roles || []).some((k) => ["supplier", "subcontractor", "selfEmployed"].includes(k)),
       );
+      /* The footing the in-table shape used to buy by geometry is now a printed
+             claim, so it is asserted as one: the panel adds its own documents up and
+             says whether they equal the subpartida the button hangs off. */
+      const model = erp.lineEconomics(gProject, wanted.chapter);
+      const line = model.find((l) => (wanted.line ? l.lineId === wanted.line : l.unassigned));
+      const docs = erp
+        .chapterCosts(gProject, wanted.chapter)
+        .filter((r) => (wanted.line ? r.lineId === wanted.line : !r.lineId));
       return {
+        openedPanel: !!panel,
+        // The rows left the table: no cost document is loose among the tree rows.
+        goneFromTable: ![...document.querySelectorAll("#view tbody tr")].some((r) =>
+          /E2E-VB/.test(r.innerText),
+        ),
+        heads: heads.join("|"),
         named: /E2E-VB/.test(text),
-        stillNoDrawer: !document.querySelector(".drawer.on .card"),
         saysSupplier: !!row && row.innerText.includes(sup.name),
         saysTaxId: !!row && !!sup.taxId && row.innerText.includes(sup.taxId),
         saysDate: !!row && /\d{2}\/\d{2}\/\d{4}/.test(row.innerText),
+        agrees: /Cuadra/.test(text) && !/No cuadra/.test(text),
+        modelAgrees: !!line && docs.reduce((a, r) => a + r.amountCents, 0) === line.actualCents,
       };
     }, joined.num);
-    if (drill && drill.named && drill.stillNoDrawer)
-      ok("5-6: opening a subpartida lists the documents behind it, in place");
+    if (drill && drill.openedPanel && drill.named && drill.goneFromTable)
+      ok(`5-6: the documents button opens them in a panel of their own (${drill.heads})`);
     else bad("5-6: cost drill-down", JSON.stringify(drill));
     if (drill && drill.saysSupplier && drill.saysTaxId && drill.saysDate)
       ok("5-6: …and each document names its supplier, its NIF and its date, not just a figure");
     else bad("5-6: cost row detail", JSON.stringify(drill));
+    if (drill && drill.agrees === drill.modelAgrees)
+      ok(
+        "5-6: …and the panel states whether they foot to the subpartida, agreeing with the engine",
+      );
+    else bad("5-6: cost panel footing claim", JSON.stringify(drill));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(300);
+
+    /* PK13-S23 · THE PROJECTION VIEW, and the sign that used to be painted
+       against itself. The operator asked to see these columns against best
+       practice on project economic control. What was there was spend only —
+       budget, actual, deviation — with no commitment and no cost at completion,
+       and the deviation cell wore the danger colour whether it was over or under,
+       so a partida twenty-four euros UNDER budget printed red and bold.
+
+       Both halves are asserted: the forward columns exist and carry the engine's
+       own committed figure, and a negative deviation is NOT painted as a warning. */
+    const fc = await pg.evaluate(async () => {
+      const tab = [...document.querySelectorAll("[data-ecoview]")].find(
+        (b) => b.dataset.ecoview === "forecast",
+      );
+      if (!tab) return { noTab: true };
+      tab.click();
+      await new Promise((r) => setTimeout(r, 400));
+      const heads = [...document.querySelectorAll("#view thead th")].map((x) =>
+        x.textContent.trim(),
+      );
+      const committed = erp.committedByChapter(gProject);
+      const rows = [...document.querySelectorAll("#view tbody tr")];
+      return {
+        heads: heads.join("|"),
+        cols: heads.length,
+        // Committed is not a repeat of actual: it comes from orders and awards.
+        committedShown: Object.keys(committed).length
+          ? rows.some((r) => r.innerText.includes(eur0(Object.values(committed)[0])))
+          : true,
+        hasTotal: !!document.querySelector("#view tr.ecototal"),
+        // No expander in this view — it stops at the partida on purpose.
+        noCollapser: !document.querySelector("#ecoAll"),
+      };
+    });
+    /* PK13-S26 · THE COLUMN APPEARS WHEN THERE IS SOMETHING TO PUT IN IT. The
+       operator stopped raising purchase orders, so on their obras Comprometido
+       could only ever print zero — a column that takes width and implies a data
+       source nobody feeds. It is hidden when the obra has no commitment at all
+       and comes back on its own the day an award names a partida, so the check
+       asks the ENGINE which state this fixture is in rather than expecting one. */
+    const wantCommitted = await pg.evaluate(() =>
+      Object.values(erp.committedByChapter(gProject)).some((v) => v > 0),
+    );
+    if (fc && fc.cols === (wantCommitted ? 8 : 7) && /Proyectado/.test(fc.heads))
+      ok(
+        `5-6: the projection view carries cost at completion, and commitment only when there is any (${fc.heads})`,
+      );
+    else bad("5-6: projection columns", JSON.stringify({ ...fc, wantCommitted }));
+    if (fc && /Comprometido/.test(fc.heads) === wantCommitted && fc.hasTotal && fc.noCollapser)
+      ok("5-6: …with a total row, and no drill-down it cannot honour");
+    else bad("5-6: projection content", JSON.stringify({ ...fc, wantCommitted }));
+
+    /* …and the hiding itself, PROVEN rather than inferred. This fixture has
+       commitments, so the branch the operator actually lives in — no purchase
+       orders, no awards, the column structurally empty — is never rendered by the
+       run above. Stubbed for one render and put back, because a branch nothing
+       exercises is a branch that breaks quietly. */
+    const hidden = await pg.evaluate(async () => {
+      const real = erp.committedByChapter.bind(erp);
+      erp.committedByChapter = () => ({});
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const heads = [...document.querySelectorAll("#view thead th")].map((x) =>
+        x.textContent.trim(),
+      );
+      const widths = [...document.querySelectorAll("#view tbody tr")].map(
+        (r) => r.querySelectorAll("td").length,
+      );
+      erp.committedByChapter = real;
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        cols: heads.length,
+        says: heads.includes("Comprometido"),
+        // Every row narrows with the header — a stale colspan is how a table
+        // that hides a column comes out one cell short of its own headings.
+        ragged: widths.filter((w) => w !== heads.length && w !== 1).length,
+        backAgain: [...document.querySelectorAll("#view thead th")].some(
+          (x) => x.textContent.trim() === "Comprometido",
+        ),
+      };
+    });
+    if (hidden.cols === 7 && !hidden.says && hidden.ragged === 0 && hidden.backAgain)
+      ok("5-6: …an obra with no orders and no awards drops the column entirely, and gets it back");
+    else bad("5-6: commitment column hides itself", JSON.stringify(hidden));
+
+    /* PK13-S26 · AND A PARTIDA WITH COST AND NO RECORDED PROGRESS IS NOT
+       FORECAST. `real + presupuestado × (1 − avance)` reads the avance as fact,
+       so nought per cent beside real money projected the whole budget on top of
+       money already spent — the most damaging answer available, and the one that
+       carried 1.860 of the 4.722 deviation on the operator's own screen. Such a
+       row reports the floor, `max(presupuestado, real)`, and is marked.
+
+       Measured against the engine, not against a number typed here: whichever
+       rows are in that state, their projection must be the floor and no other. */
+    const floors = await pg.evaluate(() => {
+      const prog = {};
+      erp.chapterProgress(gProject).forEach((c) => {
+        prog[String(c.num)] = c.progressPct || 0;
+      });
+      const com = erp.committedByChapter(gProject);
+      const eco = erp.chapterEconomics(gProject);
+      const stale = eco.filter((c) => c.actualCents > 0 && (prog[String(c.num)] || 0) === 0);
+      const rowsText = [...document.querySelectorAll("#view tbody tr")].map((r) => r.innerText);
+      return {
+        stale: stale.length,
+        // Every floored partida says so on its face.
+        marked: stale.every((c) =>
+          rowsText.some((t) => t.startsWith(c.num + ".") && /sin avance/.test(t)),
+        ),
+        // …and prints the floor, not budget-plus-spend.
+        floored: stale.every((c) => {
+          const want = Math.max(
+            c.budgetCostCents,
+            c.actualCents,
+            com[c.num] || com[String(c.num)] || 0,
+          );
+          const bad = c.actualCents + c.budgetCostCents;
+          const t = rowsText.find((x) => x.startsWith(c.num + "."));
+          return !!t && t.includes(eur0(want)) && (want === bad || !t.includes(eur0(bad)));
+        }),
+        // The footnote is printed only when a row is in that state.
+        note: /sin avance registrado no se puede proyectar/.test(
+          document.querySelector("#view").innerText,
+        ),
+      };
+    });
+    if (floors.stale === 0)
+      ok("5-6: no partida has cost without recorded progress in this fixture — nothing to floor");
+    else if (floors.marked && floors.floored && floors.note)
+      ok(
+        `5-6: …and ${floors.stale} partida(s) with cost and no recorded avance report a marked floor, not budget plus spend`,
+      );
+    else bad("5-6: unforecastable partidas are floored and marked", JSON.stringify(floors));
+
+    /* The deviation colour, measured on a made-up pair rather than on whatever
+       this fixture happens to hold: a saving must not be painted as a warning. */
+    const sign = await pg.evaluate(() =>
+      typeof devCellClass === "function"
+        ? { under: devCellClass(-2400), over: devCellClass(48300), flat: devCellClass(0) }
+        : { unreachable: true },
+    );
+    if (sign.under === "num good" && sign.over === "num warn" && sign.flat === "num")
+      ok("5-6: …and a deviation under budget is a saving, not a warning painted red");
+    else bad("5-6: deviation colour follows its sign", JSON.stringify(sign));
+
+    await pg.evaluate(() => {
+      [...document.querySelectorAll("[data-ecoview]")]
+        .find((b) => b.dataset.ecoview === "actual")
+        .click();
+    });
+    await pg.waitForTimeout(400);
 
     // Revenue click-through: lands on the invoice register filtered to the job.
     const jump = await pg.evaluate((projectId) => {
@@ -6986,20 +7182,38 @@ async function testBankAndCash(browser, base) {
       ok("PK12-S7: over-returning, the wrong sign and a non-withdrawal are all refused");
     else bad("PK12-S7: cash refusals", JSON.stringify(cashRefusals));
 
-    /* And the SCREEN says it. The picker offers the withdrawal on money going
-       out, the state card prints the remainder, and neither exists because a
-       method exists — they are read off the rendered drawer. */
-    const cashScreen = await pg.evaluate(async () => {
-      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+    /* And the SCREEN says it — REACHED THE WAY THE OPERATOR REACHES IT.
+
+       PK13-S25 · This check used to call `matchDrawer(w.id)` from `pg.evaluate`,
+       handing the panel the argument the screen is supposed to supply. It proved
+       the panel renders and said nothing about whether anything can open it, and
+       the answer was no: declaring a line a reintegro classifies it (allocated,
+       out of the profit and loss), `unreconciledMovements` wants neither, so the
+       withdrawal leaves the queue whose rows are the only callers of
+       `matchDrawer`. The receipts it paid for could never be attached, and the
+       remainder could only go down by putting cash back in the bank.
+
+       So the door is PRESSED. Fourth time in two packages that a gate passed by
+       exercising the room instead of the way in. */
+    const cashDoor = await pg.evaluate(async () => {
       goTab("banking", "_reconcile");
-      await new Promise((r) => setTimeout(r, 700));
-      matchDrawer(w.id);
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 800));
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      const open = erp.openCashWithdrawals(w.accountId);
+      // The withdrawal is NOT in the queue — that is correct and is the reason
+      // the card below has to exist.
+      const inQueue = erp.unreconciledMovements(null, null, null).some((m) => m.id === w.id);
+      const btn = document.querySelector(`[data-cashopen="${w.id}"]`);
+      if (!btn) return { noDoor: true, inQueue, openCount: open.length };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 600));
       const body = document.querySelector("#dbody");
       const txt = body ? body.innerText : "";
       const st = erp.cashWithdrawalState(w.id);
       return {
-        card: /Reintegro de efectivo/.test(txt),
+        inQueue,
+        openCount: open.length,
+        opened: !!body && /Reintegro de efectivo/.test(txt),
         showsOutstanding: txt.includes(eur(st.outstandingCents)),
         // Already a withdrawal, so the option to declare it again is not offered.
         noRedeclare: !/>Reintegro de efectivo</.test(
@@ -7007,9 +7221,78 @@ async function testBankAndCash(browser, base) {
         ),
       };
     });
-    if (cashScreen.card && cashScreen.showsOutstanding && cashScreen.noRedeclare)
-      ok("PK12-S7: the drawer prints what is still in cash, and will not redeclare a withdrawal");
-    else bad("PK12-S7: withdrawal on screen", JSON.stringify(cashScreen));
+    if (
+      cashDoor.opened &&
+      cashDoor.showsOutstanding &&
+      cashDoor.noRedeclare &&
+      cashDoor.inQueue === false
+    )
+      ok(
+        `PK13-S25: a declared withdrawal is out of the queue and still has a door — ${cashDoor.openCount} open, opened by pressing it`,
+      );
+    else bad("PK13-S25: door into an open withdrawal", JSON.stringify(cashDoor));
+
+    /* AND THE RECEIPTS ACTUALLY LAND. The old arithmetic check asserted the
+       returned cash and the remainder and never once asserted that anything was
+       DOCUMENTED — so a withdrawal that could never be justified satisfied it.
+       This one matches a real open bill from inside the panel and requires
+       `documentedCents` to move by that amount and the remainder to fall. */
+    const cashJustify = await pg.evaluate(async () => {
+      const w = erp.state.movements.find((m) => m.cashWithdrawal);
+      const before = erp.cashWithdrawalState(w.id);
+      const cands = erp.reconciliationCandidates(w.id);
+      const pick = cands.find((c) => c.outstandingCents <= before.outstandingCents);
+      if (!pick) return { noCandidate: true, outstanding: before.outstandingCents };
+      const btn = document.querySelector(`[data-pick="${pick.id}"]`);
+      if (!btn) return { noPickButton: true, ref: pick.reference };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 800));
+      const after = erp.cashWithdrawalState(w.id);
+      const m = erp.state.movements.find((x) => x.id === w.id);
+      return {
+        took: pick.outstandingCents,
+        documentedBefore: before.documentedCents,
+        documentedAfter: after.documentedCents,
+        outstandingBefore: before.outstandingCents,
+        outstandingAfter: after.outstandingCents,
+        adds:
+          after.totalCents === after.documentedCents + after.returnedCents + after.outstandingCents,
+        // A matched withdrawal is still the company moving its own money.
+        stillTransfer: m.class === "internalTransfer" && m.excludedFromPL === true,
+      };
+    });
+    if (
+      cashJustify.documentedAfter === cashJustify.documentedBefore + cashJustify.took &&
+      cashJustify.outstandingAfter === cashJustify.outstandingBefore - cashJustify.took &&
+      cashJustify.adds &&
+      cashJustify.stillTransfer
+    )
+      ok(
+        `PK13-S25: …and a receipt matched from it reduces what is still in cash (${cashJustify.outstandingBefore}c → ${cashJustify.outstandingAfter}c), without turning the withdrawal into a cost`,
+      );
+    else bad("PK13-S25: receipts justify the withdrawal", JSON.stringify(cashJustify));
+
+    /* An explained movement can be opened again. It is the general form of the
+       fault above — the list of what is explained offered exactly one verb, undo,
+       so a line needing a SECOND document had to lose the first. */
+    const explainedDoor = await pg.evaluate(async () => {
+      closeDrawer();
+      goTab("banking", "_reconciled");
+      await new Promise((r) => setTimeout(r, 800));
+      const row = document.querySelector("#rdList tbody tr");
+      if (!row) return { noRow: true };
+      row.click();
+      await new Promise((r) => setTimeout(r, 600));
+      /* `.drawer.on`, not `#dbody`. The panel element stays in the document when
+             it is closed, so reading `#dbody` reads the LAST drawer that was opened
+             and a row that does nothing at all looks like a row that worked — which
+             is exactly what this check reported when it was first run against the
+             fault it exists to catch. */
+      const panel = document.querySelector(".drawer.on #dbody");
+      return { opened: !!panel && /Candidatos/.test(panel.innerText) };
+    });
+    if (explainedDoor.opened) ok("PK13-S25: …and an explained movement opens its panel again");
+    else bad("PK13-S25: explained row opens", JSON.stringify(explainedDoor));
     await pg.evaluate(() => closeDrawer());
     await pg.waitForTimeout(300);
     /* Back to the accounts tab EXPLICITLY — the same rule written a few
@@ -10154,8 +10437,8 @@ async function testProcurement(browser, base) {
     await pg.waitForTimeout(500);
     const subHash = await pg.evaluate(() => location.hash);
     const subText = await pg.locator("#view").innerText();
-    if (subHash === "#subcontractors" && /industrial/i.test(subText))
-      ok("subcontratos: the retired route redirects to the DMT-03 fichero");
+    if (subHash === "#suppliers" && /proveedor/i.test(subText))
+      ok("subcontratos: the retired route redirects to Proveedores, one file for all of them");
     else bad("subcontratos: retired route", `${subHash} · ${subText.slice(0, 70)}`);
 
     /* ---- PRY-03 (PK9-S2): a register, and CHG-04 survives it ----
@@ -12272,6 +12555,108 @@ async function testAdmin(browser, base) {
       else bad("1G: docs in archive", JSON.stringify(zipCheck));
     }
 
+    /* PK13-S24 · THE QUARTER THAT HAS DOCUMENTS AND NO STATEMENT.
+       The check above deliberately picks the quarter with the MOST bank
+       movements, so it could never have found what the operator found: a
+       workbook with one tab, the reconciliation, built from movements alone.
+       A quarter whose statement has not been imported shipped a header row and
+       nothing under it, sitting beside a docs/ folder holding three real
+       supplier invoices — the documents travelled and the register naming them
+       did not.
+
+       So this one takes the opposite quarter: bills and invoices, no movements.
+       It asserts the two document tabs exist and carry a row per document, and
+       that the empty reconciliation tab SAYS it is empty rather than being
+       blank. Verified against the fault as well as the fix — with the old
+       single-sheet workbook it reports `sheets:1` and no invoice tab. */
+    const emptyQ = await pg.evaluate(async () => {
+      const qOf = (d) => {
+        const [y, m] = String(d).split("-").map(Number);
+        return y + "-Q" + Math.ceil(m / 3);
+      };
+      const movQ = new Set(erp.state.movements.map((m) => qOf(m.accountingDate)));
+      const docQ = {};
+      for (const b of erp.state.bills) docQ[qOf(b.date)] = (docQ[qOf(b.date)] || 0) + 1;
+      for (const i of erp.state.invoices) docQ[qOf(i.date)] = (docQ[qOf(i.date)] || 0) + 1;
+      let q = Object.keys(docQ).find((k) => !movQ.has(k));
+      /* No such quarter in the fixture? MAKE one, rather than skipping the
+             check — the state the operator hit has to be reachable on demand or
+             this regression can come back on a workspace we never sample. */
+      if (!q) {
+        const src = erp.state.bills[0];
+        if (!src) return { skip: "no bills at all" };
+        const far = "2019-02-15";
+        q = qOf(far);
+        erp.state.bills.push({ ...src, id: "bill_e2e_s24", number: "E2E-S24", date: far });
+      }
+      for (const x of erp.exceptionsWithStatus(q).filter((r) => !r.accepted))
+        erp.acceptException(q, x.key, "e2e", "bo");
+      const pkg = erp.quarterlyPackage(q, { recipient: "E2E" }, "bo");
+      const z = await buildAccountantZip(q, pkg);
+      const bytes = new Uint8Array(await z.blob.arrayBuffer());
+      const dir = ErpImport.zip.centralDirectory(bytes);
+      const book = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
+      const bookBytes = book.buffer ? book : new Uint8Array(book);
+      const inner = ErpImport.zip.centralDirectory(bookBytes);
+      const sheets = Object.keys(inner).filter((n) => /worksheets\/sheet\d+\.xml$/.test(n));
+      const readSheet = async (n) => {
+        try {
+          return await ErpImport.parseXlsxRows(bookBytes, n);
+        } catch {
+          return [];
+        }
+      };
+      const bodyOf = (rows, headerCell) => {
+        const at = rows.findIndex((r) => (r || []).includes(headerCell));
+        if (at < 0) return null;
+        const out = [];
+        for (const r of rows.slice(at + 1)) {
+          if (!(r || []).some((c) => String(c || "").trim())) break;
+          out.push(r);
+        }
+        return out;
+      };
+      const conc = await readSheet(1);
+      const bills = await readSheet(2);
+      const invs = await readSheet(3);
+      const summary = await readSheet(4);
+      const billBody = bodyOf(bills, "Nº factura");
+      const invBody = bodyOf(invs, "Nº factura");
+      const concText = conc.flat().join(" ");
+      return {
+        q,
+        sheets: sheets.length,
+        movements: pkg.bankMovements.length,
+        billRows: billBody ? billBody.length : null,
+        modelBills: pkg.receivedBills.length,
+        invRows: invBody ? invBody.length : null,
+        modelInvoices: pkg.issuedInvoices.length,
+        // The empty tab explains itself instead of being a bare header.
+        emptySaysWhy: /Sin movimientos de banco/.test(concText),
+        // The counterparty's tax id travels on BOTH halves now.
+        billsHaveTaxId: !!billBody && billBody.some((r) => /[A-Z]?\d{7,}/.test(String(r[3] || ""))),
+        hasSummary: summary.flat().some((c) => /IVA/.test(String(c || ""))),
+        warned: !z.rows && z.bills + z.invoices > 0,
+      };
+    });
+    if (emptyQ.skip) bad("1G: PK13-S24 fixture", JSON.stringify(emptyQ));
+    else if (
+      emptyQ.sheets === 4 &&
+      emptyQ.movements === 0 &&
+      emptyQ.billRows === emptyQ.modelBills &&
+      emptyQ.invRows === emptyQ.modelInvoices &&
+      emptyQ.billsHaveTaxId
+    )
+      ok(
+        `1G: a quarter with documents and no statement still ships them — ${emptyQ.sheets} tabs, ${emptyQ.billRows} bills, ${emptyQ.invRows} issued (${emptyQ.q})`,
+      );
+    else bad("1G: documents reach the workbook", JSON.stringify(emptyQ));
+    if (emptyQ.emptySaysWhy && emptyQ.warned && emptyQ.hasSummary)
+      ok(
+        "1G: …the empty reconciliation tab says why, the download says so too, and the quarter is summarised",
+      );
+    else bad("1G: empty tab explains itself", JSON.stringify(emptyQ));
+
     if (errs.length === 0) ok("administración: no console errors");
     else bad("administración: no console errors", errs.slice(0, 3).join(" | "));
   } catch (e) {
@@ -12727,18 +13112,25 @@ async function testControlTowerAndDay(browser, base) {
     // catalogue, not that a page renders.
     await pg.evaluate(() => (location.hash = "items"));
     await pg.waitForTimeout(450);
+    /* Rows are a PAGE now, not the whole catalogue: this screen became a
+       register like the others. What still has to be true is that the page comes
+       from the engine's own catalogue and fills to the page size. */
     const catState = await pg.evaluate(() => ({
       hash: location.hash,
       branches: document.querySelectorAll(".catbr[data-chap]").length,
-      rows: document.querySelectorAll("tr.click[data-item]").length,
+      rows: document.querySelectorAll("#catList tbody tr.click").length,
       engineItems: erp.state.catalogue.filter((i) => i.active !== false).length,
+      size: Number((document.getElementById("catSize") || {}).value || 0),
     }));
     if (
       catState.hash === "#items" &&
       catState.branches > 1 &&
-      catState.rows === catState.engineItems
+      catState.size > 0 &&
+      catState.rows === Math.min(catState.size, catState.engineItems)
     )
-      ok(`DMC-01: the catalogue renders in the shell from the engine (${catState.rows} partidas)`);
+      ok(
+        `DMC-01: the catalogue renders from the engine, paginated (${catState.rows} de ${catState.engineItems})`,
+      );
     else bad("DMC-01 catalogue", JSON.stringify(catState));
 
     // The tree filters the table, and the branch counts are real.
@@ -12752,13 +13144,14 @@ async function testControlTowerAndDay(browser, base) {
       await pg.locator(`.catbr[data-chap="${firstChapter}"]`).click();
       await pg.waitForTimeout(350);
       const filtered = await pg.evaluate((c) => {
-        const shown = document.querySelectorAll("tr.click[data-item]").length;
+        const shown = document.querySelectorAll("#catList tbody tr.click").length;
+        const size = Number((document.getElementById("catSize") || {}).value || 0);
         const expect = erp.state.catalogue.filter(
           (i) => i.chapter === c && i.active !== false,
         ).length;
-        return { shown, expect };
+        return { shown, expect, size, capped: Math.min(size, expect) };
       }, firstChapter);
-      if (filtered.shown === filtered.expect && filtered.shown > 0)
+      if (filtered.shown === filtered.capped && filtered.shown > 0)
         ok("DMC-01: choosing a chapter in the tree filters the partidas table");
       else bad("DMC-01 tree filter", JSON.stringify(filtered));
     } else {
@@ -12941,6 +13334,31 @@ async function testControlTowerAndDay(browser, base) {
     }
 
     // ---- DMC-02: the comparison strip, and the rule it exists to protect ----
+    /* PK13-S27 · THE CATALOGUE LIST IS A REGISTER LIKE THE OTHERS. It was a
+       hand-rolled table with its own search and no page size at all, so two
+       hundred subpartidas rendered two hundred rows and there was no way
+       forward — every other master file on this product paginates. Now it is
+       `renderMasterList`, and the check asserts the three controls exist and
+       that the page really is capped. */
+    await pg.evaluate(() => (location.hash = "items"));
+    await pg.waitForTimeout(600);
+    const cat = await pg.evaluate(() => ({
+      total: erp.state.catalogue.filter((i) => i.active !== false).length,
+      shown: document.querySelectorAll("#catList table.mlist tbody tr.click").length,
+      size: !!document.getElementById("catSize"),
+      next: !!document.getElementById("catNext"),
+      search: !!document.getElementById("catQ"),
+      newBtn: !!document.getElementById("catNew"),
+      packages: /Paquetes de trabajo/.test(document.querySelector("#view").innerText),
+    }));
+    if (cat.size && cat.next && cat.search && cat.newBtn && cat.shown <= 25)
+      ok(
+        `5-7: el catalogo pagina como los demas registros — ${cat.shown} de ${cat.total} en pantalla`,
+      );
+    else bad("5-7: catalogo paginado", JSON.stringify(cat));
+    if (!cat.packages) ok("5-7: …y los paquetes de trabajo, que nada creaba ni leia, ya no estan");
+    else bad("5-7: paquetes retirados", JSON.stringify(cat));
+
     await pg.evaluate(() => (location.hash = "price-list"));
     await pg.waitForTimeout(450);
     // The strip is deliberately absent until one partida is chosen: comparing
@@ -15320,13 +15738,33 @@ async function testErp(browser, base) {
     else
       bad("erp: clientes export", `${menuTxt.replace(/\n/g, " ")} · ${JSON.stringify(zipMagic)}`);
 
-    // DMT-02/03: Proveedores and Subcontratas are the same party file, filtered
-    // by role, on the shared list primitive built for S2. Creating a supplier
-    // must not leak into the Subcontratas list, and vice versa.
+    /* PK13-S27 · ONE FILE FOR EVERYONE YOU BUY FROM. Proveedores and Subcontratas
+       were two screens over the SAME `parties` collection, separated by a role —
+       and the operator read them as one thing, correctly: an industrial is a
+       supplier you award work to. Maestros keeps one register now.
+
+       The trap that came with folding them: the Proveedores list named only
+       `supplier` and `selfEmployed`, and its creation door PINNED `supplier`. So
+       an industrial would have had no register and no way to be filed, while the
+       picker that awards them work had been reading all three roles the whole
+       time. Both halves are asserted here — the industrial is listed, and it can
+       be created. */
     await pg.evaluate(() => (location.hash = "suppliers"));
     await pg.waitForTimeout(350);
     await pg.locator("#supNew").click();
     await pg.waitForTimeout(250);
+    // The door offers the roles this screen is about, and not the customer.
+    const roleOpts = await pg.evaluate(() =>
+      [...document.querySelectorAll("#f_role option")].map((o) => o.value),
+    );
+    if (
+      roleOpts.length === 3 &&
+      roleOpts.includes("subcontractor") &&
+      !roleOpts.includes("customer")
+    )
+      ok(`erp: DMT-02 the supplier door offers its three roles (${roleOpts.join("/")})`);
+    else bad("erp: DMT-02 role choices", JSON.stringify(roleOpts));
+
     const supName = "E2E Proveedor " + String(Date.now()).slice(-5);
     await pg.locator("#f_name").fill(supName);
     await pg.locator("#f_tax").fill("B10000008");
@@ -15339,20 +15777,16 @@ async function testErp(browser, base) {
     await pg.locator("#supQ").fill(supName);
     await pg.waitForTimeout(300);
     const supRows = await pg.locator("tbody tr.click").count();
-    if (supRows === 1) ok("erp: DMT-02 proveedores — created and listed by role");
+    if (supRows === 1) ok("erp: DMT-02 proveedores — created and listed");
     else bad("erp: DMT-02 proveedores", `rows=${supRows}`);
 
-    await pg.evaluate(() => (location.hash = "subcontractors"));
-    await pg.waitForTimeout(350);
-    await pg.locator("#subQ").fill(supName);
-    await pg.waitForTimeout(300);
-    const supInSub = await pg.locator("tbody tr.click").count();
-    if (supInSub === 0) ok("erp: DMT-02/03 — a supplier does not leak into Subcontratas");
-    else bad("erp: DMT-02/03 role separation", `subcontratas rows=${supInSub}`);
-
-    await pg.locator("#subNew").click();
+    // An INDUSTRIAL, filed from the same door, appears in the same register.
+    await pg.locator("#supQ").fill("");
+    await pg.waitForTimeout(200);
+    await pg.locator("#supNew").click();
     await pg.waitForTimeout(250);
     const subName = "E2E Industrial " + String(Date.now()).slice(-5);
+    await pg.selectOption("#f_role", "subcontractor");
     await pg.locator("#f_name").fill(subName);
     await pg.locator("#f_tax").fill("B20000006");
     await pg.locator("#f_mob").fill("600222333");
@@ -15361,14 +15795,18 @@ async function testErp(browser, base) {
     await pg.locator("#f_city").fill("Sant Just");
     await pg.locator("#f_save").click();
     await pg.waitForTimeout(350);
-    await pg.locator("#subQ").fill(subName);
+    await pg.locator("#supQ").fill(subName);
     await pg.waitForTimeout(300);
     const subRows = await pg.locator("tbody tr.click").count();
-    if (subRows === 1) ok("erp: DMT-03 subcontratas — created and listed by role");
-    else bad("erp: DMT-03 subcontratas", `rows=${subRows}`);
+    const subRole = await pg.evaluate(
+      (n) => (erp.state.parties.find((p) => p.name === n) || {}).roles,
+      subName,
+    );
+    if (subRows === 1 && (subRole || []).includes("subcontractor"))
+      ok("erp: DMT-03 an industrial is filed with its role and listed in Proveedores");
+    else bad("erp: DMT-03 industrial", `rows=${subRows} roles=${JSON.stringify(subRole)}`);
 
-    // Universal search must route a supplier/subcontractor hit to their own
-    // screen (DMT-02/03), not into Clientes — the bug this session fixed.
+    // Universal search routes a subcontrata hit to the register that now holds it.
     await pg.locator("#q").fill(subName);
     await pg.waitForTimeout(300);
     const subSearchTxt = await pg.locator("#sres.on").innerText();
@@ -15376,8 +15814,8 @@ async function testErp(browser, base) {
       await pg.locator("#sres .si").first().click();
       await pg.waitForTimeout(400);
       const afterHash = await pg.evaluate(() => location.hash);
-      if (afterHash === "#subcontractors")
-        ok("erp: universal search routes a subcontrata hit to Subcontratas, not Clientes");
+      if (afterHash === "#suppliers")
+        ok("erp: universal search routes a subcontrata hit to Proveedores, not Clientes");
       else bad("erp: search routing (subcontratas)", afterHash);
     } else bad("erp: search grouping (subcontratas)", subSearchTxt.slice(0, 80));
     await pg.locator("#dClose").click();

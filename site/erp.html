@@ -1401,6 +1401,10 @@
       td.good {
         color: var(--greenDeep);
       }
+      tr.ecototal td {
+        font-weight: 600;
+        border-top: 2px solid var(--line);
+      }
       .adj {
         font: 600 10px var(--sans);
         color: var(--amber);
@@ -5613,7 +5617,7 @@
             (await ErpStore.getMeta("ui.customers")) || (await ErpStore.getMeta("ui.clientes"));
           const st = getListState("customers", 25);
           if (cp && LIST_PAGE_SIZES.includes(cp.pageSize)) st.pageSize = cp.pageSize;
-          for (const id of ["suppliers", "subcontractors", "staff"]) {
+          for (const id of ["suppliers", "staff"]) {
             const sz = await loadListPageSize(id);
             if (sz) getListState(id, 25).pageSize = sz;
           }
@@ -6127,7 +6131,6 @@
           subs: [
             { k: "customers", lab: "Clientes", code: "DMT-01" },
             { k: "suppliers", lab: "Proveedores", code: "DMT-02" },
-            { k: "subcontractors", lab: "Subcontratas", code: "DMT-03" },
             { k: "staff", lab: "Personal interno", code: "DMT-04" },
           ],
         },
@@ -6175,7 +6178,7 @@
         economia: "economics",
         modificaciones: "variations",
         compras: "purchasing",
-        subcontratos: "subcontractors", // lifecycle screens retired; master data remains
+        subcontratos: "suppliers", // industriales are suppliers; DMT-03 folded in
         horas: "labour",
         facturacion: "invoicing",
         pagos: "supplier-invoices", // merged into ADM-03
@@ -6936,7 +6939,7 @@
             .map((p) => ({
               lab: p.name,
               sub: `${p.code}${p.billCity ? " · " + p.billCity : ""}`,
-              k: "subcontractors",
+              k: "suppliers",
               open: () => partyDrawer(p.id),
             })),
         );
@@ -7181,7 +7184,7 @@
         else if (ref.opportunity) go("leads");
         else if (ref.price) go("price-list");
         else if (ref.change) go("progress");
-        else if (ref.subcontract) go("subcontractors");
+        else if (ref.subcontract) go("suppliers");
         else if (ref.worker) go("labour");
         else if (ref.purchase) go("purchasing");
         else if (ref.quarter) go("accountant");
@@ -12260,6 +12263,10 @@
         const open = erp.unreconciledMovements(r.from, r.to, bankAcc);
         const allOpen = erp.unreconciledMovements(null, null, bankAcc);
         const transfers = R ? R.internalTransfers(erp, r.from, r.to) : [];
+        /* Not scoped to the period, on purpose — see `openCashWithdrawals`.
+                 Money taken out in March is spent in April, and a list that respected
+                 the period would hide the withdrawals open longest. */
+        const openCash = erp.openCashWithdrawals(bankAcc);
         const openIds = new Set(open.map((m) => m.id));
         for (const id of [...rcSel]) if (!openIds.has(id)) rcSel.delete(id);
 
@@ -12270,6 +12277,7 @@
            <button class="btn sm" id="rcClose" title="Bloquea el trimestre; exige que todo en él esté asignado">🔒 Bloquear trimestre</button>
          </div></div>
          ${transferCard(transfers)}
+         ${cashOpenCard(openCash)}
          ${!R ? '<div class="card"><div class="empty">El emparejamiento asistido necesita el módulo de capacidades, que no se ha cargado. Recarga la página.</div></div>' : ""}
          <div id="rcSelBar"></div>
          <div id="rcList"></div>
@@ -12340,6 +12348,9 @@
           ],
           onRowClick: (id) => matchDrawer(id),
         });
+        v.querySelectorAll("[data-cashopen]").forEach(
+          (b) => (b.onclick = () => matchDrawer(b.dataset.cashopen)),
+        );
         /* The checkbox's own click handler stops the event there — without
                  this, ticking a box would also fire the row's onclick and open the
                  matching panel underneath it. */
@@ -12713,6 +12724,40 @@
               closeDrawer();
             }, "Trimestre bloqueado");
       }
+      /**
+       * The cash that is still out, and the way back into it.
+       *
+       * THIS CARD EXISTS BECAUSE THE WITHDRAWAL LEAVES THE QUEUE. Declaring a
+       * bank line to be a reintegro classifies it — allocated, out of the profit
+       * and loss — and `unreconciledMovements` wants neither of those, so the
+       * line vanishes from the only list whose rows open `matchDrawer`. That is
+       * the panel carrying Candidatos, the split matcher and the withdrawal card
+       * with its three figures; without a door to it, the receipts a withdrawal
+       * paid for could never be attached and the remainder could only ever go
+       * down by putting cash back in the bank.
+       *
+       * It is NOT the queue. An open withdrawal is not an unexplained line and
+       * must not block sealing the quarter — cash in a pocket at the end of a
+       * week is ordinary, and the operator said so. It is a list of work, beside
+       * the queue, with a button into each item.
+       */
+      function cashOpenCard(list) {
+        if (!list.length) return "";
+        const note =
+          '<div class="it" style="color:var(--muted)">Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.</div>';
+        const rows = list
+          .map((m) => {
+            const detail = `<span class="sub">${eur(m.cash.totalCents)} · <span>justificado</span> ${eur(m.cash.documentedCents)} · <span>devuelto</span> ${eur(m.cash.returnedCents)}</span>`;
+            return `<div class="it"><span style="color:var(--muted)" translate="no">${fmtD(m.accountingDate)}</span>
+             <span style="flex:1;margin-left:8px">${movWho(m)}<br>${detail}</span>
+             <b style="color:var(--amber)" translate="no">${eur(m.cash.outstandingCents)}</b>
+             <button class="btn sm" data-cashopen="${esc(m.id)}">Justificar</button></div>`;
+          })
+          .join("");
+        return `<div class="card"><div class="ch"><h3>Efectivo pendiente de justificar</h3>
+           <span class="tag" translate="no">${list.length}</span></div>
+          <div class="daylist" style="padding:10px 14px">${note}${rows}</div></div>`;
+      }
       function transferCard(transfers) {
         if (!transfers.length) return "";
         const line = (id) => {
@@ -12839,7 +12884,13 @@
             },
             { label: "", get: () => "", html: (m) => undoCell(m) },
           ],
-          onRowClick: () => {},
+          /* A ROW OPENS ITS MOVEMENT. This was `() => {}` — the list showed what
+                   had been explained and offered exactly one verb, undo. So a line that
+                   was explained and then needed a second document (a cash withdrawal is
+                   the ordinary case: it is declared first and justified afterwards) had
+                   no way back to the panel that could take one, short of undoing the
+                   explanation it already had. */
+          onRowClick: (id) => matchDrawer(id),
         });
 
         v.querySelectorAll("[data-undo]").forEach(
@@ -14157,8 +14208,19 @@
        * something that looks like a database dump.
        */
       function xlsxBlob(sheetName, rows, opts) {
+        return xlsxWorkbookBlob([{ name: sheetName, rows, opts }]);
+      }
+
+      /**
+       * One sheet's XML, its column widths and its frozen pane.
+       *
+       * Lifted out of `xlsxBlob` unchanged so a workbook can hold more than one
+       * of them. Everything a sheet decides for itself — its identity block, the
+       * row it freezes at, the style of each row — stays here, per sheet; only
+       * the parts a workbook shares (the styles, the content types) moved out.
+       */
+      function xlsxSheetPart(rows, opts) {
         opts = opts || {};
-        const enc = new TextEncoder();
         const iss = typeof erp !== "undefined" && erp._issuerBlock ? erp._issuerBlock() : {};
         const title = opts.title || iss.tradeName || iss.legalName || "";
         const subtitle = opts.subtitle || "";
@@ -14237,34 +14299,88 @@
             `<pane ySplit="${splitAt}" topLeftCell="A${splitAt + 1}" activePane="bottomLeft" state="frozen"/>` +
             "</sheetView></sheetViews>"
           : `<sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>`;
+        return { sheet, cols, freeze };
+      }
+
+      /**
+       * A workbook of one or more sheets — `[{ name, rows, opts }, …]`.
+       *
+       * WHY MORE THAN ONE. The accountant's quarterly package shipped a workbook
+       * with a single tab, the bank reconciliation, because that was the only
+       * thing the export had ever been asked for. A quarter with three supplier
+       * invoices and no imported statement therefore handed the gestor a sheet
+       * with a header row and nothing under it, next to a folder holding the
+       * three PDFs. The documents existed, the export had nowhere to put them.
+       *
+       * Sheet names are what Excel shows on the tab, and it refuses a workbook
+       * whose names collide, exceed 31 characters or contain any of `[]:*?/\` —
+       * so they are cleaned here rather than trusted from the caller.
+       */
+      function xlsxWorkbookBlob(sheets) {
+        const enc = new TextEncoder();
+        const list = (sheets || []).filter(Boolean);
+        if (!list.length) list.push({ name: "Hoja", rows: [] });
+        const used = new Set();
+        const tabName = (raw, i) => {
+          let n = String(raw || "")
+            .replace(/[[\]:*?/\\]/g, " ")
+            .trim()
+            .slice(0, 31);
+          if (!n) n = "Hoja " + (i + 1);
+          let cand = n;
+          let k = 2;
+          while (used.has(cand.toLowerCase())) cand = n.slice(0, 28) + " " + k++;
+          used.add(cand.toLowerCase());
+          return cand;
+        };
+        const parts = list.map((sh) => xlsxSheetPart(sh.rows || [], sh.opts));
+        const names = list.map((sh, i) => tabName(sh.name, i));
 
         const f = (path, xml) => ({
           path,
           bytes: enc.encode('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + xml),
         });
-        return zipStore([
+        const CT = "application/vnd.openxmlformats-officedocument.spreadsheetml";
+        const REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        const overrides = parts
+          .map(
+            (p, i) =>
+              `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="${CT}.worksheet+xml"/>`,
+          )
+          .join("");
+        const sheetTags = names
+          .map((n, i) => `<sheet name="${xmlEsc(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+          .join("");
+        const sheetRels = parts
+          .map(
+            (p, i) =>
+              `<Relationship Id="rId${i + 1}" Type="${REL}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+          )
+          .join("");
+        const files = [
           f(
             "[Content_Types].xml",
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+            `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="${CT}.sheet.main+xml"/>${overrides}<Override PartName="/xl/styles.xml" ContentType="${CT}.styles+xml"/></Types>`,
           ),
           f(
             "_rels/.rels",
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+            `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
           ),
           f(
             "xl/workbook.xml",
-            `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xmlEsc(sheetName).slice(0, 31)}" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+            `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheetTags}</sheets></workbook>`,
           ),
           f(
             "xl/_rels/workbook.xml.rels",
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+            `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheetRels}<Relationship Id="rIdSty" Type="${REL}/styles" Target="styles.xml"/></Relationships>`,
           ),
           f("xl/styles.xml", XLSX_STYLES),
-          f(
-            "xl/worksheets/sheet1.xml",
-            `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${freeze}${cols}<sheetData>${sheet}</sheetData></worksheet>`,
-          ),
-        ]);
+        ];
+        parts.forEach((p, i) => {
+          const xml = `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${p.freeze}${p.cols}<sheetData>${p.sheet}</sheetData></worksheet>`;
+          files.push(f("xl/worksheets/sheet" + (i + 1) + ".xml", xml));
+        });
+        return zipStore(files);
       }
       function downloadBlob(blob, filename) {
         const a = document.createElement("a");
@@ -14740,7 +14856,7 @@
           }
           <span class="tag">${countTag(rows.length, q ? base.length : null, sing, plur)}</span></div>
          <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
-           ${cols.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
+           ${cols.map((c) => `<th${c.num ? ' class="num"' : ""}>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>
          ${
            page
              .map(
@@ -14753,7 +14869,7 @@
                  `<tr class="click${cfg.rowClass ? " " + cfg.rowClass(r) : ""}" data-id="${r.id}">${cols
                    .map(
                      (c) =>
-                       `<td data-th="${esc(c.label)}"${c.primary ? ' class="k"' : ""}>${c.html ? c.html(r) : esc(String((c.get ? c.get(r) : "") ?? ""))}</td>`,
+                       `<td data-th="${esc(c.label)}"${c.primary ? ' class="k"' : c.num ? ' class="num"' : ""}>${c.html ? c.html(r) : esc(String((c.get ? c.get(r) : "") ?? ""))}</td>`,
                    )
                    .join("")}</tr>`,
              )
@@ -15858,7 +15974,7 @@
               })
               .join("")}</select></label></div>
          </div></div>`
-               : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
+             : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
           <div class="it"><label class="opt">Lead abierto
             <select id="bn_lead" style="margin-left:auto">${openLeads
               .map(
@@ -20728,18 +20844,171 @@
             ownDoc || matchedBillDoc,
           ]);
         }
-        const xlsx = xlsxBlob("Conciliacion " + quarter, rows, {
-          subtitle: "Conciliación " + quarter,
-        });
+        /* A SHEET THAT IS EMPTY SAYS WHY IT IS EMPTY. The reconciliation table
+                 is one row per bank movement of the quarter, so a quarter whose
+                 statement has not been imported yet produces a header and nothing
+                 under it — which is what the gestor opened, next to a folder holding
+                 three real invoices. The row below is not data; it is the sheet
+                 telling its reader that the absence is a state of the workspace and
+                 not a fault of the export. */
+        const conciliationRows = rows.slice();
+        if (rows.length === 1)
+          conciliationRows.push([
+            "",
+            "",
+            "Sin movimientos de banco en este trimestre — importe el extracto en Conciliación. Las facturas del trimestre están en las otras hojas.",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+          ]);
+
+        const pctTxt = (bp) => (bp == null ? "" : (bp / 100).toFixed(2).replace(".", ",") + " %");
+        const docOfNumber = {};
+        for (const b of erp.state.bills)
+          if (billDocName[b.id]) docOfNumber[b.number] = billDocName[b.id];
+
+        /* THE DOCUMENTS OF THE QUARTER, WHICH THE WORKBOOK NEVER CARRIED. The
+                 package has always computed them — `receivedBills` and `issuedInvoices`
+                 are the two halves of the GES-02 transaction dictionary — and the
+                 export put neither in a cell. The PDFs travelled and the register that
+                 names them did not, so the gestor received a folder of files with no
+                 sheet saying what they were, from whom, for how much, or with what
+                 tax on them. */
+        const billRows = [
+          [
+            "Fecha",
+            "Nº factura",
+            "Proveedor",
+            "NIF",
+            "Base (€)",
+            "IVA",
+            "Cuota IVA (€)",
+            "IRPF",
+            "Retención (€)",
+            "Total (€)",
+            "Categoría",
+            "Presupuesto",
+            "Vencimiento",
+            "Pagado (€)",
+            "Justificante",
+          ],
+        ];
+        for (const t of pkg.receivedBills)
+          billRows.push([
+            t.date,
+            t.invoiceNumber || "",
+            t.partyName || "",
+            t.partyTaxId || "",
+            eurTxt(t.baseCents),
+            pctTxt(t.vatBp),
+            eurTxt(t.vatCents),
+            pctTxt(t.irpfBp),
+            eurTxt(t.irpfCents),
+            eurTxt(t.totalCents),
+            t.category || "",
+            t.budgetRef || "",
+            t.dueDate || "",
+            eurTxt(t.paidCents),
+            docOfNumber[t.invoiceNumber] || "",
+          ]);
+
+        const invoiceRows = [
+          [
+            "Fecha",
+            "Nº factura",
+            "Cliente",
+            "NIF",
+            "Base (€)",
+            "IVA",
+            "Cuota IVA (€)",
+            "IRPF",
+            "Retención (€)",
+            "Total (€)",
+            "Presupuesto",
+            "Vencimiento",
+            "Cobrado (€)",
+          ],
+        ];
+        for (const t of pkg.issuedInvoices)
+          invoiceRows.push([
+            t.date,
+            t.invoiceNumber || "",
+            t.partyName || "",
+            t.partyTaxId || "",
+            eurTxt(t.baseCents),
+            pctTxt(t.vatBp),
+            eurTxt(t.vatCents),
+            pctTxt(t.irpfBp),
+            eurTxt(t.irpfCents),
+            eurTxt(t.totalCents),
+            t.budgetRef || "",
+            t.dueDate || "",
+            eurTxt(t.paidCents),
+          ]);
+
+        /* The two figures the quarter is actually filed on, reconciled to the
+                 registers above them rather than typed again: `vatSummary` and
+                 `irpfSummary` are what the tax screens already read. */
+        const sumRows = [["Concepto", "Base (€)", "Cuota (€)"]];
+        const sumStyle = [null];
+        const pushSum = (label, base, cuota, style) => {
+          sumRows.push([label, base, cuota]);
+          sumStyle.push(style === undefined ? null : style);
+        };
+        pushSum("IVA repercutido por tipo", "", "", 7);
+        for (const [bp, r] of Object.entries(pkg.vat.byRate))
+          pushSum(pctTxt(Number(bp)), eurTxt(r.outputBaseCents), eurTxt(r.outputVatCents));
+        pushSum("IVA soportado por tipo", "", "", 7);
+        for (const [bp, r] of Object.entries(pkg.vat.byRate))
+          pushSum(pctTxt(Number(bp)), eurTxt(r.inputBaseCents), eurTxt(r.inputVatCents));
+        pushSum("Repercutido", "", eurTxt(pkg.vat.outputVatCents), 8);
+        pushSum("Soportado", "", eurTxt(pkg.vat.inputVatCents), 8);
+        pushSum("Resultado del trimestre", "", eurTxt(pkg.vat.netCents), 10);
+        pushSum("IRPF", "", "", 7);
+        pushSum("Practicada a terceros", "", eurTxt(pkg.irpf.retainedCents), 8);
+        pushSum("Soportada por clientes", "", eurTxt(pkg.irpf.sufferedCents), 8);
+
+        const book = xlsxWorkbookBlob([
+          {
+            name: "Conciliacion " + quarter,
+            rows: conciliationRows,
+            opts: { subtitle: "Conciliación " + quarter },
+          },
+          {
+            name: "Facturas recibidas",
+            rows: billRows,
+            opts: { subtitle: "Facturas recibidas · " + quarter },
+          },
+          {
+            name: "Facturas emitidas",
+            rows: invoiceRows,
+            opts: { subtitle: "Facturas emitidas · " + quarter },
+          },
+          {
+            name: "Resumen",
+            rows: sumRows,
+            opts: {
+              subtitle: "Resumen del trimestre · " + quarter,
+              freezeAt: 0,
+              styleOf: (i) => sumStyle[i],
+            },
+          },
+        ]);
         files.unshift({
           path: "conciliacion.xlsx",
-          bytes: new Uint8Array(await xlsx.arrayBuffer()),
+          bytes: new Uint8Array(await book.arrayBuffer()),
         });
         return {
           blob: zipStore(files),
           entries: files.map((f) => f.path),
           missing,
           rows: rows.length - 1,
+          bills: pkg.receivedBills.length,
+          invoices: pkg.issuedInvoices.length,
         };
       }
 
@@ -20825,7 +21094,10 @@
               expCsv: "supExpCsv",
             },
             newLabel: "＋ Nuevo",
-            onNew: () => newPartyDrawer("supplier"),
+            onNew: () =>
+              newPartyDrawer(null, {
+                roleChoices: ["supplier", "subcontractor", "selfEmployed"],
+              }),
             /* A SUPPLIER CAN BE BORN FROM THEIR OWN PAPER. The second door the
                      operator asked for: "we should also give the alternative to
                      capture an image or upload a ticket/invoice to create a supplier
@@ -20836,11 +21108,16 @@
             leading:
               `<label class="btn sm" id="supDocL">＋ Alta desde documento<input type="file" id="supDoc" accept="image/*,application/pdf" hidden></label>` +
               `<label class="btn sm">Cámara<input type="file" id="supCam" accept="image/*" capture="environment" hidden></label>`,
-            searchPlaceholder: "Buscar proveedor por nombre o NIF",
+            searchPlaceholder: "Buscar proveedor o industrial por nombre o NIF",
             nounSingular: "proveedor",
             nounPlural: "proveedores",
+            /* SUPPLIER_ROLES, which already includes `subcontractor`. This list
+                       named two of the three roles, so an industrial filed only as such
+                       appeared in no register at all once Maestros stopped carrying its
+                       own copy — while the PICKER that awards them work had been reading
+                       all three the whole time. One file for everyone you buy from. */
             baseRows: erp.state.parties.filter(
-              (p) => p.active && p.roles.some((r) => ["supplier", "selfEmployed"].includes(r)),
+              (p) => p.active && p.roles.some((r) => SUPPLIER_ROLES.includes(r)),
             ),
             matches: (p, q) =>
               p.name.toLowerCase().includes(q) ||
@@ -20907,89 +21184,6 @@
               el.onchange = () => {
                 if (el.files && el.files[0]) supplierFromDocStart(el.files[0]);
               };
-          });
-        },
-
-        /* ---------- Subcontratas (spec DMT-03) ----------
-          The lifecycle screens (docs, certifications, retention) retired by
-          decision 5 — the 69 engine references that ran them did not, and this is
-          the master-data screen the doc still asks for: the fichero, nothing more.
-          Reachable again from Compras/Subcontratos flows via the party record. */
-        subcontractors(v) {
-          $("#sub").textContent =
-            "Fichero de subcontratas (industriales). El ciclo de documentos y certificaciones sigue en el motor; esta pantalla es su ficha.";
-          renderMasterList(v, {
-            id: "subcontractors",
-            ids: {
-              q: "subQ",
-              size: "subSize",
-              prev: "subPrev",
-              next: "subNext",
-              newBtn: "subNew",
-              exp: "subExp",
-              expMenu: "subExpMenu",
-              expXlsx: "subExpXlsx",
-              expCsv: "subExpCsv",
-            },
-            newLabel: "＋ Nuevo",
-            onNew: () => newPartyDrawer("subcontractor"),
-            searchPlaceholder: "Buscar industrial por nombre o NIF",
-            nounSingular: "industrial",
-            nounPlural: "industriales",
-            baseRows: erp.state.parties.filter(
-              (p) => p.active && p.roles.includes("subcontractor"),
-            ),
-            matches: (p, q) =>
-              p.name.toLowerCase().includes(q) ||
-              String(p.code).toLowerCase().includes(q) ||
-              taxHit(p, q),
-            columns: [
-              { label: "Código", primary: true, get: (p) => p.code },
-              { label: "Nombre / Razón social", primary: true, get: (p) => p.name },
-              {
-                label: "NIF/CIF",
-                get: (p) => p.taxId || "",
-                html: (p) => (p.taxId ? esc(p.taxId) : TAX_PENDING),
-              },
-              {
-                label: "Contacto",
-                get: (p) => p.contactPerson || "",
-                html: (p) => esc(p.contactPerson || "—"),
-              },
-              {
-                label: "Teléfono",
-                get: (p) => p.landline || p.mobile || "",
-                html: (p) => esc(p.landline || p.mobile || "—"),
-              },
-              { label: "Email", get: (p) => p.email || "", html: (p) => esc(p.email || "—") },
-              {
-                label: "Ciudad",
-                get: (p) => p.billCity || "",
-                html: (p) => esc(p.billCity || "—"),
-              },
-              {
-                label: "Alta",
-                get: (p) => p.createdAt || "",
-                html: (p) => (p.createdAt ? fmtD(p.createdAt) : "—"),
-              },
-              {
-                label: "Datos",
-                get: (p) => {
-                  const c = erp.partyCompleteness(p.id);
-                  return c.ok ? "Completo" : `${c.pct}% · falta ${c.missing.length}`;
-                },
-                html: (p) => {
-                  const c = erp.partyCompleteness(p.id);
-                  return c.ok
-                    ? '<span class="pill g">Completo</span>'
-                    : `<span class="pill r">${c.pct}% · falta ${c.missing.length}</span>`;
-                },
-              },
-            ],
-            onRowClick: (id) => partyDrawer(id),
-            exportFile: "subcontratas",
-            exportSheetName: "Subcontratas",
-            emptyText: "Ninguna subcontrata coincide con la búsqueda.",
           });
         },
 
@@ -21509,32 +21703,32 @@
                 .toLowerCase()
                 .includes(q),
             columns: [
-                    { label: "Contrato", primary: true, get: (c) => c.number },
-                    { label: "Cliente", get: (c) => c.party },
-                    { label: "Obra", get: (c) => c.projectCode || "—" },
-                    { label: "Importe original", html: (c) => eur0(c.originalCents) },
-                    {
-                      label: "Importe vigente",
-                      html: (c) =>
-                        c.differs
-                          ? `<span class="pill y">${eur0(c.currentCents)}</span>`
-                          : eur0(c.currentCents),
-                    },
-                    { label: "Anexos", get: (c) => c.annexes || "—" },
-                    {
-                      label: "Firma",
-                      html: (c) =>
-                        c.signed
-                          ? '<span class="pill g">Firmado</span>'
-                          : '<span class="pill r">Sin firmar</span>',
-                    },
-                    {
-                      label: "Estado",
-                      html: (c) => {
-                        const l = CST[c.status] || [c.status, ""];
-                        return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
-                      },
-                    },
+              { label: "Contrato", primary: true, get: (c) => c.number },
+              { label: "Cliente", get: (c) => c.party },
+              { label: "Obra", get: (c) => c.projectCode || "—" },
+              { label: "Importe original", html: (c) => eur0(c.originalCents) },
+              {
+                label: "Importe vigente",
+                html: (c) =>
+                  c.differs
+                    ? `<span class="pill y">${eur0(c.currentCents)}</span>`
+                    : eur0(c.currentCents),
+              },
+              { label: "Anexos", get: (c) => c.annexes || "—" },
+              {
+                label: "Firma",
+                html: (c) =>
+                  c.signed
+                    ? '<span class="pill g">Firmado</span>'
+                    : '<span class="pill r">Sin firmar</span>',
+              },
+              {
+                label: "Estado",
+                html: (c) => {
+                  const l = CST[c.status] || [c.status, ""];
+                  return `<span class="pill ${l[1]}">${esc(l[0])}</span>`;
+                },
+              },
             ],
             onRowClick: (id) => {
               conWork = { id, tab: "datos" };
@@ -22077,7 +22271,12 @@
             (i) => i.active !== false && !chapters.some((c) => c.code === i.chapter),
           );
 
-          const q = catQ.trim().toLowerCase();
+          /* THE TEXT SEARCH BELONGS TO THE LIST NOW. This screen kept its own
+                   `catQ` and its own hand-rolled table, so a catalogue of two hundred
+                   subpartidas rendered two hundred rows at once — no page size, no way
+                   forward, nothing like the customer or supplier registers beside it.
+                   The chapter still decides WHICH rows; `renderMasterList` decides how
+                   many of them are on screen. */
           const rows = erp.state.catalogue
             .filter((i) => i.active !== false)
             .filter((i) =>
@@ -22086,15 +22285,6 @@
                 : catChapter === "~"
                   ? !chapters.some((c) => c.code === i.chapter)
                   : i.chapter === catChapter,
-            )
-            .filter(
-              (i) =>
-                !q ||
-                i.code.toLowerCase().includes(q) ||
-                i.desc.toLowerCase().includes(q) ||
-                catalogueDesc(i).toLowerCase().includes(q) ||
-                (i.brand || "").toLowerCase().includes(q) ||
-                (i.model || "").toLowerCase().includes(q),
             )
             .sort((a, b) => String(a.code).localeCompare(String(b.code)));
           const TYPE = {
@@ -22131,65 +22321,7 @@
            }
          </div>
          <div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-            <button class="btn primary sm" id="catNew">＋ Nueva subpartida</button>
-            <input id="catQ" placeholder="Buscar por código, descripción o marca" value="${esc(catQ)}"
-              style="flex:0 1 300px;min-width:190px;font:inherit;font-size:13px;padding:7px 10px;border:1px solid var(--line);border-radius: 0;background:var(--paper);color:var(--ink)">
-            <span class="tag">${rows.length} subpartida${rows.length === 1 ? "" : "s"}</span></div>
-          <div class="card"><div class="scroll"><table class="mlist"><thead><tr>
-            <th></th><th>Código</th><th>Descripción</th><th>Partida</th><th>Ud</th><th>Tipo</th>
-            <th>Marca</th><th>Modelo</th><th>Calidad</th>
-            <th class="num">Coste</th><th class="num">Precio</th><th class="num">Margen</th><th class="num">Fotos</th></tr></thead><tbody>
-          ${
-            rows
-              .map((i) => {
-                const m = i.defaultPriceCents
-                  ? Math.round(
-                      ((i.defaultPriceCents - i.defaultCostCents) / i.defaultPriceCents) * 1000,
-                    ) / 10
-                  : null;
-                return `<tr class="click" data-item="${i.id}">
-            <td class="pictcell" data-th="">${pict(i)}</td>
-            <td class="k" data-th="Código">${esc(i.code)}</td>
-            <td class="k" data-th="Descripción">${esc(catalogueDesc(i))}</td>
-            <td data-th="Partida">${i.chapter ? esc(chapterLabel(i.chapter)) : '<span class="pill y">sin partida</span>'}</td>
-            <td data-th="Ud">${esc(i.unit)}</td>
-            <td data-th="Tipo">${esc(TYPE[i.type] || i.type)}</td>
-            <td data-th="Marca">${esc(i.brand || "—")}</td>
-            <td data-th="Modelo">${esc(i.model || "—")}</td>
-            <td data-th="Calidad">${esc(i.quality || "—")}</td>
-            <td class="num" data-th="Coste">${eur(i.defaultCostCents)}</td>
-            <td class="num" data-th="Precio">${i.defaultPriceCents ? eur(i.defaultPriceCents) : '<span class="pill y">sin precio</span>'}</td>
-            <td class="num" data-th="Margen">${m == null ? "—" : m + "%"}</td>
-            <td class="num" data-th="Fotos">${(i.imageRefs || []).length || "—"}</td></tr>`;
-              })
-              .join("") ||
-            '<tr><td colspan="13"><div class="empty">Ninguna subpartida coincide.</div></td></tr>'
-          }
-          </tbody></table></div></div>
-          <div class="card"><div class="ch"><h3>Paquetes de trabajo</h3><span class="tag">rendimiento · merma · compra mínima · envase</span></div>
-           <div class="scroll"><table><thead><tr><th>Código</th><th>Nombre</th><th>Por</th><th class="num">Merma</th><th class="num">Mín.</th><th class="num">Envase</th><th>Componentes</th><th class="num">Coste 10 ud</th></tr></thead><tbody>
-           ${
-             erp.state.packages
-               .map(
-                 (
-                   w,
-                 ) => `<tr><td class="k">${esc(w.code)}</td><td>${esc(w.name)}</td><td>${esc(w.unit)}</td>
-             <td class="num">${w.wastePct}%</td><td class="num">${w.minPurchaseQty || "—"}</td><td class="num">${w.containerSize || "—"}</td>
-             <td>${
-               (w.components || [])
-                 .map((c) => {
-                   const it = erp.state.catalogue.find((x) => x.id === c.itemId);
-                   return esc(it ? it.code : "?") + " ×" + c.qtyPerUnitMilli / 1000;
-                 })
-                 .join(" · ") || "—"
-             }</td>
-             <td class="num k">${eur(erp.packageCostCents(w.id, 10000))}</td></tr>`,
-               )
-               .join("") ||
-             '<tr><td colspan="8"><div class="empty">Sin paquetes definidos.</div></td></tr>'
-           }
-           </tbody></table></div></div>
+          <div id="catList"></div>
          </div></div>`;
 
           const tq2 = $("#catTreeQ");
@@ -22198,17 +22330,6 @@
             const at = tq2.selectionStart;
             render();
             const n = $("#catTreeQ");
-            if (n) {
-              n.focus();
-              n.setSelectionRange(at, at);
-            }
-          };
-          const cq = $("#catQ");
-          cq.oninput = () => {
-            catQ = cq.value;
-            const at = cq.selectionStart;
-            render();
-            const n = $("#catQ");
             if (n) {
               n.focus();
               n.setSelectionRange(at, at);
@@ -22266,14 +22387,73 @@
               );
             };
           });
-          $("#catNew").onclick = () => {
-            const isOrphanBucket = catChapter === "~";
-            const seed = isOrphanBucket ? "" : catChapter;
-            catalogueItemDrawer(null, { chapter: seed });
-          };
-          v.querySelectorAll("tr.click").forEach(
-            (tr) => (tr.onclick = () => catalogueItemDrawer(tr.dataset.item)),
-          );
+          /* The list id carries the chapter, so moving between partidas does not
+                   inherit the previous one's page or its search — the same rule the
+                   reconciliation queue follows for the account. */
+          /* Built outside the cell, like `sin partida` below it: a quoted tag beside
+                   a call puts a greater-than and a less-than either side of the code
+                   between them, and the source audit reads that as a sentence nobody
+                   translated. Eighth variant of that trap in this file. */
+          const NO_PRICE = '<span class="pill y">sin precio</span>';
+          const NO_CHAPTER = '<span class="pill y">sin partida</span>';
+          const mgn = (i) =>
+            i.defaultPriceCents
+              ? Math.round(
+                  ((i.defaultPriceCents - i.defaultCostCents) / i.defaultPriceCents) * 1000,
+                ) / 10
+              : null;
+          renderMasterList($("#catList"), {
+            id: "catalogue-" + (catChapter || "all"),
+            defSize: 25,
+            ids: {
+              q: "catQ",
+              size: "catSize",
+              prev: "catPrev",
+              next: "catNext",
+              newBtn: "catNew",
+              exp: "catExp",
+              expMenu: "catExpMenu",
+              expXlsx: "catExpXlsx",
+              expCsv: "catExpCsv",
+            },
+            newLabel: "＋ Nueva subpartida",
+            onNew: () =>
+              catalogueItemDrawer(null, { chapter: catChapter === "~" ? "" : catChapter }),
+            searchPlaceholder: "Buscar por código, descripción o marca",
+            nounSingular: "subpartida",
+            nounPlural: "subpartidas",
+            baseRows: rows,
+            matches: (i, q) =>
+              i.code.toLowerCase().includes(q) ||
+              i.desc.toLowerCase().includes(q) ||
+              catalogueDesc(i).toLowerCase().includes(q) ||
+              (i.brand || "").toLowerCase().includes(q) ||
+              (i.model || "").toLowerCase().includes(q),
+            columns: [
+              { label: "", get: () => "", html: (i) => pict(i) },
+              { label: "Código", primary: true, get: (i) => i.code },
+              { label: "Descripción", primary: true, get: (i) => catalogueDesc(i) },
+              {
+                label: "Partida",
+                get: (i) => (i.chapter ? chapterLabel(i.chapter) : ""),
+                html: (i) => (i.chapter ? esc(chapterLabel(i.chapter)) : NO_CHAPTER),
+              },
+              { label: "Ud", get: (i) => i.unit },
+              { label: "Tipo", get: (i) => TYPE[i.type] || i.type },
+              { label: "Marca", get: (i) => i.brand || "", html: (i) => esc(i.brand || "—") },
+              { label: "Modelo", get: (i) => i.model || "", html: (i) => esc(i.model || "—") },
+              { label: "Calidad", get: (i) => i.quality || "", html: (i) => esc(i.quality || "—") },
+              { label: "Coste", num: true, get: (i) => eur(i.defaultCostCents) },
+              {
+                label: "Precio",
+                num: true,
+                get: (i) => (i.defaultPriceCents ? eur(i.defaultPriceCents) : ""),
+                html: (i) => (i.defaultPriceCents ? eur(i.defaultPriceCents) : NO_PRICE),
+              },
+              { label: "Margen", num: true, get: (i) => (mgn(i) == null ? "—" : mgn(i) + "%") },
+            ],
+            onRowClick: (id) => catalogueItemDrawer(id),
+          });
         },
 
         /* ---------- Unidades de medida (DMC-03) ---------- */
@@ -22830,16 +23010,7 @@
            '<tr><td colspan="15"><div class="empty">Sin precios registrados para este filtro.</div></td></tr>'
          }
          </tbody></table></div></div>
-         <div class="card"><div class="ch"><h3>Paquetes de trabajo</h3><span class="tag">rendimiento · compra mínima · envase</span></div><div class="scroll"><table><tbody>
-         ${
-           erp.state.packages
-             .map(
-               (w) =>
-                 `<tr><td class="k">${esc(w.code)} · ${esc(w.name)}</td><td>por ${esc(w.unit)}</td><td>merma ${w.wastePct}%</td><td>mín. ${w.minPurchaseQty || "—"}</td><td>envase ${w.containerSize || "—"}</td><td class="num">coste 10 ${esc(w.unit)}: ${eur(erp.packageCostCents(w.id, 10000))}</td></tr>`,
-             )
-             .join("") || '<tr><td><div class="empty">Sin paquetes definidos.</div></td></tr>'
-         }
-         </tbody></table></div></div>`;
+`;
           $("#prcItem").onchange = (e) => {
             priceItem = e.target.value;
             render();
@@ -23135,6 +23306,14 @@
                 say(
                   z.missing.length +
                     " justificante(s) sin archivo detrás — el ZIP los nombra pero no puede incluirlos.",
+                );
+              /* SAID AT THE DOOR, NOT ONLY INSIDE THE FILE. A quarter with
+                       documents and no imported statement produced a reconciliation
+                       tab with a header and nothing under it, and the operator found
+                       that out by opening the workbook. */
+              else if (!z.rows && z.bills + z.invoices > 0)
+                say(
+                  "El trimestre no tiene movimientos de banco todavía, así que la hoja de conciliación va vacía. Las facturas del trimestre sí van, en sus propias hojas.",
                 );
             };
         },
@@ -25834,7 +26013,7 @@
          single place a tercero comes into existence, it just no longer has to be
          the place you were standing when it happened. */
       function newPartyDrawer(role, opts) {
-        const { back, onCreated } = opts || {};
+        const { back, onCreated, roleChoices } = opts || {};
         const KNOWN = {
           customer: ["Nuevo cliente", "Guardar cliente", "Cliente creado"],
           supplier: ["Nuevo proveedor", "Guardar proveedor", "Proveedor creado"],
@@ -25846,12 +26025,20 @@
           "Tercero creado",
         ];
         const db = openDrawer(title, back);
-        const ROLE = [
+        /* THE ROLE CAN BE NARROWED WITHOUT BEING FIXED. A screen that pins the
+                   role hides every other one from its own creation door: Proveedores
+                   pinned `supplier`, so once Maestros stopped keeping a second copy of
+                   the party file there was no way left in the product to file an
+                   INDUSTRIAL at all — while the picker that awards them work had been
+                   reading all three roles the whole time. `roleChoices` lets a screen
+                   offer the roles it is about and no others. */
+        const ROLE_ALL = [
           ["customer", "Cliente"],
           ["supplier", "Proveedor"],
           ["subcontractor", "Industrial"],
           ["selfEmployed", "Autónomo"],
         ];
+        const ROLE = roleChoices ? ROLE_ALL.filter(([v]) => roleChoices.includes(v)) : ROLE_ALL;
         db.innerHTML = `<div class="fgrid">
          <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
          <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="f_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después">⚠</span></label><input id="f_tax" placeholder="12345678Z / B12345674"></div>
@@ -28250,6 +28437,26 @@
                opened. Keys are prefixed so a partida and a subpartida can never
                collide on a shared number. */
       const ecoOpen = new Set();
+      /* WHICH OF THE TWO QUESTIONS THE TABLE IS ANSWERING. «Ejecutado» is what
+               has been spent — the columns the operator dictated word for word, kept
+               exactly as they settled them. «Proyección» is the forward-looking cost
+               report the same operator then asked for: what is already committed,
+               what the partida is heading for at this rate, and what margin is left
+               if it gets there.
+
+               Two views rather than one row of eleven columns. They answer different
+               questions, they are read at different moments, and a construction cost
+               report that puts spent and forecast side by side on a phone is a
+               report nobody finishes reading. */
+      let ecoView = "actual";
+      /* The class of a deviation cell — by index, not by a chain of comparisons.
+               A greater-than and a less-than in one expression is exactly what the
+               source audit reads as a tag pair, and it reported the code between them
+               as a sentence awaiting translation. `Math.sign` maps under / dead on /
+               over to 0 / 1 / 2 and the operators disappear with the false positive.
+               Sixth variant of that trap in this file. */
+      const DEV_CELL = ["num good", "num", "num warn"];
+      const devCellClass = (cents) => DEV_CELL[Math.sign(cents) + 1];
       /**
        * The per-partida table, three levels deep and all of it one table.
        *
@@ -28273,8 +28480,20 @@
        * claim about exactly that a few lines further down.
        */
       function ecoTreeRows(projectId, tableRows, names, variationNums, pend) {
-        const money = (cents, warn) =>
-          `<td class="num${warn ? " warn" : ""}">${warn && cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
+        const money = (cents) => `<td class="num">${eur0(cents)}</td>`;
+        /* THE COLOUR FOLLOWS THE SIGN. This cell used to be `money(cents, true)`,
+                 and `warn` was applied whether the figure was positive or negative —
+                 so a partida twenty-four euros UNDER budget printed in danger red and
+                 bold, exactly like one four hundred over. The operator pointed at
+                 these two columns: the plus and the minus said one thing and the
+                 colour said another, on the one screen whose job is to tell those two
+                 states apart.
+
+                 Over budget is red and carries its plus; under budget is the green the
+                 margin columns already use; dead on is neither, because a deviation of
+                 zero is not an achievement to paint. */
+        const deviation = (cents) =>
+          `<td class="${devCellClass(cents)}">${cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
         const signed = (cents) =>
           `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
         const pct = (bp) =>
@@ -28284,17 +28503,6 @@
                  how two cells on one row come to disagree. */
         const signedPct = (cents, bp) =>
           `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${bp === null ? "—" : (bp / 100).toFixed(1) + "%"}</td>`;
-        const SRC2 = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
-        /* What the money bought, in the words the cost was booked under. Built
-                 as a lookup rather than a chain of ternaries between quoted strings,
-                 which is the shape the source audit reads as a sentence. */
-        const KIND_LABEL = {
-          material: "Material",
-          labour: "Mano de obra",
-          subcontract: "Subcontrata",
-          equipment: "Maquinaria",
-          other: "Otros",
-        };
         const out = [];
         for (const c of tableRows) {
           const key = "c:" + c.chapter;
@@ -28304,7 +28512,7 @@
             `<tr class="click" data-chcosts="${c.chapter}" data-ecotoggle="${esc(key)}"><td class="k"><span translate="no">${caret}</span> ${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
               money(c.budgetCents) +
               money(c.actualCents) +
-              money(c.varianceCents, true) +
+              deviation(c.varianceCents) +
               pct(c.spentBp) +
               signed(c.marginCents) +
               signedPct(c.marginCents, c.marginBp) +
@@ -28316,13 +28524,16 @@
             out.push(
               `<tr><td colspan="7" style="padding-left:26px;color:var(--muted)">Esta partida no tiene subpartidas en su línea base.</td></tr>`,
             );
+          /* Counted once for the whole partida rather than once per subpartida:
+                   `chapterCosts` walks every cost row of the job, and calling it
+                   inside the loop below turned an open partida into one full walk
+                   per line for a number printed on a button. */
+          const chDocs = erp.chapterCosts(projectId, c.chapter);
           for (const l of lines) {
             /* `lineId`, not `id` — `lineEconomics` returns {lineId, num, name,
                      …} and reading the wrong key made every subpartida key on its
                      number alone and every document filter match nothing, so a
                      subpartida showing 1.330 € reported no documents behind it. */
-            const lkey = "l:" + c.chapter + ":" + (l.lineId || l.num || "x");
-            const lopen = ecoOpen.has(lkey);
             const dev = l.actualCents - l.budgetCostCents;
             const mg = l.saleCents - l.actualCents;
             const spentBp = l.budgetCostCents
@@ -28332,49 +28543,39 @@
             const label = l.unassigned
               ? '<span class="pill y">sin subpartida</span>'
               : esc(l.num + " · " + l.name);
+            const nDocs = chDocs.filter((r) =>
+              l.unassigned ? !r.lineId : r.lineId === l.lineId,
+            ).length;
+            /* THE DOCUMENTS MOVED OUT OF THE TABLE, and this button is where they
+                     went. They used to be a third level of rows indented under this
+                     one, and the comment that lived here argued for it: the amount sat
+                     in the same column as the subtotal above, so the eye could check
+                     that the documents added up to the line they hang off.
+
+                     The operator overruled it on sight, and the geometry is why. A
+                     document row carries a supplier, a tax id and a date, and not one
+                     of those is a budget, an actual or a margin — so under a header of
+                     seven money columns they landed in columns that already meant
+                     something else, and the screen printed a supplier's name under
+                     «Presupuestado». Reported as unreadable, which it was.
+
+                     The check the old shape bought is not lost, it is stated: the panel
+                     foots its own documents and prints this subpartida's accumulated
+                     cost beside the sum, so a disagreement is a sentence rather than a
+                     column the reader has to line up by eye. */
+            const door = nDocs
+              ? `<button class="btn sm" style="margin-left:8px" data-ecodocs="${esc(String(c.chapter))}" data-ecoline="${esc(l.lineId || "")}">Documentos</button> <span class="tag" translate="no">${nDocs}</span>`
+              : `<span class="tag" style="margin-left:8px;color:var(--muted)">Sin documentos</span>`;
             out.push(
-              `<tr class="click" data-ecotoggle="${esc(lkey)}"><td style="padding-left:26px"><span translate="no">${lopen ? "▾" : "▸"}</span> ${label}</td>` +
+              `<tr data-ecosub="${esc("l:" + c.chapter + ":" + (l.lineId || l.num || "x"))}"><td style="padding-left:26px">${label}${door}</td>` +
                 money(l.budgetCostCents) +
                 money(l.actualCents) +
-                money(dev, true) +
+                deviation(dev) +
                 pct(spentBp) +
                 signed(mg) +
                 signedPct(mg, mgBp) +
                 `</tr>`,
             );
-            if (!lopen) continue;
-            const docs = erp
-              .chapterCosts(projectId, c.chapter)
-              .filter((r) => (l.unassigned ? !r.lineId : r.lineId === l.lineId));
-            if (!docs.length)
-              out.push(
-                `<tr><td colspan="7" style="padding-left:52px;color:var(--muted)">Sin documentos todavía.</td></tr>`,
-              );
-            /* THE WHOLE EXPENSE, NOT A NUMBER WITH A DATE. The operator, on the
-                     documents behind a subpartida: "it should open the full expenses
-                     list, with all the important details: supplier name, NIF, invoice,
-                     amount, date, etc." What it showed was the kind, the reference, the
-                     amount and the date — the counterparty was in the template and never
-                     rendered, because `chapterCosts` dropped `party` on its way out of
-                     `projectCostRows`.
-
-                     It stays IN the table rather than opening a drawer: this drill-down
-                     is deliberately the table itself, and the amount sits in the same
-                     column as the subtotal above it so the eye can check that the
-                     documents add up to the line they hang off. */
-            for (const r of docs) {
-              const who = r.party ? esc(r.party) : "—";
-              const nif = r.taxId ? esc(r.taxId) : "—";
-              const what = KIND_LABEL[r.kind] || "";
-              out.push(
-                `<tr><td style="padding-left:52px;color:var(--muted)">${esc(SRC2[r.source] || r.source)} · ${esc(r.ref || "—")}</td>` +
-                  `<td style="color:var(--muted)">${who}</td>` +
-                  `<td class="num">${eur0(r.amountCents)}</td>` +
-                  `<td style="color:var(--muted)" translate="no">${nif}</td>` +
-                  `<td style="color:var(--muted)">${r.date ? fmtD(r.date) : "—"}</td>` +
-                  `<td colspan="2" style="color:var(--muted)">${esc(what)}</td></tr>`,
-              );
-            }
           }
         }
         /* The money that names no partida, at the foot and in the same table.
@@ -28396,6 +28597,236 @@
           `<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`
         );
       }
+      /**
+       * The projection view of the same partidas — the forward half of a cost
+       * report, at chapter level.
+       *
+       * WHY THE PROJECTION IS COMPUTED AND CANNOT BE TYPED. The screen used to
+       * carry an «Ajustar» button over `setForecastOverride`, and the operator
+       * removed it: the budget is fixed, and the only thing that moves it is an
+       * adicional to the contract. That ruling settles this column too. Nothing
+       * here writes; every figure is derived from what is already recorded, so
+       * there is no second place a chapter's number can be changed.
+       *
+       * THE FORMULA, AND WHY THIS ONE. Cost at completion is
+       * `real + presupuestado × (1 − avance)` — spend to date plus the budget
+       * for the work still to do. The obvious alternative, `real ÷ avance`,
+       * assumes every future euro will be as inefficient as every past one, and
+       * on a partida that buys its material on day one it reports a catastrophe
+       * at five per cent progress and recants at fifty. This one degrades
+       * gracefully: at nought per cent it is the budget, at a hundred it is the
+       * real cost, and in between it moves by what actually overran.
+       *
+       * Then floored at what is already real and at what is already committed:
+       * a projection below money that is spent, or below an order that is
+       * placed and cannot be unplaced, is not a forecast, it is a wish.
+       */
+      /**
+       * The figures behind the projection view — computed once, read twice.
+       *
+       * Split from the rendering because the SCREEN needs two of its answers
+       * before it can build a header: whether this obra has any commitment at
+       * all (which decides a column) and whether any partida is being floored
+       * (which decides a footnote). Handing those back through the renderer was
+       * the first shape of this and it was a side channel on a function object —
+       * correct only while the template happened to read it after calling it.
+       */
+      function ecoForecastModel(projectId, tableRows) {
+        const committed = erp.committedByChapter(projectId);
+        const progress = {};
+        try {
+          erp.chapterProgress(projectId).forEach((c) => {
+            progress[String(c.num)] = c.progressPct || 0;
+          });
+        } catch (err) {}
+        const rows = tableRows.map((c) => {
+          const pctDone = progress[String(c.chapter)] || 0;
+          const com = committed[c.chapter] || committed[String(c.chapter)] || 0;
+          /* A PARTIDA WITH COST AND NO RECORDED PROGRESS IS NOT FORECAST.
+                   The formula reads the avance as fact, so a partida that had spent
+                   2.123 against a budget of 1.860 while still registering nought per
+                   cent was told that ALL of the budgeted work was still to come, and
+                   projected 2.123 + 1.860. That is the most damaging answer available
+                   and it is almost never the true one: nought beside real money means
+                   nobody recorded the progress, not that nothing was built. On the
+                   operator's own screen that single row carried 1.860 of a 4.722
+                   deviation.
+
+                   So a row in that state reports a FLOOR — the greater of what was
+                   budgeted and what is already spent — and says on its face that it is
+                   one. A floor understates a partida that genuinely has work left, and
+                   that is the right way to be wrong here: the mark tells the reader the
+                   figure is provisional, and the remedy, recording the avance, is the
+                   same thing that makes the whole column mean something. */
+          const noProgress = pctDone === 0 && c.actualCents > 0;
+          const toGo = Math.round((c.budgetCents * (100 - pctDone)) / 100);
+          const projected = noProgress
+            ? Math.max(c.budgetCents, c.actualCents, com)
+            : Math.max(c.actualCents + toGo, c.actualCents, com);
+          return {
+            ...c,
+            pctDone,
+            noProgress,
+            committedCents: com,
+            projectedCents: projected,
+            devCents: projected - c.budgetCents,
+            marginFcastCents: c.saleCents - projected,
+          };
+        });
+        return {
+          rows,
+          /* THE COLUMN APPEARS WHEN THERE IS SOMETHING TO PUT IN IT. The operator
+                     stopped using purchase orders, and the only other source of a
+                     commitment is a subcontract award — so on their obras this column
+                     could print nothing but zero, for ever, in a table already short of
+                     width. A column that can only ever be empty is worse than no column:
+                     it takes the space and implies the data exists.
+
+                     Hidden rather than deleted, and computed rather than configured: the
+                     day an award names a partida the column comes back on its own, with
+                     no setting to remember and nothing to migrate. */
+          showCommitted: rows.some((r) => r.committedCents > 0),
+          anyFloor: rows.some((r) => r.noProgress),
+        };
+      }
+
+      function ecoForecastRows(model, names, variationNums, pend) {
+        const { rows, showCommitted } = model;
+        const cell = (cents) => `<td class="num">${eur0(cents)}</td>`;
+        const dev = (cents) =>
+          `<td class="${devCellClass(cents)}">${cents > 0 ? "+" : ""}${eur0(cents)}</td>`;
+        const signed = (cents) =>
+          `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${eur0(cents)}</td>`;
+        const nil = `<td class="num">—</td>`;
+        /* The two pills, each in its own statement. Written as one expression they
+                 put a greater-than and a less-than either side of the code between them,
+                 which the source audit reads as a tag pair and reports as a sentence
+                 nobody translated — the seventh variant of that trap in this file. */
+        const VAR_PILL = ' <span class="pill b">variación</span>';
+        const FLOOR_PILL = ' <span class="pill y">sin avance</span>';
+        const out = rows.map((r) => {
+          const varTag = variationNums.has(String(r.chapter)) ? VAR_PILL : "";
+          const floorTag = r.noProgress ? FLOOR_PILL : "";
+          const tags = varTag + floorTag;
+          const body =
+            cell(r.budgetCents) +
+            (showCommitted ? cell(r.committedCents) : "") +
+            cell(r.actualCents) +
+            `<td class="num" translate="no">${r.pctDone}%</td>` +
+            cell(r.projectedCents) +
+            dev(r.devCents) +
+            signed(r.marginFcastCents);
+          return `<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${tags}</td>${body}</tr>`;
+        });
+        /* The money that names no partida is projected at exactly itself: it is
+                 already spent, and nothing about it is still to come. Leaving it out
+                 would make the total below disagree with the card above by the one
+                 figure this screen already has a pill for. */
+        const pendCents = (pend || []).reduce((a, r) => a + r.amountCents, 0);
+        if (pendCents) {
+          const spent = cell(pendCents);
+          const com = showCommitted ? nil : "";
+          out.push(
+            `<tr><td class="k"><span class="pill y">Sin partida</span></td>${nil}${com}${spent}${nil}${spent}${nil}${nil}</tr>`,
+          );
+        }
+        if (!out.length)
+          return `<tr><td colspan="${showCommitted ? 8 : 7}"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`;
+        const tot = (pick) => rows.reduce((a, r) => a + r[pick], 0);
+        const totProjected = tot("projectedCents") + pendCents;
+        const totCells =
+          cell(tot("budgetCents")) +
+          (showCommitted ? cell(tot("committedCents")) : "") +
+          cell(tot("actualCents") + pendCents) +
+          nil +
+          cell(totProjected) +
+          dev(totProjected - tot("budgetCents")) +
+          signed(tot("saleCents") - totProjected);
+        out.push(`<tr class="ecototal"><td class="k">Total</td>${totCells}</tr>`);
+        return out.join("");
+      }
+
+      /**
+       * The documents behind ONE subpartida of Avance económico, in a panel.
+       *
+       * A cost document answers a different question from the row it hangs off.
+       * The row is four money columns and two percentages; the document is who
+       * issued it, under what tax id, on what day, and for how much. Putting the
+       * second under the header of the first is what the operator saw and
+       * rejected: the supplier name sat in the column labelled with the budget,
+       * the tax id under the deviation, the date under the percentage.
+       *
+       * What the in-table shape bought was a vertical check — the amounts under
+       * the subtotal. That is kept as a printed claim instead: the sum of these
+       * documents and the subpartida accumulated cost are shown side by side,
+       * with a pill that says whether they agree. A footing that is asserted
+       * beats one the reader has to perform.
+       */
+      function lineCostsDrawer(projectId, chapterNum, lineId) {
+        const SRC2 = { bill: "Factura", labour: "Horas", movement: "Banco", capture: "Documento" };
+        /* What the money bought, in the words the cost was booked under. Built
+           as a lookup rather than a chain of ternaries between quoted strings,
+           which is the shape the source audit reads as a sentence. */
+        const KIND_LABEL = {
+          material: "Material",
+          labour: "Mano de obra",
+          subcontract: "Subcontrata",
+          equipment: "Maquinaria",
+          other: "Otros",
+        };
+        const lines = erp.lineEconomics(projectId, chapterNum);
+        const line = lines.find((l) => (lineId ? l.lineId === lineId : l.unassigned));
+        const docs = erp
+          .chapterCosts(projectId, chapterNum)
+          .filter((r) => (lineId ? r.lineId === lineId : !r.lineId));
+        const label = line && !line.unassigned ? line.num + " · " + line.name : String(chapterNum);
+        const sum = docs.reduce((a, r) => a + r.amountCents, 0);
+        const actual = line ? line.actualCents : sum;
+        const agrees = sum === actual;
+        /* EVERY PIECE BUILT BEFORE THE PAGE, none of them beside another inside
+                 it. A template literal that ends where the next one begins — the two
+                 arms of a ternary, a `.join()` between two backticks — is read by the
+                 source audit as one string running through the code between them, and
+                 the code then arrives in the miss ledger as a sentence to translate.
+                 Recorded five times in this repository already; this drawer had two of
+                 them at once. */
+        const rowsHtml = docs
+          .map((r) => {
+            const cells =
+              `<td>${r.date ? fmtD(r.date) : "—"}</td>` +
+              `<td>${esc(SRC2[r.source] || r.source)}</td>` +
+              `<td translate="no">${esc(r.ref || "—")}</td>` +
+              `<td>${r.party ? esc(r.party) : "—"}</td>` +
+              `<td translate="no">${r.taxId ? esc(r.taxId) : "—"}</td>` +
+              `<td>${esc(KIND_LABEL[r.kind] || "—")}</td>` +
+              `<td class="num" translate="no">${eur(r.amountCents)}</td>`;
+            return `<tr>${cells}</tr>`;
+          })
+          .join("");
+        const emptyHtml = `<tr><td colspan="7"><div class="empty">Esta subpartida no tiene documentos todavía.</div></td></tr>`;
+        const agreeHtml = agrees
+          ? `<span class="pill g">Cuadra</span><span style="flex:1;margin-left:8px">Los documentos de abajo suman exactamente el acumulado de esta subpartida.</span>`
+          : `<span class="pill r">No cuadra</span><span style="flex:1;margin-left:8px">Los documentos de abajo no suman el acumulado de esta subpartida.</span><b translate="no">${eur(sum)}</b>`;
+        const heading = line && line.unassigned ? "Costes sin subpartida" : "Esta subpartida";
+        const b = openDrawer("Documentos · " + label);
+        b.innerHTML = `
+          <div class="card"><div class="ch"><h3>${esc(heading)}</h3><span class="tag" translate="no">${esc(String(chapterNum))}</span></div>
+           <div class="daylist">
+            <div class="it"><span style="flex:1">Presupuestado</span><b translate="no">${eur(line ? line.budgetCostCents : 0)}</b></div>
+            <div class="it"><span style="flex:1">Acumulado real</span><b translate="no">${eur(actual)}</b></div>
+            <div class="it">${agreeHtml}</div>
+           </div></div>
+
+          <div class="card"><div class="ch"><h3>Documentos</h3><span class="tag" translate="no">${docs.length}</span></div>
+           <div class="scroll"><table><thead><tr>
+             <th>Fecha</th><th>Origen</th><th>Referencia</th><th>Proveedor</th>
+             <th>NIF</th><th>Tipo</th><th class="num">Importe</th></tr></thead><tbody>
+           ${rowsHtml || emptyHtml}
+           </tbody></table></div>
+           <div class="daylist"><div class="it" style="color:var(--muted)">El coste se asigna a la subpartida desde Gastos y desde Horas; desde aquí solo se consulta.</div></div>
+          </div>`;
+      }
+
       function economicsPanel(body, id) {
         const p = erp.project(id);
         const e = erp.projectEconomics(id);
@@ -28470,6 +28901,19 @@
                  sat 45 € short of the card above it. It is a footer of the table it
                  makes a claim about now, which is closer to the figures it is
                  about than the separate card ever was. */
+        /* Built before the page, because the header depends on it: whether the
+                 commitment column has anything to show and whether any partida is being
+                 floored are answers about the DATA, and a template cannot ask a question
+                 whose answer it also has to print above itself. The two notes are built
+                 unconditionally and shown conditionally — a literal inside a conditional
+                 inside a template is what the source audit reads as untranslated prose. */
+        const fcast = ecoForecastModel(id, tableRows);
+        const fcastCommittedNote = fcast.showCommitted
+          ? `<div class="it" style="color:var(--muted)">Comprometido es lo ya pedido o adjudicado, esté facturado o no, y el proyectado nunca baja de ahí.</div>`
+          : "";
+        const fcastFloorNote = fcast.anyFloor
+          ? `<div class="it" style="color:var(--muted)">Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.</div>`
+          : "";
         const agreeNote = tableAgrees
           ? `<div class="it"><span class="pill g">Cuadra</span><span style="flex:1;margin-left:8px">Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.</span></div>`
           : `<div class="it"><span class="pill r">No cuadra</span>
@@ -28488,14 +28932,38 @@
 
           <div class="card" style="margin-top:12px"><div class="ch"><h3>Por partida</h3>
             <span style="flex:1"></span>
-            <button class="btn sm" id="ecoAll">${ecoOpen.size ? "Contraer todo" : "Desplegar todo"}</button></div>
-           <div class="scroll"><table><thead><tr>
+            ${
+              ecoView === "actual"
+                ? `<button class="btn sm" id="ecoAll">${ecoOpen.size ? "Contraer todo" : "Desplegar todo"}</button>`
+                : ""
+            }</div>
+           <div class="tabstrip" style="padding:0 12px">
+             <button class="tab${ecoView === "actual" ? " on" : ""}" data-ecoview="actual">Ejecutado</button>
+             <button class="tab${ecoView === "forecast" ? " on" : ""}" data-ecoview="forecast">Proyección</button>
+           </div>
+           ${
+             ecoView === "actual"
+               ? `<div class="scroll"><table><thead><tr>
              <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
              <th class="num">Desviación</th><th class="num">%</th>
              <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
            ${ecoTreeRows(id, tableRows, names, variationNums, pend)}
            </tbody></table></div>
-           <div class="daylist">${agreeNote}<div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>
+           <div class="daylist">${agreeNote}<div class="it" style="color:var(--muted)">Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y el botón de documentos de una subpartida para ver lo que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.</div></div>`
+               : `<div class="scroll"><table><thead><tr>
+             <th>Partida</th><th class="num">Presupuestado</th>${fcast.showCommitted ? '<th class="num">Comprometido</th>' : ""}
+             <th class="num">Acumulado real</th><th class="num">Avance</th>
+             <th class="num">Proyectado</th><th class="num">Desviación</th>
+             <th class="num">Margen previsto</th></tr></thead><tbody>
+           ${ecoForecastRows(fcast, names, variationNums, pend)}
+           </tbody></table></div>
+           <div class="daylist">
+            <div class="it" style="color:var(--muted)">Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda. Desviación es proyectado menos presupuestado.</div>
+            ${fcastCommittedNote}
+            ${fcastFloorNote}
+            <div class="it" style="color:var(--muted)">Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.</div>
+           </div>`
+           }
           </div>
           </div>`;
 
@@ -28517,6 +28985,24 @@
               const k = row.dataset.ecotoggle;
               if (ecoOpen.has(k)) ecoOpen.delete(k);
               else ecoOpen.add(k);
+              render();
+            }),
+        );
+        /* The third level is a panel now, so it needs a door of its own —
+                 `stopPropagation` because the button sits inside a row that toggles,
+                 and a click that both opened the documents and collapsed the partida
+                 they belong to is a click that undoes itself. */
+        body.querySelectorAll("[data-ecodocs]").forEach(
+          (btn) =>
+            (btn.onclick = (ev) => {
+              ev.stopPropagation();
+              lineCostsDrawer(id, btn.dataset.ecodocs, btn.dataset.ecoline || null);
+            }),
+        );
+        body.querySelectorAll("[data-ecoview]").forEach(
+          (b) =>
+            (b.onclick = () => {
+              ecoView = b.dataset.ecoview;
               render();
             }),
         );
@@ -29859,7 +30345,8 @@
                 : { ref: "", why: "", note: "", chg: null };
             }
             const b = a.budgetId ? erp.state.budgets.find((x) => x.id === a.budgetId) : null;
-            const v = b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
+            const v =
+              b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
             return {
               ref: a.ref || (v && v.adiNumber) || (b && b.number) || "",
               why: (v && v.reason) || (b && b.internalRef) || "",

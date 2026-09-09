@@ -990,8 +990,57 @@ window.CANEI_DICT.ca = {
   "Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.":
     "Tot el cost d'aquesta obra té partida. La taula quadra amb el projecte.",
   "La tabla no cuadra con el coste del proyecto.": "La taula no quadra amb el cost del projecte.",
-  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
-    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. Premi una partida per veure les seves subpartides, i una subpartida per veure els documents que hi ha darrere. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
+  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y el botón de documentos de una subpartida para ver lo que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
+    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. Premi una partida per veure les seves subpartides, i el botó de documents d'una subpartida per veure què hi ha darrere. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
+  Proyección: "Projecció",
+  Proyectado: "Projectat",
+  "Documentos ·": "Documents ·",
+  "Esta subpartida": "Aquesta subpartida",
+  "Costes sin subpartida": "Costos sense subpartida",
+  "Sin documentos": "Sense documents",
+  "Esta subpartida no tiene documentos todavía.": "Aquesta subpartida encara no té documents.",
+  "Los documentos de abajo suman exactamente el acumulado de esta subpartida.":
+    "Els documents de sota sumen exactament l'acumulat d'aquesta subpartida.",
+  "Los documentos de abajo no suman el acumulado de esta subpartida.":
+    "Els documents de sota no sumen l'acumulat d'aquesta subpartida.",
+  "Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.":
+    "Aquesta vista arriba fins a la partida i no baixa a la subpartida: una comanda i una adjudicació es signen contra una partida, i repartir-les entre subpartides seria inventar una dada que ningú ha registrat.",
+  "El coste se asigna a la subpartida desde Gastos y desde Horas; desde aquí solo se consulta.":
+    "El cost s'assigna a la subpartida des de Despeses i des d'Hores; des d'aquí només es consulta.",
+  "Base (€)": "Base (€)",
+  "Cuota IVA (€)": "Quota IVA (€)",
+  "Cuota (€)": "Quota (€)",
+  "Retención (€)": "Retenció (€)",
+  "Pagado (€)": "Pagat (€)",
+  "Cobrado (€)": "Cobrat (€)",
+  "Facturas recibidas ·": "Factures rebudes ·",
+  "Facturas emitidas ·": "Factures emeses ·",
+  "Resumen del trimestre ·": "Resum del trimestre ·",
+  "IVA repercutido por tipo": "IVA repercutit per tipus",
+  "IVA soportado por tipo": "IVA suportat per tipus",
+  Repercutido: "Repercutit",
+  Soportado: "Suportat",
+  "Resultado del trimestre": "Resultat del trimestre",
+  IRPF: "IRPF",
+  "Practicada a terceros": "Practicada a tercers",
+  "Soportada por clientes": "Suportada per clients",
+  "Sin movimientos de banco en este trimestre — importe el extracto en Conciliación. Las facturas del trimestre están en las otras hojas.":
+    "Sense moviments de banc en aquest trimestre — importi l'extracte a Conciliació. Les factures del trimestre són a les altres pestanyes.",
+  "El trimestre no tiene movimientos de banco todavía, así que la hoja de conciliación va vacía. Las facturas del trimestre sí van, en sus propias hojas.":
+    "El trimestre encara no té moviments de banc, així que el full de conciliació va buit. Les factures del trimestre sí que hi van, en fulls propis.",
+  "Efectivo pendiente de justificar": "Efectiu pendent de justificar",
+  justificado: "justificat",
+  devuelto: "retornat",
+  "Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.":
+    "Un reintegrament s'explica amb els tiquets que va pagar i amb el que torna al banc. Obri'l per adjuntar-hi els seus documents; el que sobri es torna identificant l'ingrés com a devolució d'efectiu.",
+  "sin avance": "sense avanç",
+  "Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda. Desviación es proyectado menos presupuestado.":
+    "Projectat és cap a on va la partida a aquest ritme: el gastat més el pressupost de la feina que queda. Desviació és projectat menys pressupostat.",
+  "Comprometido es lo ya pedido o adjudicado, esté facturado o no, y el proyectado nunca baja de ahí.":
+    "Compromès és el que ja s'ha demanat o adjudicat, estigui facturat o no, i el projectat mai no baixa d'aquí.",
+  "Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.":
+    "Una partida amb despesa i sense avanç registrat no es pot projectar: es mostra el terra, el més gran entre el pressupostat i el gastat, i es marca «sense avanç». Registra l'avanç a Avanç físic perquè la projecció signifiqui alguna cosa.",
+  "Buscar proveedor o industrial por nombre o NIF": "Cerca proveidor o industrial per nom o NIF",
   "Motivo del adicional": "Motiu de l'addicional",
   "Días de plazo que añade": "Dies de termini que afegeix",
   "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",
