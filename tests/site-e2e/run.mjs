@@ -10170,6 +10170,61 @@ async function testContractCreation(browser, base) {
       });
     }
 
+    /* PK13-S28 · A PROGRESS MILESTONE CARRIES ITS PER CENT ALL THE WAY DOWN.
+       `readHitos` splits «atProgressPct:50» into a trigger and a threshold, and
+       `save` copied the trigger and dropped the number — so CON-04 refused the
+       WHOLE contract with «A progress milestone needs one of 10, 20, … 90 per
+       cent», naming a field the screen never showed. Choosing «Al 50 % de
+       avance» made a contract impossible to create.
+
+       Driven through the SCREEN: the trigger is chosen in the row's own select,
+       exactly as a person does it, and what is asserted is the contract the
+       engine ends up holding. */
+    const progressHito = await pg.evaluate(async () => {
+      const held = erp.state.contracts.find((x) => x.budgetId);
+      if (held) held.budgetId = null;
+      const b = erp.state.budgets.find(
+        (x) => x.acceptedVersionId && !erp.state.contracts.some((c) => c.budgetId === x.id),
+      );
+      if (!b) return { skipped: true };
+      newContractDrawer({ budgetId: b.id });
+      await new Promise((r) => setTimeout(r, 700));
+      document.getElementById("cn_days").value = "30";
+      // Two rows: half at 50 % of progress, half when the work is finished.
+      document.getElementById("cn_addh").click();
+      await new Promise((r) => setTimeout(r, 250));
+      const rows = [...document.querySelectorAll("[data-hrow]")];
+      if (rows.length < 2) return { rows: rows.length };
+      rows[0].querySelector("[data-htrig]").value = "atProgressPct:50";
+      rows[0].querySelector("[data-hpct]").value = "50";
+      rows[1].querySelector("[data-htrig]").value = "onCompletion";
+      rows[1].querySelector("[data-hpct]").value = "50";
+      const before = erp.state.contracts.length;
+      document.getElementById("cn_save").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const c = erp.state.contracts[erp.state.contracts.length - 1];
+      return {
+        created: erp.state.contracts.length === before + 1,
+        installments: (c && c.installments ? c.installments : []).map((i) => ({
+          t: i.trigger,
+          p: i.progressPct == null ? null : i.progressPct,
+        })),
+      };
+    });
+    if (progressHito.skipped) {
+      bad("COM-04 PK13-S28", "no uncontracted acceptance to drive the check");
+    } else if (
+      progressHito.created &&
+      progressHito.installments.some((i) => i.t === "atProgressPct" && i.p === 50) &&
+      progressHito.installments.some((i) => i.t === "onCompletion")
+    )
+      ok(
+        "COM-04: «al 50 % de avance» y «a la finalización» conviven, y el umbral llega al contrato",
+      );
+    else bad("COM-04 PK13-S28 progress milestone", JSON.stringify(progressHito));
+    await pg.evaluate(() => closeDrawer());
+    await pg.waitForTimeout(250);
+
     /* S6 · THE NEXT STEP OFFERED WHERE THE LAST ONE ENDED. The operator used
        to accept a quote and then go to another screen to find «＋ Nuevo
        contrato» and pick that same quote out of a list. */

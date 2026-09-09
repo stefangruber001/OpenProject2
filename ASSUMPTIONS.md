@@ -10007,3 +10007,54 @@ ordenado por código eso está muy lejos de la fila veinticinco: ahora lo BUSCA,
 es lo que hace una persona, y de paso ejerce el buscador de la lista. La de la
 forma del shell fijaba 31 subsecciones y ahora son 30; repinchada con el motivo al
 lado, que es para lo que sirve fijarla.
+
+**S118 · Elegir «Al 50 % de avance» hacía imposible crear el contrato.** El
+operador lo contó como que no podía poner la otra mitad al terminar. El fallo era
+mayor: el contrato ENTERO se rechazaba.
+
+Una fila de hito lleva un solo `<select>` con dos hechos dentro —
+`atProgressPct:50`— y `readHitos` los separa correctamente en un trigger y un
+`progressPct`. `save` construía los `installments` copiando `trigger`, `pct` y
+`expectedDate`, y **tiraba el umbral**. `_validateContractTerms` lo exige por
+CON-04, así que `createContract` lanzaba «A progress milestone needs one of 10,
+20, … 90 per cent» — nombrando un campo que la pantalla nunca enseñó y que el
+operador no podía rellenar. Con la fila del 50 % puesta, no había contrato.
+
+**Probado contra el motor antes de tocar nada**, porque la sospecha y la causa no
+son lo mismo: `{trigger:"atProgressPct", pct:50}` se rechaza,
+`{trigger:"atProgressPct", pct:50, progressPct:50}` se acepta, y
+`{trigger:"onCompletion", pct:50}` se acepta. La otra mitad SÍ tenía sitio; lo que
+no se podía guardar era el contrato con la primera dentro.
+
+**Y no existe «al 100 % de avance», a propósito.** `progressTriggerSteps` va de 10
+a 90: el cien por cien es «A la finalización», que es un trigger propio. Anotado
+porque es la pregunta que sigue a este arreglo.
+
+**S118a · La comprobación PULSA el select, no llama a la función.** Elige el
+trigger en la fila, rellena las dos mitades, guarda, y afirma lo que el MOTOR
+acaba teniendo: un `atProgressPct` con `progressPct: 50` y un `onCompletion`
+conviviendo. Verificada contra el fallo, donde informa `created:false` — el
+síntoma exacto del operador en JSON. Quinta vez en dos paquetes que la regla vale
+la pena: ejercer la puerta, no la habitación.
+
+**S118b · Dos peticiones quedan PROPUESTAS, sin implementar, a petición expresa.**
+
+_Heredar el reparto de pago del presupuesto._ Hoy no hay nada estructurado que
+heredar: `paymentConditions` es una lista de FRASES —el código y la etiqueta son
+la misma cadena, «40% a la firma · 40% a mitad de obra · 20% a la finalización»— y
+el comentario del cajón ya rechaza parsearla, con razón. La propuesta es que cada
+entrada de esa lista lleve un `installments` opcional y estructurado; el contrato
+siembra sus filas cuando existe y se teclea como hoy cuando no. Coste: un campo
+opcional en una lista que el propietario ya mantiene, el seed de las cuatro
+condiciones existentes, y una línea en `newContractDrawer`. Cero en el motor.
+
+_Títulos sobre las partidas._ La partida es la unidad que lee TODO: `chapterNum`
+viaja en cada asignación de gasto, en las certificaciones, en `chapterEconomics`,
+`chapterProgress`, `committedByChapter`, los anexos y el paquete de gestoría. Un
+tercer nivel real toca todo eso. La propuesta es que el título sea una ETIQUETA de
+la partida y no un contenedor: un campo `title` opcional en el capítulo, y el
+documento agrupa bajo una cabecera las partidas consecutivas que lo comparten.
+`addChapter` ya hace `Object.assign` sobre sus valores por defecto, así que el
+motor lo almacena sin cambiar una línea. El precio, dicho por delante: un título
+no puede partirse en dos tramos no consecutivos sin imprimirse dos veces, y no se
+reordena de golpe — se mueven sus partidas.

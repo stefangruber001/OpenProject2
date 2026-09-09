@@ -26931,13 +26931,25 @@
           }
           readHitos();
           const days = Math.round(+$("#cn_days").value || 0);
+          /* THE THRESHOLD TRAVELS WITH THE TRIGGER. `readHitos` splits
+                   «atProgressPct:50» into a trigger and a `progressPct`, and this map
+                   copied the trigger and dropped the number — so every progress
+                   milestone reached `createContract` as `atProgressPct` with no per
+                   cent on it, and CON-04 refused the WHOLE contract:
+                   «A progress milestone needs one of 10, 20, … 90 per cent». Choosing
+                   «Al 50 % de avance» made the contract impossible to create, and the
+                   refusal named a field the screen never showed. */
           const installments = hitos
             .filter((h) => Number(h.pct) > 0)
-            .map((h) => ({
-              trigger: h.trigger,
-              pct: Number(h.pct),
-              expectedDate: h.date || null,
-            }));
+            .map((h) => {
+              const rec = {
+                trigger: h.trigger,
+                pct: Number(h.pct),
+                expectedDate: h.date || null,
+              };
+              if (h.progressPct != null) rec.progressPct = h.progressPct;
+              return rec;
+            });
           const signedOn = $("#cn_signed").value || null;
           const start = $("#cn_start").value || null;
           const budgetId = $("#cn_budget").value;

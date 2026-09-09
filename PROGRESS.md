@@ -2076,7 +2076,7 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Twenty-seven reports from the operator against the live workspace, arriving
+Twenty-eight reports from the operator against the live workspace, arriving
 faster than they could be batched, and almost every one of them a screen that
 was silent rather than wrong. One commit per report or per pair, each one green
 on the unfiltered browser run before it was made.
@@ -2708,6 +2708,32 @@ siempre. Proveedores lee `SUPPLIER_ROLES` y el alta ofrece los tres roles.
 Gates: site E2E **780/780 unfiltered**, `pnpm test` 27/27, manageability 513/513,
 site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
 workspace audit 0/0, rutas iOS 9/9. ASSUMPTIONS S117, S117a–S117c.
+
+**S28 · «Al 50 % de avance» hacía imposible crear el contrato.** El operador lo
+contó como que no podía poner la otra mitad al terminar; el fallo era mayor. La
+fila de hito lleva un `<select>` con dos hechos dentro, `atProgressPct:50`, y
+`readHitos` los separa bien — pero `save` copiaba el trigger y **tiraba el
+umbral**, y CON-04 lo exige. `createContract` lanzaba «A progress milestone needs
+one of 10, 20, … 90 per cent», nombrando un campo que la pantalla nunca enseñó.
+Con esa fila puesta no había contrato.
+
+Probado contra el motor antes de tocar nada: sin umbral se rechaza, con umbral se
+acepta, y `onCompletion` se acepta — la otra mitad sí tenía sitio. Y no existe «al
+100 % de avance» a propósito: los umbrales van de 10 a 90 y el cien por cien es «A
+la finalización».
+
+La comprobación pulsa el select en vez de llamar a la función, y se verificó
+contra el fallo, donde informa `created:false` — el síntoma del operador en JSON.
+
+**Dos peticiones más quedan propuestas y sin implementar, a petición expresa:**
+heredar el reparto de pago del presupuesto (hoy `paymentConditions` es prosa, no
+datos; la propuesta le añade un `installments` opcional) y los **Títulos** sobre
+las partidas (como etiqueta de la partida, no como contenedor, porque `chapterNum`
+lo lee todo el sistema). Ambas en ASSUMPTIONS S118b.
+
+Gates: site E2E **781/781 unfiltered**, `pnpm test` 27/27, manageability 513/513,
+site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
+workspace audit 0/0. ASSUMPTIONS S118, S118a, S118b.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker
