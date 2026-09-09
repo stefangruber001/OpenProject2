@@ -2076,7 +2076,7 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Twenty-six reports from the operator against the live workspace, arriving
+Twenty-seven reports from the operator against the live workspace, arriving
 faster than they could be batched, and almost every one of them a screen that
 was silent rather than wrong. One commit per report or per pair, each one green
 on the unfiltered browser run before it was made.
@@ -2678,6 +2678,36 @@ render and put back: the column goes, the rows narrow with it, and it returns.
 Gates: site E2E **778/778 unfiltered**, `pnpm test` 27/27 tasks, manageability
 513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
 literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S116, S116a–S116c.
+
+**S27 · Tres pantallas señaladas a la vez.** El operador marcó en verde, rojo y
+naranja tres partes de Maestros, y las tres resultaron ser el mismo fallo con
+distinta cara: algo que no comparte el primitivo que todos los demás comparten.
+
+**Verde — el catálogo era el único registro sin paginar.** 209 subpartidas
+dibujaban 209 filas, con tabla propia y sin tamaño de página, mientras Clientes y
+Proveedores usan `renderMasterList` desde hace tres paquetes. Ahora lo usa: filas
+por pantalla, anterior/siguiente y exportación que no tenía. Y el primitivo
+aprendió columnas numéricas, que no soportaba, para que Coste, Precio y Margen
+sigan alineados — lo ganan todas las listas.
+
+**Rojo — los paquetes de trabajo, muertos por los dos extremos.** Ninguna pantalla
+podía crear uno y `packageCostCents` no alimentaba nada salvo las dos tablas que
+lo imprimían. Retiradas. Los métodos del motor se quedan porque los afirma la
+simulación, sin puerta y anotado como tal.
+
+**Naranja — dos cosas con un nombre.** `Maestros > Subcontratas` era un filtro por
+rol sobre el mismo `parties` que Proveedores: retirada. `Obra > Subcontratos` son
+las adjudicaciones, con certificaciones y documentación con caducidad, y alimentan
+la columna Comprometido: se queda.
+
+**Y retirarla abría una trampa.** Proveedores nombraba dos de los tres roles y su
+alta fijaba `supplier`, así que un industrial se habría quedado sin registro y sin
+forma de crearse — mientras el selector que les adjudica obra leía los tres desde
+siempre. Proveedores lee `SUPPLIER_ROLES` y el alta ofrece los tres roles.
+
+Gates: site E2E **780/780 unfiltered**, `pnpm test` 27/27, manageability 513/513,
+site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
+workspace audit 0/0, rutas iOS 9/9. ASSUMPTIONS S117, S117a–S117c.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

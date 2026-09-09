@@ -9954,3 +9954,56 @@ pair and reported the code as a sentence awaiting translation. Each pill is its
 own statement now. The old combined footer paragraph was retired from both
 dictionaries rather than left behind, because the notes are printed conditionally
 now and a dead entry is a thing that drifts.
+
+**S117 · Tres pantallas señaladas a la vez, y las tres tenían razón.** El operador
+marcó en verde, rojo y naranja tres partes de la misma zona de Maestros. Las tres
+resultaron ser el mismo tipo de fallo con distinta cara.
+
+**El catálogo era el único registro sin paginar.** Doscientas nueve subpartidas
+dibujaban doscientas nueve filas: tabla escrita a mano, buscador propio, sin
+tamaño de página y sin forma de avanzar — mientras Clientes, Proveedores, Personal
+y la cola de conciliación comparten `renderMasterList` desde hace tres paquetes.
+Ahora lo comparte también, y gana lo que ese primitivo trae de serie: filas por
+pantalla, anterior y siguiente, y exportación a xlsx/csv que no tenía. El id de la
+lista lleva el capítulo dentro, así que cambiar de partida no hereda ni la página
+ni la búsqueda de la anterior — la misma regla que sigue la cola con la cuenta.
+
+**Y `renderMasterList` no sabía de columnas numéricas.** Coste, Precio y Margen
+habrían quedado alineados a la izquierda. Una línea en el primitivo, y la ganan
+todas las listas del producto.
+
+**S117a · Los paquetes de trabajo estaban muertos por los dos extremos.** Ninguna
+pantalla podía crear uno: `addWorkPackage` solo se llama desde el seed y desde las
+simulaciones. Y `packageCostCents` no alimentaba nada — su único consumidor eran
+las dos tablas que lo imprimían. Ni puerta de entrada ni consumidor: la definición
+exacta de código que ocupa sitio y no hace nada. Se van las dos tarjetas.
+
+**Los métodos del motor se quedan**, y esto es una decisión, no un olvido: los
+afirma `manageability-sim` y retirarlos tocaría 513 comprobaciones a cambio de
+nada visible. Quedan sin puerta, que es el patrón que este paquete lleva
+encontrando toda la semana; anotado aquí para que la próxima sesión lo vea escrito
+en vez de volver a descubrirlo.
+
+**S117b · Subcontratas eran dos cosas con un solo nombre, y el operador leía la
+que sobraba.** `Maestros > Subcontratas` era un filtro por rol sobre el MISMO
+`state.parties` que Proveedores: dos pantallas, una colección. Retirada.
+`Obra > Subcontratos` no es eso: son las adjudicaciones, con certificado,
+retención y documentación obligatoria con caducidad, y es lo que alimenta la
+columna Comprometido de Proyección. Esa se queda.
+
+**Y retirarla abría una trampa que casi se cuela.** La lista de Proveedores
+nombraba `supplier` y `selfEmployed` y su alta FIJABA `supplier`. Sin la pantalla
+de Maestros, un industrial se habría quedado sin registro Y sin forma de darse de
+alta — mientras `supplierOptions`, el selector que les adjudica obra, llevaba
+leyendo los tres roles desde siempre. Tres sitios y tres respuestas distintas
+sobre qué es un proveedor. Ahora Proveedores lee `SUPPLIER_ROLES`, y
+`newPartyDrawer` acepta `roleChoices` para que una pantalla ofrezca los roles de
+los que trata sin fijar uno. La comprobación afirma las dos mitades: que el
+industrial se lista y que se puede crear.
+
+**S117c · Dos comprobaciones cayeron por el cambio, y las dos decían algo.** La
+del idioma buscaba DEM-101 en la primera página, y en un registro paginado y
+ordenado por código eso está muy lejos de la fila veinticinco: ahora lo BUSCA, que
+es lo que hace una persona, y de paso ejerce el buscador de la lista. La de la
+forma del shell fijaba 31 subsecciones y ahora son 30; repinchada con el motivo al
+lado, que es para lo que sirve fijarla.

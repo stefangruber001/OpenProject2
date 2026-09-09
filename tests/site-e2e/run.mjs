@@ -2188,8 +2188,8 @@ async function testShell(browser, base) {
     if (sections === 6 && subsOpen === 0) ok("shell: 6 sections, subsection panel collapsed");
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
-    // The count, asserted rather than assumed: six secciones, thirty-one
-    // subsecciones declared, four of them hidden (Part 2 · item 3 — hidden,
+    // The count, asserted rather than assumed: six secciones, thirty
+    // subsecciones declared, five of them hidden (Part 2 · item 3 — hidden,
     // never deleted, so SECTIONS still declares them and their routes live).
     // Pinned so both a thirty-second sub and a fifth hidden entry arrive
     // deliberately rather than by drift. It went from 30 to 31 when
@@ -2207,11 +2207,15 @@ async function testShell(browser, base) {
       // (PRY-04, Proyectos). It carried `href` and the ↗ while it was a page of
       // its own; it is a screen of this shell now, so it carries neither — the
       // count is the same because the entry never went anywhere.
-      shape.subs === 31 &&
+      // 30 again since PK13-S27 folded Maestros > Subcontratas into Proveedores:
+      // they were two screens over the same `parties` collection separated by a
+      // role, and the operator read them as one thing. The role survives on the
+      // record and in the creation door; only the duplicate register went.
+      shape.subs === 30 &&
       shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
-      ok("shell: 6 secciones × 31 declared subs, 5 hidden by name");
-    else bad("shell: 6×31 (5 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 30 declared subs, 5 hidden by name");
+    else bad("shell: 6x30 (5 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -2937,6 +2941,12 @@ async function testBudgetBuilder(browser, base) {
     const readCatalogueRow = async () => {
       await pg.evaluate(() => go("items"));
       await pg.waitForTimeout(800);
+      /* SEARCH FOR IT. The catalogue is a paginated register now, and DEM-101
+             sorts well past the first page of two hundred subpartidas — reading row
+             one of page one found nothing. Typing the code is what a person does
+             anyway, and it exercises the list's own search while it is at it. */
+      await pg.locator("#catQ").fill("DEM-101");
+      await pg.waitForTimeout(500);
       return pg.evaluate(() => {
         const row = [...document.querySelectorAll("#view table.mlist tbody tr.click")].find((tr) =>
           /DEM-101/.test(tr.textContent),
@@ -10427,8 +10437,8 @@ async function testProcurement(browser, base) {
     await pg.waitForTimeout(500);
     const subHash = await pg.evaluate(() => location.hash);
     const subText = await pg.locator("#view").innerText();
-    if (subHash === "#subcontractors" && /industrial/i.test(subText))
-      ok("subcontratos: the retired route redirects to the DMT-03 fichero");
+    if (subHash === "#suppliers" && /proveedor/i.test(subText))
+      ok("subcontratos: the retired route redirects to Proveedores, one file for all of them");
     else bad("subcontratos: retired route", `${subHash} · ${subText.slice(0, 70)}`);
 
     /* ---- PRY-03 (PK9-S2): a register, and CHG-04 survives it ----
@@ -13102,18 +13112,25 @@ async function testControlTowerAndDay(browser, base) {
     // catalogue, not that a page renders.
     await pg.evaluate(() => (location.hash = "items"));
     await pg.waitForTimeout(450);
+    /* Rows are a PAGE now, not the whole catalogue: this screen became a
+       register like the others. What still has to be true is that the page comes
+       from the engine's own catalogue and fills to the page size. */
     const catState = await pg.evaluate(() => ({
       hash: location.hash,
       branches: document.querySelectorAll(".catbr[data-chap]").length,
-      rows: document.querySelectorAll("tr.click[data-item]").length,
+      rows: document.querySelectorAll("#catList tbody tr.click").length,
       engineItems: erp.state.catalogue.filter((i) => i.active !== false).length,
+      size: Number((document.getElementById("catSize") || {}).value || 0),
     }));
     if (
       catState.hash === "#items" &&
       catState.branches > 1 &&
-      catState.rows === catState.engineItems
+      catState.size > 0 &&
+      catState.rows === Math.min(catState.size, catState.engineItems)
     )
-      ok(`DMC-01: the catalogue renders in the shell from the engine (${catState.rows} partidas)`);
+      ok(
+        `DMC-01: the catalogue renders from the engine, paginated (${catState.rows} de ${catState.engineItems})`,
+      );
     else bad("DMC-01 catalogue", JSON.stringify(catState));
 
     // The tree filters the table, and the branch counts are real.
@@ -13127,13 +13144,14 @@ async function testControlTowerAndDay(browser, base) {
       await pg.locator(`.catbr[data-chap="${firstChapter}"]`).click();
       await pg.waitForTimeout(350);
       const filtered = await pg.evaluate((c) => {
-        const shown = document.querySelectorAll("tr.click[data-item]").length;
+        const shown = document.querySelectorAll("#catList tbody tr.click").length;
+        const size = Number((document.getElementById("catSize") || {}).value || 0);
         const expect = erp.state.catalogue.filter(
           (i) => i.chapter === c && i.active !== false,
         ).length;
-        return { shown, expect };
+        return { shown, expect, size, capped: Math.min(size, expect) };
       }, firstChapter);
-      if (filtered.shown === filtered.expect && filtered.shown > 0)
+      if (filtered.shown === filtered.capped && filtered.shown > 0)
         ok("DMC-01: choosing a chapter in the tree filters the partidas table");
       else bad("DMC-01 tree filter", JSON.stringify(filtered));
     } else {
@@ -13316,6 +13334,31 @@ async function testControlTowerAndDay(browser, base) {
     }
 
     // ---- DMC-02: the comparison strip, and the rule it exists to protect ----
+    /* PK13-S27 · THE CATALOGUE LIST IS A REGISTER LIKE THE OTHERS. It was a
+       hand-rolled table with its own search and no page size at all, so two
+       hundred subpartidas rendered two hundred rows and there was no way
+       forward — every other master file on this product paginates. Now it is
+       `renderMasterList`, and the check asserts the three controls exist and
+       that the page really is capped. */
+    await pg.evaluate(() => (location.hash = "items"));
+    await pg.waitForTimeout(600);
+    const cat = await pg.evaluate(() => ({
+      total: erp.state.catalogue.filter((i) => i.active !== false).length,
+      shown: document.querySelectorAll("#catList table.mlist tbody tr.click").length,
+      size: !!document.getElementById("catSize"),
+      next: !!document.getElementById("catNext"),
+      search: !!document.getElementById("catQ"),
+      newBtn: !!document.getElementById("catNew"),
+      packages: /Paquetes de trabajo/.test(document.querySelector("#view").innerText),
+    }));
+    if (cat.size && cat.next && cat.search && cat.newBtn && cat.shown <= 25)
+      ok(
+        `5-7: el catalogo pagina como los demas registros — ${cat.shown} de ${cat.total} en pantalla`,
+      );
+    else bad("5-7: catalogo paginado", JSON.stringify(cat));
+    if (!cat.packages) ok("5-7: …y los paquetes de trabajo, que nada creaba ni leia, ya no estan");
+    else bad("5-7: paquetes retirados", JSON.stringify(cat));
+
     await pg.evaluate(() => (location.hash = "price-list"));
     await pg.waitForTimeout(450);
     // The strip is deliberately absent until one partida is chosen: comparing
@@ -15695,13 +15738,33 @@ async function testErp(browser, base) {
     else
       bad("erp: clientes export", `${menuTxt.replace(/\n/g, " ")} · ${JSON.stringify(zipMagic)}`);
 
-    // DMT-02/03: Proveedores and Subcontratas are the same party file, filtered
-    // by role, on the shared list primitive built for S2. Creating a supplier
-    // must not leak into the Subcontratas list, and vice versa.
+    /* PK13-S27 · ONE FILE FOR EVERYONE YOU BUY FROM. Proveedores and Subcontratas
+       were two screens over the SAME `parties` collection, separated by a role —
+       and the operator read them as one thing, correctly: an industrial is a
+       supplier you award work to. Maestros keeps one register now.
+
+       The trap that came with folding them: the Proveedores list named only
+       `supplier` and `selfEmployed`, and its creation door PINNED `supplier`. So
+       an industrial would have had no register and no way to be filed, while the
+       picker that awards them work had been reading all three roles the whole
+       time. Both halves are asserted here — the industrial is listed, and it can
+       be created. */
     await pg.evaluate(() => (location.hash = "suppliers"));
     await pg.waitForTimeout(350);
     await pg.locator("#supNew").click();
     await pg.waitForTimeout(250);
+    // The door offers the roles this screen is about, and not the customer.
+    const roleOpts = await pg.evaluate(() =>
+      [...document.querySelectorAll("#f_role option")].map((o) => o.value),
+    );
+    if (
+      roleOpts.length === 3 &&
+      roleOpts.includes("subcontractor") &&
+      !roleOpts.includes("customer")
+    )
+      ok(`erp: DMT-02 the supplier door offers its three roles (${roleOpts.join("/")})`);
+    else bad("erp: DMT-02 role choices", JSON.stringify(roleOpts));
+
     const supName = "E2E Proveedor " + String(Date.now()).slice(-5);
     await pg.locator("#f_name").fill(supName);
     await pg.locator("#f_tax").fill("B10000008");
@@ -15714,20 +15777,16 @@ async function testErp(browser, base) {
     await pg.locator("#supQ").fill(supName);
     await pg.waitForTimeout(300);
     const supRows = await pg.locator("tbody tr.click").count();
-    if (supRows === 1) ok("erp: DMT-02 proveedores — created and listed by role");
+    if (supRows === 1) ok("erp: DMT-02 proveedores — created and listed");
     else bad("erp: DMT-02 proveedores", `rows=${supRows}`);
 
-    await pg.evaluate(() => (location.hash = "subcontractors"));
-    await pg.waitForTimeout(350);
-    await pg.locator("#subQ").fill(supName);
-    await pg.waitForTimeout(300);
-    const supInSub = await pg.locator("tbody tr.click").count();
-    if (supInSub === 0) ok("erp: DMT-02/03 — a supplier does not leak into Subcontratas");
-    else bad("erp: DMT-02/03 role separation", `subcontratas rows=${supInSub}`);
-
-    await pg.locator("#subNew").click();
+    // An INDUSTRIAL, filed from the same door, appears in the same register.
+    await pg.locator("#supQ").fill("");
+    await pg.waitForTimeout(200);
+    await pg.locator("#supNew").click();
     await pg.waitForTimeout(250);
     const subName = "E2E Industrial " + String(Date.now()).slice(-5);
+    await pg.selectOption("#f_role", "subcontractor");
     await pg.locator("#f_name").fill(subName);
     await pg.locator("#f_tax").fill("B20000006");
     await pg.locator("#f_mob").fill("600222333");
@@ -15736,14 +15795,18 @@ async function testErp(browser, base) {
     await pg.locator("#f_city").fill("Sant Just");
     await pg.locator("#f_save").click();
     await pg.waitForTimeout(350);
-    await pg.locator("#subQ").fill(subName);
+    await pg.locator("#supQ").fill(subName);
     await pg.waitForTimeout(300);
     const subRows = await pg.locator("tbody tr.click").count();
-    if (subRows === 1) ok("erp: DMT-03 subcontratas — created and listed by role");
-    else bad("erp: DMT-03 subcontratas", `rows=${subRows}`);
+    const subRole = await pg.evaluate(
+      (n) => (erp.state.parties.find((p) => p.name === n) || {}).roles,
+      subName,
+    );
+    if (subRows === 1 && (subRole || []).includes("subcontractor"))
+      ok("erp: DMT-03 an industrial is filed with its role and listed in Proveedores");
+    else bad("erp: DMT-03 industrial", `rows=${subRows} roles=${JSON.stringify(subRole)}`);
 
-    // Universal search must route a supplier/subcontractor hit to their own
-    // screen (DMT-02/03), not into Clientes — the bug this session fixed.
+    // Universal search routes a subcontrata hit to the register that now holds it.
     await pg.locator("#q").fill(subName);
     await pg.waitForTimeout(300);
     const subSearchTxt = await pg.locator("#sres.on").innerText();
@@ -15751,8 +15814,8 @@ async function testErp(browser, base) {
       await pg.locator("#sres .si").first().click();
       await pg.waitForTimeout(400);
       const afterHash = await pg.evaluate(() => location.hash);
-      if (afterHash === "#subcontractors")
-        ok("erp: universal search routes a subcontrata hit to Subcontratas, not Clientes");
+      if (afterHash === "#suppliers")
+        ok("erp: universal search routes a subcontrata hit to Proveedores, not Clientes");
       else bad("erp: search routing (subcontratas)", afterHash);
     } else bad("erp: search grouping (subcontratas)", subSearchTxt.slice(0, 80));
     await pg.locator("#dClose").click();

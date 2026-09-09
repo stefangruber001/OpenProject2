@@ -1045,6 +1045,10 @@ window.CANEI_DICT = {
       "Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.",
       "A line item with cost and no recorded progress cannot be forecast: what is shown is the floor, the greater of budgeted and spent, marked «no progress». Record the progress in Physical progress so the forecast means something.",
     ],
+    [
+      "Buscar proveedor o industrial por nombre o NIF",
+      "Search supplier or trade by name or tax id",
+    ],
     ["Motivo del adicional", "Reason for the additional"],
     ["Días de plazo que añade", "Days it adds to the schedule"],
     ["Ampliación de la instalación eléctrica", "Extending the electrical installation"],

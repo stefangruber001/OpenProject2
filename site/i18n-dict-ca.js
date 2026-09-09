@@ -1040,6 +1040,7 @@ window.CANEI_DICT.ca = {
     "Compromès és el que ja s'ha demanat o adjudicat, estigui facturat o no, i el projectat mai no baixa d'aquí.",
   "Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.":
     "Una partida amb despesa i sense avanç registrat no es pot projectar: es mostra el terra, el més gran entre el pressupostat i el gastat, i es marca «sense avanç». Registra l'avanç a Avanç físic perquè la projecció signifiqui alguna cosa.",
+  "Buscar proveedor o industrial por nombre o NIF": "Cerca proveidor o industrial per nom o NIF",
   "Motivo del adicional": "Motiu de l'addicional",
   "Días de plazo que añade": "Dies de termini que afegeix",
   "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",
