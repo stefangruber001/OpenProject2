@@ -2729,11 +2729,11 @@ contra el fallo, donde informa `created:false` — el síntoma del operador en J
 heredar el reparto de pago del presupuesto (hoy `paymentConditions` es prosa, no
 datos; la propuesta le añade un `installments` opcional) y los **Títulos** sobre
 las partidas (como etiqueta de la partida, no como contenedor, porque `chapterNum`
-lo lee todo el sistema). Ambas en ASSUMPTIONS S118b.
+lo lee todo el sistema). Ambas en ASSUMPTIONS S119b.
 
 Gates: site E2E **781/781 unfiltered**, `pnpm test` 27/27, manageability 513/513,
 site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
-workspace audit 0/0. ASSUMPTIONS S118, S118a, S118b.
+workspace audit 0/0. ASSUMPTIONS S119, S119a, S119b.
 
 **Where the parallel stream is.** S10 and S11 above, and everything on `main`
 after them, come from the session working the hours redesign and the site-worker

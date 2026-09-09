@@ -10008,7 +10008,49 @@ es lo que hace una persona, y de paso ejerce el buscador de la lista. La de la
 forma del shell fijaba 31 subsecciones y ahora son 30; repinchada con el motivo al
 lado, que es para lo que sirve fijarla.
 
-**S118 · Elegir «Al 50 % de avance» hacía imposible crear el contrato.** El
+**S118 · Both halves green, against two different contracts.** The crew's first
+real attempt to save hours was refused by the server: _«"recordHours" (record
+hours) takes 1 argument(s), got 2. Your latest changes are NOT saved.»_ The
+client S110 shipped sent the acting user as a trailing argument. It must not.
+`erp-commands.ts` says so at the top of the file — _«`user` is deliberately NOT
+part of `arity`. Every mutating engine method takes the acting user as its last
+argument… the server appends it from the session, so a caller cannot claim to be
+somebody else by putting a name in the request body»_ — and `runCommand` counts
+the arguments and refuses the call. The rule was written down, enforced, and
+read by nobody on the way past.
+
+The wire now carries the command's own arguments and nothing else. `COMMAND_LOCAL`
+appends the user itself, because the local copy has no session to read; that
+asymmetry is the point rather than an oversight, and it is stated where the table
+is defined.
+
+**S118a · Neither gate could see it, and both were green.** This is the sharper
+half. The two suites test the two halves of one contract against two different
+ideas of what it is:
+
+- `tests/site-e2e` drives the real screen but serves `site/` from disk with NO
+  SERVER, so `commandMutate` takes its local branch and calls the engine
+  directly — where the user IS the last argument and two is correct. It pressed
+  the button, reloaded the page, found the row, and was right about everything
+  it could see.
+- `tests/server-e2e` calls the endpoint, but with an argument list it writes
+  itself. It proved the server's contract against the server's own idea of it
+  and never once looked at what the client would send.
+
+So the yesterday's fix carried a positive test on each side of a boundary that
+nothing crossed. **A contract tested from both ends by two parties who each
+supply their own copy of it is not tested.**
+
+`tests/command-arity/run.mjs` compares the two directly: it reads the arity out
+of the whitelist, parses every `commandMutate("…", […])` call site out of
+`site/erp.html`, and fails when they disagree — naming the file, the line and,
+for the off-by-one that caused this, the reason. It needs no browser, no
+database and no network and runs in milliseconds. Verified the way a gate has to
+be: the bug was reintroduced, the gate failed with the right sentence and exit
+code 1, and passed again when it was removed. It also fails if it finds NO call
+sites, because S103b's lesson applies here too — a gate that cannot see its
+subject must fail rather than report nothing wrong.
+**S119 · Elegir «Al 50 % de avance» hacía imposible crear el contrato.** El
 operador lo contó como que no podía poner la otra mitad al terminar. El fallo era
 mayor: el contrato ENTERO se rechazaba.
 
@@ -10030,14 +10072,14 @@ no se podía guardar era el contrato con la primera dentro.
 a 90: el cien por cien es «A la finalización», que es un trigger propio. Anotado
 porque es la pregunta que sigue a este arreglo.
 
-**S118a · La comprobación PULSA el select, no llama a la función.** Elige el
+**S119a · La comprobación PULSA el select, no llama a la función.** Elige el
 trigger en la fila, rellena las dos mitades, guarda, y afirma lo que el MOTOR
 acaba teniendo: un `atProgressPct` con `progressPct: 50` y un `onCompletion`
 conviviendo. Verificada contra el fallo, donde informa `created:false` — el
 síntoma exacto del operador en JSON. Quinta vez en dos paquetes que la regla vale
 la pena: ejercer la puerta, no la habitación.
 
-**S118b · Dos peticiones quedan PROPUESTAS, sin implementar, a petición expresa.**
+**S119b · Dos peticiones quedan PROPUESTAS, sin implementar, a petición expresa.**
 
 _Heredar el reparto de pago del presupuesto._ Hoy no hay nada estructurado que
 heredar: `paymentConditions` es una lista de FRASES —el código y la etiqueta son

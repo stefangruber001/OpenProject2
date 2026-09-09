@@ -5927,7 +5927,7 @@
        */
       async function commandMutate(name, args, msg) {
         if (!(ErpStore.isRemote() && ErpStore.isScoped())) {
-          return mutate(() => COMMAND_LOCAL[name](args), msg);
+          return mutate(() => COMMAND_LOCAL[name](args, SESSION.email || "site"), msg);
         }
         try {
           const res = await ErpStore.command(name, args);
@@ -5948,12 +5948,24 @@
       }
 
       /* The same three commands run against the in-memory engine, for the local
-         copy that has no server to ask. Keyed by the name the server knows them
-         by, so the two paths cannot drift apart in their argument order. */
+         copy that has no server to ask.
+
+         THE ACTING USER IS NOT ONE OF THE ARGUMENTS, and that is the whole
+         shape of this table. Every mutating engine method takes the user LAST
+         and writes it to the audit trail; the server appends it from the
+         SESSION, precisely so that a caller cannot claim to be somebody else by
+         putting a name in the request body — `erp-commands.ts` says so and its
+         `arity` counts the arguments before it.
+
+         The client sent it anyway. The server counted two arguments where the
+         whitelist allows one and refused the save — «"recordHours" takes 1
+         argument(s), got 2» — on the crew's phone, on every attempt. So the
+         wire carries the command's own arguments and nothing else, and the
+         local copy, which has no session to read, appends the user here. */
       const COMMAND_LOCAL = {
-        recordHours: (a) => erp.recordHours(a[0], a[1]),
-        correctHours: (a) => erp.correctHours(a[0], a[1], a[2]),
-        deleteHours: (a) => erp.deleteHours(a[0], a[1]),
+        recordHours: (a, user) => erp.recordHours(a[0], user),
+        correctHours: (a, user) => erp.correctHours(a[0], a[1], user),
+        deleteHours: (a, user) => erp.deleteHours(a[0], user),
       };
 
       /**
@@ -10095,7 +10107,6 @@
                   hoursMilli: Math.round(hrs * 1000),
                   date: hDay,
                 },
-                SESSION.email || "site",
               ],
               "Horas guardadas",
             );
@@ -10105,11 +10116,7 @@
           .forEach(
             (b) =>
               (b.onclick = () =>
-                commandMutate(
-                  "deleteHours",
-                  [b.dataset.medel, SESSION.email || "site"],
-                  "Apunte eliminado",
-                )),
+                commandMutate("deleteHours", [b.dataset.medel], "Apunte eliminado")),
           );
         document.querySelectorAll("[data-mefix]").forEach(
           (b) =>
@@ -10131,11 +10138,11 @@
               if (r === null) return;
               const hrs = Number(String(r.h).replace(",", "."));
               if (!(hrs > 0)) {
-                commandMutate("deleteHours", [l.id, SESSION.email || "site"], "Apunte corregido");
+                commandMutate("deleteHours", [l.id], "Apunte corregido");
               } else {
                 commandMutate(
                   "correctHours",
-                  [l.id, { hoursMilli: Math.round(hrs * 1000) }, SESSION.email || "site"],
+                  [l.id, { hoursMilli: Math.round(hrs * 1000) }],
                   "Apunte corregido",
                 );
               }
