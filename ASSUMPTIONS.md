@@ -10264,3 +10264,51 @@ assertion would pass against any implementation, including none.
 `getBoundingClientRect` rather than `offsetLeft` because the offset parent is
 not the scroller, and `scrollIntoView({inline:"center"})` is avoided because it
 drags the PAGE vertically as well as the strip sideways.
+
+**S125 · The Gantt was not integrated into the recorrido; it was linked from
+it.** The operator: the chart is very badly integrated in the customer journey,
+I cannot edit the plan or monitor the execution. Both halves were true, and the
+phase's own comment said why without noticing it was the complaint — «no verb
+of its own, on purpose… progress is marked on the chart», where the chart was
+on a different screen. What Ejecución actually carried was five figures about
+MONEY, no verb at all, and a link out.
+
+Money is not execution. A job can be 80 % billed and a fortnight late, and
+nothing on that phase could say so.
+
+The phase now draws the plan: the same `ganttChart` and `ganttList` the full
+screen draws, off the same `ganttContext`, with `ganttWire` binding the same
+gestures — drag a bar, pull an edge, tap to open the task. Not a smaller second
+chart: two renderers for one plan is how two screens come to disagree about
+when a job finishes, and the Gantt block's own header already forbids
+recomputing a date locally.
+
+It also reports the SCHEDULE — planned finish, critical path, drift against the
+frozen baseline — and the phase goes `late` on positive drift rather than
+staying amber at 80 % done.
+
+**S125a · The verbs came back because the reason for their absence did.** The
+phase had no action deliberately: the thing to do was on the chart. With the
+chart here, «＋ Tarea» and «◆ Hito» belong here, and for a job with NO plan the
+verb is the one that builds one — «Derivar del presupuesto», disabled with its
+reason when there is no accepted budget to derive from, because a verb that can
+only fail is worse than none. That last state is the one the operator could not
+reach from the recorrido at all.
+
+**S125b · One gatherer, two screens.** `ganttContext(pid)` returns the plan, the
+schedule, the payment milestones, the baseline comparison and whether the job
+can be derived from its budget. The full screen was rewritten to use it rather
+than keeping its own copy of those twenty lines, so the recorrido cannot drift
+from it. The legend moved the same way: an unexplained red bar is precisely the
+complaint that put the chart on the phase.
+
+The full screen keeps what does not belong on a phase — zoom, the baseline
+toggle, the working calendar, the S-curve, recalculating the payment milestones
+— and «Abrir la carta Gantt ↗» still goes there.
+
+**S125c · The check has to survive a tap, not just find an `<svg>`.** A picture
+of a chart would satisfy any assertion about elements being present. So the
+browser check counts bars against the plan's own task count, requires the
+handler `ganttWire` binds, and then TAPS a bar and requires the task drawer to
+open. Verified by taking the chart back out: `svg:false, bars:0, wired:false`
+and the tap times out.

@@ -1161,6 +1161,112 @@ async function testJourney(browser, base) {
       else bad("recorrido: phase rail centring", JSON.stringify(rail));
     }
 
+    // ── THE PLAN IS ON THE PHASE, AND IT WORKS. The operator: the Gantt is
+    //    very badly integrated in the customer journey, I cannot edit the plan
+    //    or monitor the execution. They were right twice. Ejecución carried
+    //    five money figures, no verb at all — deliberately, on the grounds that
+    //    progress is marked on the chart — and one link to a different screen.
+    //    Five figures about money are not execution, and a door out is not
+    //    integration.
+    //
+    //    What is asserted is that it is the REAL chart: the same `ganttChart`
+    //    the full screen draws, off the same plan, with its bars wired to the
+    //    same task drawer. A picture of a chart would satisfy a check for an
+    //    <svg>; it would not survive tapping a bar.
+    const plan = await pg.evaluate(async () => {
+      const job = erp.state.projects.find((p) => {
+        const g = ganttContext(p.id);
+        return g && g.plan.tasks.length;
+      });
+      if (!job) return { why: "no planned job in the seed" };
+      journeySelect("prj:" + job.id);
+      render();
+      await new Promise((r) => setTimeout(r, 120));
+      jStep = 8;
+      render();
+      await new Promise((r) => setTimeout(r, 250));
+      const g = ganttContext(job.id);
+      const view = document.querySelector("#view");
+      return {
+        job: job.code,
+        tasks: g.plan.tasks.length,
+        svg: !!view.querySelector("#gSvg"),
+        bars: view.querySelectorAll(".gn[data-task]").length,
+        legend: !!view.querySelector(".glegend"),
+        // The bars carry the same handler the full screen binds.
+        wired: !!(view.querySelector(".gn[data-task]") || {}).onclick,
+        act: (view.ownerDocument.querySelector("#jAct") || {}).innerText || "",
+        act2: (view.ownerDocument.querySelector("#jAct2") || {}).innerText || "",
+        finish: /Fin previsto/.test(view.innerText),
+        critical: /Ruta crítica/.test(view.innerText),
+      };
+    });
+    if (
+      plan.svg &&
+      plan.bars === plan.tasks &&
+      plan.bars > 0 &&
+      plan.legend &&
+      plan.wired &&
+      /Tarea/.test(plan.act) &&
+      /Hito/.test(plan.act2) &&
+      plan.finish &&
+      plan.critical
+    )
+      ok(
+        `recorrido: Ejecución draws the real plan — ${plan.bars} live bars, finish date and critical path (${plan.job})`,
+      );
+    else bad("recorrido: the plan on the execution phase", JSON.stringify(plan));
+
+    // …and a bar opens the task it belongs to, which is what «edit the plan»
+    // means from here.
+    await pg.locator("#view .gn[data-task]").first().click();
+    await pg.waitForTimeout(400);
+    const taskDrawer = await pg.evaluate(() => {
+      const d = document.querySelector("#drawer");
+      return { open: !!(d && d.innerText.trim()), text: d ? d.innerText.slice(0, 40) : "" };
+    });
+    if (taskDrawer.open) ok("recorrido: tapping a bar opens its task, from the phase itself");
+    else bad("recorrido: a bar opens its task", JSON.stringify(taskDrawer));
+    if (await pg.locator("#dClose").count()) await pg.locator("#dClose").click();
+    await pg.waitForTimeout(250);
+
+    // ── AND A JOB WITH NO PLAN IS OFFERED THE ONE VERB THAT BUILDS ONE, rather
+    //    than an empty box. Disabled with its reason when there is no accepted
+    //    budget to derive from — a verb that could only fail is worse than none.
+    const unplanned = await pg.evaluate(async () => {
+      const job = erp.state.projects.find((p) => {
+        const g = ganttContext(p.id);
+        return g && !g.plan.tasks.length;
+      });
+      if (!job) return { skipped: true };
+      journeySelect("prj:" + job.id);
+      render();
+      await new Promise((r) => setTimeout(r, 120));
+      jStep = 8;
+      render();
+      await new Promise((r) => setTimeout(r, 200));
+      const g = ganttContext(job.id);
+      const btn = document.querySelector("#jAct");
+      return {
+        job: job.code,
+        derivable: g.derivable,
+        act: (btn || {}).innerText || "",
+        disabled: !!(btn || {}).disabled,
+        noChart: !document.querySelector("#view #gSvg"),
+        says: !!document.querySelector("#view .empty"),
+      };
+    });
+    if (unplanned.skipped)
+      ok("recorrido: every job in the seed is planned — unplanned case not present");
+    else if (
+      /Derivar/.test(unplanned.act) &&
+      unplanned.noChart &&
+      unplanned.says &&
+      unplanned.disabled === !unplanned.derivable
+    )
+      ok(`recorrido: an unplanned job is offered the verb that builds a plan (${unplanned.job})`);
+    else bad("recorrido: unplanned job on the execution phase", JSON.stringify(unplanned));
+
     // ── Back to the register.
     await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(600);

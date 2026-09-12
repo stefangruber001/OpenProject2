@@ -3115,3 +3115,21 @@ Checked at phone width, because at desktop width the whole rail fits and the
 assertion would pass against no implementation at all.
 
 See ASSUMPTIONS S124, S124a.
+
+## S18 · The plan moves into the recorrido (2026-09-12)
+
+Ejecución carried five money figures, no verb, and a link to another screen —
+so the operator could neither edit the plan nor follow the work from the one
+screen meant to walk them through the job.
+
+It now draws the real chart and task list, off one shared `ganttContext`, with
+the same drag/tap gestures bound by the same `ganttWire`. It reports the
+schedule as well as the money — planned finish, critical path, baseline drift —
+and turns `late` when the drift is positive. The verbs are «＋ Tarea» and
+«◆ Hito», or «Derivar del presupuesto» when there is no plan yet, disabled with
+its reason when there is no accepted budget behind it.
+
+The full screen keeps zoom, baseline, calendar, the S-curve and the payment
+recalculation, and is still one tap away.
+
+See ASSUMPTIONS S125, S125a, S125b, S125c.

@@ -7543,6 +7543,55 @@
           ? ErpBridge.scheduling.plans
           : null;
       }
+      /**
+       * Everything a screen needs to draw one job's plan, gathered in one place.
+       *
+       * Extracted so the recorrido can show the SAME chart the full screen
+       * shows rather than a second, smaller idea of the plan. Two screens
+       * asking the engine the same questions in two different ways is how they
+       * end up disagreeing about when a job finishes — and the whole point of
+       * the Gantt block, as its own header says, is that every date comes from
+       * the scheduling capability and none is computed here.
+       *
+       * `base` is compared unconditionally; the full screen hides it behind its
+       * own toggle, and the recorrido wants the drift whether or not anybody
+       * has pressed that button. Returns null when the capability bundle is not
+       * loaded, which is a real state on a cold page and not an error.
+       */
+      function ganttContext(pid) {
+        const B = ganttApi();
+        if (!B || !pid) return null;
+        const plan = B.get(erp.state, pid);
+        let base = null;
+        try {
+          base = B.compareToBaseline(plan);
+        } catch (e) {
+          /* no baseline frozen yet — a normal state, not a fault */
+        }
+        let derivable = false,
+          budgetId = null;
+        try {
+          const pr = erp.project(pid);
+          budgetId = pr.budgetId || null;
+          derivable = !!(
+            pr.budgetId &&
+            erp
+              .version(pr.budgetId, pr.acceptedVersionId)
+              .chapters.some((c) => c.section === "base" && c.lines.length)
+          );
+        } catch (e) {
+          /* no accepted budget: nothing to derive from, and the caller says so */
+        }
+        return {
+          B: B,
+          plan: plan,
+          sch: B.schedule(plan),
+          pays: ErpBridge.scheduling.paymentMilestones(erp, pid),
+          base: base,
+          derivable: derivable,
+          budgetId: budgetId,
+        };
+      }
       /* Give every freshly-seeded project a schedule.
          Plans are owned by @repo/capability-scheduling and live in the bundle, not
          in erp-engine.js, so erp-seed.js (which also has to run under plain Node)
@@ -7674,6 +7723,20 @@
         return `<div class="gmob">${items.map(row).join("")}</div>`;
       }
 
+      /** What the colours on the chart mean. A function rather than markup in
+          one screen, because the recorrido draws the same chart and a bar whose
+          colour nothing explains is the shape of the complaint that put the
+          chart there. */
+      function ganttLegend(cmp) {
+        return `<div class="glegend">
+           <span><i style="background:var(--green)"></i>Tarea</span>
+           <span><i style="background:var(--danger)"></i>Ruta crítica — un día perdido aquí es un día perdido en la obra</span>
+           <span><i style="background:var(--greenDeep);border-radius: 0;transform:rotate(45deg)"></i>Hito</span>
+           <span><i style="background:var(--blue)"></i>Hito de cobro del contrato</span>
+           ${cmp ? `<span><i style="background:transparent;border:1px dashed var(--faint)"></i>Línea base congelada</span>` : ""}
+           <span><i style="background:var(--hair)"></i>Día no laborable</span>
+         </div>`;
+      }
       function ganttChart(plan, sch, cmp, pays) {
         const B = ganttApi(),
           cal = plan.calendar || B.defaultCalendar(),
@@ -21831,9 +21894,10 @@
             return;
           }
 
-          const pid = gProject,
-            plan = B.get(erp.state, pid),
-            sch = B.schedule(plan);
+          const pid = gProject;
+          const G = ganttContext(pid) || {};
+          const plan = G.plan || B.get(erp.state, pid),
+            sch = G.sch || B.schedule(plan);
           /* PK4-A: opening a job now lands here directly, so an UNPLANNED job
              lands here too — and the first row of the list is exactly that. The
              empty state therefore has to distinguish "no plan yet" from "nothing
@@ -21841,20 +21905,10 @@
              `fromBudget` to derive and no subpartidas to record progress against, so
              offering «Derivar del presupuesto» there is offering a button that can
              only fail. */
-          let derivable = false,
-            budgetId = null;
-          try {
-            const pr = erp.project(pid);
-            budgetId = pr.budgetId || null;
-            derivable = !!(
-              pr.budgetId &&
-              erp
-                .version(pr.budgetId, pr.acceptedVersionId)
-                .chapters.some((c) => c.section === "base" && c.lines.length)
-            );
-          } catch (e) {}
-          const cmp = gBaseline ? B.compareToBaseline(plan) : null;
-          const pays = ErpBridge.scheduling.paymentMilestones(erp, pid);
+          const derivable = !!G.derivable,
+            budgetId = G.budgetId || null;
+          const cmp = gBaseline ? G.base : null;
+          const pays = G.pays || ErpBridge.scheduling.paymentMilestones(erp, pid);
           const cal = plan.calendar || B.defaultCalendar();
           const crit = sch ? sch.criticalPath.length : 0;
           /* Every figure in the deviations panel and both curves come from
@@ -21908,14 +21962,7 @@
                : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance.
              <div style="margin-top:10px"><button class="btn sm primary" id="gGoBudget">${budgetId ? "Abrir el presupuesto" : "Ir a Presupuestos"}</button></div></div>`
          }
-         <div class="glegend">
-           <span><i style="background:var(--green)"></i>Tarea</span>
-           <span><i style="background:var(--danger)"></i>Ruta crítica — un día perdido aquí es un día perdido en la obra</span>
-           <span><i style="background:var(--greenDeep);border-radius: 0;transform:rotate(45deg)"></i>Hito</span>
-           <span><i style="background:var(--blue)"></i>Hito de cobro del contrato</span>
-           ${cmp ? `<span><i style="background:transparent;border:1px dashed var(--faint)"></i>Línea base congelada</span>` : ""}
-           <span><i style="background:var(--hair)"></i>Día no laborable</span>
-         </div>
+         ${ganttLegend(cmp)}
          <div class="gtools" style="border-top:1px solid var(--hair)">
            <span style="font:600 11px var(--sans);color:var(--muted)">DÍAS NO LABORABLES</span>
            ${(cal.nonWorkingDates || []).map((d) => `<span class="chip"><b>${fmtD(d)}</b><button data-nw="${d}" title="Quitar">✕</button></span>`).join("") || '<span class="chip">ninguno</span>'}
@@ -24260,12 +24307,70 @@
              13 and is not coming back through this screen. «Abrir la pantalla
              completa» carries the obra's code, so it lands on the chart for THIS
              job. */
-          eco
-            ? S(eco.progressPct >= 100 ? "done" : eco.progressPct > 0 ? "doing" : "pending", [
-                ["Avance", eco.progressPct + "%"],
-                ["Coste real", eur0(eco.actualCents)],
-              ])
-            : S("pending", [["Estado", "Sin obra en ejecución"]]),
+          !eco
+            ? S("pending", [["Estado", "Sin obra en ejecución"]])
+            : (() => {
+                /* THE PHASE REPORTS THE PLAN, AND ACTS ON IT.
+                   It used to carry two figures and no verb, on the stated
+                   grounds that progress is marked on the chart — which was true
+                   and was the problem, because the chart was on another screen.
+                   Now the chart is on this phase, so the verbs that belong to it
+                   come with it.
+
+                   WHAT IT REPORTS IS THE SCHEDULE, not only the money. «Avance
+                   62 %» does not say whether the job is late; a finish date and
+                   the drift against the frozen baseline do. Both come from the
+                   scheduling capability through `ganttContext` — nothing here
+                   computes a date. */
+                const G = project ? ganttContext(project.id) : null;
+                const planned = !!(G && G.plan.tasks.length);
+                const drift = G && G.base ? G.base.finishDriftDays : 0;
+                const rows = [
+                  ["Avance", eco.progressPct + "%"],
+                  ["Coste real", eur0(eco.actualCents)],
+                ];
+                if (planned) {
+                  rows.push(["Fin previsto", fmtD(G.sch.finish)]);
+                  /* A count over a count, never «3 de 12»: a sentence with two
+                     numbers in it is one text node the dictionary cannot hold —
+                     the rule `journeyCount` exists for. */
+                  rows.push([
+                    "Ruta crítica",
+                    G.sch.criticalPath.length + " / " + G.plan.tasks.length,
+                  ]);
+                  if (G.base)
+                    rows.push(["Desvío", (drift > 0 ? "+" : "") + drift + " d"]);
+                }
+                /* LATE IS A FACT ABOUT THE CALENDAR, and it is the one this
+                   phase exists to surface. A job can be 80 % done and a fortnight
+                   behind; colouring that as «en curso» is how a screen teaches
+                   somebody to stop reading it. */
+                const state =
+                  eco.progressPct >= 100
+                    ? "done"
+                    : drift > 0
+                      ? "late"
+                      : eco.progressPct > 0
+                        ? "doing"
+                        : "pending";
+                return {
+                  ...S(state, rows),
+                  /* With a plan, the verb is adding to it. Without one, the verb
+                     is the one that BUILDS it — which is the thing the operator
+                     could not reach from here at all. */
+                  act: planned
+                    ? { lab: "＋ Tarea", run: () => ganttNewTask(project.id, false) }
+                    : {
+                        lab: "↻ Derivar del presupuesto",
+                        block: G && G.derivable ? null : "Hace falta un presupuesto aceptado",
+                        run: () =>
+                          deriveFromBudget(project.id, G.plan.calendar || G.B.defaultCalendar()),
+                      },
+                  act2: planned
+                    ? { lab: "◆ Hito", run: () => ganttNewTask(project.id, true) }
+                    : null,
+                };
+              })(),
           /* 10 · Facturación */
           invoices.length
             ? S(
@@ -24898,6 +25003,16 @@
           (tr) => (tr.onclick = () => invoiceDrawer(tr.dataset.inv)),
         );
         if ($("#jOpen")) $("#jOpen").onclick = () => full.run();
+        /* THE BARS ARE LIVE HERE TOO. `ganttWire` binds drag-to-move,
+           pull-to-lengthen, join-two-bars-for-a-dependency and tap-to-open
+           within whatever root it is given, so the chart the phase draws is the
+           working chart and not a picture of one. Same function the full screen
+           calls, with the same plan object — there is no second set of
+           gestures to keep in step. */
+        if (JOURNEY[jStep] && JOURNEY[jStep].k === "execution" && c.project) {
+          const gc = ganttContext(c.project.id);
+          if (gc && gc.plan.tasks.length) ganttWire(v, c.project.id, gc.plan, gc.sch);
+        }
         journeyLedgerWire(v, c);
         $("#jPrev").onclick = () => {
           jStep = Math.max(0, jStep - 1);
@@ -25026,12 +25141,50 @@
           );
         if ((k === "execution" || k === "close" || k === "works") && p) {
           const e = erp.projectEconomics(p.id);
-          return `<div class="daylist">
+          const money = `<div class="daylist">
             ${journeyRow(["Venta actual", eur0(e.currentRevenueCents)])}
             ${journeyRow(["Coste comprometido", eur0(e.committedCents)])}
             ${journeyRow(["Coste real", eur0(e.actualCents)])}
             ${journeyRow(["Margen previsto", eur0(e.marginForecastCents)])}
             ${journeyRow(["Avance", e.progressPct + "%"])}</div>`;
+          if (k !== "execution") return money;
+          /* THE PLAN, ON THE PHASE — not a link to a screen that has it.
+             This phase used to be five money rows and «Abrir la carta Gantt ↗»,
+             and the operator said the plain truth about it: the chart is badly
+             integrated, they can neither edit the plan nor follow the work. Five
+             figures about money are not execution, and a door out of a screen is
+             not integration.
+
+             It is the SAME chart and the same task list the full screen draws —
+             `ganttChart` and `ganttList` unchanged, off `ganttContext` — so the
+             bars here and the bars there cannot disagree about a date. Wiring
+             them up (drag a bar, pull an edge, tap to open the task) happens in
+             VIEWS.journey, which is where the view root is.
+
+             The full screen keeps what does not belong on a phase: zoom, the
+             baseline toggle, the working calendar, the S-curve, the payment
+             milestones recalculation. This is the plan and the work on it. */
+          const G = ganttContext(p.id);
+          if (!G) return money;
+          if (!G.plan.tasks.length)
+            return (
+              money +
+              `<div class="empty">${
+                /* Word for word the sentences the full screen already uses for
+                   these two states. A second wording for the same situation is a
+                   second entry in three dictionaries and a second thing to keep
+                   true; these are already translated. */
+                G.derivable
+                  ? "Sin planificación. «Derivar del presupuesto» la construye a partir de las partidas y subpartidas aceptadas: la duración de cada partida sale de sus cantidades y del rendimiento diario del oficio."
+                  : "Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance."
+              }</div>`
+            );
+          return (
+            money +
+            ganttChart(G.plan, G.sch, G.base, G.pays) +
+            ganttLegend(G.base) +
+            ganttList(G.plan, G.sch, G.pays)
+          );
         }
         return "";
       }
