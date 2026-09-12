@@ -4150,17 +4150,6 @@
         .camview {
           display: none;
         }
-        /* downloadBudgetPdf appends exactly one .printsheet as the last child
-           of body and calls window.print(). Hiding every OTHER direct child
-           of body is what keeps the rail, the drawer and its scrim out of the
-           printed page — the sheet does not need its own print stylesheet,
-           it only needs to be alone. */
-        body > *:not(.printsheet) {
-          display: none !important;
-        }
-      }
-      .printsheet {
-        display: none;
       }
       /* The page the customer's document is set on. Without this the browser
          used whatever default it liked, so the same quote came out with
@@ -4176,35 +4165,6 @@
       @page {
         size: A4;
         margin: 12mm;
-      }
-      @media print {
-        .printsheet {
-          display: block;
-          padding: 0;
-          /* Tints, rules and the coloured section headings are the document's
-             design, not decoration a printer may drop: without this Chrome
-             strips every background the moment «Background graphics» is off,
-             which is its default. */
-          -webkit-print-color-adjust: exact;
-          print-color-adjust: exact;
-        }
-        /* On screen .doc reads as a PREVIEW of a document — dashed border,
-           tinted paper. On paper it IS the document, so it prints as one:
-           plain white, no border, no rounded corners pretending to be a card.
-           `.cdoc` is the same idea for the contract and the factura, which are
-           set as sheets rather than as cards; it needs the same treatment or
-           it prints its own shadow. */
-        .printsheet .cdoc {
-          background: #fff;
-          border: 0;
-          border-radius: 0;
-          padding: 0;
-          box-shadow: none;
-          max-width: none;
-        }
-        .printsheet .annexpg {
-          break-before: page;
-        }
       }
 
       .scrim {
@@ -25862,9 +25822,9 @@
         else if (row.receiptId) refs.receiptId = row.receiptId;
 
         if (format === "docx") return downloadDocx(row.doc, refs, lang, row.ref + ".docx");
-        // PDF: the same sheet every screen prints, so this is the document
-        // the customer already has rather than a second rendering of it.
-        return printSheetHtml(sheetDocHtml(row.doc, refs, lang));
+        // The same descriptor as the Word file beside it, through the PDF
+        // writer: one document, two formats, and a file either way.
+        return downloadPdf(row.doc, refs, lang, row.ref + ".pdf");
       }
 
       function partyDrawer(id) {
@@ -28135,46 +28095,6 @@
         );
       }
       /**
-       * The document as a standalone printable sheet — Package 2 slide 1's
-       * "botón de descarga en PDF". No PDF library is bundled or needed: the
-       * browser's own print dialog ("Guardar como PDF") is the established
-       * pattern here, the same one #tPrint already uses elsewhere. What is new is
-       * isolating exactly this one document on the page, since printing the
-       * drawer as it sits would print the rail and the drawer chrome around it.
-       *
-       * Annex images are resolved to real URLs and awaited BEFORE print() is
-       * called: paintImages() fires them off without waiting, and a picture
-       * still loading when the print dialog opens prints as a blank frame.
-       */
-      /** Isolate one sheet's HTML on the page and print it — the browser's
-       *  own dialog ("Guardar como PDF") is the established pattern here.
-       *  Every stored image is resolved AND decoded before print() fires:
-       *  a picture still loading when the dialog opens prints as a blank
-       *  frame, measured at 0 of 3 decoded on the seeded quote. The race
-       *  caps the wait so one corrupt file cannot hold the dialog shut. */
-      async function printSheetHtml(html) {
-        const sheet = el("div", "printsheet");
-        sheet.innerHTML = html;
-        document.body.appendChild(sheet);
-        const imgs = [...sheet.querySelectorAll("img[data-blob]")];
-        await Promise.all(
-          imgs.map(async (im) => {
-            const u = await imageUrl(im.dataset.blob);
-            if (!u) {
-              im.alt = "(imagen no disponible)";
-              return;
-            }
-            im.src = u;
-            await Promise.race([
-              im.decode().catch(() => {}),
-              new Promise((r) => setTimeout(r, 5000)),
-            ]);
-          }),
-        );
-        window.print();
-        sheet.remove();
-      }
-      /**
        * A stored picture as baseline-JPEG bytes the PDF writer can embed.
        *
        * Everything goes through a canvas, including a file that is already a
@@ -28356,14 +28276,54 @@
        * than inside them so a screen that gains a document gains both.
        */
       function downloadDocx(kind, refs, lang, filename) {
-        const descriptor = CaneiErpFacts.docFor(
+        saveDocx(docDescriptor(kind, refs, lang), lang, filename);
+      }
+      /** The descriptor both writers read, built once so they cannot diverge. */
+      function docDescriptor(kind, refs, lang) {
+        return CaneiErpFacts.docFor(
           erp,
           kind,
           refs || {},
           CaneiDocTypes,
           CaneiDocI18n.tr(lang || "es"),
         );
-        saveDocx(descriptor, lang, filename);
+      }
+      /* THE WRITER EMITS A LATIN-1 STRING, NOT BYTES. One character per byte,
+         so the conversion is a mask rather than an encode — `TextEncoder` would
+         turn every byte above 127 into two and corrupt the file. */
+      function pdfBlob(built) {
+        const bytes = new Uint8Array(built.length);
+        for (let i = 0; i < built.length; i += 1) bytes[i] = built.charCodeAt(i) & 0xff;
+        return new Blob([bytes], { type: "application/pdf" });
+      }
+      function savePdf(descriptor, lang, filename) {
+        downloadBlob(
+          pdfBlob(CaneiPdf.build(descriptor, brandBlock(), CaneiDocI18n.tr(lang || "es"))),
+          filename,
+        );
+      }
+      /**
+       * EVERY OTHER DOCUMENT AS A REAL PDF, and until now there was no such
+       * thing outside the quote.
+       *
+       * The contract, the invoice, the rectificativa, the receipt and the job
+       * sheet all produced their PDF by building the on-screen sheet and
+       * calling `window.print()`. In a browser that opens the print dialog and
+       * the operator picks «save as PDF», which is what the comment on the old
+       * route called the established pattern. INSIDE THE APP IT DOES NOTHING AT
+       * ALL: a WKWebView has no print dialog, so the button was silently inert
+       * on the phone — and since the quote took a different route and worked,
+       * what the operator saw was that SOME PDFs open and some do not.
+       *
+       * There is no reason left to print: the writer that makes the quote's PDF
+       * takes a descriptor, and `docFor` has produced a descriptor for all
+       * twenty document kinds since the Word mirror shipped. So this is the
+       * Word path with the other writer on the end of it — same descriptor,
+       * same facts, same language — and it hands back a file on every platform
+       * rather than a dialog on one of them.
+       */
+      function downloadPdf(kind, refs, lang, filename) {
+        savePdf(docDescriptor(kind, refs, lang), lang, filename);
       }
       async function downloadBudgetPdf(id, versionId) {
         const built = await budgetPdfString(id, versionId);
@@ -29844,30 +29804,25 @@
         if (issued) invoiceDrawer(issued.number);
       }
 
-      /**
-       * The issued invoice as a sheet the browser can save as PDF — the same
-       * `.printsheet` route the presupuesto uses. No PDF library: the print
-       * dialog's "Guardar como PDF" is the established pattern here.
-       */
+      /** The issued invoice as a PDF file — see `downloadPdf` for why it is no
+          longer the print dialog. */
       function downloadInvoicePdf(number) {
         const inv = erp.renderInvoiceDoc(number);
-        printSheetHtml(
-          sheetDocHtml(
-            inv.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
-            { invoiceId: number },
-            inv.language,
-          ),
+        downloadPdf(
+          inv.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+          { invoiceId: number },
+          inv.language,
+          number + ".pdf",
         );
       }
-      /** The generated contract, printable at last — same route as the rest. */
+      /** The generated contract, as a PDF file. */
       function downloadContractPdf(contractId) {
         const d = erp.renderContractDoc(contractId);
-        printSheetHtml(
-          sheetDocHtml(
-            "contrato",
-            { contractId, lineText: (l) => lineDesc(l, d.language) },
-            d.language,
-          ),
+        downloadPdf(
+          "contrato",
+          { contractId, lineText: (l) => lineDesc(l, d.language) },
+          d.language,
+          (d.number || "contrato") + ".pdf",
         );
       }
 

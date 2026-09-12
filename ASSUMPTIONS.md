@@ -10194,3 +10194,45 @@ drives the real button — and with the shadowing put back it reports
 `hash: "#quotes", onJourney: false`, which is the operator's sentence in the
 suite's own words. Same lesson as S112a, one layer along: a test that stubs the
 thing the bug is in is a test of something else.
+
+**S123 · «Some PDFs do not open» — the ones that were never files.** Only the
+quote had a real PDF. The contract, the invoice, the rectificativa, the receipt
+and the job sheet produced theirs by laying the on-screen sheet out on the page
+and calling `window.print()`. In a browser that opens the print dialog and the
+operator picks save-as-PDF, which the old comment called the established
+pattern. **A WKWebView has no print dialog**, so inside the app those buttons
+did nothing whatsoever — no file, no error, no dialog. And because the quote
+took the other route and worked, what the operator saw was exactly what they
+reported: some PDFs open and some do not.
+
+Nothing had to be invented to fix it. `CaneiPdf.build` takes a descriptor, and
+`docFor` has produced a descriptor for all twenty document kinds since the Word
+mirror shipped — which is why the Word button beside every one of these worked
+all along. So `downloadPdf` is `downloadDocx` with the other writer on the end
+of it: same descriptor, same facts, same language, and a file on every
+platform. The print route is deleted rather than left beside it, along with the
+`@media print` rules that only it could reach: a half-removed feature is how
+somebody reintroduces this in a year by reaching for the function that is still
+there.
+
+The desktop behaviour changes and it changes for the better — a button labelled
+with a download arrow now downloads, as its Word twin always did, instead of
+opening a print dialog.
+
+**S123a · The test asserted the mechanism, so it could not see the fault.**
+`COM-04: contract download` stubbed `window.print`, clicked the button, and
+checked that the approved sheet had been laid out on the page for the dialog.
+That is a faithful test OF PRINTING, and it passed on every run while the
+button did nothing on the only device the crew uses. The mechanism was the bug;
+a test written against it inherits the bug's blind spot.
+
+It now asserts the artefact: a download event, a `%PDF-` header and a plausible
+size. That is the one thing the print route could never produce anywhere, and
+it fails with `name: null` the moment the button goes inert again — which is
+how it was verified. The ledger check beside it does the same, plus a sweep
+that builds a PDF for every document kind the ledger can offer, because a
+download test only ever exercises whichever row happens to come first.
+
+**S123b · Source literals 161 → 158, and the CI ceiling follows.** Deleting the
+print route took three Spanish strings with it. Lowered in the same commit, per
+the rule that ceilings only ever move down.

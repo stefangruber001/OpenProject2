@@ -3083,3 +3083,22 @@ recorrido — that last one because the first version called the engine directly
 and would have passed with the navigation bug live.
 
 See ASSUMPTIONS S121, S122, S122a.
+
+## S16 · The PDFs that were never files (2026-09-12)
+
+The operator: some PDFs are not opening. Only the quote had a real PDF writer
+behind it; the contract, invoice, rectificativa, receipt and job sheet built
+the on-screen sheet and called `window.print()`. A browser answers that with a
+dialog; a WKWebView answers it with nothing, so inside the app those buttons
+were inert — and the quote working is what made it look like «some».
+
+`downloadPdf` is now the Word path with the PDF writer on the end: the same
+descriptor `docFor` already produced for all twenty kinds. The print route and
+its `@media print` rules are deleted, not left beside it.
+
+The test that covered this asserted the print mechanism — it stubbed
+`window.print` and checked the sheet was laid out — so it passed throughout.
+It now asserts a download event with a `%PDF-` header, as does a new one on the
+ledger, plus a sweep that builds a PDF for every kind the ledger offers.
+
+See ASSUMPTIONS S123, S123a, S123b.

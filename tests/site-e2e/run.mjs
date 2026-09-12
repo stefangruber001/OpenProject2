@@ -1005,6 +1005,96 @@ async function testJourney(browser, base) {
       ok(`recorrido: a document downloads from the ledger (${file.suggestedFilename()})`);
     else bad("recorrido: ledger document downloads", file ? file.suggestedFilename() : "(none)");
 
+    // ── AND SO DOES THE PDF BESIDE IT, which for a long time it did not.
+    //    Every ledger row but the quote produced its PDF by laying the sheet
+    //    out on the page and calling `window.print()`. A browser answers that
+    //    with a dialog offering «save as PDF»; a WKWebView answers it with
+    //    nothing at all, so inside the app the button was inert — and because
+    //    the quote took the other route and worked, what the operator saw was
+    //    that SOME PDFs open and some do not.
+    //
+    //    A download event is the whole assertion: it is the one thing the
+    //    print route could never produce, on any platform.
+    const dlp = pg.waitForEvent("download", { timeout: 20000 }).catch(() => null);
+    await pg.locator('#jLedger [data-led="pdf"]').first().click();
+    const pdf = await dlp;
+    const pdfHead = pdf
+      ? await pdf
+          .createReadStream()
+          .then(
+            (st) =>
+              new Promise((res) => {
+                let b = Buffer.alloc(0);
+                st.on("data", (d) => (b = Buffer.concat([b, d])));
+                st.on("end", () => res(b));
+              }),
+          )
+          .then((b) => ({ head: b.subarray(0, 5).toString(), bytes: b.length }))
+          .catch(() => null)
+      : null;
+    if (
+      pdf &&
+      /\.pdf$/.test(pdf.suggestedFilename()) &&
+      pdfHead &&
+      pdfHead.head === "%PDF-" &&
+      pdfHead.bytes > 1000
+    )
+      ok(
+        `recorrido: and the PDF beside it is a real file (${pdf.suggestedFilename()}, ${pdfHead.bytes} bytes)`,
+      );
+    else
+      bad(
+        "recorrido: ledger PDF downloads as a PDF",
+        JSON.stringify({ name: pdf && pdf.suggestedFilename(), pdfHead }),
+      );
+
+    // ── AND THE SAME WRITER ANSWERS FOR EVERY KIND THE LEDGER CAN OFFER. The
+    //    button above exercises whichever row happens to come first; these are
+    //    the five that used to go to the print dialog, each built through the
+    //    descriptor its Word file is built from.
+    const pdfKinds = await pg.evaluate(() => {
+      const out = [];
+      const first = (list) => (list && list.length ? list[list.length - 1] : null);
+      const inv = first(erp.state.invoices.filter((i) => i.kind !== "creditNote"));
+      const rect = first(erp.state.invoices.filter((i) => i.kind === "creditNote"));
+      const con = first(erp.state.contracts);
+      const prj = first(erp.state.projects);
+      const rec = first(erp.state.receipts || []);
+      const want = [
+        inv && ["factura", { invoiceId: inv.number }],
+        rect && ["rectificativa", { invoiceId: rect.number }],
+        con && ["contrato", { contractId: con.id, lineText: (l) => l.desc || "" }],
+        prj && ["fichaProyecto", { projectId: prj.id }],
+        rec && ["recibo", { receiptId: rec.id }],
+      ].filter(Boolean);
+      for (const [kind, refs] of want) {
+        try {
+          const built = CaneiPdf.build(
+            docDescriptor(kind, refs, "es"),
+            brandBlock(),
+            CaneiDocI18n.tr("es"),
+          );
+          out.push({
+            kind,
+            ok: built.slice(0, 5) === "%PDF-" && built.length > 1000,
+            bytes: built.length,
+          });
+        } catch (e) {
+          out.push({ kind, ok: false, err: String((e && e.message) || e).slice(0, 80) });
+        }
+      }
+      return out;
+    });
+    if (pdfKinds.length >= 4 && pdfKinds.every((k) => k.ok))
+      ok(
+        `recorrido: every document kind the ledger offers writes a PDF (${pdfKinds.length} kinds)`,
+      );
+    else
+      bad(
+        "recorrido: every ledger document kind writes a PDF",
+        JSON.stringify(pdfKinds.filter((k) => !k.ok)) + ` of ${pdfKinds.length}`,
+      );
+
     // ── Back to the register.
     await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(600);
@@ -9390,26 +9480,46 @@ async function testContract(browser, base) {
       ok("COM-04: the document is rendered from data, customer and all");
     else bad("COM-04: document from data", docText.replace(/\n/g, " ").slice(0, 120));
 
-    // PK-F: the contract finally has a download, and what it prints is the
-    // approved sheet — never the retired idioms.
-    const conDl = await pg.evaluate(async () => {
-      let during = null;
-      const orig = window.print;
-      window.print = () => {
-        during =
-          !!document.querySelector(".printsheet .cnsheet .sheet") &&
-          !document.querySelector(".printsheet .cdoc, .printsheet .doc");
-      };
-      const btn = document.querySelector("#conDl");
-      if (btn) btn.click();
-      await new Promise((r) => setTimeout(r, 900));
-      const after = !!document.querySelector(".printsheet");
-      window.print = orig;
-      return { btn: !!btn, during, after };
-    });
-    if (conDl.btn && conDl.during === true && !conDl.after)
-      ok("COM-04: «Descargar PDF» prints the contract as the approved sheet, then cleans up");
-    else bad("COM-04: contract download", JSON.stringify(conDl));
+    /* PK-F: the contract has a download, and it is a FILE.
+       This used to stub `window.print` and assert that the approved sheet had
+       been laid out on the page for the print dialog — which was the whole
+       mechanism, and the whole fault: a WKWebView has no print dialog, so
+       inside the app the button did nothing and the operator reported that
+       some PDFs do not open. The sheet is still what the reader sees; it is
+       now written by the same writer that makes the quote's PDF, from the same
+       descriptor as the Word file beside it. So the assertion is the file. */
+    const conDlEvt = pg.waitForEvent("download", { timeout: 20000 }).catch(() => null);
+    await pg.locator("#conDl").click();
+    const conFile = await conDlEvt;
+    const conHead = conFile
+      ? await conFile
+          .createReadStream()
+          .then(
+            (st) =>
+              new Promise((res) => {
+                let b = Buffer.alloc(0);
+                st.on("data", (d) => (b = Buffer.concat([b, d])));
+                st.on("end", () => res(b));
+              }),
+          )
+          .then((b) => ({ head: b.subarray(0, 5).toString(), bytes: b.length }))
+          .catch(() => null)
+      : null;
+    if (
+      conFile &&
+      /\.pdf$/.test(conFile.suggestedFilename()) &&
+      conHead &&
+      conHead.head === "%PDF-" &&
+      conHead.bytes > 1000
+    )
+      ok(
+        `COM-04: «Descargar PDF» writes the contract as a real PDF (${conFile.suggestedFilename()}, ${conHead.bytes} bytes)`,
+      );
+    else
+      bad(
+        "COM-04: contract download",
+        JSON.stringify({ name: conFile && conFile.suggestedFilename(), conHead }),
+      );
 
     // Package 2 slide 6, a real bug: guaranteeCategories is engine vocabulary
     // (executionAndFinishes/installations/structural) and was printed
