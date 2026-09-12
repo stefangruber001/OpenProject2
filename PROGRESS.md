@@ -3102,3 +3102,16 @@ It now asserts a download event with a `%PDF-` header, as does a new one on the
 ledger, plus a sweep that builds a PDF for every kind the ledger offers.
 
 See ASSUMPTIONS S123, S123a, S123b.
+
+## S17 · The phase rail opens where the job is (2026-09-12)
+
+Thirteen chips, a phone shows five, and the strip always started at chip one —
+so a job at phase 8 opened with that phase off the right-hand edge. It is now
+scrolled so the current chip is centred, clamped at both ends, and still freely
+draggable. It moves only when the selected phase changes, so a redraw cannot
+haul it back under the operator's thumb.
+
+Checked at phone width, because at desktop width the whole rail fits and the
+assertion would pass against no implementation at all.
+
+See ASSUMPTIONS S124, S124a.

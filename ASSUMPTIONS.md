@@ -10236,3 +10236,31 @@ download test only ever exercises whichever row happens to come first.
 **S123b · Source literals 161 → 158, and the CI ceiling follows.** Deleting the
 print route took three Spanish strings with it. Lowered in the same commit, per
 the rule that ceilings only ever move down.
+
+**S124 · The rail opened on chip one, whatever phase the job was in.** Thirteen
+phase chips are about a thousand pixels wide and a phone shows five, so the
+strip always started at the left: a job at phase 8 opened with the phase the
+operator came to see off the right-hand edge, and the first thing they did was
+drag. Measured without the fix, on a 390px screen: phase 7 sits 307px past the
+edge and phase 13 604px past it.
+
+The scroller is now set so the current chip is centred, and the browser clamps
+the number — which is why phase 1 sits against the left edge and phase 13
+against the right rather than centred against empty space. The box keeps
+`overflow-x: auto`, so dragging it anywhere still works exactly as before.
+
+**S124a · It moves only when the selected phase changes, which is the same rule
+as S120.** Re-centring on every render would haul the strip back under the
+thumb of somebody who had just scrolled it somewhere else — the yanking problem
+one card above, in a second place. `jRailAt` remembers where the rail was last
+put, so a redraw that changes nothing changes nothing. The check asserts both
+halves: the clamped-centre position to within 2px at phases 1, 7 and 13, and a
+manual scroll surviving an unrelated redraw.
+
+It is measured at PHONE WIDTH deliberately. At the desktop width the rest of
+this suite runs at, the whole rail fits and there is nothing to centre — the
+assertion would pass against any implementation, including none.
+
+`getBoundingClientRect` rather than `offsetLeft` because the offset parent is
+not the scroller, and `scrollIntoView({inline:"center"})` is avoided because it
+drags the PAGE vertically as well as the strip sideways.

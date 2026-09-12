@@ -1095,6 +1095,72 @@ async function testJourney(browser, base) {
         JSON.stringify(pdfKinds.filter((k) => !k.ok)) + ` of ${pdfKinds.length}`,
       );
 
+    // ── THE RAIL OPENS ON THE PHASE YOU ARE IN. Thirteen chips are about a
+    //    thousand pixels and a phone shows five, so the strip used to start at
+    //    chip one: a job at phase 8 opened with the phase you came to see off
+    //    the right-hand edge. On a PHONE-WIDTH page, because at desktop width
+    //    the whole rail fits and there is nothing to centre — measuring it
+    //    there would assert nothing at all.
+    {
+      const rp = await browser.newPage({ viewport: { width: 390, height: 844 } });
+      await rp.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
+      await bootedShell(rp);
+      await rp.waitForTimeout(600);
+      const rail = await rp.evaluate(async () => {
+        const prj = erp.state.projects.find((x) => journeyContext("prj:" + x.id));
+        if (!prj) return { why: "no job to open" };
+        journeySelect("prj:" + prj.id);
+        render();
+        await new Promise((r) => setTimeout(r, 120));
+        const read = () => {
+          const on = document.querySelector(".jrail .jstep.on");
+          const box = on.closest(".scroll");
+          const c = on.getBoundingClientRect();
+          const b = box.getBoundingClientRect();
+          const max = box.scrollWidth - box.clientWidth;
+          // Where the browser should have left it: the chip centred, then
+          // clamped, which is why the first and last sit against an edge.
+          const want = Math.max(
+            0,
+            Math.min(max, box.scrollLeft + c.left - b.left - (b.width - c.width) / 2),
+          );
+          return { at: box.scrollLeft, want, max, scrollable: max > 40 };
+        };
+        const out = { steps: [] };
+        for (const i of [0, 6, 12]) {
+          jStep = i;
+          render();
+          await new Promise((r) => setTimeout(r, 120));
+          const r0 = read();
+          out.steps.push({
+            i,
+            off: Math.round(Math.abs(r0.at - r0.want)),
+            scrollable: r0.scrollable,
+          });
+        }
+        /* AND A REDRAW DOES NOT HAUL IT BACK. Somebody who has dragged the
+           strip somewhere else keeps their place; only changing the phase
+           moves it. */
+        const box = document.querySelector(".jrail").closest(".scroll");
+        box.scrollLeft = 0;
+        render();
+        await new Promise((r) => setTimeout(r, 150));
+        out.keptManual = document.querySelector(".jrail").closest(".scroll").scrollLeft === 0;
+        return out;
+      });
+      await rp.close();
+      if (
+        rail.steps &&
+        rail.steps.length === 3 &&
+        rail.steps.every((x) => x.scrollable && x.off <= 2) &&
+        rail.keptManual
+      )
+        ok(
+          "recorrido: the phase rail opens centred on the current phase, and stays where you drag it",
+        );
+      else bad("recorrido: phase rail centring", JSON.stringify(rail));
+    }
+
     // ── Back to the register.
     await pg.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
     await pg.waitForTimeout(600);

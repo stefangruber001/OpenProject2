@@ -23957,6 +23957,10 @@
       // of its own: this screen writes none.
       let jSubject = null,
         jStep = -1,
+        /* Which phase the rail was last scrolled to sit on. Not the same as
+           `jStep`: it is what stops an unrelated redraw from dragging the strip
+           back under the operator's thumb — see where it is used. */
+        jRailAt = -1,
         /* The phase drawn last time and the state it was in, so the screen can
            tell a phase that HAS JUST FINISHED from one that was already finished
            when you walked back to look at it. Only the first of those should
@@ -24375,6 +24379,7 @@
         jStep = -1;
         // A different job's progress must not move this one's view.
         jSeen = null;
+        jRailAt = -1;
         const c = journeyContext(key);
         if (c && c.project) {
           gProject = c.project.id;
@@ -24851,6 +24856,37 @@
               render();
             }),
         );
+        /* THE RAIL OPENS ON THE PHASE YOU ARE IN, IN THE MIDDLE.
+           Thirteen chips are about a thousand pixels and a phone shows five, so
+           the strip has always started at chip one — which on a job at phase 8
+           means the phase you came to see is off the right-hand edge and the
+           first thing you do is drag. Centred, the phase is under your thumb
+           with its neighbours either side, which is what the strip is for.
+
+           SCROLLED, NOT SNAPPED: the box keeps `overflow-x: auto`, so dragging
+           it wherever you like still works exactly as before. The browser
+           clamps the number for us, so phase 1 sits at the left edge and phase
+           13 at the right rather than centred against empty space.
+
+           And it only moves when the SELECTED PHASE has changed. Re-centring on
+           every render would haul the strip back under the thumb of anybody who
+           had just scrolled it somewhere else — the same yanking `jSeen` exists
+           to prevent one card above. `getBoundingClientRect` rather than
+           `offsetLeft` because the offset parent here is not the scroller, and
+           `scrollIntoView` is avoided because its inline centring drags the
+           PAGE vertically too. */
+        const railOn = v.querySelector(".jrail .jstep.on");
+        const railBox = railOn && railOn.closest(".scroll");
+        if (railBox && jRailAt !== jStep) {
+          const chip = railOn.getBoundingClientRect();
+          const box = railBox.getBoundingClientRect();
+          // A zero-width box is one that has not been laid out; leave it alone
+          // rather than scrolling by a number computed from nothing.
+          if (box.width > 0) {
+            jRailAt = jStep;
+            railBox.scrollLeft += chip.left - box.left - (box.width - chip.width) / 2;
+          }
+        }
         if ($("#jNext"))
           $("#jNext").onclick = () => {
             jStep = nextIdx;
