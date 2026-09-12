@@ -3042,3 +3042,22 @@ app predates the tab-bar fix, which Part 2 above makes harmless rather than
 merely untidy in the meantime.
 
 See ASSUMPTIONS S110, S110a, S110b, S110c, S110d.
+
+## S14 · Two quick ones on the recorrido (2026-09-12)
+
+**The strip says which phase the job is in.** The middle of the three names
+under the dots was always Contrato — a fixed milestone that the operator read
+as a statement about the job. The two ends stay; between them the only named
+dot is the one the ring is on, in the accent colour. Which labels fit is
+measured in all three languages at four widths, and Catalan is what set the
+thresholds: a Spanish-only measurement would have shipped two overlaps.
+
+**Finishing a phase moves you on to the next.** The screen kept the phase you
+were looking at, so completing a visit recoloured a dot and left the next action
+behind a button. It follows the work now — but only on a real transition, so a
+completed phase can still be opened and read without being thrown forward.
+
+Both are covered by browser checks that fail when the old behaviour is put back:
+156 label positions across es/ca/en, and the 2 → 3 jump the operator described.
+
+See ASSUMPTIONS S119, S119a, S119b, S120.

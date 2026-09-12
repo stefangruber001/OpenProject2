@@ -5546,6 +5546,15 @@ body.siteworker .rail {
 .jmk.en {
   transform: translateX(-100%);
 }
+/* The phase the job is in. The two ends are furniture — they say what the strip
+   runs between — and this one is the answer, so it is the only word in the band
+   that is not faint. Colour and weight, no second dot and no box: the ring
+   above it already marks the position, and this says what the position is
+   called. */
+.jmk.cur {
+  color: var(--accent);
+  font-weight: 700;
+}
 .jdot {
   position: relative;
   width: 8px;

@@ -413,37 +413,93 @@ async function testJourney(browser, base) {
       ok(`recorrido: the register draws the phase as a timeline (${strips.length} × 13 dots)`);
     else bad("recorrido: thirteen dots, one ringed, named", JSON.stringify(badStrip.slice(0, 2)));
 
-    // …AND THE STRIP CARRIES A SCALE. Thirteen anonymous dots give a position
-    // and no way to read it, so three phases are named underneath — start,
-    // commitment, end — and their dots are drawn heavier. Measured, not merely
-    // present: a fourth label used to overlap the third by 23px on a 320px
-    // phone, which is the failure this check exists to catch if anybody adds
-    // one back. The labels must also sit inside the strip, or they hang off the
-    // card.
-    const marks = await pg.evaluate(() => {
-      const s = document.querySelector(".jmini");
-      if (!s) return { missing: true };
-      const box = s.getBoundingClientRect();
-      const m = [...s.querySelectorAll(".jmk")].map((n) => {
-        const r = n.getBoundingClientRect();
-        return { t: n.textContent.trim(), l: r.left - box.left, r: r.right - box.left };
-      });
-      return {
-        texts: m.map((x) => x.t),
-        heavy: s.querySelectorAll(".jdot.mk").length,
-        overflows: m.some((x) => x.l < -0.5 || x.r > box.width + 0.5),
-        overlaps: m.some((x, i) => i > 0 && x.l < m[i - 1].r + 4),
-      };
-    });
-    if (
-      marks.texts &&
-      marks.texts.length === 3 &&
-      marks.heavy === 3 &&
-      !marks.overflows &&
-      !marks.overlaps
-    )
-      ok(`recorrido: the strip names its milestones (${marks.texts.join(" · ")})`);
-    else bad("recorrido: milestone labels fit and are named", JSON.stringify(marks));
+    // …AND THE STRIP SAYS WHICH PHASE THE JOB IS IN. Thirteen anonymous dots
+    // give a position and no way to read it. The two ends are named because
+    // they say what the strip runs between; the third label is the phase the
+    // job is ON, and it moves with the ring. It used to be Contrato — always
+    // Contrato — which the operator read as a statement about the job.
+    //
+    // EVERY PHASE, EVERY LANGUAGE, EVERY WIDTH, because the thresholds that
+    // decide which labels fit are dot counts and the words they stand for are
+    // rewritten by i18n after render. Measuring one phase in one language is
+    // how a Spanish-only measurement ships two Catalan overlaps: Tancament i
+    // ressenya and Enviament al client are what set the limit here, and this
+    // check is what found them.
+    //
+    // On a page of its own, and reloaded per language rather than switched in
+    // place: `CANEI_I18N.set` reloads by design — the dictionary is chosen at
+    // boot — so calling it under `evaluate` destroys the context the check is
+    // running in. The language cookie is shared by the whole browser context,
+    // so this puts it back to Spanish before the suite carries on.
+    const bandFails = [];
+    let bandNamed = 0;
+    let bandHeavy = -1;
+    {
+      const bp = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
+      // A page still on about:blank has no origin, so it cannot be given a
+      // cookie: load the site first, choose, then load it again in that choice.
+      await bp.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
+      for (const lang of ["es", "ca", "en"]) {
+        await chooseLang(bp, lang);
+        await bp.goto(`${base}/erp.html#journey`, { waitUntil: "networkidle" });
+        await bootedShell(bp);
+        await bp.waitForTimeout(400);
+        const r = await bp.evaluate((lg) => {
+          const host = document.createElement("div");
+          document.body.appendChild(host);
+          const fails = [];
+          let named = 0;
+          for (const W of [262, 300, 356, 420]) {
+            host.style.cssText = `position:fixed;left:-9999px;top:0;width:${W}px`;
+            for (let at = 0; at <= 12; at += 1) {
+              host.innerHTML = journeyMini(
+                Array.from({ length: 13 }, () => "done"),
+                at,
+              );
+              host.querySelector(".jmini").style.minWidth = "0";
+              CANEI_I18N.translateNode(host);
+              const box = host.querySelector(".jmini").getBoundingClientRect();
+              const m = [...host.querySelectorAll(".jmk")].map((n) => ({
+                t: n.textContent.trim(),
+                cur: n.classList.contains("cur"),
+                l: n.getBoundingClientRect().left,
+                r: n.getBoundingClientRect().right,
+              }));
+              const where = `${lg} ${W}px phase ${at + 1}`;
+              // The whole point of the change: wherever the job is, it is named.
+              if (m.some((x) => x.cur)) named += 1;
+              else fails.push(`${where}: the current phase is not named`);
+              for (let i = 0; i < m.length; i += 1) {
+                if (m[i].l < box.left - 1.5 || m[i].r > box.right + 1.5)
+                  fails.push(`${where}: ${m[i].t} hangs off the strip`);
+                for (let j = i + 1; j < m.length; j += 1)
+                  if (Math.max(m[j].l - m[i].r, m[i].l - m[j].r) < 2)
+                    fails.push(`${where}: ${m[i].t} / ${m[j].t} overlap`);
+              }
+            }
+          }
+          /* ONE strip, not every row in the register: the page holds twenty
+             of them and counting the lot measures the row count. */
+          const heavy = document.querySelectorAll(".jmini")[0].querySelectorAll(".jdot.mk").length;
+          host.remove();
+          return { fails, named, heavy };
+        }, lang);
+        bandFails.push(...r.fails);
+        bandNamed += r.named;
+        if (lang === "es") bandHeavy = r.heavy;
+      }
+      await chooseLang(bp, "es");
+      await bp.close();
+    }
+    if (!bandFails.length && bandNamed === 156 && bandHeavy === 2)
+      ok("recorrido: the strip names the phase the job is in, in three languages, at four widths");
+    else
+      bad(
+        "recorrido: the strip's labels fit and name the current phase",
+        `${bandFails.length} problem(s), named ${bandNamed}/156, heavy dots ${bandHeavy} — ${bandFails
+          .slice(0, 4)
+          .join(" · ")}`,
+      );
 
     const strip0 = strips[0];
     const railTones = await pg.evaluate(
@@ -521,16 +577,90 @@ async function testJourney(browser, base) {
     if (walked === 4) ok("recorrido: «Siguiente ›» moves one phase");
     else bad("recorrido: next phase", String(walked));
 
-    // ── Every phase renders, and none of them throws.
+    // ── Every phase renders, none of them throws, AND THE ONE YOU CLICKED IS
+    //    THE ONE YOU GET. That second half guards the other side of the
+    //    follow-the-work rule below: most of these thirteen are already done,
+    //    and a rule that moved you on from any finished phase would make them
+    //    unreadable — you would click phase 2 to see what happened and be
+    //    thrown to phase 3 by the very next render.
     let rendered = 0;
+    let stayed = 0;
     for (let i = 0; i < 13; i++) {
       await pg.locator(`[data-j="${i}"]`).click();
       await pg.waitForTimeout(120);
       const t = await pg.locator("#view").innerText();
       if (t && t.trim().length > 40) rendered++;
+      const on = await pg.evaluate(() =>
+        [...document.querySelectorAll(".jrail .jstep")].findIndex((c) =>
+          c.classList.contains("on"),
+        ),
+      );
+      if (on === i) stayed++;
     }
-    if (rendered === 13) ok("recorrido: all thirteen phases render");
-    else bad("recorrido: all phases render", `${rendered}/13`);
+    if (rendered === 13 && stayed === 13)
+      ok("recorrido: all thirteen phases render, and each one stays where it was opened");
+    else
+      bad("recorrido: all phases render and stay", `rendered ${rendered}/13, stayed ${stayed}/13`);
+
+    // ── FINISHING A PHASE MOVES YOU ON. The operator: after phase 2 I have to
+    //    move to phase 3 by hand before I can make the quote. The screen used
+    //    to remember the phase you were looking at, so completing the visit
+    //    recoloured a dot and left the next action behind a button.
+    //
+    //    Staged rather than hunted for in the seed: a visit is scheduled on an
+    //    opportunity so phase 2 is genuinely waiting, the screen is opened on
+    //    it, and then the visit is completed through the engine — the drawer
+    //    that normally does it is covered elsewhere, and what is under test
+    //    here is what the SCREEN does when the phase beneath it finishes.
+    const jump = await pg.evaluate(async () => {
+      /* One with NO completed visit, or phase 2 is already done and there is
+         no transition to observe — which is exactly what this check is for. */
+      const opp = erp.state.opportunities.find(
+        (o) =>
+          o.status !== "lost" &&
+          journeyContext("opp:" + o.id) &&
+          !erp.state.visits.some((v) => v.opportunityId === o.id && v.status === "done"),
+      );
+      if (!opp) return { why: "no opportunity without a completed visit to stage one on" };
+      const v = erp.scheduleVisit(
+        { opportunityId: opp.id, scheduledAt: erp.state.today, owner: "operations" },
+        "e2e",
+      );
+      journeySelect("opp:" + opp.id);
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      jStep = 1;
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      const before = {
+        step: jStep,
+        state: journeySteps(journeyContext("opp:" + opp.id))[1].state,
+      };
+      erp.completeVisit(v.id, { completedAt: erp.state.today, notes: "e2e" }, "e2e");
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      const steps = journeySteps(journeyContext("opp:" + opp.id));
+      return {
+        before,
+        after: jStep,
+        phase2: steps[1].state,
+        want: journeyNext(steps),
+        onChip: [...document.querySelectorAll(".jrail .jstep")].findIndex((c) =>
+          c.classList.contains("on"),
+        ),
+      };
+    });
+    if (
+      jump.before &&
+      jump.before.step === 1 &&
+      jump.before.state !== "done" &&
+      jump.phase2 === "done" &&
+      jump.after === jump.want &&
+      jump.after > 1 &&
+      jump.onChip === jump.after
+    )
+      ok(`recorrido: completing a phase moves the screen on to the next (2 → ${jump.after + 1})`);
+    else bad("recorrido: finishing a phase moves you on", JSON.stringify(jump));
 
     // ── ACTING ON A PHASE WRITES INTO THE ERP. The proveedor first: phase 8 is
     //    where the purchase order picker has never offered a way to file one.

@@ -23989,7 +23989,12 @@
       // jSubject names the record picked, prefixed prj or opp. Never a record
       // of its own: this screen writes none.
       let jSubject = null,
-        jStep = -1;
+        jStep = -1,
+        /* The phase drawn last time and the state it was in, so the screen can
+           tell a phase that HAS JUST FINISHED from one that was already finished
+           when you walked back to look at it. Only the first of those should
+           move you on; see the note beside it in VIEWS.journey. */
+        jSeen = null;
 
       /* The chain a recorrido is drawn from, walked from whichever end was picked.
          The five records point at each other in one direction only, and the one
@@ -24401,6 +24406,8 @@
            on the phase the job is actually in, and the view resolves the sentinel
            because it is the one place that has already computed it. */
         jStep = -1;
+        // A different job's progress must not move this one's view.
+        jSeen = null;
         const c = journeyContext(key);
         if (c && c.project) {
           gProject = c.project.id;
@@ -24481,36 +24488,51 @@
 
          `aria-hidden`, because the phase is named in words immediately beside it.
          Thirteen dots read aloud are noise, not information. */
-      /* THREE OF THE THIRTEEN ARE NAMED: where a job starts, where it becomes
-         binding, and where it ends. Thirteen anonymous dots gave a position
-         without a scale — the operator asked for key milestones to be named —
-         and thirteen labels do not fit on a 340px card, which is why the strip
-         lost its words in the first place.
+      /* THE TWO ENDS, AND WHERE THE JOB ACTUALLY IS. Thirteen anonymous dots
+         gave a position without a scale, so three of them were named: start,
+         commitment, finished. The middle one was Contrato — ALWAYS Contrato,
+         whatever phase the job was in — and the operator read it as a statement
+         about the job rather than as a fixed milestone: a ring sitting at
+         Compras with the word CONTRATO under the nearest labelled dot says the
+         wrong thing to anybody not counting dots.
 
-         THREE, NOT FOUR, AND THAT WAS MEASURED. Ejecución was the fourth, and on
-         a 320px phone its label overlapped the closing one by 23 pixels; at
-         390px it still overlapped by nine. Three clears every width down to 320
-         with 44px to spare, and start / commitment / finished is already a
-         complete scale: it says what the strip runs BETWEEN, which is the thing
-         the dots could not say on their own.
+         So the middle label moves. The two ends stay put — they are what the
+         strip runs BETWEEN — and between them the only named dot is the one the
+         job is on, drawn in the accent colour so it reads as a position rather
+         than as a third milestone.
+
+         WHICH LABELS FIT IS MEASURED, NOT GUESSED, and the numbers below are
+         the measurement: every phase, at 262 / 300 / 356 / 420px of track, in
+         all three languages. The band is at its narrowest on a phone card and
+         CATALAN IS WHAT SETS THE LIMIT — Tancament i ressenya and Enviament al
+         client are long enough that a Spanish-only measurement would have
+         shipped two overlaps. The opening word therefore appears from phase 6
+         onward and the closing word up to phase 6, so only phase 6 has room for
+         all three; everywhere else the band carries the current phase and one
+         end. That costs nothing: a ring that close to an end is visibly at that
+         end, and the phase is spelled out in full on the line below.
+
+         The thresholds are dot COUNTS rather than pixels on purpose: i18n
+         rewrites these words after render, so any width computed here would be
+         measured in Spanish and wrong in the other two. `tests/site-e2e` asserts
+         no two labels in this band overlap and none hangs off the strip, for all
+         thirteen phases in all three languages — that check is what keeps a dot
+         count honest, and it is how the Catalan pair above was found.
 
          (No phrase in quotation marks anywhere above: source-audit.mjs counts a
          quoted phrase inside a comment as a user-visible string.)
-
-         The named dots are drawn heavier, so «big dot = milestone, small dot =
-         a step between them» is legible without a legend anywhere.
 
          The labels are `JOURNEY[i].lab` and nothing new: the same words the full
          rail uses, already in both dictionaries, each in its own text node so it
          translates. A short form invented here would be a fifth vocabulary for
          the same thirteen things. */
-      const J_MARKS = [0, 5, 12];
       function journeyMini(states, at) {
+        const last = states.length - 1;
         const dots = states
           .map(
             (st, i) =>
               `<i class="jdot s-${st}${i === at ? " on" : ""}${
-                J_MARKS.includes(i) ? " mk" : ""
+                i === 0 || i === last ? " mk" : ""
               }"></i>`,
           )
           .join("");
@@ -24518,13 +24540,34 @@
            i/(n-1) of the track, so the label sits on exactly that fraction. The
            first and last are aligned to their end instead of centred, or half of
            each would hang off the card. */
-        const last = states.length - 1;
-        const marks = J_MARKS.filter((i) => i <= last)
-          .map((i) => {
-            const edge = i === 0 ? " st" : i === last ? " en" : "";
-            const pct = ((i / last) * 100).toFixed(2);
-            return `<span class="jmk${edge}" style="left:${pct}%">${esc(JOURNEY[i].lab)}</span>`;
-          })
+        /* Collected as data and rendered in one `map`, rather than pushed as
+           strings: a template literal split across a `push(` call reads to
+           source-audit.mjs as a piece of markup with Spanish in it, and the
+           ceiling went up by one for a string no user will ever see. */
+        const picked = [];
+        const add = (i, cls) => picked.push({ i: i, cls: cls });
+        /* NEAR AN EDGE, A LABEL GROWS INWARD. Centred on its own dot, the last
+           phases run off the end of the strip — Pagos a proveedores is 113px
+           wide on a dot 22px from the right edge — which is the same reason the
+           opening and closing words have never been centred. So the current one
+           borrows their alignment when it is in their zone: it starts at its dot
+           near the beginning and ends at its dot near the end, and only the
+           middle of the strip has room to centre. Alignment rather than width
+           does the work, which is what keeps it true in three languages.
+
+           This also folds the ends in: at phase 1 the label IS the opening one
+           and at phase 13 it IS the closing one, so they take the accent and
+           there is one word on the dot instead of two. */
+        if (at >= 5) add(0, " st");
+        add(at, (at <= 2 ? " st" : at >= 9 ? " en" : "") + " cur");
+        if (at <= 5) add(last, " en");
+        const marks = picked
+          .map(
+            (m) =>
+              `<span class="jmk${m.cls}" style="left:${((m.i / last) * 100).toFixed(2)}%">${esc(
+                JOURNEY[m.i].lab,
+              )}</span>`,
+          )
           .join("");
         return `<span class="jmini" aria-hidden="true"><span class="jmd">${dots}</span><span class="jmks">${marks}</span></span>`;
       }
@@ -24710,6 +24753,34 @@
         const at = journeyPhase(steps);
         if (jStep >= steps.length || jStep < 0) jStep = at;
         const nextIdx = journeyNext(steps);
+        /* FINISHING A PHASE MOVES YOU ON TO THE NEXT ONE.
+           The operator: after phase 2 I have to move to phase 3 by hand before I
+           can make the quote. They did — the screen remembered the phase they
+           were looking at, and completing the visit changed the phase's colour
+           and nothing else, so the next action sat one click away behind a
+           button that had to be found and pressed. The whole point of this
+           screen is to be told what to do next.
+
+           IT MOVES ONLY WHEN THE PHASE FINISHES UNDER YOU, which is why the
+           previous state is remembered rather than just the previous index. A
+           rule that simply moved you on from any finished phase would make a
+           finished phase impossible to look at: you would click phase 2 to read
+           what happened and be thrown to phase 3 by the very next render. So
+           the jump needs a TRANSITION — not done, then done, with the viewer
+           standing still — which no amount of navigating can produce.
+
+           `jNext` stays: this follows the work, and that button goes wherever
+           you ask, which are different things. */
+        if (
+          jSeen &&
+          jSeen.i === jStep &&
+          jSeen.state !== "done" &&
+          steps[jStep].state === "done" &&
+          nextIdx >= 0 &&
+          nextIdx !== jStep
+        )
+          jStep = nextIdx;
+        jSeen = { i: jStep, state: steps[jStep].state };
         const step = steps[jStep];
         const meta = JOURNEY[jStep];
         const eco = c.project ? erp.projectEconomics(c.project.id) : null;

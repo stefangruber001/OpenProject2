@@ -10100,3 +10100,54 @@ documento agrupa bajo una cabecera las partidas consecutivas que lo comparten.
 motor lo almacena sin cambiar una línea. El precio, dicho por delante: un título
 no puede partirse en dos tramos no consecutivos sin imprimirse dos veces, y no se
 reordena de golpe — se mueven sus partidas.
+
+**S119 · The strip's middle word was always Contrato, whatever phase the job was
+in.** The register names three of the thirteen phases under the dots — start,
+commitment, end — and the operator read the middle one as a statement about the
+job: a ring sitting on Compras with CONTRATO under the nearest labelled dot says
+the wrong thing to anybody not counting dots. The two ends stay, because they
+are what the strip runs BETWEEN; the middle label is now the phase the job is
+on, in the accent colour, so it reads as a position rather than as a third
+milestone.
+
+**S119a · Which labels fit was measured in three languages, and CATALAN is what
+set the limits.** The thresholds — opening word from phase 6 onward, closing
+word up to phase 6 — come from measuring all thirteen phases at 262 / 300 / 356
+/ 420px of track. A Spanish-only measurement would have shipped two overlaps:
+Tancament i ressenya and Enviament al client are long enough to collide where
+their Spanish equivalents clear by 29px. The first draft of this change WAS
+Spanish-only and the sweep found them.
+
+They are dot COUNTS rather than pixel sums on purpose. i18n rewrites these words
+after render, so any width computed in the client is measured in the language
+the source happens to be written in and is wrong in the other two — the same
+shape of hidden dependency as S112. What keeps a dot count honest is the browser
+check that now asserts, for every phase in every language at four widths, that
+no two labels overlap, that none hangs off the strip, and that the current phase
+is named: 156 positions, and it fails 156/156 with the fixed middle label back.
+
+**S119b · A label near an edge grows inward, which is what makes it
+language-proof.** Centred on its own dot, the late phases run off the end —
+Pagos a proveedores is 113px wide on a dot 22px from the right edge. The
+opening and closing words have never been centred for exactly that reason, and
+the current label now borrows their alignment inside their zone. Alignment does
+the work rather than arithmetic over a string, so nothing here depends on how
+long a word is in a given language.
+
+**S120 · Finishing a phase left you standing on it.** The operator: after phase
+2 I have to move to phase 3 by hand before I can make the quote. The recorrido
+kept two different ideas of where you are — the phase the JOB is in, and the
+phase you are LOOKING AT — and only the first moved when work completed. So
+recording the visit recoloured a dot and left the next action behind a button
+that had to be found and pressed, on the one screen whose whole purpose is to
+say what to do next.
+
+The view now follows the work. What it does NOT do is move you off a phase you
+went back to read: the rule needs a TRANSITION — the phase you are standing on
+going from unfinished to finished while you stand on it — which no amount of
+navigating can produce. A simpler rule (if this phase is done, go forward) would
+have made every completed phase unreadable, and that half is asserted too: all
+thirteen are opened in turn and each has to stay where it was opened.
+
+`Ir a la fase N` stays. Following the work and going where you ask are different
+things, and the button is the second one.
