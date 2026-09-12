@@ -1095,6 +1095,78 @@ async function testJourney(browser, base) {
         JSON.stringify(pdfKinds.filter((k) => !k.ok)) + ` of ${pdfKinds.length}`,
       );
 
+    // ── AND NOT ONE OF EACH KIND: EVERY DOCUMENT, IN EVERY RECORRIDO, IN BOTH
+    //    FORMATS. The check above takes the last invoice, the last contract and
+    //    so on — five documents standing in for all of them. That is enough to
+    //    catch a writer that is broken for a KIND and blind to one that is
+    //    broken for a RECORD: an invoice with no lines, a contract whose job
+    //    was deleted, a receipt in a language the others are not in.
+    //
+    //    Asked for after «PDF invoice download not possible»: check that all
+    //    the documents in the whole customer journey download, Word and PDF.
+    //    Swept by hand once, clean; a sweep run once proves a day, and this is
+    //    the same sweep wired to the gate so it proves every day.
+    //
+    //    It goes through `historyDocFile`, which is the button's own route one
+    //    layer down — the bytes and the name, everything except handing the
+    //    file over. Rebuilding the references here instead would drift from the
+    //    button silently and then pass while the button was broken.
+    const sweep = await pg.evaluate(async () => {
+      const keys = [
+        ...erp.state.projects.map((p) => "prj:" + p.id),
+        ...erp.state.opportunities.map((o) => "opp:" + o.id),
+      ];
+      const out = { docs: 0, files: 0, kinds: {}, bad: [] };
+      // A DOCX is a ZIP: "PK". A PDF says so in its first five bytes.
+      const heads = { pdf: "%PDF-", docx: "PK" };
+      for (const key of keys) {
+        const c = journeyContext(key);
+        if (!c) continue;
+        for (const row of journeyLedgerRows(c)) {
+          if (!row.doc) continue;
+          out.docs += 1;
+          for (const format of ["pdf", "docx"]) {
+            const kind = (row.doc.doc || (row.doc.budgetId ? "presupuesto" : "?")) + "·" + format;
+            try {
+              const file = await historyDocFile(row.doc, format);
+              const head = await file.blob
+                .slice(0, 5)
+                .arrayBuffer()
+                .then((b) => String.fromCharCode(...new Uint8Array(b)));
+              const good =
+                head.startsWith(heads[format]) &&
+                file.blob.size > 1000 &&
+                /\.(pdf|docx)$/.test(file.name);
+              if (good) {
+                out.files += 1;
+                out.kinds[kind] = (out.kinds[kind] || 0) + 1;
+              } else out.bad.push({ kind, name: file.name, size: file.blob.size, head });
+            } catch (e) {
+              out.bad.push({ kind, err: String((e && e.message) || e).slice(0, 90) });
+            }
+          }
+        }
+      }
+      return out;
+    });
+    // The count is asserted too, and deliberately: a sweep that found nothing
+    // to sweep would otherwise report every document healthy. That is the
+    // failure this repo keeps meeting — a gate that cannot see its subject.
+    if (sweep.docs >= 40 && sweep.bad.length === 0 && sweep.files === sweep.docs * 2)
+      ok(
+        `recorrido: every document in every recorrido writes both formats (${sweep.docs} documents, ${sweep.files} files — ${Object.entries(
+          sweep.kinds,
+        )
+          .sort()
+          .map(([k, n]) => `${k} ${n}`)
+          .join(", ")})`,
+      );
+    else
+      bad(
+        "recorrido: every document downloads as PDF and as Word",
+        JSON.stringify({ docs: sweep.docs, files: sweep.files, bad: sweep.bad.slice(0, 4) }),
+      );
+
     // ── THE RAIL OPENS ON THE PHASE YOU ARE IN. Thirteen chips are about a
     //    thousand pixels and a phone shows five, so the strip used to start at
     //    chip one: a job at phase 8 opened with the phase you came to see off
@@ -2524,6 +2596,80 @@ async function testNativeShell(browser, base) {
     if (subs.on && subs.items >= 5 && subs.onScreen)
       ok(`native shell: the breadcrumb opens the subsection list on screen (${subs.items} items)`);
     else bad("native shell: subsections reachable", JSON.stringify(subs));
+
+    /* A DEPLOY HAS TO REACH A RUNNING APP.
+       The shell keeps one long-lived web view per tab, loaded once at launch,
+       so a fix published to `site/` does not reach a phone that is already
+       open. Three faults reported in one afternoon were all the same one: the
+       fix was live and the page in the operator's hand was from before it.
+
+       What is asserted here is the DECISION, not the transport: the page is
+       handed a health answer and a reload it can count, and the tally says
+       what it chose. Stubbing `fetch` is fair — the bug was never in `fetch`;
+       stubbing the decision would be a test of something else. The four
+       refusals matter as much as the one reload: a page that reloads at boot
+       loops for ever, one that reloads on `unknown` never stops, and one that
+       reloads over a focused field throws away somebody's work. */
+    const tally = await nat.pg.evaluate(async () => {
+      const store = window.ErpStore;
+      const keep = { remote: store.isRemote, base: store.apiBase, fetch: window.fetch };
+      let rev = "unknown";
+      let reloads = 0;
+      const reload = () => {
+        reloads += 1;
+      };
+      store.isRemote = () => true;
+      store.apiBase = () => "";
+      window.fetch = async (url) =>
+        String(url).includes("/api/health")
+          ? { ok: true, json: async () => ({ status: "ok", revision: rev }) }
+          : keep.fetch(url);
+      const t = {};
+      try {
+        // A static copy, or a build made without BUILD_REVISION, answers this.
+        await window.caneiRecheckBuild(reload);
+        t.unknown = reloads;
+        // The first real read: there is nothing to compare against yet.
+        rev = "aaaaaaa";
+        await window.caneiRecheckBuild(reload);
+        t.first = reloads;
+        // A minute later, still the same build.
+        await window.caneiRecheckBuild(reload);
+        t.same = reloads;
+        // A deploy lands while somebody has the caret in a field.
+        rev = "bbbbbbb";
+        const probe = document.createElement("input");
+        document.body.appendChild(probe);
+        probe.focus();
+        await window.caneiRecheckBuild(reload);
+        t.typing = reloads;
+        probe.blur();
+        probe.remove();
+        // And again with a panel open, which is work in progress too.
+        const d = document.querySelector("#drawer");
+        const wasOn = d.classList.contains("on");
+        d.classList.add("on");
+        await window.caneiRecheckBuild(reload);
+        t.drawer = reloads;
+        if (!wasOn) d.classList.remove("on");
+        // Hands off: now the page may pick the deploy up by itself.
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+        await window.caneiRecheckBuild(reload);
+        t.landed = reloads;
+      } finally {
+        store.isRemote = keep.remote;
+        store.apiBase = keep.base;
+        window.fetch = keep.fetch;
+      }
+      return t;
+    });
+    const quiet =
+      tally.unknown === 0 && tally.first === 0 && tally.same === 0 && tally.typing === 0;
+    if (quiet && tally.drawer === 0 && tally.landed === 1)
+      ok(
+        "native shell: a new build reloads the held page — but never at boot, and never over somebody's hands",
+      );
+    else bad("native shell: build recheck decision", JSON.stringify(tally));
 
     if (nat.errs.length === 0 && saf.errs.length === 0)
       ok("native shell: no console errors under either user agent");

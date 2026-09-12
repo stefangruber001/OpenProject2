@@ -10312,3 +10312,46 @@ browser check counts bars against the plan's own task count, requires the
 handler `ganttWire` binds, and then TAPS a bar and requires the task drawer to
 open. Verified by taking the chart back out: `svg:false, bars:0, wired:false`
 and the tap times out.
+
+**S126 · The fault was not in the button; it was in the page holding it.** The
+report said the invoice PDF would not download. It downloads: clicked in a
+browser, `#iv_pdf` and `#iv_word` both write their file, and a sweep of all 26
+invoices built both formats without one failure. What reproduces the report is
+a page loaded before the fix deployed — the shell keeps one long-lived web view
+per tab, all loaded at launch, so nothing published to `site/` reaches a phone
+that is already open. Three faults reported in one afternoon were that same
+fault underneath, and «force-quit the app» is not a fix, it is a habit the
+product is asking a person to have.
+
+So the page watches `/api/health`, which already answers with the commit the
+running image was built from — it exists because this project kept getting
+exactly this wrong. It remembers the first revision it sees and reloads when
+the server starts answering with a different one. Three refusals are as
+load-bearing as the reload: never on the first read (nothing to compare
+against, and it would loop), never on `unknown` (a static copy and any build
+made without `BUILD_REVISION` answer that, for ever), and never over an open
+drawer or a focused field — a deploy lands several times a day and a reload
+would throw somebody's work away. Verified by removing each guard in turn: the
+browser check reports `first:1`, `typing:1` and `first:1` respectively.
+
+**S126a · Sweeping by hand proves a day; a gate proves every day.** The general
+check the operator asked for — every document in the whole recorrido, Word and
+PDF — was run by hand and came back clean. That is worth exactly one afternoon.
+It is now `tests/site-e2e`: every ledger row of every recorrido, both formats,
+**176 documents · 352 files** — presupuesto 55, contrato 46, factura 45,
+fichaProyecto 24, recibo 6 — each asserted to start `%PDF-` or `PK`, to exceed
+a thousand bytes, and to carry the right extension.
+
+The count is asserted too, and not as decoration: a sweep that found nothing to
+sweep would otherwise report every document healthy. Verified by emptying the
+list of recorridos — `docs:0` fails, where before it would have passed.
+
+**S126b · A sweep that rebuilds the route is a test of the sweep.** The obvious
+way to write it is to assemble the references itself and call the writers. That
+passes while the button is broken, because the button's own reference-building
+is the half that is not being exercised. So `downloadHistoryDoc` was split:
+`historyDocFile(row, format)` returns the bytes and the name, and the download
+handler is now that function plus `downloadBlob`. The sweep calls it — the
+button's route one layer down — and cannot drift from the button without the
+button breaking too. Verified by making one kind throw: `factura·pdf` fails 45
+times, which is the shape of the operator's report.

@@ -3133,3 +3133,28 @@ The full screen keeps zoom, baseline, calendar, the S-curve and the payment
 recalculation, and is still one tap away.
 
 See ASSUMPTIONS S125, S125a, S125b, S125c.
+
+## S19 · Every document, both formats — and a deploy that reaches the phone (2026-09-12)
+
+«PDF invoice download not possible. General check all documents download word
+and pdf in whole customer journey that it is working.»
+
+The invoice buttons could not be reproduced as broken: in a browser `⤓ PDF` and
+`⤓ Word` both wrote their file. What reproduces the report is a page loaded
+before the fix deployed, which is a real fault and a wider one — the shell holds
+one web view per tab from launch, so nothing published reaches a phone that is
+already open. Three reports in one afternoon were that same fault underneath.
+
+Two things landed:
+
+- **The page notices a new build.** `/api/health` already answers with the
+  commit the running image was built from. The page remembers the first
+  revision it sees and reloads when the server starts answering with another —
+  never at boot, never on `unknown`, and never over an open drawer or a focused
+  field.
+- **The sweep became a gate.** Every document of every recorrido, in both
+  formats, through `historyDocFile` — the button's own route one layer down.
+  **176 documents · 352 files**, all of them a real PDF or a real Word file:
+  presupuesto 55, contrato 46, factura 45, fichaProyecto 24, recibo 6.
+
+See ASSUMPTIONS S126, S126a, S126b.

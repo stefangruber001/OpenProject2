@@ -5791,19 +5791,97 @@
           idBusy = false;
         }
       }
+      /* A DEPLOY HAS TO REACH A RUNNING APP, AND IT DID NOT.
+         The shell keeps one long-lived web view per tab, loaded once at launch,
+         so a fix published to `site/` does not reach a phone that is already
+         open until somebody force-quits it. Three faults reported in one
+         afternoon were the same fault underneath: the fix was live on the
+         server and the page in the operator's hand was the one from before it.
+         Being told to close the app each time is not a fix, it is a habit the
+         product is asking a person to have.
+
+         `/api/health` already answers with the commit the running image was
+         built from — it exists because this project kept getting exactly this
+         wrong. The page remembers the revision it first saw and reloads when
+         the server starts answering with a different one.
+
+         THREE THINGS IT MUST NOT DO, and each one is why a line is here:
+         · Never on the first read. There is nothing to compare against yet, and
+           reloading at boot is an infinite loop.
+         · Never on `unknown`. A static copy with no server, and any build made
+           without BUILD_REVISION, answer that; a page that reloaded on it would
+           reload for ever.
+         · Never over somebody's hands. A deploy lands several times a day and
+           an open drawer or a focused field means work in progress that a
+           reload would throw away. It waits and asks again a minute later.
+
+         Offline says nothing and changes nothing, for the reason `recheckIdentity`
+         gives: a page that blanked itself whenever a lift ate the signal would be
+         worse than a stale one. */
+      let buildRev = "";
+      /** True while somebody is typing or has a panel open — see above. */
+      function midEdit() {
+        const d = $("#drawer");
+        if (d && d.classList.contains("on")) return true;
+        const a = document.activeElement;
+        return !!(
+          a &&
+          (a.tagName === "INPUT" ||
+            a.tagName === "TEXTAREA" ||
+            a.tagName === "SELECT" ||
+            a.isContentEditable)
+        );
+      }
+      /* `reload` is a parameter with the real thing as its default, exactly as
+         `recheckIdentity` takes one: it is what lets the suite assert the
+         DECISION without a page that reloads itself out from under it. */
+      async function recheckBuild(reload) {
+        const doReload = reload || (() => location.reload());
+        if (!ErpStore.isRemote()) return;
+        try {
+          const res = await fetch((ErpStore.apiBase() || "") + "/api/health", {
+            cache: "no-store",
+            credentials: "same-origin",
+          });
+          if (!res.ok) return;
+          const rev = String(((await res.json()) || {}).revision || "");
+          if (!rev || rev === "unknown") return;
+          if (!buildRev) {
+            buildRev = rev;
+            return;
+          }
+          if (rev === buildRev || midEdit()) return;
+          buildRev = rev;
+          doReload();
+        } catch (e) {
+          /* offline — say nothing, change nothing */
+        }
+      }
       function watchIdentity() {
         if (!ErpStore.isRemote()) return;
         identity = identityOf(SESSION);
+        recheckBuild();
         setInterval(recheckIdentity, 60000);
+        setInterval(recheckBuild, 60000);
         document.addEventListener("visibilitychange", () => {
-          if (document.visibilityState === "visible") recheckIdentity();
+          if (document.visibilityState === "visible") {
+            recheckIdentity();
+            recheckBuild();
+          }
         });
         // Restored from the back/forward cache with whatever it had on screen.
         window.addEventListener("pageshow", (e) => {
-          if (e.persisted) recheckIdentity();
+          if (e.persisted) {
+            recheckIdentity();
+            recheckBuild();
+          }
         });
         window.caneiRecheckSession = recheckIdentity;
       }
+      /* Reachable from the suite, which cannot wait sixty seconds for a timer
+         and must not let a page reload itself out from under an assertion.
+         That is what the `reload` parameter is for. */
+      window.caneiRecheckBuild = recheckBuild;
       /* Demo pictures for the seeded budget's graphic annex, keyed exactly as
          erp-seed.js references them. Drawn, not downloaded: the page must work from
          a bare static host with no network, and a repository is the wrong place to
@@ -25987,15 +26065,34 @@
           };
         });
       }
-      /** One row, one format. The quote goes through the budget builder so it
-       *  arrives with its graphic annex; everything else is its descriptor. */
-      async function downloadHistoryDoc(row, format) {
+      /**
+       * One row, one format, as BYTES AND A NAME — everything the button does
+       * except handing the file over.
+       *
+       * Split out of `downloadHistoryDoc` so that the suite can sweep every
+       * document a recorrido offers through the route the button actually
+       * takes. The alternative — a sweep that assembles the references itself —
+       * looks equivalent and is not: it drifts from this function silently, and
+       * then reports every document healthy while the button beside it is
+       * broken. A gate that cannot see its subject must fail, not pass.
+       *
+       * The quote goes through the budget builder so it arrives with its
+       * graphic annex; everything else is its descriptor, and both formats read
+       * the same one so they cannot say different things.
+       */
+      async function historyDocFile(row, format) {
         if (row.budgetId) {
           const b = erp.budget(row.budgetId);
           const vId = b.acceptedVersionId || b.currentVersionId;
-          if (format === "pdf") return downloadBudgetPdf(row.budgetId, vId);
-          if (format === "docx") return downloadBudgetDocx(row.budgetId, vId);
-          return downloadBudgetXlsx(row.budgetId, vId);
+          if (format === "docx") {
+            const d = await budgetDescriptor(row.budgetId, vId);
+            return {
+              blob: docxBlob(d.descriptor, d.lang),
+              name: `${d.number}-v${d.version}.docx`,
+            };
+          }
+          const built = await budgetPdfString(row.budgetId, vId);
+          return { blob: pdfBlob(built.pdf), name: `${built.number}-v${built.version}.pdf` };
         }
         const refs = {};
         let lang = "es";
@@ -26010,10 +26107,26 @@
         } else if (row.projectId) refs.projectId = row.projectId;
         else if (row.receiptId) refs.receiptId = row.receiptId;
 
-        if (format === "docx") return downloadDocx(row.doc, refs, lang, row.ref + ".docx");
+        const descriptor = docDescriptor(row.doc, refs, lang);
+        if (format === "docx")
+          return { blob: docxBlob(descriptor, lang), name: row.ref + ".docx" };
         // The same descriptor as the Word file beside it, through the PDF
         // writer: one document, two formats, and a file either way.
-        return downloadPdf(row.doc, refs, lang, row.ref + ".pdf");
+        return {
+          blob: pdfBlob(CaneiPdf.build(descriptor, brandBlock(), CaneiDocI18n.tr(lang))),
+          name: row.ref + ".pdf",
+        };
+      }
+      /** One row, one format, handed over. */
+      async function downloadHistoryDoc(row, format) {
+        // The spreadsheet exists for the quote alone — it is a way to read a
+        // list of line items in columns, which no other document here is.
+        if (row.budgetId && format !== "pdf" && format !== "docx") {
+          const b = erp.budget(row.budgetId);
+          return downloadBudgetXlsx(row.budgetId, b.acceptedVersionId || b.currentVersionId);
+        }
+        const file = await historyDocFile(row, format);
+        downloadBlob(file.blob, file.name);
       }
 
       function partyDrawer(id) {
@@ -28446,13 +28559,13 @@
       function docxBytes(descriptor, lang) {
         return CaneiDocx.build(descriptor, brandBlock(), CaneiDocI18n.tr(lang || "es"));
       }
+      function docxBlob(descriptor, lang) {
+        return new Blob([docxBytes(descriptor, lang)], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
+      }
       function saveDocx(descriptor, lang, filename) {
-        downloadBlob(
-          new Blob([docxBytes(descriptor, lang)], {
-            type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          }),
-          filename,
-        );
+        downloadBlob(docxBlob(descriptor, lang), filename);
       }
       /** The quote, as Word. Awaits the plates exactly as the PDF path does. */
       async function downloadBudgetDocx(id, versionId) {
@@ -28516,12 +28629,7 @@
       }
       async function downloadBudgetPdf(id, versionId) {
         const built = await budgetPdfString(id, versionId);
-        const bytes = new Uint8Array(built.pdf.length);
-        for (let i = 0; i < built.pdf.length; i++) bytes[i] = built.pdf.charCodeAt(i) & 0xff;
-        downloadBlob(
-          new Blob([bytes], { type: "application/pdf" }),
-          `${built.number}-v${built.version}.pdf`,
-        );
+        downloadBlob(pdfBlob(built.pdf), `${built.number}-v${built.version}.pdf`);
       }
       /**
        * The same quote as a spreadsheet.
