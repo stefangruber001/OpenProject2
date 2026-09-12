@@ -48,6 +48,14 @@
     return d.toISOString().slice(0, 10);
   };
   const daysBetween = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
+  /** An ISO date as dd/mm/yyyy, for the one place the engine produces a date a
+   *  CUSTOMER reads: the `{{fecha}}` token of a message template. Everything
+   *  else the engine stores and passes stays ISO, and erp-facts.js formats the
+   *  dates that go on documents. */
+  const dmy = (isoDate) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate || ""));
+    return m ? m[3] + "/" + m[2] + "/" + m[1] : String(isoDate || "");
+  };
   // Monday of the ISO week containing dateIso (§4.6's weekly grid, LAB-01).
   const weekStartOf = (dateIso) => {
     const d = new Date(dateIso + "T00:00:00Z");
@@ -10548,15 +10556,36 @@
             flags: { unpaid: true },
           });
       }
+      /* EVERY TOKEN ITS TEMPLATES USE, OR THE CUSTOMER READS THE TOKEN.
+         `renderTemplate` leaves an unsupplied `{{token}}` visible — the right
+         choice, because a silently blank sentence is worse than an obvious
+         gap — but it means an event that under-reports its variables sends the
+         gap to the customer. These two did: `works-start` is raised by
+         contract-signed and greets «Hola {{cliente}},» under the subject
+         «Comenzamos su obra el {{fecha}}», and `warranty-followup` is raised by
+         works-finished and greets the same way. Both were shipping the braces.
+         Found by generating the sample pack, which is the first thing that ever
+         read these messages as a customer would. */
       for (const c of this.state.contracts)
-        if (c.signature && c.signature.customerSignedAt)
+        if (c.signature && c.signature.customerSignedAt) {
+          // The start date the works-start message announces: the job's own,
+          // when there is a job, and the signature date when there is not yet.
+          const job = this.state.projects.find((p) => p.contractId === c.id);
           ev.push({
             event: "contract-signed",
             subjectRef: c.number,
             date: c.signature.customerSignedAt,
             recipients: addr(c.partyId),
-            vars: { number: c.number },
+            vars: {
+              number: c.number,
+              cliente: this.party(c.partyId).name,
+              /* dd/mm/yyyy, not ISO: this lands in a subject line a customer
+                 reads. `{{fecha}}` is the only date token any template uses,
+                 so it is formatted where it is produced. */
+              fecha: dmy((job && job.dates && job.dates.start) || c.signature.customerSignedAt),
+            },
           });
+        }
       for (const p of this.state.projects)
         if (p.closed && p.dates.actualEnd)
           ev.push({
@@ -10564,7 +10593,7 @@
             subjectRef: p.code,
             date: p.dates.actualEnd,
             recipients: addr(p.partyId),
-            vars: { number: p.code },
+            vars: { number: p.code, cliente: this.party(p.partyId).name, fecha: p.dates.actualEnd },
           });
       for (const s of this.state.subcontracts || []) {
         const ds = this.subcontractDocStatus(s);

@@ -10355,3 +10355,55 @@ handler is now that function plus `downloadBlob`. The sweep calls it — the
 button's route one layer down — and cannot drift from the button without the
 button breaking too. Verified by making one kind throw: `factura·pdf` fails 45
 times, which is the shape of the operator's report.
+
+**S127 · Two emails were sending braces to customers, and only a customer would
+have seen it.** Asked for a sample of every email the system composes, the only
+honest way to make one was to generate it from the product's own code. Doing
+that read the messages the way a recipient reads them for the first time —
+every screen in the app shows the TEMPLATE, so `{{cliente}}` on a template
+screen looks like a token doing its job — and two of the six standard messages
+had never had their tokens supplied. `works-start` went out under the subject
+«Comenzamos su obra el {{fecha}}» and opened «Hola {{cliente}},»;
+`warranty-followup` opened the same way.
+
+The fault is a contract with no gate: a template names the variables it needs,
+`commsEvents()` supplies them, and nothing compared the two. `renderTemplate`
+leaves an unsupplied token visible, which is the right choice — a sentence that
+silently loses its subject is worse than one that obviously did — but it means
+the disagreement is only visible in the sent mail.
+
+Fixed where the send path sees it: `contract-signed` and `works-finished` now
+carry `cliente` and `fecha`, and `fecha` is formatted dd/mm/yyyy because it
+lands in a subject line a customer reads, not in a field. Gated by
+`tests/comms-tokens/run.mjs`, which renders every standard template against the
+event that raises it and fails on a surviving brace — and fails too when a
+template has no event to raise it, because an email that cannot be produced is
+an email this sweep did not check.
+
+**S127a · The sample pack is generated, or it is a drawing of the product.** A
+pack assembled by hand agrees with the code on the day it is made and drifts
+silently afterwards, which is how a client approves wording that changed two
+sessions ago. So `scripts/sample-emails.mjs` takes the message library from the
+engine, the token fill from the messaging capability, the branded body from the
+same function the send path uses, and the attachments from the same writer that
+produces the customer's download. Nothing in it writes a sentence, an address or
+a figure.
+
+That had one consequence worth recording: `draftEmailHtml` moved out of
+erp.html into `CaneiEml.bodyHtml`, beside the MIME assembly, for the reason that
+file's own docstring already gave about two copies disagreeing within a month.
+The body is as much part of what gets sent as the envelope around it.
+
+**S127b · A generator that fills its own gaps hides them.** The first version of
+the script topped up `cliente` from the party record when the event did not
+carry it. The pack then read perfectly while the product sent braces — the
+sample would have certified the bug. The patch was removed and the gap fixed in
+the engine instead: what the pack shows has to be what the send path produces,
+including where that is wrong.
+
+**S127c · What the pack does not claim.** A quote the app sends goes through the
+budget route, which resolves a line's photographs into a graphic annex; that
+route draws in a browser and cannot run in the generator. It matters only for a
+quote that HAS photographs, so rather than assert the files are identical, each
+quote attachment states whether that quote has any — the seeded one does not, so
+its annex is empty and the sample is the whole of what is sent.

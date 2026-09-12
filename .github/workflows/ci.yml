@@ -477,6 +477,14 @@ jobs:
       - name: Command arguments (what the client sends is what the server accepts)
         run: node tests/command-arity/run.mjs
 
+      # The same shape of fault one layer up: a message template names the
+      # variables it needs, the event supplies them, and nothing compared the
+      # two. Two of the six went out to customers reading «Hola {{cliente}},»
+      # under «Comenzamos su obra el {{fecha}}» — visible only in the sent mail,
+      # because every screen shows the template rather than the rendered message.
+      - name: Message templates (no {{token}} survives to the customer)
+        run: node tests/comms-tokens/run.mjs
+
       - name: Bank statement import (a real .xlsx fixture, through the same module)
         run: node tests/bank-import/run.mjs
 

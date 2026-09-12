@@ -70,5 +70,49 @@
     return s;
   }
 
-  return { build, textToB64, chunk };
+  /** HTML-escape. The module's own, because this file must work in Node as
+   *  well as in a page — the sample-email generator runs it headless. */
+  const esc = (s) =>
+    String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  /**
+   * THE MESSAGE BODY IN THE APPROVED EMAIL DESIGN — lockup, the template
+   * wording, the company legal foot. Inline styles throughout: this lands in a
+   * mail client, which has no stylesheet of ours and may strip a `<style>`
+   * block outright.
+   *
+   * Here rather than in the page for the reason at the top of this file. The
+   * body is as much a part of what gets sent as the MIME around it, and the
+   * sample pack the client is shown has to be the same email the customer
+   * receives — a second renderer for the samples would make the pack a drawing
+   * of the product instead of the product.
+   *
+   * `issuer` is `erp._issuerBlock()`.
+   */
+  function bodyHtml(subject, bodyText, issuer) {
+    const iss = issuer || {};
+    const paras = String(bodyText || "")
+      .split(/\n{2,}|\n/)
+      .filter(Boolean)
+      .map((l) => '<p style="margin:0 0 12px">' + esc(l) + "</p>")
+      .join("");
+    return `<!doctype html><html><body style="margin:0;padding:0;background:#EDEDEB">
+        <div style="max-width:620px;margin:0 auto;padding:28px 26px;background:#fff;font:400 14px/1.55 Arial,Helvetica,sans-serif;color:#3D3D3D">
+         <div style="display:flex;align-items:center;gap:10px;border-bottom:2px solid #48733C;padding-bottom:12px;margin-bottom:18px">
+          <svg width="26" height="30" viewBox="0 0 118.391 137.002" xmlns="http://www.w3.org/2000/svg"><path fill="#48733C" fill-rule="nonzero" d="M60.449 0 0 38.374V137.002H118.391V38.445ZM107.462 126.073H71.480L56.137 122.671V71.986L82.416 65.524H45.953V126.073H10.929V44.382L60.318 13.028L107.462 44.311Z"/></svg>
+          <span style="font:400 20px Georgia,serif;color:#000">${esc(iss.tradeName || iss.legalName || "")}</span>
+         </div>
+         ${paras}
+         <div style="border-top:2px solid #48733C;margin-top:22px;padding-top:10px;font:400 11px/1.6 Georgia,serif;color:#48733C">
+          ${esc([iss.legalName, iss.taxId, iss.registeredAddress || iss.address].filter(Boolean).join(" · "))}<br>
+          ${esc([iss.phone, iss.email, iss.web].filter(Boolean).join(" · "))}
+         </div>
+        </div></body></html>`;
+  }
+
+  return { build, bodyHtml, textToB64, chunk };
 });

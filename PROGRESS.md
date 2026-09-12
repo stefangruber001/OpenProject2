@@ -3158,3 +3158,28 @@ Two things landed:
   presupuesto 55, contrato 46, factura 45, fichaProyecto 24, recibo 6.
 
 See ASSUMPTIONS S126, S126a, S126b.
+
+## S20 · Every email the system composes, as one pack — and the braces it found (2026-09-12)
+
+«Create sample emails and emails attachments for everything the ERP system will
+ever create on emails so far. Then share the one pdf.»
+
+**Eight emails, six families, four attachments**, in one 23-page PDF: the six
+standard message templates (quote sent, quote followed up, invoice chased,
+works starting, subcontractor paperwork expired, post-completion check) and the
+two account emails the server composes (activation, password reset). Each gets
+the envelope it is sent with, the plain-text part a phone notification shows,
+and the branded HTML body — and where it carries a document, the real file
+follows immediately.
+
+Generated, not drawn: the library from the engine, the token fill from the
+messaging capability, the body from the same function the send path uses, the
+attachments from the same writer that produces the customer's download.
+
+**Generating it found a live defect.** Two of the six messages had never had
+their tokens supplied, so a customer received «Hola {{cliente}},» under
+«Comenzamos su obra el {{fecha}}». Visible only in the sent mail, because every
+screen shows the template. Fixed in `commsEvents()` and gated by
+`tests/comms-tokens/run.mjs`.
+
+See ASSUMPTIONS S127, S127a, S127b, S127c.
