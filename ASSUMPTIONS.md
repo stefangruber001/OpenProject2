@@ -10151,3 +10151,46 @@ thirteen are opened in turn and each has to stay where it was opened.
 
 `Ir a la fase N` stays. Following the work and going where you ask are different
 things, and the button is the second one.
+
+**S121 · A local variable named `opts` hid the caller's `opts`, and the quote
+send walked off the screen.** The operator: after the quote is sent it jumps to
+the main overview. `sendBudgetDrawer(id, opts)` takes the caller's options, and
+the recorrido passes `{ stay: true }`. Inside the send handler a local
+`const opts = { channel: ch }` was declared for the engine call — shadowing the
+parameter for the whole block, including the `afterCreate(opts, …)` at the end
+of it. So the caller's intent was unreachable from the one line written to read
+it, and every send from the recorrido landed on the quotes register.
+
+The comment immediately above that line already said what should happen —
+_«Unless the caller asked to stay… the recorrido does»_ — which is the part
+worth keeping: the code and its own documentation disagreed, and the
+documentation was right. Renamed to `issue`, which is what it is. Only the
+recorrido passes options at all, so the two register callers are untouched.
+
+**S122 · Turning green was the wrong test for «is there anything left here».**
+S120 moved the screen on when the phase under it finished. That caught the
+visit and missed two more, both reported the same day: a quote SENT goes to
+`waiting` — it is with the customer, not finished — and has nothing left to
+press, while the next verb sits one phase along. `journeyNext` does not help
+either: it answers what is unfinished, and a quote with the customer is
+unfinished while offering nothing to do.
+
+So the rule now turns on the VERB rather than the colour: the phase had an
+action you could take, and after what you did it has none. Where it goes is the
+next phase you can act on, with `journeyNext` as the fallback.
+
+That is also what keeps it from doing harm. Create a contract without signing
+it and the verb does not vanish — it becomes «Firmar» — so the screen stays
+exactly where it is rather than marching the operator around their own
+signature. Same rule, opposite answer, and the second half is the one that
+would have cost something.
+
+**S122a · A check that called the engine could not see the bug in the drawer.**
+The first test written for the sent-quote jump called `issueVersion` directly,
+because the drawer is covered elsewhere and what was under test was the
+screen's reaction. It passed with S121 live: the navigation fault was in the
+drawer, and a test that skips the drawer skips the fault. A second check now
+drives the real button — and with the shadowing put back it reports
+`hash: "#quotes", onJourney: false`, which is the operator's sentence in the
+suite's own words. Same lesson as S112a, one layer along: a test that stubs the
+thing the bug is in is a test of something else.

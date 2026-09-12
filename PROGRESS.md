@@ -3061,3 +3061,25 @@ Both are covered by browser checks that fail when the old behaviour is put back:
 156 label positions across es/ca/en, and the 2 → 3 jump the operator described.
 
 See ASSUMPTIONS S119, S119a, S119b, S120.
+
+## S15 · The recorrido follows the work through the quote and the contract (2026-09-12)
+
+Two more from the operator, with two different causes.
+
+**Sending the quote no longer leaves the screen.** `sendBudgetDrawer` declared a
+local `opts` that shadowed its own parameter — the one carrying `{ stay: true }`
+— so the send walked to the quotes register while the comment beside it said it
+would stay. Renamed; the two register callers pass no options and are untouched.
+
+**And finishing with a phase moves you on, even when it is not finished.** A
+quote sent is «waiting», not done: there is nothing left to press and the next
+verb is one phase along. The rule now turns on the verb disappearing rather than
+the colour changing — which is also why a contract created but NOT signed keeps
+you where you are, because its verb becomes «Firmar».
+
+Three browser checks, each verified against its own fault: the 2 → 3 jump, the
+sent quote moving to the answer, and the real Send button staying on the
+recorrido — that last one because the first version called the engine directly
+and would have passed with the navigation bug live.
+
+See ASSUMPTIONS S121, S122, S122a.

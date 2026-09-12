@@ -662,6 +662,143 @@ async function testJourney(browser, base) {
       ok(`recorrido: completing a phase moves the screen on to the next (2 → ${jump.after + 1})`);
     else bad("recorrido: finishing a phase moves you on", JSON.stringify(jump));
 
+    // ── AND IT IS THE VERB DISAPPEARING THAT MOVES YOU, NOT THE COLOUR.
+    //    A quote SENT is not finished — it is with the customer, and its phase
+    //    goes to «waiting» — but there is nothing left to press on it and the
+    //    next verb is «Registrar la respuesta» one phase along. Turning green
+    //    was the only transition at first, and this case fell straight through
+    //    it: the operator's second report.
+    const sentJump = await pg.evaluate(async () => {
+      const keys = [
+        ...erp.state.projects.map((p) => "prj:" + p.id),
+        ...erp.state.opportunities.map((o) => "opp:" + o.id),
+      ];
+      const able = (st) => !!(st && st.act && !st.act.block);
+      const key = keys.find((k) => {
+        const c = journeyContext(k);
+        if (!c || !c.budget) return false;
+        const st = journeySteps(c);
+        return able(st[3]) && able(st[4]);
+      });
+      if (!key) return { why: "no job with a quote that can be sent" };
+      journeySelect(key);
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      jStep = 3;
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      const was = { step: jStep, act: able(journeySteps(journeyContext(key))[3]) };
+      /* Freeze and send the current version — what the drawer's button does.
+         The drawer itself is covered by the quotes suite; what is under test
+         here is what the SCREEN does once the phase has nothing left on it. */
+      erp.issueVersion(
+        journeyContext(key).budget.id,
+        { channel: "hand", sentDate: erp.state.today },
+        "e2e",
+      );
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      const st = journeySteps(journeyContext(key));
+      return {
+        was,
+        after: jStep,
+        phase4: st[3].state,
+        phase4act: able(st[3]),
+        onChip: [...document.querySelectorAll(".jrail .jstep")].findIndex((c) =>
+          c.classList.contains("on"),
+        ),
+      };
+    });
+    if (
+      sentJump.was &&
+      sentJump.was.act &&
+      sentJump.phase4 !== "done" &&
+      !sentJump.phase4act &&
+      sentJump.after === 4 &&
+      sentJump.onChip === 4
+    )
+      ok("recorrido: sending the quote moves on to the answer, though that phase is not done");
+    else bad("recorrido: a sent quote moves you on", JSON.stringify(sentJump));
+
+    // ── AND SENDING IT FROM HERE STAYS HERE. This is the operator's report in
+    //    its own words: after the quote is sent the screen jumps to the main
+    //    overview. It did — `sendBudgetDrawer` declared a local `opts` for the
+    //    engine call that shadowed its own parameter of that name, the one
+    //    carrying `{ stay: true }`, so the `afterCreate` at the end of the same
+    //    block read the wrong object and walked to the quotes register. The
+    //    comment two lines above it said the recorrido asks to stay.
+    //
+    //    Driven through the real drawer, because the fault was in the drawer:
+    //    the check above exercises the rule by calling the engine, and would
+    //    have passed all day with this bug live.
+    const sendStay = await pg.evaluate(async () => {
+      const keys = [
+        ...erp.state.projects.map((p) => "prj:" + p.id),
+        ...erp.state.opportunities.map((o) => "opp:" + o.id),
+      ];
+      const able = (st) => !!(st && st.act && !st.act.block);
+      const key = keys.find((k) => {
+        const c = journeyContext(k);
+        if (!c || !c.budget) return false;
+        return (
+          able(journeySteps(c)[3]) &&
+          !erp.validateBudget(c.budget.id).some((i) => i.level === "block")
+        );
+      });
+      if (!key) return { why: "no sendable quote left to drive the drawer with" };
+      journeySelect(key);
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      jStep = 3;
+      render();
+      await new Promise((r) => setTimeout(r, 80));
+      return { key, ready: !!document.querySelector("#jAct") };
+    });
+    if (sendStay.ready) {
+      await pg.click("#jAct");
+      await pg.waitForTimeout(500);
+      await pg.selectOption("#sbChannel", "hand");
+      await pg.waitForTimeout(250);
+      await pg.click("#sbGo");
+      await pg.waitForTimeout(700);
+      const landed = await pg.evaluate(() => ({
+        hash: location.hash,
+        onJourney: !!document.querySelector(".jrail"),
+        subject: typeof jSubject === "string" ? jSubject : null,
+        step: jStep,
+      }));
+      if (landed.hash === "#journey" && landed.onJourney && landed.subject === sendStay.key)
+        ok(`recorrido: sending the quote from here stays here, on phase ${landed.step + 1}`);
+      else bad("recorrido: sending must not walk off to the register", JSON.stringify(landed));
+    } else bad("recorrido: a quote to send through the drawer", JSON.stringify(sendStay));
+
+    // ── THE MIRROR, AND IT IS THE HALF THAT COULD DO HARM. A phase that still
+    //    has something to press must keep you on it: create a contract without
+    //    signing it and the verb does not vanish, it becomes «Firmar», and a
+    //    screen that marched past that would walk the operator around their own
+    //    signature. The seed holds no unsigned contract to stage that exact
+    //    flow, so what is asserted is the property the rule turns on — a phase
+    //    that can still be acted on does not move you, however many times the
+    //    screen redraws. The label changing is invisible to the rule.
+    const stayPut = await pg.evaluate(async () => {
+      const able = (st) => !!(st && st.act && !st.act.block);
+      const steps = journeySteps(journeyContext(jSubject));
+      const i = steps.findIndex(able);
+      if (i < 0) return { why: "nothing actionable on this recorrido" };
+      jStep = i;
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      const first = jStep;
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      render();
+      await new Promise((r) => setTimeout(r, 60));
+      return { i, first, after: jStep, verb: steps[i].act.lab };
+    });
+    if (stayPut.first === stayPut.i && stayPut.after === stayPut.i)
+      ok(`recorrido: a phase that still has something to press keeps you on it (${stayPut.verb})`);
+    else bad("recorrido: an actionable phase must not move you on", JSON.stringify(stayPut));
+
     // ── ACTING ON A PHASE WRITES INTO THE ERP. The proveedor first: phase 8 is
     //    where the purchase order picker has never offered a way to file one.
     const before = await pg.evaluate(() => erp.state.parties.length);

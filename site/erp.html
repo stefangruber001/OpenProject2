@@ -19266,12 +19266,19 @@
             const ch = chSel.value;
             let waLink = null;
             mutate(() => {
-              const opts = { channel: ch };
+              /* `issue`, NOT `opts`. This was called `opts` and shadowed the
+                 drawer's own parameter of that name — the one carrying
+                 `{ stay: true }` — for the whole of this block, including the
+                 `afterCreate` at the end of it. So the recorrido asked to stay,
+                 the comment below said it would, and the operator was sent to
+                 the quotes register on every send: the caller's intent was
+                 unreachable from the line that was supposed to read it. */
+              const issue = { channel: ch };
               if (ch === "hand") {
-                opts.sentDate = $("#sbHandDate").value || erp.today;
-                opts.sentTime = $("#sbHandTime").value || null;
+                issue.sentDate = $("#sbHandDate").value || erp.today;
+                issue.sentTime = $("#sbHandTime").value || null;
               }
-              erp.issueVersion(id, opts, "backoffice");
+              erp.issueVersion(id, issue, "backoffice");
               // The covering message — not the document itself — comes from
               // the operator's own "Envío de presupuesto" template in
               // Configuración → Comunicaciones, exactly as slide 1 asked.
@@ -24769,18 +24776,46 @@
            the jump needs a TRANSITION — not done, then done, with the viewer
            standing still — which no amount of navigating can produce.
 
+           TWO TRANSITIONS COUNT, NOT ONE. Turning green is the obvious one and
+           it was the only one at first, which left the operator stranded twice
+           more: a quote SENT goes to «waiting» — with the customer, not
+           finished — and a contract created and signed in the same drawer
+           leaves a phase that is done but whose successor is what needs doing.
+           The honest question is not whether the phase is finished, it is
+           whether there is anything left HERE for you to press. So the other
+           transition is the verb disappearing: the phase had an action you
+           could take, and after what you did it has none.
+
+           That distinction is also what keeps the contract phase still: create
+           a contract without signing it and the verb does not vanish, it
+           becomes «Firmar» — the next thing to do is right here, and the screen
+           stays put. Only when this phase has nothing left does it move on.
+
+           WHERE IT MOVES IS THE NEXT PHASE YOU CAN ACT ON, which is not always
+           `journeyNext`: that answers «what is unfinished», and a quote sitting
+           with the customer is unfinished while offering nothing to press. It
+           is the fallback, not the first choice.
+
            `jNext` stays: this follows the work, and that button goes wherever
            you ask, which are different things. */
+        const canAct = (s) => !!(s && s.act && !s.act.block);
+        const nextToAct = () => {
+          for (let i = jStep + 1; i < steps.length; i += 1) if (canAct(steps[i])) return i;
+          return -1;
+        };
         if (
           jSeen &&
           jSeen.i === jStep &&
-          jSeen.state !== "done" &&
-          steps[jStep].state === "done" &&
-          nextIdx >= 0 &&
-          nextIdx !== jStep
-        )
-          jStep = nextIdx;
-        jSeen = { i: jStep, state: steps[jStep].state };
+          ((jSeen.act && !canAct(steps[jStep])) ||
+            (jSeen.state !== "done" && steps[jStep].state === "done"))
+        ) {
+          // `dest`, never `go`: that name is this file's navigation function,
+          // and shadowing it here is the fault fixed in sendBudgetDrawer today.
+          const to = nextToAct();
+          const dest = to >= 0 ? to : nextIdx;
+          if (dest >= 0 && dest !== jStep) jStep = dest;
+        }
+        jSeen = { i: jStep, state: steps[jStep].state, act: canAct(steps[jStep]) };
         const step = steps[jStep];
         const meta = JOURNEY[jStep];
         const eco = c.project ? erp.projectEconomics(c.project.id) : null;
