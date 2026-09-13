@@ -628,7 +628,7 @@ for k, t in enumerate(ACT_TYPES, 13):
     kv(k, 7, f"  {t}s, all time", f'=COUNTIF({AL("C")},"{t}")')
 r = ST_LAST + 2
 wd.cell(row=r, column=1, value="Stop conditions (12-SYNTHESIS.md, Falsification) — decided before starting").font = F_SUB; r += 1
-header_row(wd, r, ["Condition", "Live proxy", "", "", ""], None); wd.merge_cells(start_row=r, start_column=3, end_row=r, end_column=5); r += 1
+header_row(wd, r, ["Condition", "", "", "Live proxy", "Now"], None); wd.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3); r += 1
 proxies = [
     ("A+B firms engaged (Stage past Cold call, not Lost/Not a fit) — threshold: at least 12 of 37", f'=COUNTIFS({P("focus")},"Yes",{P("stage")},"<>Not started",{P("stage")},"<>Research",{P("stage")},"<>Cold call",{P("stage")},"<>Lost",{P("stage")},"<>Not a fit")'),
     ("Pilots running or converted — value case is measured on their data during the pilot", f'=COUNTIF({P("stage")},"Pilot running")+COUNTIF({P("stage")},"Customer")'),
@@ -636,21 +636,36 @@ proxies = [
 ]
 for k, cond in enumerate(falsification[:3]):
     c = wd.cell(row=r, column=1, value=cond); c.font = F_BASE; c.alignment = WRAP
-    wd.merge_cells(start_row=r, start_column=1, end_row=r, end_column=2)
+    wd.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
     label, formula = proxies[k] if k < len(proxies) else ("", "")
     c2 = wd.cell(row=r, column=4, value=label); c2.font = F_NOTE; c2.alignment = WRAP
-    x = wd.cell(row=r, column=5, value=formula); x.font = F_BOLD
-    wd.row_dimensions[r].height = 75; r += 1
+    x = wd.cell(row=r, column=5, value=formula); x.font = F_BOLD; x.alignment = Alignment(horizontal="right", vertical="top")
+    # ~48 characters per line across the merged A:C at these widths; 13pt per line.
+    wd.row_dimensions[r].height = max(60, 13 * (len(cond) // 48 + 2)); r += 1
 chart = BarChart(); chart.type = "bar"; chart.style = 10; chart.title = "Firms by stage"; chart.y_axis.title = None; chart.x_axis.title = None
 chart.add_data(Reference(wd, min_col=5, min_row=ST_FIRST, max_row=ST_LAST), titles_from_data=False)
 chart.set_categories(Reference(wd, min_col=4, min_row=ST_FIRST, max_row=ST_LAST))
 chart.legend = None; chart.height = 9; chart.width = 16
 wd.add_chart(chart, f"A{r + 1}")
 
-# ----------------------------------------------------------------- order & save
+# ----------------------------------------------------------------- order, print setup & save
 order = ["README", "Dashboard", "Pipeline", "Playbook", "Scripts", "Objections", "Triggers", "Pricing & Pilot", "Activity Log", "Lists"]
 wb._sheets = [wb[n] for n in order]
 wb.active = 1
+# Print one page wide on the reading sheets; the Pipeline is a working grid and
+# prints its frozen identity columns on every page instead.
+for name in order:
+    ws_ = wb[name]
+    ws_.page_setup.orientation = "landscape"
+    ws_.page_setup.fitToWidth = 1
+    ws_.page_setup.fitToHeight = 0
+    ws_.sheet_properties.pageSetUpPr.fitToPage = name != "Pipeline"
+    ws_.print_options.gridLines = False
+wsP.print_title_rows = "1:1"
+wsP.print_title_cols = f"A:{L['legal']}"
+# Excel recalculates every formula on open, so a copy saved from a viewer that
+# cached nothing still shows live numbers.
+wb.calculation.fullCalcOnLoad = True
 for ws_ in wb.worksheets:
     for row in ws_.iter_rows():
         for c in row:

@@ -10463,3 +10463,29 @@ legitimate interest with the balancing test written in Phase 4a and carried
 into Phase 10 as the pilot's art. 28 posture. Committing the list to the
 private repository was judged the more reversible choice than keeping it only
 on disk overnight.
+
+**S129 · The pipeline workbook is generated from the artefacts, and its blanks
+are honest.** The operator asked for one Excel to start approaching prospects:
+the target list with contacts, ordered by priority, and a guided selling
+process. `scripts/market-pipeline-xlsx.py` builds it from the roadmap files
+rather than from typed cells, so a re-scoring or an enrichment rebuilds it
+without anybody copying a row. Every lookup is INDEX/MATCH so the verifying
+LibreOffice can evaluate it (the Calc component had to be installed first —
+the sandbox shipped core and common only); 1,447 formulas, zero errors.
+
+**S129a · Contact enrichment, and what it could not find.** A targeted pass
+over the 37 Tier A+B firms, by web search only, found published company-level
+channels for 17 of them — 16 phones, 8 emails, 8 websites, one company LinkedIn
+page — every value with its source URL, written to `04b-CONTACTS.jsonl` and
+labelled unaudited; the audited `04-PROSPECTS.jsonl` was not touched. Twenty
+Focus firms still have no channel at all, one of them in Tier A. The Dashboard
+counts that number rather than hiding it, because the cheapest next step is a
+paid registry pull, not another search.
+
+**S129b · The workbook does not pretend the product is finished.** The README
+carries the two facts a seller must not contradict: the 15-minute tenant claim
+holds for the specification and not for a sign-in-able tenant, so a demo on
+their data is an engineering booking of 8–16 hours; and the product is not yet
+Verifactu-compliant on day one, so objection 9 is answered honestly. Headers
+and guidance are in English, consistent with the artefacts the operator reads;
+the outreach copy stays Castilian and Catalan.

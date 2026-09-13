@@ -3205,3 +3205,13 @@ holds for the specification but not for a sign-in-able tenant — 8–16 hours
 today, with two structural blockers named.
 
 See ASSUMPTIONS S128, S128a, S128b, S128c, S128d.
+
+## S22 · The Barcelona pipeline workbook (2026-09-13)
+
+`docs/market/barcelona/BARCELONA-PIPELINE.xlsx`: the 128 firms tiered and
+ranked, with published contacts (enriched for Tier A+B), a stage-by-stage
+playbook whose next action, script and exit criterion appear on each firm's
+row, the Castilian and Catalan scripts, the twelve objections, the triggers with
+their openers, pricing and pilot term sheet, an activity log and a formula-driven
+dashboard with the three stop conditions. Rebuild with
+`python3 scripts/market-pipeline-xlsx.py`. See ASSUMPTIONS S129–S129b.
