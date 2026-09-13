@@ -3224,3 +3224,13 @@ websites, 27 emails, 33 named administrators, 40 Tier D firms whose recovered
 CNAE puts them back in the target family. Three firms — two dissolved, one with
 no registry record — are flagged DO NOT CALL and removed from the working set.
 Zero measured error on the fields a seller acts on. See ASSUMPTIONS S130–S130d.
+
+## S24 · Why the phone numbers are missing, and the three ways to get them (2026-09-13)
+
+Established by testing rather than assumption: this session cannot fetch a web
+page — the egress proxy refuses every host. `docs/market/barcelona/ENRICHMENT-OPTIONS.md`
+sets out the three doors with costs (environment Network access → Full, free;
+an MCP connector, free; Google Places, free at this volume) and what each fills
+column by column. `scripts/market-enrich.mjs` implements all three, probes which
+are open, and refuses to run on snippets alone. The workbook already reads the
+output file and has the columns waiting. See ASSUMPTIONS S131–S131b.

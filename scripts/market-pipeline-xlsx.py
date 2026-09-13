@@ -150,6 +150,10 @@ def load_keyed(fname):
 # first pass over Tier A+B, kept as a fallback for anything 04c left null.
 contacts = load_keyed("04b-CONTACTS.jsonl")
 enriched = load_keyed("04c-ENRICHED.jsonl")
+# 04d is whatever `scripts/market-enrich.mjs` could fetch once a door was opened
+# (environment Network access, or a Google Places key). Empty until then; the
+# workbook simply shows blanks, which is the honest state.
+fetched = load_keyed("04d-ENRICHED.jsonl")
 
 # ---- 05 scoring tables (the three "Rows" tables), Tier A/B/C/D detail
 t05 = read("05-TARGET-LIST.md")
@@ -247,6 +251,7 @@ for s in scored:
     a = tierA.get(nif, {})
     c = contacts.get(nif) or contacts.get(norm_name(s["Legal name"])) or {}
     e = enriched.get(nif) or enriched.get(norm_name(s["Legal name"])) or {}
+    g = fetched.get(nif) or fetched.get(norm_name(s["Legal name"])) or {}
 
     def pick(*vals):
         """First value anybody actually sourced; blank when nobody did."""
@@ -255,7 +260,12 @@ for s in scored:
                 return v
         return ""
 
-    origin = "audited + deep search" if e else ("audited + first pass" if c else "audited only")
+    origin = " + ".join(
+        ["audited"]
+        + (["fetched"] if g else [])
+        + (["deep search"] if e else [])
+        + (["first pass"] if c and not e else [])
+    )
     form = s.get("Legal form", "")
     cn = re.sub(r"\D", "", s.get("CNAE", "")) or re.sub(r"\D", "", str(e.get("cnae") or ""))
     if tier in ("A", "B"):
@@ -274,20 +284,24 @@ for s in scored:
         "layer": lm.group(1) if lm else layer, "driver": (lm.group(2) if lm and lm.group(2) else ""),
         "triggers": s.get("Detected triggers", ""), "rationale": s.get("Rationale", ""),
         "why": a.get("why", ""), "confirm": a.get("confirm", ""), "lose": lose,
-        "phone": pick(p.get("phone"), e.get("phone"), c.get("phone")),
-        "email": pick(p.get("email"), e.get("email"), c.get("email")),
-        "web": pick(p.get("website"), e.get("website"), c.get("website")),
+        "phone": pick(p.get("phone"), g.get("phone"), e.get("phone"), c.get("phone")),
+        "email": pick(p.get("email"), g.get("email"), e.get("email"), c.get("email")),
+        "web": pick(p.get("website"), g.get("website"), e.get("website"), c.get("website")),
         "form_url": pick(e.get("contact_form_url"), c.get("contact_form_url")),
         "linkedin": c.get("linkedin_company_url") or "", "person": c.get("contact_person_published") or "",
-        "maps": c.get("maps_rating") if c.get("maps_rating") is not None else "",
         "admin_name": e.get("owner_name") or "", "owner_role": e.get("owner_role") or "",
-        "address": e.get("address") or "",
+        "address": pick(g.get("address"), e.get("address")),
+        "rating": g.get("rating") if g.get("rating") is not None else "",
+        "reviews": g.get("reviews") if g.get("reviews") is not None else "",
+        "hours": g.get("hours") or "",
         "founded": pick(p.get("founded_year"), e.get("founded_year")),
         "employees": pick(p.get("employees_band"), e.get("employees_band")),
         "revenue": pick(p.get("revenue_band_eur"), e.get("revenue_band_eur")),
         "activity": pick(e.get("activity_description"), c.get("activity_description")),
         "rescore": "Yes — CNAE recovered" if e.get("rescore_candidate") else "",
-        "dnc": e.get("do_not_call") or "",
+        "dnc": e.get("do_not_call")
+        or (f"NOT OPERATIONAL on Google Maps ({g['business_status']}) — verify before calling." if g.get("business_status") else "")
+        or "",
         "origin": origin,
         "sources": ", ".join(sorted(set([u for u in (p.get("source_urls") or [])] + [v for k, v in c.items() if k.endswith("_source") and v]))),
     })
@@ -466,7 +480,7 @@ COLS = [  # key, header, width, kind ('data'|'fill'|'formula')
     ("confirm", "Fact that confirms or demotes", 40, "data"), ("lose", "Reason we lose them", 40, "data"),
     ("admin_name", "Owner / administrator", 26, "data"), ("owner_role", "Owner role", 20, "data"),
     ("phone", "Phone", 14, "data"), ("email", "Email", 26, "data"), ("web", "Website", 26, "data"), ("form_url", "Contact form", 26, "data"),
-    ("linkedin", "LinkedIn (company)", 26, "data"), ("person", "Contact person (published)", 22, "data"), ("maps", "Maps rating", 8, "data"),
+    ("linkedin", "LinkedIn (company)", 26, "data"), ("person", "Contact person (published)", 22, "data"), ("rating", "Rating", 8, "data"), ("reviews", "Reviews", 8, "data"), ("hours", "Opening hours", 30, "data"),
     ("dnc", "DO NOT CALL", 40, "data"),
     ("rescore", "Re-score candidate", 16, "data"), ("origin", "Data source", 20, "data"),
     ("sources", "Source URLs", 40, "data"), ("coverage", "Contact coverage", 9, "formula"),
@@ -518,7 +532,7 @@ for i, f in enumerate(firms):
             if key in ("stage_date", "last", "due"): cell.number_format = "dd/mm/yyyy"
         else:
             cell.font = F_BASE
-        cell.alignment = WRAP if key in ("driver", "triggers", "rationale", "why", "confirm", "lose", "sources", "notes", "next", "exit", "cnae_label", "activity", "address", "admin_name", "owner_role", "dnc") else TOP
+        cell.alignment = WRAP if key in ("driver", "triggers", "rationale", "why", "confirm", "lose", "sources", "notes", "next", "exit", "cnae_label", "activity", "address", "admin_name", "owner_role", "dnc", "hours") else TOP
     S = f"${L['stage']}{r}"
     wsP[f"{L['focus']}{r}"] = f'=IF({L["dnc"]}{r}<>"","No",IF(OR({L["tier"]}{r}="A",{L["tier"]}{r}="B"),"Yes","No"))'
     wsP[f"{L['coverage']}{r}"] = f"=COUNTA({L['phone']}{r}:{L['linkedin']}{r})"
@@ -670,14 +684,15 @@ for k, (label, key) in enumerate([
     ("Phone", "phone"), ("Email", "email"), ("Website", "web"),
     ("Owner / administrator", "admin_name"), ("Address", "address"), ("CNAE", "cnae"),
     ("Founded year", "founded"), ("Employees band", "employees"), ("Revenue band", "revenue"),
+    ("Maps rating", "rating"), ("Opening hours", "hours"),
 ], 16):
     wd.cell(row=k, column=1, value=label).font = F_BASE
     a = wd.cell(row=k, column=2, value=f'=COUNTIFS({P("focus")},"Yes",{P(key)},"<>")'); a.font = F_BOLD
     a.alignment = Alignment(horizontal="right")
     b = wd.cell(row=k, column=3, value=f'=COUNTIF({P(key)},"<>")'); b.font = F_NOTE
     b.alignment = Alignment(horizontal="right")
-kv(25, 1, "Re-score candidates (CNAE recovered)", f'=COUNTIF({P("rescore")},"<>")')
-kv(26, 1, "DO NOT CALL (dissolved or not found)", f'=COUNTIF({P("dnc")},"<>")')
+kv(27, 1, "Re-score candidates (CNAE recovered)", f'=COUNTIF({P("rescore")},"<>")')
+kv(28, 1, "DO NOT CALL (dissolved or not found)", f'=COUNTIF({P("dnc")},"<>")')
 wd.cell(row=4, column=4, value="Firms by stage").font = F_SUB
 for k, s in enumerate(STAGES, 5):
     kv(k, 4, s[0], f'=COUNTIF({P("stage")},"{s[0]}")')
@@ -692,7 +707,7 @@ kv(11, 7, "Touches last 7 days", f'=COUNTIFS({AL("A")},">="&(TODAY()-7),{AL("A")
 kv(12, 7, "Touches last 30 days", f'=COUNTIFS({AL("A")},">="&(TODAY()-30),{AL("A")},"<="&TODAY())')
 for k, t in enumerate(ACT_TYPES, 13):
     kv(k, 7, f"  {t}s, all time", f'=COUNTIF({AL("C")},"{t}")')
-r = max(ST_LAST, 26) + 3
+r = max(ST_LAST, 28) + 3
 wd.cell(row=r, column=1, value="Stop conditions (12-SYNTHESIS.md, Falsification) — decided before starting").font = F_SUB; r += 1
 header_row(wd, r, ["Condition", "", "", "Live proxy", "Now"], None); wd.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3); r += 1
 proxies = [

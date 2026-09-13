@@ -10536,3 +10536,40 @@ The researched owner column and the sales-rep owner column shared the key
 the role — whose key was unique — appeared normally. A column that is present,
 headed correctly and silently empty is the failure this repository keeps
 meeting. Duplicate keys in `COLS` now abort the build.
+
+**S131 · The missing telephones are a network setting, not a research failure.**
+73 firms have no telephone and 103 no email, and the reason was worth
+establishing rather than assuming: this session cannot open a web page.
+`WebFetch`, `curl`, Node's `fetch` and a real headless Chromium were all tried
+against eInforma, Google and a firm's own site; every one is refused by the
+egress proxy with `x-deny-reason: host_not_allowed` and the instruction _"Add
+this host to your network egress settings to allow access."_ Only web search
+gets out, which is exactly why the activity code and the address filled well —
+a directory snippet carries them — and the telephone and the email did not.
+They live on a contact page behind a link nobody could follow.
+
+Three doors exist and they stack, documented for the operator in
+`docs/market/barcelona/ENRICHMENT-OPTIONS.md`: the environment's own **Network
+access** level (Trusted today; **Full** costs nothing and takes two minutes),
+an **MCP connector** whose traffic goes through Anthropic's servers rather than
+the session's network and so is not subject to the allowlist at all
+(**Parallel Search** is authless and free), and **Google Places**, which is the
+canonical source for a local business's telephone and is inside its free
+monthly tier at 128 firms. `scripts/market-enrich.mjs` implements all three as
+interchangeable sources, probes which are open, and **refuses to run on
+snippets alone** — snippets are what left the cells empty.
+
+**S131a · The probe reported the door open while every page was refused.** Its
+first version accepted "any status below 500" as success, and the proxy answers
+a blocked host with a real HTTP 403. So it cheerfully said `direct: OPEN` and
+would have sent somebody to spend an afternoon on an enrichment that could not
+fetch anything. Blocked is now identified by the proxy's own `x-deny-reason`
+header, and open additionally requires a body large enough to be a page. This
+is the same class as every gate in this repository that had to be taught to
+fail: a check that cannot tell open from shut is worse than no check.
+
+**S131b · Google Places would also catch the dissolved firms automatically.**
+Its `businessStatus` field says whether a business is still trading, and the
+pipeline folds a non-`OPERATIONAL` answer straight into the workbook's DO NOT
+CALL column. The audit found three such firms by hand — one of them Tier B, on
+next week's call list. That should not depend on an auditor noticing.
