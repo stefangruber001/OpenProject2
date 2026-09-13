@@ -131,13 +131,25 @@ def cnae_label(c):
 
 # ---- 04 prospects + 04b contacts
 prospects = [json.loads(l) for l in read("04-PROSPECTS.jsonl").splitlines() if l.strip()]
-contacts = {}
-if (SRC / "04b-CONTACTS.jsonl").exists():
-    for l in read("04b-CONTACTS.jsonl").splitlines():
+def load_keyed(fname):
+    """A jsonl of firm records, reachable by NIF and by normalised legal name."""
+    d = {}
+    if not (SRC / fname).exists():
+        return d
+    for l in read(fname).splitlines():
         if l.strip():
             c = json.loads(l)
-            contacts[c.get("nif") or norm_name(c.get("legal_name"))] = c
-            contacts[norm_name(c.get("legal_name"))] = c
+            if c.get("nif"):
+                d[str(c["nif"]).strip()] = c
+            d[norm_name(c.get("legal_name"))] = c
+    return d
+
+
+# Two enrichment passes, both search-sourced and both unaudited until their QA
+# report says otherwise. 04c is the deep pass over all 128 firms; 04b is the
+# first pass over Tier A+B, kept as a fallback for anything 04c left null.
+contacts = load_keyed("04b-CONTACTS.jsonl")
+enriched = load_keyed("04c-ENRICHED.jsonl")
 
 # ---- 05 scoring tables (the three "Rows" tables), Tier A/B/C/D detail
 t05 = read("05-TARGET-LIST.md")
@@ -234,8 +246,18 @@ for s in scored:
     lm = re.match(r"(L\d(?:[–-]L\d)?)\s*(?:\((.*)\))?", layer)
     a = tierA.get(nif, {})
     c = contacts.get(nif) or contacts.get(norm_name(s["Legal name"])) or {}
+    e = enriched.get(nif) or enriched.get(norm_name(s["Legal name"])) or {}
+
+    def pick(*vals):
+        """First value anybody actually sourced; blank when nobody did."""
+        for v in vals:
+            if v not in (None, "", []):
+                return v
+        return ""
+
+    origin = "audited + deep search" if e else ("audited + first pass" if c else "audited only")
     form = s.get("Legal form", "")
-    cn = re.sub(r"\D", "", s.get("CNAE", ""))
+    cn = re.sub(r"\D", "", s.get("CNAE", "")) or re.sub(r"\D", "", str(e.get("cnae") or ""))
     if tier in ("A", "B"):
         seg = "S2" if cn.startswith("41") else ("S3" if not re.search(r"S\.?L", form, re.I) else "S1")
     else:
@@ -252,10 +274,20 @@ for s in scored:
         "layer": lm.group(1) if lm else layer, "driver": (lm.group(2) if lm and lm.group(2) else ""),
         "triggers": s.get("Detected triggers", ""), "rationale": s.get("Rationale", ""),
         "why": a.get("why", ""), "confirm": a.get("confirm", ""), "lose": lose,
-        "phone": c.get("phone") or p.get("phone") or "", "email": c.get("email") or p.get("email") or "",
-        "web": c.get("website") or p.get("website") or "", "form_url": c.get("contact_form_url") or "",
+        "phone": pick(p.get("phone"), e.get("phone"), c.get("phone")),
+        "email": pick(p.get("email"), e.get("email"), c.get("email")),
+        "web": pick(p.get("website"), e.get("website"), c.get("website")),
+        "form_url": pick(e.get("contact_form_url"), c.get("contact_form_url")),
         "linkedin": c.get("linkedin_company_url") or "", "person": c.get("contact_person_published") or "",
         "maps": c.get("maps_rating") if c.get("maps_rating") is not None else "",
+        "owner": e.get("owner_name") or "", "owner_role": e.get("owner_role") or "",
+        "address": e.get("address") or "",
+        "founded": pick(p.get("founded_year"), e.get("founded_year")),
+        "employees": pick(p.get("employees_band"), e.get("employees_band")),
+        "revenue": pick(p.get("revenue_band_eur"), e.get("revenue_band_eur")),
+        "activity": pick(e.get("activity_description"), c.get("activity_description")),
+        "rescore": "Yes — CNAE recovered" if e.get("rescore_candidate") else "",
+        "origin": origin,
         "sources": ", ".join(sorted(set([u for u in (p.get("source_urls") or [])] + [v for k, v in c.items() if k.endswith("_source") and v]))),
     })
 firms.sort(key=lambda f: (TIER_ORDER[f["tier"]], -f["total"], f["legal"].lower()))
@@ -425,12 +457,16 @@ wsP = sheet("Pipeline")
 COLS = [  # key, header, width, kind ('data'|'fill'|'formula')
     ("rank", "Priority rank", 8, "data"), ("tier", "Tier", 6, "data"), ("focus", "Focus", 7, "formula"), ("seg", "Segment", 9, "data"),
     ("legal", "Legal name", 34, "data"), ("trade", "Trade name", 22, "data"), ("nif", "NIF", 11, "data"), ("cnae", "CNAE", 7, "data"),
-    ("cnae_label", "CNAE label", 26, "data"), ("form", "Legal form", 9, "data"), ("muni", "Municipality (verify)", 20, "data"), ("prov", "Province", 10, "data"),
+    ("cnae_label", "CNAE label", 26, "data"), ("activity", "What they do (own words)", 34, "data"),
+    ("form", "Legal form", 9, "data"), ("muni", "Municipality (verify)", 20, "data"), ("prov", "Province", 10, "data"),
+    ("address", "Address", 34, "data"), ("founded", "Founded", 8, "data"), ("employees", "Employees", 10, "data"), ("revenue", "Revenue band", 12, "data"),
     ("total", "Total score", 8, "data"), ("conf", "Confidence", 10, "data"), ("layer", "Layer", 8, "data"), ("driver", "Driving requirement", 30, "data"),
     ("triggers", "Detected triggers", 30, "data"), ("rationale", "Rationale", 40, "data"), ("why", "Why citable (Tier A)", 40, "data"),
     ("confirm", "Fact that confirms or demotes", 40, "data"), ("lose", "Reason we lose them", 40, "data"),
+    ("owner", "Owner / administrator", 26, "data"), ("owner_role", "Owner role", 20, "data"),
     ("phone", "Phone", 14, "data"), ("email", "Email", 26, "data"), ("web", "Website", 26, "data"), ("form_url", "Contact form", 26, "data"),
     ("linkedin", "LinkedIn (company)", 26, "data"), ("person", "Contact person (published)", 22, "data"), ("maps", "Maps rating", 8, "data"),
+    ("rescore", "Re-score candidate", 16, "data"), ("origin", "Data source", 20, "data"),
     ("sources", "Source URLs", 40, "data"), ("coverage", "Contact coverage", 9, "formula"),
     ("owner", "Owner", 12, "fill"), ("stage", "Stage", 16, "fill"), ("stage_date", "Stage date", 11, "fill"), ("cperson", "Contact person", 18, "fill"),
     ("role", "Role", 14, "fill"), ("lang", "Preferred language", 9, "fill"), ("trig_obs", "Trigger observed", 22, "fill"), ("last", "Last contact", 11, "fill"),
@@ -449,6 +485,13 @@ for j, (key, h, w, kind) in enumerate(COLS, 1):
 wsP.cell(row=1, column=list(L).index("muni") + 1).comment = Comment("Municipality was wrong in 30.8% of the audited sample (04-EXTRACTION-QA.md). Verify before relying on it.", "roadmap")
 wsP.cell(row=1, column=list(L).index("total") + 1).comment = Comment("Capped at 63.6: three rubric dimensions could not be observed from public data. Relative ranking, not absolute.", "roadmap")
 wsP.cell(row=1, column=list(L).index("phone") + 1).comment = Comment("Published business contacts only. Blank = not found by search; enrich, do not guess.", "roadmap")
+wsP.cell(row=1, column=list(L).index("owner") + 1).comment = Comment(
+    "Company administrator as published in the Registro Mercantil and republished by company-data sites. "
+    "Public record, processed under legitimate interest for B2B contact; anyone who objects is marked Lost and never contacted again. "
+    "Never taken from a personal social profile.", "roadmap")
+wsP.cell(row=1, column=list(L).index("rescore") + 1).comment = Comment(
+    "A CNAE recovered by research puts this firm inside the target family though Phase 5 scored it without one. "
+    "Re-run the scoring deliberately before promoting it — the tier here is still the one Phase 5 gave.", "roadmap")
 
 PB = f"Playbook!$A${PB_FIRST}:$A${PB_LAST}"
 def pb(col): return f"Playbook!${col}${PB_FIRST}:${col}${PB_LAST}"
@@ -467,10 +510,10 @@ for i, f in enumerate(firms):
             if key in ("stage_date", "last", "due"): cell.number_format = "dd/mm/yyyy"
         else:
             cell.font = F_BASE
-        cell.alignment = WRAP if key in ("driver", "triggers", "rationale", "why", "confirm", "lose", "sources", "notes", "next", "exit", "cnae_label") else TOP
+        cell.alignment = WRAP if key in ("driver", "triggers", "rationale", "why", "confirm", "lose", "sources", "notes", "next", "exit", "cnae_label", "activity", "address", "owner", "owner_role") else TOP
     S = f"${L['stage']}{r}"
     wsP[f"{L['focus']}{r}"] = f'=IF(OR({L["tier"]}{r}="A",{L["tier"]}{r}="B"),"Yes","No")'
-    wsP[f"{L['coverage']}{r}"] = f"=COUNTA({L['phone']}{r}:{L['person']}{r})"
+    wsP[f"{L['coverage']}{r}"] = f"=COUNTA({L['phone']}{r}:{L['linkedin']}{r})"
     wsP[f"{L['next']}{r}"] = f'=IFERROR(INDEX({pb("C")},MATCH({S},{PB},0)),"")'
     wsP[f"{L['script']}{r}"] = f'=IFERROR(INDEX({pb("D")},MATCH({S},{PB},0)),"")'
     wsP[f"{L['exit']}{r}"] = f'=IFERROR(INDEX({pb("E")},MATCH({S},{PB},0)),"")'
@@ -504,6 +547,7 @@ stage_col = f"{L['stage']}{FIRST}:{L['stage']}{LAST}"
 for val, color in [("Customer", "C6E0B4"), ("Pilot running", "A9D08E"), ("Demo on their data", "FFE699"), ("Lost", "D9D9D9"), ("Not a fit", "D9D9D9")]:
     wsP.conditional_formatting.add(stage_col, CellIsRule(operator="equal", formula=[f'"{val}"'], fill=PatternFill("solid", fgColor=color)))
 wsP.conditional_formatting.add(f"{L['coverage']}{FIRST}:{L['coverage']}{LAST}", CellIsRule(operator="equal", formula=["0"], fill=PatternFill("solid", fgColor="F8CBAD")))
+wsP.conditional_formatting.add(f"{L['rescore']}{FIRST}:{L['rescore']}{LAST}", CellIsRule(operator="notEqual", formula=['""'], fill=PatternFill("solid", fgColor="FFE699")))
 
 # ============================================================ Activity Log
 wa = sheet("Activity Log")
@@ -612,6 +656,18 @@ kv(10, 1, "Focus firms with NO contact channel", f'=COUNTIFS({P("focus")},"Yes",
 kv(11, 1, "Focus firms with a phone", f'=COUNTIFS({P("focus")},"Yes",{P("phone")},"<>")')
 kv(12, 1, "Focus firms with an email", f'=COUNTIFS({P("focus")},"Yes",{P("email")},"<>")')
 kv(13, 1, "Overdue next actions", f'=COUNTIF({P("overdue")},"OVERDUE")')
+wd.cell(row=15, column=1, value="Research coverage — Focus (A+B) / all 128").font = F_SUB
+for k, (label, key) in enumerate([
+    ("Phone", "phone"), ("Email", "email"), ("Website", "web"),
+    ("Owner / administrator", "owner"), ("Address", "address"), ("CNAE", "cnae"),
+    ("Founded year", "founded"), ("Employees band", "employees"), ("Revenue band", "revenue"),
+], 16):
+    wd.cell(row=k, column=1, value=label).font = F_BASE
+    a = wd.cell(row=k, column=2, value=f'=COUNTIFS({P("focus")},"Yes",{P(key)},"<>")'); a.font = F_BOLD
+    a.alignment = Alignment(horizontal="right")
+    b = wd.cell(row=k, column=3, value=f'=COUNTIF({P(key)},"<>")'); b.font = F_NOTE
+    b.alignment = Alignment(horizontal="right")
+kv(25, 1, "Re-score candidates (CNAE recovered)", f'=COUNTIF({P("rescore")},"<>")')
 wd.cell(row=4, column=4, value="Firms by stage").font = F_SUB
 for k, s in enumerate(STAGES, 5):
     kv(k, 4, s[0], f'=COUNTIF({P("stage")},"{s[0]}")')
@@ -626,7 +682,7 @@ kv(11, 7, "Touches last 7 days", f'=COUNTIFS({AL("A")},">="&(TODAY()-7),{AL("A")
 kv(12, 7, "Touches last 30 days", f'=COUNTIFS({AL("A")},">="&(TODAY()-30),{AL("A")},"<="&TODAY())')
 for k, t in enumerate(ACT_TYPES, 13):
     kv(k, 7, f"  {t}s, all time", f'=COUNTIF({AL("C")},"{t}")')
-r = ST_LAST + 2
+r = max(ST_LAST, 25) + 3
 wd.cell(row=r, column=1, value="Stop conditions (12-SYNTHESIS.md, Falsification) — decided before starting").font = F_SUB; r += 1
 header_row(wd, r, ["Condition", "", "", "Live proxy", "Now"], None); wd.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3); r += 1
 proxies = [
