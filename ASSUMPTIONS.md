@@ -10407,3 +10407,59 @@ route draws in a browser and cannot run in the generator. It matters only for a
 quote that HAS photographs, so rather than assert the files are identical, each
 quote attachment states whether that quote has any — the seeded one does not, so
 its annex is empty and the sample is the whole of what is sent.
+
+**S128 · The Barcelona roadmap was run unattended, and what that run could and
+could not see.** The operator approved a twelve-phase, IESE-style process for
+identifying the next tenants in the Barcelona region and asked for it to be run
+overnight without questions, with one operational rule: if a result is empty,
+wait and restart. Each phase ran as its own agent on the model the roadmap
+named; each artefact had to pass `scripts/market-gate.mjs` — exists, long
+enough to be an answer, every section its phase asked for, none of the phrases a
+model uses to file a non-answer — before it was committed. Thirteen artefacts,
+one commit each, all on `main` under `docs/market/barcelona/`, bound into one
+PDF by `scripts/market-pack.mjs`.
+
+**Zero gate failures on first submission. One interruption**: Phase 11 hit the
+API session limit during its final reply, after its file was complete and
+gate-accepted; no retry was needed. **One agent committed its own artefact**
+(Phase 1) without pushing; the commit was kept — no history rewrite — and later
+agents were told not to.
+
+**S128a · Only web search reaches outside this environment.** Phase 4a probed
+every source it was asked to use and found that every direct fetch — open-data
+portals, procurement platforms, guild directories, company registries, BOE —
+answers 403 to the proxy; search-surfaced text is all that is legible. That
+bounded the whole run: the 128-firm prospect list carries honest nulls in most
+fields, Phase 4c found `municipality` wrong in 30.8 % of its sample and cleared
+only name, NIF and CNAE for scoring, and every score in Phase 5 is therefore
+capped at 63.6/100 with three rubric dimensions marked PROVISIONAL. The
+synthesis says so in its body, and its sixth decision is that no message leaves
+the building against the current list until it is enriched. A day with SABI or
+eInforma access changes this; nothing in this repository can.
+
+**S128b · The fifteen-minute claim, measured.** Phase 7 ran the factory CLI on
+a probe tenant: `new-tenant` 0.9 s, `resolve` 1.1 s, `validate` 0.9 s — the
+SPECIFICATION meets the Definition of Done with room to spare. A firm that can
+sign in with its own branding, series and clause blocks measures 8–16
+engineering hours, 32–64× the target, for two structural reasons with file
+paths: tenant specs are baked into the container image, and the session carries
+no tenant claim while accounts span every tenant, so two customers cannot yet
+share one stack. That finding was carried into the pilot design (two pilots at
+once, each on its own stack) and is the synthesis's first engineering ask.
+The probe tenant was removed and `tenants/INDEX.md` restored before commit.
+
+**S128c · The red team read the plan without knowing who wrote it.** A fresh
+agent was handed the artefacts as files and framed as a sceptical supervisor.
+Its verdict — proceed with conditions, and stop if the first experiment fails —
+is quoted in the synthesis, and the synthesis concedes where it was right: the
+revenue-per-employee figure is restated, the compliance half of the value case
+is priced at zero until the submission channel ships, and outreach claim C9 is
+struck. A plan that survives a polite review has not been reviewed.
+
+**S128d · GDPR posture for prospect data, fixed in advance.** Company-level
+data only; `directors[]` from registry sources only (and empty in practice,
+since none were reachable); no personal emails or mobiles; legal basis
+legitimate interest with the balancing test written in Phase 4a and carried
+into Phase 10 as the pilot's art. 28 posture. Committing the list to the
+private repository was judged the more reversible choice than keeping it only
+on disk overnight.

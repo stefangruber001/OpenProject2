@@ -3183,3 +3183,25 @@ screen shows the template. Fixed in `commsEvents()` and gated by
 `tests/comms-tokens/run.mjs`.
 
 See ASSUMPTIONS S127, S127a, S127b, S127c.
+
+## S21 · The Barcelona tenant roadmap, run end to end overnight (2026-09-13)
+
+Twelve phases, each on the model the roadmap named, each gated before commit:
+reference case, market map, ICP and rubric, regulatory trigger map, sourcing
+plan, 128-firm prospect list with a 10 % re-derivation audit, scoring into four
+tiers, value case per segment, tailoring economics measured against the real
+CLI, route to market, outreach kit in Castilian and Catalan, pilot
+specification, a red team in a fresh context, and a decision document.
+
+`docs/market/barcelona/12-SYNTHESIS.md` is the one to read: seven design-partner
+candidates, an ask of €55,000 over thirteen weeks, eight yes/no decisions the
+operator can take separately, and three stop conditions written before starting.
+The bound PDF is 183 pages; the decision document is its first nine.
+
+Two findings the operator should weigh before anything else: the prospect list
+cannot be used for outreach until it is enriched from a paid registry (only web
+search reaches outside this environment), and the fifteen-minute tenant claim
+holds for the specification but not for a sign-in-able tenant — 8–16 hours
+today, with two structural blockers named.
+
+See ASSUMPTIONS S128, S128a, S128b, S128c, S128d.
