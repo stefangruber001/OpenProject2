@@ -10489,3 +10489,50 @@ their data is an engineering booking of 8–16 hours; and the product is not yet
 Verifactu-compliant on day one, so objection 9 is answered honestly. Headers
 and guidance are in English, consistent with the artefacts the operator reads;
 the outreach copy stays Castilian and Catalan.
+
+**S130 · The pipeline was researched on the open web, and audited before anyone
+could dial it.** The operator asked for every column filled for all 128 firms.
+Six workers researched them by web search — the only route out of this
+environment, direct fetches being refused by the egress proxy — and a seventh
+re-derived a 15-row sample field by field before the workbook shipped.
+
+Coverage across the 128: CNAE 46 → 103, address 0 → 97, activity 0 → 114,
+telephone 15 → 55, website 13 → 40, email 4 → 27, year founded 10 → 58,
+employee band 19 → 53, and 33 administrators where there were none. **Forty
+Tier D firms recovered a CNAE inside the target family**; they were declined
+only for lacking one, so each is flagged a re-score candidate — flagged, not
+promoted, because the tiering is Phase 5's to redo deliberately.
+
+**S130a · Three firms must never be called, and the audit is the only reason we
+know.** Two are dissolved — `Construcciones Y Reformas Decorhogar SL` (Tier B,
+and therefore on next week's call list) and `Reformas Terrassa SL` — both
+_Extinguida_ in the registry. One, `Reformas y Diseño a Medida SL`, has no
+registry record at all under any search. All three carry a DO NOT CALL reason,
+turn the row red, and are excluded from Focus, which fell from 37 to 36.
+Measured error on the fields a seller acts on was zero: NIF 0/13, CNAE 0/10,
+address 0/12, phone 0/3, email 0/5, website 0/5, activity 0/13. `owner_role`
+had one contradiction in two checkable values and is provisional.
+
+**S130b · Owner names, and the rule that kept them clean.** Administrators of a
+Spanish S.L. are public record in the Registro Mercantil. Every one of the 33
+came from a registry republisher — Axesor, Iberinform, Empresite, Infonif,
+eInforma, libreBORME — with the role as published; the audit found no name
+taken from LinkedIn, Facebook, a review site or a news article, and the merge
+step drops any that is. The basis is legitimate interest for B2B contact, and
+anyone who objects is marked Lost and never contacted again.
+
+**S130c · Two method errors, both found by measuring rather than assuming.**
+Querying field by field exhausted a worker's 200-search budget on nine firms and
+left its remaining eight with nothing; one well-formed query returns CIF,
+address, administrator, CNAE, employees and activity together, and the rewritten
+instruction did 23 firms in 46 searches. And the merge keyed on NIF, so a firm
+whose NIF the second pass discovered arrived as two rows — 138 rows for 128
+firms. It keys on the normalised legal name now and combines both passes field
+by field, since each found things the other missed.
+
+**S130d · A duplicate column key wrote the administrator into the wrong cell.**
+The researched owner column and the sales-rep owner column shared the key
+`owner`, so the name was written to the tracking column and then blanked, while
+the role — whose key was unique — appeared normally. A column that is present,
+headed correctly and silently empty is the failure this repository keeps
+meeting. Duplicate keys in `COLS` now abort the build.

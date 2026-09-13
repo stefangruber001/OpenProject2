@@ -3215,3 +3215,12 @@ row, the Castilian and Catalan scripts, the twelve objections, the triggers with
 their openers, pricing and pilot term sheet, an activity log and a formula-driven
 dashboard with the three stop conditions. Rebuild with
 `python3 scripts/market-pipeline-xlsx.py`. See ASSUMPTIONS S129–S129b.
+
+## S23 · The pipeline, researched and audited (2026-09-13)
+
+All 128 firms researched on the open web and the results audited on a 15-row
+sample before shipping: CNAE on 103, addresses on 97, 55 telephones, 40
+websites, 27 emails, 33 named administrators, 40 Tier D firms whose recovered
+CNAE puts them back in the target family. Three firms — two dissolved, one with
+no registry record — are flagged DO NOT CALL and removed from the working set.
+Zero measured error on the fields a seller acts on. See ASSUMPTIONS S130–S130d.
