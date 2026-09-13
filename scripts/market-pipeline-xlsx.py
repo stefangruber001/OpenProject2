@@ -280,7 +280,7 @@ for s in scored:
         "form_url": pick(e.get("contact_form_url"), c.get("contact_form_url")),
         "linkedin": c.get("linkedin_company_url") or "", "person": c.get("contact_person_published") or "",
         "maps": c.get("maps_rating") if c.get("maps_rating") is not None else "",
-        "owner": e.get("owner_name") or "", "owner_role": e.get("owner_role") or "",
+        "admin_name": e.get("owner_name") or "", "owner_role": e.get("owner_role") or "",
         "address": e.get("address") or "",
         "founded": pick(p.get("founded_year"), e.get("founded_year")),
         "employees": pick(p.get("employees_band"), e.get("employees_band")),
@@ -463,7 +463,7 @@ COLS = [  # key, header, width, kind ('data'|'fill'|'formula')
     ("total", "Total score", 8, "data"), ("conf", "Confidence", 10, "data"), ("layer", "Layer", 8, "data"), ("driver", "Driving requirement", 30, "data"),
     ("triggers", "Detected triggers", 30, "data"), ("rationale", "Rationale", 40, "data"), ("why", "Why citable (Tier A)", 40, "data"),
     ("confirm", "Fact that confirms or demotes", 40, "data"), ("lose", "Reason we lose them", 40, "data"),
-    ("owner", "Owner / administrator", 26, "data"), ("owner_role", "Owner role", 20, "data"),
+    ("admin_name", "Owner / administrator", 26, "data"), ("owner_role", "Owner role", 20, "data"),
     ("phone", "Phone", 14, "data"), ("email", "Email", 26, "data"), ("web", "Website", 26, "data"), ("form_url", "Contact form", 26, "data"),
     ("linkedin", "LinkedIn (company)", 26, "data"), ("person", "Contact person (published)", 22, "data"), ("maps", "Maps rating", 8, "data"),
     ("rescore", "Re-score candidate", 16, "data"), ("origin", "Data source", 20, "data"),
@@ -475,6 +475,12 @@ COLS = [  # key, header, width, kind ('data'|'fill'|'formula')
     ("prob", "Probability", 9, "formula"), ("acv", "ACV (€)", 10, "formula"), ("weighted", "Weighted (€)", 11, "formula"),
     ("days", "Days since last contact", 9, "formula"), ("overdue", "Overdue", 9, "formula"), ("light", "Status", 8, "formula"),
 ]
+_dupes = [k for k in (c[0] for c in COLS) if [c[0] for c in COLS].count(k) > 1]
+if _dupes:
+    # Two columns sharing a key make L point at the last one, so the first
+    # column's values are written into the wrong cell and then overwritten.
+    # That cost an owner column once; it fails loudly now.
+    raise SystemExit(f"duplicate column keys in COLS: {sorted(set(_dupes))}")
 L = {key: get_column_letter(j) for j, (key, *_r) in enumerate(COLS, 1)}
 header_row(wsP, 1, [h for _, h, *_r in COLS], [w for _, _, w, _ in COLS])
 for j, (key, h, w, kind) in enumerate(COLS, 1):
@@ -485,7 +491,7 @@ for j, (key, h, w, kind) in enumerate(COLS, 1):
 wsP.cell(row=1, column=list(L).index("muni") + 1).comment = Comment("Municipality was wrong in 30.8% of the audited sample (04-EXTRACTION-QA.md). Verify before relying on it.", "roadmap")
 wsP.cell(row=1, column=list(L).index("total") + 1).comment = Comment("Capped at 63.6: three rubric dimensions could not be observed from public data. Relative ranking, not absolute.", "roadmap")
 wsP.cell(row=1, column=list(L).index("phone") + 1).comment = Comment("Published business contacts only. Blank = not found by search; enrich, do not guess.", "roadmap")
-wsP.cell(row=1, column=list(L).index("owner") + 1).comment = Comment(
+wsP.cell(row=1, column=list(L).index("admin_name") + 1).comment = Comment(
     "Company administrator as published in the Registro Mercantil and republished by company-data sites. "
     "Public record, processed under legitimate interest for B2B contact; anyone who objects is marked Lost and never contacted again. "
     "Never taken from a personal social profile.", "roadmap")
@@ -510,7 +516,7 @@ for i, f in enumerate(firms):
             if key in ("stage_date", "last", "due"): cell.number_format = "dd/mm/yyyy"
         else:
             cell.font = F_BASE
-        cell.alignment = WRAP if key in ("driver", "triggers", "rationale", "why", "confirm", "lose", "sources", "notes", "next", "exit", "cnae_label", "activity", "address", "owner", "owner_role") else TOP
+        cell.alignment = WRAP if key in ("driver", "triggers", "rationale", "why", "confirm", "lose", "sources", "notes", "next", "exit", "cnae_label", "activity", "address", "admin_name", "owner_role") else TOP
     S = f"${L['stage']}{r}"
     wsP[f"{L['focus']}{r}"] = f'=IF(OR({L["tier"]}{r}="A",{L["tier"]}{r}="B"),"Yes","No")'
     wsP[f"{L['coverage']}{r}"] = f"=COUNTA({L['phone']}{r}:{L['linkedin']}{r})"
@@ -659,7 +665,7 @@ kv(13, 1, "Overdue next actions", f'=COUNTIF({P("overdue")},"OVERDUE")')
 wd.cell(row=15, column=1, value="Research coverage — Focus (A+B) / all 128").font = F_SUB
 for k, (label, key) in enumerate([
     ("Phone", "phone"), ("Email", "email"), ("Website", "web"),
-    ("Owner / administrator", "owner"), ("Address", "address"), ("CNAE", "cnae"),
+    ("Owner / administrator", "admin_name"), ("Address", "address"), ("CNAE", "cnae"),
     ("Founded year", "founded"), ("Employees band", "employees"), ("Revenue band", "revenue"),
 ], 16):
     wd.cell(row=k, column=1, value=label).font = F_BASE
