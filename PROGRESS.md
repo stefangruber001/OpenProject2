@@ -43,7 +43,7 @@ output; the factory is the product.
    reduced-rate decision engine w/ persisted justification, SHA-256 invoice
    chain, Spanish labels, IRPF retention profiles, **hard resolve-time gate on
    verifactu.enabled**. `@repo/pack-vertical-construction-reformas` —
-   mediciones, construction.* attribute contract, terminology config. 21 tests.
+   mediciones, construction.\* attribute contract, terminology config. 21 tests.
 7. `@repo/boundary-lint` — layer matrix + forbidden-literal scan in CI
    (`pnpm boundaries`), committed violation fixtures proven caught; already
    caught+fixed a real locale leak in kernel docs.
@@ -3275,3 +3275,37 @@ scheduling 30, year 149) · comms gate 678 · site-e2e unfiltered.
 **Next:** nothing outstanding on the messaging path. Operator-only items
 unchanged — repository variable `APP_URL`, the worker record's sign-in address,
 TestFlight #25, Canva and Stripe reauthorisation.
+
+## S26 · The App Store route confirmed, and everything that can be ready is (2026-09-14)
+
+**Done.**
+
+- **`ios/CaneiSubirats/Resources/PrivacyInfo.xcprivacy`** — the one real gap.
+  Required since May 2024, absent, and the most-cited privacy rejection for an
+  app using `UserDefaults`. No tracking, no collected data, `CA92.1` for
+  UserDefaults.
+- **`tests/app-store/run.mjs`** — 76 checks over the listing, the screenshots,
+  the review information and the manifest, in both locales; in CI on every
+  commit and in the release workflow with `--ready`. Proven red on a too-long
+  subtitle and a wrong-size screenshot.
+- Release notes rewritten in both languages for what the build actually
+  contains; App Review contact phone filled.
+- `docs/RELEASE-IOS.md` — Business Manager enrolment walkthrough, the App
+  Privacy / export-compliance / age-rating answers field by field, the
+  certificate-cap clear, and what the preflight covers.
+- `INTEGRATIONS_PENDING.md` — both blockers recorded with their remedies.
+
+**Blocked, and both are operator-only.**
+
+1. **Apple Business Manager enrolment** — no Organization ID, so no custom
+   distribution, so no submission. D-U-N-S + a verification call; days.
+2. **Signing certificate cap** — run #26 failed on it. Two minutes at
+   developer.apple.com, and it must be cleared before any new build.
+
+**Immediately available regardless:** TestFlight, 100 internal testers, no Apple
+review. It holds 1.1 (14) from 8 Sep; 1.1 (15) goes up the moment the cap is
+cleared.
+
+**Next:** clear the cap → TestFlight build → (when the Org ID exists) set custom
+distribution in App Store Connect → `ios-release.yml` with `submit: false`, read
+it, then `submit: true`.

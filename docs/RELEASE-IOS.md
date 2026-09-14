@@ -33,6 +33,33 @@ been using it already.
 Start the enrolment at <https://business.apple.com>; come back to this document
 when the Organization ID exists.
 
+### Enrolling in Apple Business Manager — what it actually involves
+
+Checked 14 Sep 2026: **Canei is not enrolled.** Until it is, there is no
+Organization ID, App Store Connect cannot be set to custom distribution, and a
+submission would go in as a PUBLIC app — into precisely the rejection this whole
+route exists to avoid. So this is the critical path, and it is worth starting
+before anything else.
+
+1. **Get a D-U-N-S number if the company has none.** It is a free nine-digit
+   identifier from Dun & Bradstreet, and Apple has its own request form for it:
+   <https://developer.apple.com/enroll/duns-lookup/>. Look the company up first —
+   most registered Spanish companies already have one and do not know it. If it
+   has to be created, allow up to five business days.
+2. **Enrol at <https://business.apple.com>.** You need the legal entity name
+   exactly as registered, the D-U-N-S number, and a work email address on the
+   company's own domain — a Gmail address is refused.
+3. **Name a verification contact.** Apple telephones this person to confirm the
+   enrolment is genuine and that whoever signed up can bind the company. It is a
+   short call, but it is a human on a telephone, so it happens in business hours
+   and it is the step that decides how long this takes.
+4. **Accept the terms**, and the account is live.
+5. **Take the Organization ID** from Business Manager → **Settings → Enrollment
+   Information**. That is the value App Store Connect asks for.
+
+Expect **days, occasionally a week**. Nothing else waits on it: TestFlight
+carries the app inside the company the whole time, with no Apple review at all.
+
 ---
 
 ## What is ready in this repository
@@ -40,12 +67,38 @@ when the Organization ID exists.
 ### The build — done, and green
 
 `.github/workflows/ios-testflight.yml` — Actions → **iOS · TestFlight** → Run
-workflow. Last run: **#24, success, on `8830f42`**, which carries the current web
-work. The build is in App Store Connect → TestFlight now.
+workflow. TestFlight currently holds **version 1.1, build 14** (8 Sep).
+
+**Run #26, on 14 Sep, failed — and not because of anything in this repository.**
+Apple refused to mint a signing certificate:
+
+> Choose a certificate to revoke. Your account has reached the maximum number of
+> certificates.
+
+That is the known consequence of cloud-managed signing, which asks Apple for a
+_new_ certificate on every CI run. It is written up in `INTEGRATIONS_PENDING.md`
+and it is **two minutes to clear**, below. It has to be cleared before a
+submission, because the build now in TestFlight predates the current work — and
+predates the privacy manifest, which Apple has required since May 2024.
 
 The web content updates by itself on every deploy; a new build is only needed
 when something bundled into the shell changes — the tab bar, the icon,
-permissions.
+permissions, the privacy manifest.
+
+#### Clearing the certificate cap (two minutes, and it is the one thing blocking a build)
+
+1. developer.apple.com → **Certificates, Identifiers & Profiles → Certificates**.
+2. Revoke every certificate whose _Created By_ is the CI run rather than a
+   person. They are disposable: each was minted for one build and its private
+   key died with that runner, so revoking them can break nothing.
+3. **Keep** your own certificates, and keep the one named _Distribution
+   Managed_, whose key Apple holds.
+4. Re-run **iOS · TestFlight**.
+
+It will refill, because every run mints another. The durable fix — one
+certificate CI reuses, through fastlane `match` — is in
+`INTEGRATIONS_PENDING.md`; it is worth doing if the app starts shipping often,
+and it needs this cap cleared once first either way.
 
 ### The listing — written, both languages
 
@@ -139,6 +192,54 @@ above. It is not a file in this repository because nothing here sends it.
 
 ---
 
+## Apple's own questions, pre-answered
+
+Three screens in App Store Connect that nothing in this repository can send, and
+each of them a rejection if answered wrongly. Every answer below was checked
+against the code, not guessed.
+
+### App Privacy — "Data Collection"
+
+> **Do you or your third-party partners collect data from this app?** → **No**
+
+That is the whole questionnaire, and it is the truthful answer. The app is a
+shell around the company's own workspace: nothing is collected for analytics,
+advertising, personalisation or any other purpose Apple's list names, there is
+no SDK in the binary that collects anything, and there is no third-party partner
+at all. Data the user types goes to the company's own server as part of the
+service, which is what the app is for — Apple's own guidance is that this is not
+"collection" to be disclosed unless it is used for one of the listed purposes.
+
+If a reviewer questions it, the supporting facts are: no IDFA, no analytics SDK,
+no advertising SDK, no crash reporter, no tracking domains, and a privacy
+manifest declaring `NSPrivacyTracking: false` with an empty
+`NSPrivacyCollectedDataTypes`.
+
+### Export compliance
+
+> **Does your app use encryption?** → **Yes** (it speaks HTTPS)
+> **Does it qualify for the exemption?** → **Yes**
+
+The only cryptography in the app is the operating system's own TLS and the
+keychain. That is exemption (b) — standard encryption provided by Apple, used
+only to protect the app's own traffic — so no CCATS, no year-end self-
+classification report. The `release` lane already declares
+`export_compliance_uses_encryption: false`, which is fastlane's way of saying
+"nothing that needs documentation".
+
+### Content rights and advertising
+
+> **Does it contain third-party content?** → **No**
+> **Does it use the Advertising Identifier (IDFA)?** → **No**
+
+Both already declared by the lane.
+
+### Age rating
+
+Answer **no** to every question in the questionnaire. The result is **4+**. There
+is no user-generated content shown to other users, no unmoderated content, no
+web browser, no gambling, no contests.
+
 ## Tomorrow morning, in order
 
 1. **Check Business Manager.** Organization ID in hand → continue. Not enrolled
@@ -152,9 +253,24 @@ above. It is not a file in this repository because nothing here sends it.
 6. Run it again with `submit: true`.
 
 Apple's own questions — age rating, the App Privacy questionnaire, export
-compliance — are answered once in App Store Connect and are not files. The lane
-declares what it can: no IDFA, no encryption beyond HTTPS, no third-party
-content.
+compliance — are answered once in App Store Connect and are not files. They are
+written out field by field in the section above, so each is a copy rather than a
+judgement. The lane declares what it can: no IDFA, no encryption beyond HTTPS,
+no third-party content.
+
+### What checks the submission before Apple does
+
+`node tests/app-store/run.mjs` reads this repository the way App Review reads a
+submission: every listing field against Apple's character limits in both
+languages, no locale missing a field the other has, the URLs, the categories, the
+screenshots measured from their PNG headers rather than trusted from their
+filenames, the privacy manifest, and the review notes. It runs in CI on every
+commit, and the submission workflow runs it again with `--ready`, where the
+values only you can supply stop being pending and become failures.
+
+Roughly two in five first submissions are rejected, and the published reasons are
+mostly this kind of thing rather than anything about the software. This is the
+cheapest possible place to find them.
 
 ---
 

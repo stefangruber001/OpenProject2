@@ -54,6 +54,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Everything Apple rejects for that a script can see, seen before the
+      # upload rather than after the rejection. `--ready` makes the values only
+      # the operator can supply — the demo account, the contact phone — fatal,
+      # because at this point they have stopped being pending.
+      - name: Preflight the submission
+        working-directory: .
+        run: node tests/app-store/run.mjs --ready
+
       - name: Set up Ruby + fastlane
         uses: ruby/setup-ruby@v1
         with:

@@ -427,7 +427,7 @@ languages: es-ES # source: synthetic
   touching the pipeline.
 - **#44 — Session-limit pause honoured per operator mandate (2026-07-28).** The i18n-extraction
   and field-audit agent fleets hit the platform session limit (resets 20:30 UTC). Completed
-  results were banked (scratchpad *-partial.json), high-value fixes continued in the main loop,
+  results were banked (scratchpad \*-partial.json), high-value fixes continued in the main loop,
   and both workflows are scheduled to resume automatically after the reset — matching the
   operator's standing instruction to pause on empty cloud quota and restart when it returns.
 - **#45 — CANEI functional-spec programme, session 1: close the CI gap before any feature work
@@ -6039,7 +6039,7 @@ pass, not a redesign" is exactly the plan's own instruction.
 **Verified:** manageability-sim 396/396 (2 new red-first checks: the refusal,
 and no fabricated Tipo), import-sim/migrations-sim/scheduling-sim/year-sim/
 bank-import(-pdf) all green, full site-e2e 624/624, i18n gates unchanged at
-207/207 (one new label "Partida *" added to both dictionaries; a second
+207/207 (one new label "Partida \*" added to both dictionaries; a second
 scanner false-positive from the register's own seed-chapter ternary was
 avoided by restructuring rather than translating, matching the ASSUMPTIONS
 #183 precedent), lint/boundaries/check-types/test/build all green.
@@ -9022,7 +9022,7 @@ that mattered.
 
 **S92 · A precondition nobody can read is a feature nobody can find.**
 Reported from the live workspace: a bank line reading «ADEUDO MENSUAL DE
-TARJETA ***8442 LIQUIDACION 01/11/2026-30/11/2026 … su desglose figura en el
+TARJETA \*\*\*8442 LIQUIDACION 01/11/2026-30/11/2026 … su desglose figura en el
 extracto de tarjeta adjunto», opened in Conciliación, and NOTHING on the panel
 about a card. Propuestas 0, two candidates differing by 1.553 € and 2.879 €,
 and «Marcar sin respaldo» as the only honest-looking way out.
@@ -10663,3 +10663,66 @@ reversing the no-images note; content restructured rather than restyled; all
 three languages, because the product already chooses a document language per
 party and an email in the wrong one undoes the effect; the two missing templates
 added rather than left as drawings.
+
+## S133 · The App Store route, and two blockers that are not code (2026-09-14)
+
+Asked to put the app live on the App Store, "only for company internal use",
+first time right, with as little operator work as possible.
+
+**The route was already right and is now confirmed against Apple's current
+rules.** A single-company ERP wrapped in a WKWebView fails the public App Store
+twice: guideline 4.2, which rejects "a repackaged website… not particularly
+useful, unique, or app-like", and 3.2, which rejects an app "designed for a
+specific organisation… rather than a general audience". Apple's own answer for
+this is a **Custom App** through Business Manager — same binary, same review,
+private distribution. A previous session chose it and built the repository
+around it; nothing needed changing.
+
+**Two things block it, neither of them in this repository.**
+
+1 · **Canei is not enrolled in Apple Business Manager.** A Custom App is
+distributed to an organisation identified by its Organization ID. Without one,
+App Store Connect cannot be set to custom distribution and a submission goes in
+PUBLIC — into the rejection above. Enrolment needs a D-U-N-S number and a
+verification call from Apple: days. So "available immediately on the App Store"
+was not achievable on any route, and saying so was the useful answer. TestFlight
+is the channel that IS immediate, takes 100 internal testers and is not reviewed
+at all.
+
+2 · **The signing certificate cap refilled and run #26 hit it**, thirteen
+seconds in: _"Your account has reached the maximum number of certificates."_
+Exactly as INTEGRATIONS_PENDING predicted — cloud-managed signing asks Apple for
+a new certificate every run. Two minutes to clear, and it now matters more than
+it did, because the build sitting in TestFlight is 1.1 (14) from 8 September and
+predates the privacy manifest.
+
+**The gap that would have cost a review cycle.** `ios/` had **no
+`PrivacyInfo.xcprivacy`**, which Apple has required since May 2024 and which is
+the most-cited privacy rejection for any app touching `UserDefaults` — and this
+one does, for the Face ID arm flag, the role and the interface language. The
+uploads had gone through because at upload it is a warning; at submission it is
+not. Added, declaring what is true: no tracking, no collected data types, and
+`NSPrivacyAccessedAPICategoryUserDefaults` with reason `CA92.1`. The Xcode
+project uses a synchronised root group, so dropping the file into
+`CaneiSubirats/Resources/` was the whole change — no project surgery.
+
+**`tests/app-store/run.mjs` — the submission checked before Apple checks it.**
+Field limits per locale, locale parity, https URLs, real category keys,
+screenshots measured from their PNG headers rather than trusted from filenames,
+the privacy manifest cross-checked against whether the Swift actually uses
+`UserDefaults`, and review notes that name the privacy URL, the language switch
+and the custom-app framing. 76 checks. Proven red on an over-long subtitle and on
+an 800×600 screenshot before being trusted green.
+
+It has **two verdicts on purpose**. CI asserts what the repository owns and stays
+green while the operator-only values are blank, because blocking every commit on
+a value nobody here can supply only teaches people to ignore a red gate. The
+release workflow runs the same script with `--ready`, where a blank the reviewer
+needs is a failure — that is the moment it stops being pending and starts being
+a rejection.
+
+**Written down rather than automated:** the App Privacy questionnaire, export
+compliance and the age rating are screens in App Store Connect that nothing can
+send. `docs/RELEASE-IOS.md` now answers all three field by field, each answer
+checked against the code, so they are a copy rather than a judgement. A gate that
+pretended to cover them would be worse than one that says it does not.

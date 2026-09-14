@@ -485,6 +485,16 @@ jobs:
       - name: Every generated email, as the recipient reads it
         run: node tests/comms-tokens/run.mjs
 
+      # The same argument one floor up: App Review rejects for a subtitle two
+      # characters over the limit, a screenshot at the wrong size, a locale
+      # missing a field the other has — and each of those costs DAYS, one at a
+      # time. Everything Apple checks that can be read out of this repository is
+      # read out of it here instead. The values only the operator can supply are
+      # reported as waiting rather than failing; the release workflow runs the
+      # same script with --ready, where waiting is a failure.
+      - name: The App Store submission, before Apple sees it
+        run: node tests/app-store/run.mjs
+
       - name: Bank statement import (a real .xlsx fixture, through the same module)
         run: node tests/bank-import/run.mjs
 
