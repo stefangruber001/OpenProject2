@@ -10573,3 +10573,93 @@ Its `businessStatus` field says whether a business is still trading, and the
 pipeline folds a non-`OPERATIONAL` answer straight into the workbook's DO NOT
 CALL column. The audit found three such firms by hand — one of them Tier B, on
 next week's call list. That should not depend on an auditor noticing.
+
+## S132 · Three email designs, and the product shipped the worst one (2026-09-14)
+
+Asked to make the ERP's emails look like they came from a world-leading company
+— the wording and the Canei identity, not only the text — and told a footer with
+the logo was missing. The finding was not that nobody had designed this.
+
+**The repository held three email designs.** `apps/web/lib/invite-mail.ts` had a
+genuinely premium six-band table layout, reachable only by the two account
+emails. `site/documentos/01-cliente/17–20-email-*.html` held four approved
+mockups with a lockup, a summary table, a payment box and a complete legal foot
+— drawings, rendered by nothing. And `CaneiEml.bodyHtml`, twelve lines of
+markup, was what **every customer** received: a mark, a name, the paragraphs,
+and one rule over two lines of contact detail. The weakest of the three was the
+one wired to the send path, which is the only reason it was the one that
+shipped.
+
+**So the design moved into `site/erp-eml.js`, beside the envelope**, in the file
+both runtimes already load, and a message that does not go through it does not
+get sent. Blocks — masthead, prose, facts, payment, note, attachment,
+credentials, steps, button, sign-off, legal foot — each optional, each stating
+its own background so a force-inverting dark-mode client cannot turn a band's
+text the colour of the paper behind it. Tables and inline styles only, because
+Outlook on Windows lays out with Word's engine.
+
+**Three envelope defects, fixed on the way past.** `build()` wrote `Subject:`
+raw with no RFC 2047, and three of the six standard subjects carry «—» or «¿» —
+so every draft this browser had ever built went out with an 8-bit header. No
+`Date:` was written. `esc()` did not escape an apostrophe. The server-side
+composer had done all three correctly for a year; nothing had ever compared the
+two, which is the same shape of fault as the `{{token}}` gap and the command
+arity gap before it.
+
+**The logo, against a documented decision.** `invite-mail.ts` opened with «NO
+IMAGES, ANYWHERE», and its reasons were right: a remote logo is blocked by
+default in Outlook and Gmail, an inline `<svg>` is stripped by Gmail. A `cid:`
+part is neither — it travels inside the message and both clients draw it. So the
+mark is attached (1.5 kB green, 1.3 kB white, `scripts/email-logo.mjs`
+regenerates both from the house outline), it carries alt text, and the wordmark
+beside it is live text. The worst case is exactly the identity that shipped
+before. The note was replaced with this reasoning rather than deleted, and the
+test that asserted «loads no images at all» was rewritten to assert what now
+matters: every image is a `cid:` reference with alt text, and nothing is
+fetched.
+
+**Content, not only styling.** A three-line email in a beautiful frame is still
+a three-line email. `STANDARD_COMMS_TEMPLATES` was rewritten around the pieces
+the design lays out — greeting, prose, steps, note, closing — in **three
+languages**, following `party.docLanguage` exactly as the documents already do.
+The FIGURES are deliberately not in the templates: reference, date, amount, due
+date, days overdue and the payment account come from the event, because a
+template author retyping a total is a total that can be wrong.
+`composeCommsMessage()` puts the two together once, and the HTML part, the plain
+part and the WhatsApp text all render from it — so they cannot disagree.
+
+**Two emails the catalogue promised and the product could not send.** The
+catalogue has drawn an acceptance confirmation and an invoice covering email
+since the document set was designed, and there was no template behind either:
+a customer accepted a quote and heard nothing until the contract arrived, and
+the library had a REMINDER for an invoice nobody had ever emailed. `quote-accepted`
+and `invoice-send` now exist, raised by `quote-accepted` and `invoice-issued`
+events built from data the system already held. The four catalogue pages are
+generated from the message library by `scripts/email-docs.mjs`; a client
+reviewing the catalogue is now reviewing the product.
+
+**The gate grew to match.** `tests/comms-tokens/run.mjs` asserted one thing; it
+now asserts twenty, per template per language, on the RENDERED message: no
+token in any part, a greeting, a sign-off, a preheader, a subject under 60
+characters, figures or steps, the reference in the plain part, an account
+offered whenever the event carries one, no flexbox, no `<style>` block, no
+remote image, every image a `cid:` with alt text, no cell painting text on a
+ground it does not state, a plain part that is prose rather than stripped
+markup, and the six identity facts LSSI-CE art. 10 asks for plus the
+confidentiality and GDPR notices. 678 checks. The floor is asserted too, so a
+sweep that finds nothing fails.
+
+**What the gate caught that a person would not have.** Letter-spacing of .18em
+on the uppercase eyebrow labels made a PDF extractor read «DATOS PARA EL PAGO»
+as «D AT O S PA R A E L PA G O» — the label stopped being findable, in exactly
+the way `tests/doc-print/searchable.mjs` was written to catch after the last
+time. Tracking is now .06em; it still reads as an eyebrow. And the preheader
+carried the raw `*emphasis*` markers to the lock screen, which is precisely what
+a machine-written message looks like.
+
+**What was decided without asking** (autonomy contract): one builder rather than
+a second premium renderer per side; the `cid:` mark with a live-text fallback,
+reversing the no-images note; content restructured rather than restyled; all
+three languages, because the product already chooses a document language per
+party and an email in the wrong one undoes the effect; the two missing templates
+added rather than left as drawings.

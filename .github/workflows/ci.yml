@@ -482,7 +482,7 @@ jobs:
       # two. Two of the six went out to customers reading «Hola {{cliente}},»
       # under «Comenzamos su obra el {{fecha}}» — visible only in the sent mail,
       # because every screen shows the template rather than the rendered message.
-      - name: Message templates (no {{token}} survives to the customer)
+      - name: Every generated email, as the recipient reads it
         run: node tests/comms-tokens/run.mjs
 
       - name: Bank statement import (a real .xlsx fixture, through the same module)

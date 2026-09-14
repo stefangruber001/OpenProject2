@@ -2439,6 +2439,7 @@ var ErpFactory = (() => {
           dueDate,
           mode: rule.mode,
           vars: event.vars ?? {},
+          ...event.lang ? { lang: event.lang } : {},
           due: dueDate <= options.asOf,
           ...to ? {} : { blocked: "noRecipient" }
         });

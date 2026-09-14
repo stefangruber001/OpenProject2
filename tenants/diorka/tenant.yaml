@@ -83,57 +83,73 @@ config:
     # chapters: uses the pack default seeded from BRD Appendix A.2
 
   # Email is auto-drafted from lifecycle events; the user presses Send once.
-  # Templates are DATA (English working; es/ca before handover). No real send in
-  # dev — a log-only outbox is bound (INTEGRATIONS_PENDING: real provider).
+  # Templates are DATA. No real send in dev — a log-only outbox is bound
+  # (INTEGRATIONS_PENDING: real provider).
+  #
+  # THESE FOUR ARE THE CAPABILITY LAYER'S OWN SET, and they are deliberately
+  # short. The message the product actually sends is composed by the workspace
+  # from `STANDARD_COMMS_TEMPLATES` in site/erp-engine.js, in three languages,
+  # and laid out by site/erp-eml.js — greeting, figures, payment details,
+  # next steps, signature and legal foot. Repeating that prose here would make
+  # two libraries that drift; what is kept is the wording each event opens
+  # with, brought into line with the shipped one so the two do not contradict
+  # each other in front of the same customer.
   messaging:
     from: "hola@caneisubirats.com"
-    signature: "Canei Subirats — Renovations, simply complex."
+    signature: "Canei Subirats — Reformes senzillament complexes"
     templates:
       - event: quote-sent
-        subject: "Your renovation quote — {{project}}"
+        subject: "Your quote {{ref}}"
         body: |
           Dear {{client}},
 
-          Thank you for trusting Canei Subirats with your project “{{project}}”.
-          Please find attached our detailed quote for {{amount}}, broken down by
-          chapter with clear measurements; optional works are listed separately.
+          Please find attached quote {{ref}} for “{{project}}”, with the line
+          items, measurements and timings in full. Prices include labour,
+          materials and waste removal.
 
-          You will have a single point of contact throughout, fixed deadlines and
-          our 2-year guarantee on the works.
+          Reply to this email to accept it or to ask for a change; on acceptance
+          we send the works contract and agree a start date.
 
           Kind regards,
           {{signature}}
-          {{from}}
       - event: acceptance
-        subject: "Thank you — your project is confirmed ({{ref}})"
+        subject: "Quote {{ref}} accepted"
         body: |
           Dear {{client}},
 
-          We are delighted to confirm your acceptance for “{{project}}”. Your
-          project number is {{ref}}. We will schedule the works and keep you
-          updated at each milestone.
+          We confirm that we have your acceptance of quote {{ref}} for
+          “{{project}}”. Attached is the accepted, frozen version: that is the
+          version the work is run against, and any later change is documented as
+          a change order with a price of its own.
 
           Kind regards,
           {{signature}}
       - event: invoice
-        subject: "Invoice {{invoice}} — {{project}}"
+        subject: "Invoice {{invoice}}"
         body: |
           Dear {{client}},
 
-          Please find attached invoice {{invoice}} for the works on “{{project}}”.
-          Total due: {{amount}}. Payment terms: 15 days.
+          Attached is invoice {{invoice}} for the work at “{{project}}”, for
+          {{amount}}.
+
+          If anything does not match, reply to this email and we will look at it
+          the same day — before the due date it is far easier to correct.
 
           Kind regards,
           {{signature}}
       - event: reminder
-        subject: "Friendly reminder — invoice for {{project}}"
+        subject: "Invoice {{invoice}} outstanding"
         body: |
           Dear {{client}},
 
-          Our records show invoice {{invoice}} for {{amount}} is now due. If you
-          have already arranged payment, please disregard this note.
+          This is a reminder that invoice {{invoice}}, for {{amount}}, is
+          recorded as outstanding.
 
-          Thank you very much,
+          If you have paid in the last few days, please ignore this — the two may
+          simply have crossed. Send us the date and the reference and we will
+          reconcile it the same day.
+
+          Kind regards,
           {{signature}}
 
   # Roles reflect the family split (BRD): administration (wife) runs the office,

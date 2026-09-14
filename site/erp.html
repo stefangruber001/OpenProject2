@@ -19390,21 +19390,38 @@
                 // message has to say so, because "nothing happened and
                 // nothing was said" is precisely how a working mailbox
                 // looked broken for a day.
-                const tpl = erp.commsTemplate("quote-send");
+                /* The language this customer reads — the same rule the quote
+                   itself was rendered in, so the covering message and the
+                   document it covers arrive in one language. */
+                const qLang = b.language || party.docLanguage || "";
+                const tpl = erp.commsTemplate("quote-send", qLang);
                 if (!tpl)
                   toast(
                     "⚠ Sin plantilla «Envío de presupuesto» — no se ha preparado ningún correo",
                   );
                 if (tpl) {
-                  const vars = { number: b.number, cliente: party.name };
-                  const C = commsApi();
-                  const body = C ? C.render(tpl.body, vars) : tpl.body;
+                  const vars = {
+                    number: b.number,
+                    cliente: party.name,
+                    fecha_doc: fmtD(erp.today),
+                    validez: erp.state.config ? erp.state.config.quoteValidityDays : 30,
+                  };
                   if (ch === "whatsapp" && party.mobile)
                     waLink =
                       "https://wa.me/" +
                       waPhone(party.mobile) +
                       "?text=" +
-                      encodeURIComponent(body);
+                      /* The SAME composed message, as chat text: greeting,
+                         figures, steps and sign-off, with the legal foot left
+                         off — a confidentiality notice in a WhatsApp bubble is
+                         noise, and the reader already knows who is writing. */
+                      encodeURIComponent(
+                        CaneiEml.textPart(
+                          erp.composeCommsMessage(tpl, vars, { issuer: emailIssuer() }),
+                          emailIssuer(),
+                          { legal: false },
+                        ).trim(),
+                      );
                   if (ch === "email") {
                     // Recorded through the SAME log-only queue every other
                     // communication in this system goes through (§5.7's own
@@ -19422,6 +19439,7 @@
                         to: party.email,
                         channel: "email",
                         dueDate: erp.today,
+                        lang: tpl.lang,
                         vars,
                       },
                       "backoffice",
@@ -24416,8 +24434,7 @@
                     "Ruta crítica",
                     G.sch.criticalPath.length + " / " + G.plan.tasks.length,
                   ]);
-                  if (G.base)
-                    rows.push(["Desvío", (drift > 0 ? "+" : "") + drift + " d"]);
+                  if (G.base) rows.push(["Desvío", (drift > 0 ? "+" : "") + drift + " d"]);
                 }
                 /* LATE IS A FACT ABOUT THE CALENDAR, and it is the one this
                    phase exists to surface. A job can be 80 % done and a fortnight
@@ -26108,8 +26125,7 @@
         else if (row.receiptId) refs.receiptId = row.receiptId;
 
         const descriptor = docDescriptor(row.doc, refs, lang);
-        if (format === "docx")
-          return { blob: docxBlob(descriptor, lang), name: row.ref + ".docx" };
+        if (format === "docx") return { blob: docxBlob(descriptor, lang), name: row.ref + ".docx" };
         // The same descriptor as the Word file beside it, through the PDF
         // writer: one document, two formats, and a file either way.
         return {
@@ -28121,7 +28137,30 @@
        *  sample pack shown to the client has to be this email and not a
        *  drawing of it. */
       function draftEmailHtml(subject, bodyText) {
-        return CaneiEml.bodyHtml(subject, bodyText, erp._issuerBlock());
+        return CaneiEml.bodyHtml(subject, bodyText, emailIssuer());
+      }
+      /** How big the attachment is, from the base64 the message carries.
+       *  Named in the body so the reader knows what is arriving before they
+       *  decide whether to open it on a phone with one bar of signal. */
+      function kb(b64) {
+        const bytes = Math.floor((String(b64 || "").length * 3) / 4);
+        return bytes >= 1024 * 1024
+          ? (bytes / 1024 / 1024).toFixed(1) + " MB"
+          : Math.max(1, Math.round(bytes / 1024)) + " kB";
+      }
+      /** The issuer block as a MESSAGE needs it: the company's own record,
+       *  plus the two things only a message carries — the line under the
+       *  wordmark and the address of the privacy policy the GDPR footnote
+       *  points at. Both live here rather than on the company record because
+       *  neither appears on a document. */
+      function emailIssuer() {
+        const iss = erp._issuerBlock();
+        iss.privacyUrl =
+          iss.privacyUrl ||
+          (location && location.origin && /^https?:/.test(location.origin)
+            ? location.origin + "/privacy.html"
+            : "");
+        return iss;
       }
       /** The document behind a queued message, as a PDF attachment — the same
        *  facts and the same design the panes print. Nothing invented: a
@@ -28191,15 +28230,24 @@
       async function fileDraftForComm(q, silent) {
         if (!q || q.filed === "mailbox") return Promise.resolve("mailbox");
         try {
-          const iss = erp._issuerBlock();
-          const tpl = erp.commsTemplate(q.templateKey) || { subject: "", body: "" };
-          const C = commsApi();
-          const subject =
-            (C && tpl.subject ? C.render(tpl.subject, q.vars) : tpl.subject) ||
-            q.event + " · " + (q.subjectRef || "");
-          const body = C ? C.render(tpl.body, q.vars) : tpl.body;
+          const iss = emailIssuer();
           const att = await draftAttachmentFor(q);
           const party = erp.state.parties.find((x) => x.email === q.to);
+          /* ONE COMPOSED MESSAGE, THREE RENDERINGS. The subject, the HTML part
+             and the plain part all come from `composeCommsMessage`, so they
+             cannot disagree about the amount, the due date or the account to
+             pay into. This used to be `render(subject)` and `render(body)`,
+             which is why every email that left here was three lines of prose
+             with no reference, no figures and no way to pay. */
+          const msg = erp.composeCommsMessage(
+            erp.commsTemplate(q.templateKey, q.lang || (q.vars && q.vars.lang)),
+            q.vars,
+            {
+              issuer: iss,
+              attachment: att ? { name: att.name, size: kb(att.b64) } : null,
+            },
+          );
+          const subject = (msg && msg.subject) || q.event + " · " + (q.subjectRef || "");
           const eml = CaneiEml.build({
             fromName: iss.tradeName || iss.legalName,
             fromEmail: iss.email || "",
@@ -28212,8 +28260,11 @@
             toName: (q.vars && q.vars.cliente) || (party ? party.name : ""),
             toEmail: q.to || "",
             subject,
-            text: body,
-            html: draftEmailHtml(subject, body),
+            text: msg ? CaneiEml.textPart(msg, iss) : "",
+            html: msg
+              ? CaneiEml.bodyHtml(msg, iss)
+              : draftEmailHtml(subject, q.event + " · " + (q.subjectRef || "")),
+            inline: CaneiEml.inlineParts(),
             attachments: att ? [att] : [],
           });
           return fileDraft(eml).then((res) => {

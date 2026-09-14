@@ -715,6 +715,7 @@
       legalName: "", // denominación social, as registered
       tradeName: "", // what it trades as, when that differs
       taxId: "",
+      tagline: "", // the line under the wordmark in a message masthead
       logo: null, // an uploaded file {storageKey,name,type,size}
       logoRef: "canei-logo", // the named pictogram, for the vector document stack
 
@@ -811,54 +812,531 @@
      Wording, not law: every one of these is editable on the Comunicaciones
      screen, and editing makes a new version rather than overwriting, so a
      message already sent stays reproducible.
+
+     WHY EACH ENTRY IS THREE ENTRIES. The product already chooses a document
+     language per customer — a quote, a contract and an invoice all come out in
+     the language on the party record. The covering email did not: every one of
+     these was Spanish, so a Catalan customer got a Catalan invoice under a
+     Spanish sentence, and an English one got an English contract the same way.
+     The three languages sit side by side here rather than in three files
+     because that is what keeps them saying the same thing.
+
+     WHY THE PROSE IS SPLIT INTO PARTS. `greeting`, `body`, `closing`, `steps`
+     and `note` are separate because the message is assembled into the house
+     design (see CaneiEml.bodyHtml) and also sent down channels that have no
+     design at all — the plain-text part of the mail, and the WhatsApp deep
+     link on the quote screen. One blob of prose can be shown; it cannot be
+     laid out. The FIGURES are deliberately NOT here: reference, date, amount,
+     due date and the payment details come from the event that raises the
+     message, because a template author retyping a total is a total that can be
+     wrong.
+
+     `*emphasis*` is the only markup allowed — it becomes bold in the HTML part
+     and plain text everywhere else.
      ========================================================================== */
   const STANDARD_COMMS_TEMPLATES = [
     {
       key: "quote-send",
-      label: "Envío de presupuesto",
       family: "comercial",
-      subject: "Su presupuesto {{number}}",
-      body: "Hola {{cliente}},\n\nAdjuntamos el presupuesto {{number}}. Quedamos a su disposición para cualquier duda.\n\nUn saludo,",
       attach: "budget",
+      /* A quote has no public URL — there is no customer portal — so the
+         action is the reply, and the button is a mailto: that really works
+         rather than a link to a page that does not exist. */
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Envío de presupuesto",
+          subject: "Su presupuesto {{number}}",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Adjuntamos el presupuesto *{{number}}* con el detalle de partidas, mediciones y plazos.",
+            "Los precios incluyen mano de obra, materiales y retirada de residuos, y se mantienen durante {{validez}} días.",
+          ],
+          steps: [
+            "Revise el detalle: cada partida indica material, medición y precio.",
+            "Respóndanos a este correo para aceptarlo o pedir un cambio.",
+            "Al aceptarlo le enviamos el contrato de obra y fijamos fecha de inicio.",
+          ],
+          note: "Si alguna partida no encaja con lo que tenía en mente, díganoslo: ajustar el presupuesto antes de empezar sale mucho más barato que ajustar la obra después.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder al presupuesto",
+        },
+        ca: {
+          label: "Enviament de pressupost",
+          subject: "El seu pressupost {{number}}",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us adjuntem el pressupost *{{number}}* amb el detall de partides, amidaments i terminis.",
+            "Els preus inclouen mà d'obra, materials i retirada de residus, i es mantenen durant {{validez}} dies.",
+          ],
+          steps: [
+            "Reviseu el detall: cada partida indica material, amidament i preu.",
+            "Respongueu a aquest correu per acceptar-lo o demanar-hi un canvi.",
+            "En acceptar-lo us enviem el contracte d'obra i fixem la data d'inici.",
+          ],
+          note: "Si alguna partida no encaixa amb el que teníeu al cap, digueu-nos-ho: ajustar el pressupost abans de començar surt molt més barat que ajustar l'obra després.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre al pressupost",
+        },
+        en: {
+          label: "Quote sent",
+          subject: "Your quote {{number}}",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "Please find attached quote *{{number}}*, with the line items, measurements and timings in full.",
+            "Prices include labour, materials and waste removal, and hold for {{validez}} days.",
+          ],
+          steps: [
+            "Read the detail: every line item names its material, its measurement and its price.",
+            "Reply to this email to accept it or to ask for a change.",
+            "On acceptance we send the works contract and agree a start date.",
+          ],
+          note: "If a line item is not what you had in mind, tell us. Adjusting a quote before we start is far cheaper than adjusting the building work afterwards.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about this quote",
+        },
+      },
+    },
+    {
+      /* THE MESSAGE THE CATALOGUE PROMISED AND THE PRODUCT COULD NOT SEND.
+         `site/documentos/01-cliente/17-email-aceptacion.html` has drawn this
+         email since the document set was designed, and there was no template
+         behind it: a customer accepted a quote and got nothing at all until
+         the contract turned up. Same for the invoice below. Both are raised by
+         an event that already existed in the data and by no rule — the person
+         who took the acceptance presses send, as they do on the quote. */
+      key: "quote-accepted",
+      family: "comercial",
+      attach: "budget",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Confirmación de aceptación",
+          subject: "Presupuesto {{number}} aceptado",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Le confirmamos que hemos recibido su aceptación del presupuesto *{{number}}*. Gracias por su confianza.",
+            "Adjuntamos la versión aceptada y congelada del presupuesto: es la que rige la obra, y cualquier cambio posterior se documenta como orden de cambio con su propio precio.",
+          ],
+          steps: [
+            "Le enviamos el contrato de obra para su firma.",
+            "Al firmarlo fijamos la fecha de inicio y le avisamos.",
+            "A partir de ahí recibirá el avance cada semana.",
+          ],
+          note: "Guarde este correo con el presupuesto adjunto: es el alcance acordado, y es a lo que nos comprometemos.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder sobre la obra",
+        },
+        ca: {
+          label: "Confirmació d'acceptació",
+          subject: "Pressupost {{number}} acceptat",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us confirmem que hem rebut la vostra acceptació del pressupost *{{number}}*. Gràcies per la confiança.",
+            "Us adjuntem la versió acceptada i congelada del pressupost: és la que regeix l'obra, i qualsevol canvi posterior es documenta com a ordre de canvi amb el seu preu.",
+          ],
+          steps: [
+            "Us enviem el contracte d'obra per signar.",
+            "En signar-lo fixem la data d'inici i us avisem.",
+            "A partir d'aquí rebreu l'avenç cada setmana.",
+          ],
+          note: "Deseu aquest correu amb el pressupost adjunt: és l'abast acordat, i és allò a què ens comprometem.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre sobre l'obra",
+        },
+        en: {
+          label: "Acceptance confirmed",
+          subject: "Quote {{number}} accepted",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "We confirm that we have your acceptance of quote *{{number}}*. Thank you.",
+            "Attached is the accepted, frozen version of the quote. That is the version the work is run against, and any later change is documented as a change order with a price of its own.",
+          ],
+          steps: [
+            "We send you the works contract to sign.",
+            "Once signed, we set the start date and tell you.",
+            "From then on you get the weekly progress report.",
+          ],
+          note: "Keep this email and the attached quote: it is the scope we agreed, and it is what we are committing to.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about the works",
+        },
+      },
     },
     {
       key: "quote-followup",
-      label: "Seguimiento de presupuesto",
       family: "comercial",
-      subject: "Su presupuesto {{number}}",
-      body: "Hola {{cliente}},\n\n¿Ha podido revisar el presupuesto {{number}}? Quedamos a su disposición para cualquier ajuste.\n\nUn saludo,",
       attach: "budget",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Seguimiento de presupuesto",
+          subject: "¿Alguna duda con el presupuesto {{number}}?",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Le escribimos para saber si ha podido revisar el presupuesto *{{number}}*, que le enviamos hace unos días.",
+            "Si necesita ajustar el alcance, cambiar materiales o escalonar los trabajos, preparamos una alternativa sin compromiso.",
+          ],
+          steps: [
+            "Díganos qué le encaja y qué no; lo revisamos con usted.",
+            "Si prefiere hablarlo, llámenos al teléfono del pie de este correo.",
+          ],
+          note: "Y si ha decidido no seguir adelante, díganoslo también: nos ayuda a mejorar y dejamos de escribirle.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder al presupuesto",
+        },
+        ca: {
+          label: "Seguiment de pressupost",
+          subject: "Algun dubte amb el pressupost {{number}}?",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us escrivim per saber si heu pogut revisar el pressupost *{{number}}*, que us vam enviar fa uns dies.",
+            "Si cal ajustar l'abast, canviar materials o esglaonar els treballs, us preparem una alternativa sense compromís.",
+          ],
+          steps: [
+            "Digueu-nos què us encaixa i què no; ho revisem amb vosaltres.",
+            "Si ho preferiu parlar, truqueu-nos al telèfon del peu d'aquest correu.",
+          ],
+          note: "I si heu decidit no tirar-ho endavant, digueu-nos-ho també: ens ajuda a millorar i deixem d'escriure-us.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre al pressupost",
+        },
+        en: {
+          label: "Quote follow-up",
+          subject: "Any questions about quote {{number}}?",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "We are writing to ask whether you have had a chance to look at quote *{{number}}*, which we sent a few days ago.",
+            "If the scope needs adjusting, the materials changing, or the work splitting into stages, we will prepare an alternative with no obligation.",
+          ],
+          steps: [
+            "Tell us what works and what does not; we will go through it with you.",
+            "If you would rather talk it over, call the number in the footer.",
+          ],
+          note: "And if you have decided not to go ahead, tell us that too — it helps us improve, and we stop writing.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about this quote",
+        },
+      },
     },
     {
       key: "invoice-reminder",
-      label: "Recordatorio de factura vencida",
       family: "cobros",
-      subject: "Factura {{number}} pendiente",
-      body: "Hola {{cliente}},\n\nLa factura {{number}}, por importe de {{importe}} €, figura pendiente en nuestros registros. Si ya la ha abonado, indíquenoslo y la conciliamos.\n\nGracias,",
       attach: "invoice",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Recordatorio de factura vencida",
+          subject: "Factura {{number}} pendiente",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Le recordamos que la factura *{{number}}*, por importe de *{{importe}} €*, venció el {{vencimiento}} y figura pendiente en nuestros registros.",
+          ],
+          steps: [],
+          note: "Si ya ha realizado la transferencia en los últimos días, ignore este mensaje: es posible que se hayan cruzado. Si nos indica la fecha y la referencia, lo conciliamos el mismo día.",
+          closing: "Gracias por su colaboración. Un cordial saludo,",
+          ctaLabel: "Responder sobre el pago",
+        },
+        ca: {
+          label: "Recordatori de factura vençuda",
+          subject: "Factura {{number}} pendent",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us recordem que la factura *{{number}}*, per import de *{{importe}} €*, va vèncer el {{vencimiento}} i consta pendent als nostres registres.",
+          ],
+          steps: [],
+          note: "Si ja heu fet la transferència aquests dies, ignoreu aquest missatge: és possible que s'hagin creuat. Si ens indiqueu la data i la referència, ho conciliem el mateix dia.",
+          closing: "Gràcies per la vostra col·laboració. Ben cordialment,",
+          ctaLabel: "Respondre sobre el pagament",
+        },
+        en: {
+          label: "Overdue invoice reminder",
+          subject: "Invoice {{number}} outstanding",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "This is a reminder that invoice *{{number}}*, for *{{importe}} €*, fell due on {{vencimiento}} and is recorded as outstanding.",
+          ],
+          steps: [],
+          note: "If you have paid in the last few days, please ignore this — the two may simply have crossed. Send us the date and the reference and we will reconcile it the same day.",
+          closing: "Thank you. Kind regards,",
+          ctaLabel: "Reply about this payment",
+        },
+      },
+    },
+    {
+      /* The other one the catalogue drew and nothing sent: the invoice itself.
+         The library had a REMINDER for an invoice nobody had emailed. */
+      key: "invoice-send",
+      family: "cobros",
+      attach: "invoice",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Envío de factura",
+          subject: "Factura {{number}}",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Adjuntamos la factura *{{number}}* correspondiente a los trabajos de *{{obra}}*.",
+          ],
+          steps: [],
+          note: "Si detecta cualquier discrepancia, respóndanos a este correo y lo revisamos el mismo día — antes de que venza es mucho más fácil de corregir.",
+          closing: "Gracias, y un cordial saludo,",
+          ctaLabel: "Responder sobre la factura",
+        },
+        ca: {
+          label: "Enviament de factura",
+          subject: "Factura {{number}}",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: ["Us adjuntem la factura *{{number}}* corresponent als treballs de *{{obra}}*."],
+          steps: [],
+          note: "Si hi detecteu qualsevol discrepància, respongueu a aquest correu i ho revisem el mateix dia — abans del venciment és molt més fàcil de corregir.",
+          closing: "Gràcies, i ben cordialment,",
+          ctaLabel: "Respondre sobre la factura",
+        },
+        en: {
+          label: "Invoice sent",
+          subject: "Invoice {{number}}",
+          greeting: "Dear {{cliente}},",
+          body: ["Attached is invoice *{{number}}* for the work at *{{obra}}*."],
+          steps: [],
+          note: "If anything does not match, reply to this email and we will look at it the same day — before the due date it is far easier to correct.",
+          closing: "Thank you, and kind regards,",
+          ctaLabel: "Reply about this invoice",
+        },
+      },
     },
     {
       key: "works-start",
-      label: "Aviso de inicio de obra",
       family: "obra",
-      subject: "Comenzamos su obra el {{fecha}}",
-      body: "Hola {{cliente}},\n\nConfirmamos el inicio de los trabajos. El equipo llegará a primera hora y le informaremos del avance semanalmente.\n\nUn saludo,",
+      attach: "",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Aviso de inicio de obra",
+          subject: "Comenzamos su obra el {{fecha}}",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Confirmamos el inicio de los trabajos de *{{obra}}* el *{{fecha}}*.",
+            "El primer día protegemos accesos, suelos y mobiliario antes de tocar nada.",
+          ],
+          steps: [
+            "El equipo llega a primera hora de la mañana.",
+            "Le informamos del avance cada semana, con fotografías.",
+            "Cualquier incidencia, respóndanos a este correo o llame al teléfono del pie.",
+          ],
+          note: "Necesitamos acceso a la vivienda desde primera hora y un punto de agua y de luz disponibles durante los trabajos.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder sobre la obra",
+        },
+        ca: {
+          label: "Avís d'inici d'obra",
+          subject: "Comencem la seva obra el {{fecha}}",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Confirmem l'inici dels treballs de *{{obra}}* el *{{fecha}}*.",
+            "El primer dia protegim accessos, terres i mobiliari abans de tocar res.",
+          ],
+          steps: [
+            "L'equip arriba a primera hora del matí.",
+            "Us informem de l'avenç cada setmana, amb fotografies.",
+            "Qualsevol incidència, respongueu a aquest correu o truqueu al telèfon del peu.",
+          ],
+          note: "Necessitem accés a l'habitatge des de primera hora i un punt d'aigua i de llum disponibles durant els treballs.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre sobre l'obra",
+        },
+        en: {
+          label: "Works starting",
+          subject: "Your works start on {{fecha}}",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "We confirm that work on *{{obra}}* starts on *{{fecha}}*.",
+            "On the first day we protect the entrance, the floors and the furniture before touching anything else.",
+          ],
+          steps: [
+            "The team arrives first thing in the morning.",
+            "We report progress every week, with photographs.",
+            "Anything at all, reply to this email or call the number in the footer.",
+          ],
+          note: "We need access to the property from first thing, and water and power available while the work is under way.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about the works",
+        },
+      },
     },
     {
       key: "docs-expired",
-      label: "Documentación caducada",
       family: "proveedores",
-      subject: "Documentación pendiente — {{number}}",
-      body: "Buenos días,\n\nLa documentación asociada a {{number}} ({{oficio}}) figura caducada. Sin ella no es posible el acceso a obra.\n\nGracias,",
+      attach: "",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Documentación caducada",
+          subject: "Documentación caducada — {{number}}",
+          greeting: "Buenos días,",
+          body: [
+            "La documentación asociada a *{{number}}* ({{oficio}}) figura caducada en nuestro registro.",
+          ],
+          steps: [
+            "Envíenos el certificado actualizado respondiendo a este correo.",
+            "Lo registramos el mismo día y le confirmamos.",
+            "El acceso a obra queda restablecido en cuanto conste en vigor.",
+          ],
+          note: "Sin la documentación en vigor no es posible el acceso a obra. Es una obligación de coordinación de actividades empresariales, no una decisión nuestra.",
+          noteKind: "warn",
+          closing: "Gracias,",
+          ctaLabel: "Enviar la documentación",
+        },
+        ca: {
+          label: "Documentació caducada",
+          subject: "Documentació caducada — {{number}}",
+          greeting: "Bon dia,",
+          body: [
+            "La documentació associada a *{{number}}* ({{oficio}}) consta caducada al nostre registre.",
+          ],
+          steps: [
+            "Envieu-nos el certificat actualitzat responent a aquest correu.",
+            "El registrem el mateix dia i us ho confirmem.",
+            "L'accés a obra queda restablert tan bon punt consti vigent.",
+          ],
+          note: "Sense la documentació vigent no és possible l'accés a obra. És una obligació de coordinació d'activitats empresarials, no una decisió nostra.",
+          noteKind: "warn",
+          closing: "Gràcies,",
+          ctaLabel: "Enviar la documentació",
+        },
+        en: {
+          label: "Expired documentation",
+          subject: "Expired documentation — {{number}}",
+          greeting: "Good morning,",
+          body: ["The documentation attached to *{{number}}* ({{oficio}}) is recorded as expired."],
+          steps: [
+            "Send us the current certificate by replying to this email.",
+            "We register it the same day and confirm back to you.",
+            "Site access is restored as soon as it is on file and in date.",
+          ],
+          note: "Without current documentation there is no site access. That is a legal coordination obligation, not a decision of ours.",
+          noteKind: "warn",
+          closing: "Thank you,",
+          ctaLabel: "Send the documentation",
+        },
+      },
     },
     {
       key: "warranty-followup",
-      label: "Seguimiento posventa",
       family: "posventa",
-      subject: "¿Todo correcto tras la obra?",
-      body: "Hola {{cliente}},\n\nHa pasado un tiempo desde que terminamos. ¿Está todo a su gusto? Cualquier detalle en garantía lo revisamos sin coste.\n\nUn saludo,",
+      attach: "",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Seguimiento posventa",
+          subject: "¿Todo correcto tras la obra?",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Ha pasado un tiempo desde que terminamos *{{obra}}* y queríamos saber si todo sigue a su gusto.",
+          ],
+          steps: [
+            "Cuéntenos cualquier detalle respondiendo a este correo.",
+            "Si ha quedado satisfecho, una reseña nos ayuda muchísimo: la mayoría de nuestros clientes nos encuentran gracias a lo que otros han escrito.",
+          ],
+          note: "La obra está en garantía: cualquier detalle que dependa de nosotros lo revisamos sin coste. Guarde este correo, lleva nuestros datos de contacto.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Contarnos cómo ha ido",
+        },
+        ca: {
+          label: "Seguiment postvenda",
+          subject: "Tot correcte després de l'obra?",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Ha passat un temps des que vam acabar *{{obra}}* i volíem saber si tot continua al vostre gust.",
+          ],
+          steps: [
+            "Expliqueu-nos qualsevol detall responent a aquest correu.",
+            "Si n'heu quedat satisfets, una ressenya ens ajuda moltíssim: la majoria dels nostres clients ens troben gràcies al que altres han escrit.",
+          ],
+          note: "L'obra està en garantia: qualsevol detall que depengui de nosaltres el revisem sense cost. Deseu aquest correu, porta les nostres dades de contacte.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Explicar-nos com ha anat",
+        },
+        en: {
+          label: "Aftercare follow-up",
+          subject: "Everything in order since the work?",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "Some time has passed since we finished *{{obra}}*, and we wanted to know whether everything is still as it should be.",
+          ],
+          steps: [
+            "Tell us about anything at all by replying to this email.",
+            "If you were happy with the result, a review helps us enormously — most of our customers find us through what others have written.",
+          ],
+          note: "The work is under warranty: anything that is down to us, we put right at no cost. Keep this email — it carries our contact details.",
+          closing: "Kind regards,",
+          ctaLabel: "Tell us how it went",
+        },
+      },
     },
   ];
+
+  /** The languages the standard library ships in. */
+  const COMMS_LANGS = ["es", "ca", "en"];
+
+  /** Who signs which family of message, when nobody named a person. */
+  const DEPARTMENT = {
+    es: {
+      comercial: "Equipo comercial",
+      cobros: "Administración",
+      obra: "Jefatura de obra",
+      proveedores: "Compras y contratación",
+      posventa: "Atención al cliente",
+      contractual: "Administración",
+    },
+    ca: {
+      comercial: "Equip comercial",
+      cobros: "Administració",
+      obra: "Direcció d'obra",
+      proveedores: "Compres i contractació",
+      posventa: "Atenció al client",
+      contractual: "Administració",
+    },
+    en: {
+      comercial: "Sales team",
+      cobros: "Accounts",
+      obra: "Site management",
+      proveedores: "Procurement",
+      posventa: "Customer care",
+      contractual: "Accounts",
+    },
+  };
+
+  /** One flat template record per key and language, as the store holds them. */
+  function standardCommsRecords() {
+    const out = [];
+    for (const t of STANDARD_COMMS_TEMPLATES)
+      for (const lang of COMMS_LANGS) {
+        const l = t.langs[lang];
+        if (!l) continue;
+        out.push({
+          key: t.key,
+          family: t.family,
+          attach: t.attach,
+          cta: t.cta,
+          lang,
+          label: l.label,
+          subject: l.subject,
+          greeting: l.greeting,
+          /* `body` stays a single string on the record, because that is what
+             the Comunicaciones screen edits and what every existing caller
+             renders. The parts are joined by blank lines and split back the
+             same way. */
+          body: l.body.join("\n\n"),
+          steps: l.steps || [],
+          note: l.note || "",
+          noteKind: l.noteKind || "",
+          closing: l.closing,
+          ctaLabel: l.ctaLabel || "",
+        });
+      }
+    return out;
+  }
 
   /* =============================================================================
      ERP — the aggregate. `state` is plain JSON (persist/restore friendly).
@@ -1245,6 +1723,7 @@
         phone: c.phone,
         email: c.email,
         web: c.web,
+        tagline: c.tagline,
         iban: c.iban,
         bic: c.bic,
         bankName: c.bankName,
@@ -10410,7 +10889,18 @@
           family: "comercial", // comercial|contractual|obra|cobros|proveedores|posventa
           lang: "es",
           subject: "",
+          /* The prose, in the pieces the house design lays out. `body` is the
+             one the operator edits on the Comunicaciones screen; the rest give
+             the message its shape and are optional, so a template written by
+             hand with nothing but a body still renders. */
+          greeting: "",
           body: "",
+          closing: "",
+          steps: [],
+          note: "",
+          noteKind: "",
+          cta: "", // "reply" — the only action a message can offer today
+          ctaLabel: "",
           attach: "", // which document rides along: budget|invoice|contract|""
           version: 1,
           active: true,
@@ -10431,7 +10921,21 @@
     updateCommsTemplate(id, patch, user) {
       const cur = this.state.commsTemplates.find((x) => x.id === id);
       if (!cur) throw new Error("Template not found");
-      const allowed = ["label", "family", "lang", "subject", "body", "attach"];
+      const allowed = [
+        "label",
+        "family",
+        "lang",
+        "subject",
+        "greeting",
+        "body",
+        "closing",
+        "steps",
+        "note",
+        "noteKind",
+        "cta",
+        "ctaLabel",
+        "attach",
+      ];
       const next = Object.assign({}, cur, { id: this._id("tpl"), version: cur.version + 1 });
       for (const k of Object.keys(patch)) if (allowed.includes(k)) next[k] = patch[k];
       cur.active = false;
@@ -10456,10 +10960,17 @@
      * Same shape as ensureAlertRules(): missing ones are created, existing
      * ones are never touched, so an operator's own edits and their retired
      * versions survive untouched.
+     *
+     * KEYED ON KEY **AND** LANGUAGE. It used to test the key alone, which was
+     * right while the library was Spanish-only and silently wrong the moment
+     * it was not: the first record of each key installed and the Catalan and
+     * English ones were skipped as duplicates, so a customer whose documents
+     * come out in Catalan would have gone on getting a Spanish email with no
+     * error anywhere.
      */
     ensureCommsTemplates(user) {
-      for (const t of STANDARD_COMMS_TEMPLATES) {
-        if (this.state.commsTemplates.some((x) => x.key === t.key)) continue;
+      for (const t of standardCommsRecords()) {
+        if (this.state.commsTemplates.some((x) => x.key === t.key && x.lang === t.lang)) continue;
         this.addCommsTemplate(Object.assign({}, t), user || "system");
       }
       return this.state.commsTemplates;
@@ -10477,7 +10988,121 @@
         this.ensureCommsTemplates("system");
         all = pick();
       }
+      /* A language nobody has written a template in falls back rather than
+         answering null. The caller's only reaction to null is to send nothing,
+         and a message in the wrong language beats no message — the customer
+         reads it either way, and the alternative is silence nobody notices. */
+      if (!all.length && lang) {
+        all = this.state.commsTemplates.filter((t) => t.key === key && t.active && t.lang === "es");
+      }
       return all[all.length - 1] || null;
+    }
+
+    /**
+     * A QUEUED MESSAGE, AS THE THING THAT GETS SENT.
+     *
+     * The template holds the wording and the event holds the figures, and
+     * until now nothing put the two together beyond `render(subject)` and
+     * `render(body)` — which is why every email that left this system was
+     * three lines of prose with no reference, no amount, no due date and no
+     * way to pay.
+     *
+     * Returns the structured message CaneiEml.bodyHtml and CaneiEml.textPart
+     * both render, so the HTML part, the plain part and the WhatsApp text
+     * cannot disagree about what the message says.
+     *
+     * The FIGURES come from `vars`, never from the template: a template author
+     * retyping a total is a total that can be wrong.
+     */
+    composeCommsMessage(tpl, vars, opts) {
+      const o = opts || {};
+      const v = vars || {};
+      const t = typeof tpl === "string" ? this.commsTemplate(tpl, o.lang) : tpl;
+      if (!t) return null;
+      const lang = t.lang || o.lang || "es";
+      const fill = (s) =>
+        String(s == null ? "" : s).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) =>
+          v[k] === undefined || v[k] === null || v[k] === "" ? m : String(v[k]),
+        );
+      const iss = o.issuer || this._issuerBlock();
+      const L = {
+        es: { ref: "Referencia", date: "Fecha", valid: "Validez", due: "Vencimiento" },
+        ca: { ref: "Referència", date: "Data", valid: "Validesa", due: "Venciment" },
+        en: { ref: "Reference", date: "Date", valid: "Valid for", due: "Due" },
+      };
+      const l = L[lang] || L.es;
+      const amountLabel = { es: "Importe", ca: "Import", en: "Amount" }[lang] || "Importe";
+      const overdueLabel = { es: "Días vencida", ca: "Dies vençuda", en: "Days overdue" }[lang];
+
+      /* Which figures this message is about. Only the ones the event actually
+         carries appear — a row reading «Vencimiento —» is worse than no row. */
+      const facts = [
+        { k: l.ref, v: v.number },
+        { k: l.date, v: v.fecha_doc },
+        { k: l.valid, v: v.validez ? v.validez + (lang === "en" ? " days" : " días") : "" },
+        { k: l.due, v: v.vencimiento },
+        { k: overdueLabel, v: v.dias },
+        { k: amountLabel, v: v.importe ? v.importe + " €" : "", hero: true },
+      ].filter((f) => f.k && f.v !== undefined && f.v !== null && f.v !== "");
+
+      const paras = String(t.body || "")
+        .split(/\n{2,}/)
+        .map((p) => fill(p).trim())
+        .filter(Boolean);
+
+      const replyTo = iss.email || "";
+      const cta =
+        t.cta === "reply" && replyTo
+          ? {
+              label: fill(t.ctaLabel) || (lang === "en" ? "Reply" : "Responder"),
+              href:
+                "mailto:" +
+                replyTo +
+                (v.number ? "?subject=" + encodeURIComponent("Re: " + v.number) : ""),
+            }
+          : null;
+
+      return {
+        lang,
+        subject: fill(t.subject),
+        ref: v.number || "",
+        greeting: fill(t.greeting),
+        /* The first paragraph is the message. It gets the lede's weight
+           because a reader who stops after one line should still know why
+           this arrived. */
+        lede: paras[0] || "",
+        paras: paras.slice(1),
+        facts,
+        payment: v.iban
+          ? {
+              /* Grouped in fours, the way an IBAN is printed on every bank
+                 statement and typed into every transfer form. Stored without
+                 spaces, read with them. */
+              iban: String(v.iban)
+                .replace(/\s+/g, "")
+                .replace(/(.{4})/g, "$1 ")
+                .trim(),
+              holder: iss.legalName,
+              concept: v.concepto || "",
+            }
+          : null,
+        note: t.note ? { text: fill(t.note), kind: t.noteKind || "" } : null,
+        steps: (t.steps || []).map(fill).filter(Boolean),
+        cta,
+        attachment: o.attachment || null,
+        closing: fill(t.closing),
+        /* Somebody signs it. The queue does not know which person pressed the
+           button, so the fallback is the department that owns the message —
+           «Administración» under a payment reminder reads as a company, while
+           an unsigned message reads as a notification. A caller that does know
+           the person passes one and wins. */
+        signoff: o.signoff || {
+          who: DEPARTMENT[lang] && DEPARTMENT[lang][t.family] ? DEPARTMENT[lang][t.family] : "",
+          role: "",
+          company: iss.legalName || iss.tradeName || "",
+          phone: iss.phone || "",
+        },
+      };
     }
     addCommsRule(r, user) {
       const rec = Object.assign(
@@ -10529,32 +11154,130 @@
      */
     commsEvents() {
       const t = this.state.today;
+      const cfg = this._configForRead();
       const ev = [];
       const addr = (partyId) => {
         const p = this.party(partyId);
         return { customer: p.email || "", supplier: p.email || "" };
       };
+      /* Which language this customer reads. The same rule the documents use —
+         a customer whose invoice comes out in Catalan gets a Catalan covering
+         email, which is the whole point of having chosen a language for them. */
+      const langOf = (partyId, projectId) => this._docLanguageFor("", projectId || null, partyId);
+      /* Money as a person reads it, in the language the message is written in.
+         Written out rather than left to Intl so the same figure comes out the
+         same on a phone, in a browser and in the sample generator. */
+      const money = (c, lang) => {
+        const n = Math.round(Math.abs(c)) / 100;
+        const [i, d] = n.toFixed(2).split(".");
+        const g = i.replace(/\B(?=(\d{3})+(?!\d))/g, lang === "en" ? "," : ".");
+        return (c < 0 ? "-" : "") + g + (lang === "en" ? "." : ",") + d;
+      };
+      /* The site, as the customer calls it: the street of the property the job
+         is on, and the job's own code when there is no property. «su obra»
+         with no name is a sentence about nothing. */
+      const siteLabel = (projectId) => {
+        const p = projectId ? this.state.projects.find((x) => x.id === projectId) : null;
+        if (!p) return "";
+        const prop = p.propertyId ? this.state.properties.find((x) => x.id === p.propertyId) : null;
+        const street = prop ? [prop.street, prop.city].filter(Boolean).join(", ") : "";
+        return street || p.code;
+      };
       for (const b of this.state.budgets) {
         const v = b.versions.find((x) => x.id === b.currentVersionId);
-        if (v && v.sent && !b.acceptedVersionId)
+        if (v && v.sent && !b.acceptedVersionId) {
+          const lang = b.language || langOf(b.partyId);
           ev.push({
             event: "quote-sent",
             subjectRef: b.number,
             date: v.sent.date,
+            lang,
             recipients: addr(b.partyId),
-            vars: { number: b.number, cliente: this.party(b.partyId).name },
+            vars: {
+              number: b.number,
+              cliente: this.party(b.partyId).name,
+              fecha_doc: dmy(v.sent.date),
+              validez: cfg.quoteValidityDays,
+            },
           });
+        }
+      }
+      /* THE TWO EVENTS THE CATALOGUE'S OWN DRAWINGS ASSUMED. An accepted quote
+         and an issued invoice are both facts this system already holds; what
+         it had no way to do was write to the customer about either. */
+      for (const b of this.state.budgets) {
+        const v = b.acceptedVersionId ? b.versions.find((x) => x.id === b.acceptedVersionId) : null;
+        const when = v && v.customerResponse && v.customerResponse.date;
+        if (!when) continue;
+        const lang = b.language || langOf(b.partyId);
+        const tot = this.budgetTotals(b.id, b.acceptedVersionId);
+        ev.push({
+          event: "quote-accepted",
+          subjectRef: b.number,
+          date: when,
+          lang,
+          recipients: addr(b.partyId),
+          vars: {
+            number: b.number,
+            cliente: this.party(b.partyId).name,
+            fecha_doc: dmy(when),
+            importe: money(tot.grandCents, lang),
+          },
+        });
+      }
+      for (const i of this.state.invoices) {
+        if (i.kind === "creditNote") continue;
+        const lang = i.language || langOf(i.partyId, i.projectId);
+        ev.push({
+          event: "invoice-issued",
+          subjectRef: i.number,
+          date: i.date,
+          lang,
+          recipients: addr(i.partyId),
+          vars: {
+            number: i.number,
+            cliente: this.party(i.partyId).name,
+            obra: siteLabel(i.projectId) || i.worksAddress || i.number,
+            fecha_doc: dmy(i.date),
+            vencimiento: dmy(i.dueDate),
+            importe: money(i.totalCents, lang),
+            iban: i.iban || cfg.iban || "",
+            concepto: i.number,
+          },
+        });
       }
       for (const r of this.receivables()) {
-        if (r.outstandingCents > 0 && r.daysOverdue > 0)
+        if (r.outstandingCents > 0 && r.daysOverdue > 0) {
+          const inv = this.state.invoices.find((i) => i.number === r.number);
+          const lang = (inv && inv.language) || langOf(r.partyId, r.projectId);
           ev.push({
             event: "invoice-overdue",
             subjectRef: r.number,
             date: r.dueDate,
+            lang,
             recipients: addr(r.partyId),
-            vars: { number: r.number, importe: r.outstandingCents / 100, cliente: r.party },
+            vars: {
+              number: r.number,
+              /* The amount as it is read, not as it is stored. It used to be
+                 `outstandingCents / 100`, which reaches a customer as
+                 «2136.97 €» — a number in a language nobody writing to a
+                 Spanish customer would use. */
+              importe: money(r.outstandingCents, lang),
+              cliente: r.party,
+              fecha_doc: inv && inv.date ? dmy(inv.date) : "",
+              vencimiento: dmy(r.dueDate),
+              dias: r.daysOverdue,
+              /* How to pay it. The one thing a reminder exists to make easy,
+                 and the one thing it did not say. */
+              /* The invoice's own account when it names one — a job billed
+                 through a different account is billed through it on the
+                 reminder too — else the company's. */
+              iban: (inv && inv.iban) || cfg.iban || "",
+              concepto: r.number,
+            },
             flags: { unpaid: true },
           });
+        }
       }
       /* EVERY TOKEN ITS TEMPLATES USE, OR THE CUSTOMER READS THE TOKEN.
          `renderTemplate` leaves an unsupplied `{{token}}` visible — the right
@@ -10575,6 +11298,7 @@
             event: "contract-signed",
             subjectRef: c.number,
             date: c.signature.customerSignedAt,
+            lang: c.language || langOf(c.partyId, job ? job.id : null),
             recipients: addr(c.partyId),
             vars: {
               number: c.number,
@@ -10583,6 +11307,7 @@
                  reads. `{{fecha}}` is the only date token any template uses,
                  so it is formatted where it is produced. */
               fecha: dmy((job && job.dates && job.dates.start) || c.signature.customerSignedAt),
+              obra: siteLabel(job ? job.id : null) || c.number,
             },
           });
         }
@@ -10592,8 +11317,17 @@
             event: "works-finished",
             subjectRef: p.code,
             date: p.dates.actualEnd,
+            lang: langOf(p.partyId, p.id),
             recipients: addr(p.partyId),
-            vars: { number: p.code, cliente: this.party(p.partyId).name, fecha: p.dates.actualEnd },
+            vars: {
+              number: p.code,
+              cliente: this.party(p.partyId).name,
+              /* dd/mm/yyyy here too. It was ISO, which nothing rendered — so
+                 the two events disagreed about what a date looks like and the
+                 disagreement was invisible until a message printed this one. */
+              fecha: dmy(p.dates.actualEnd),
+              obra: siteLabel(p.id),
+            },
           });
       for (const s of this.state.subcontracts || []) {
         const ds = this.subcontractDocStatus(s);
@@ -10602,6 +11336,7 @@
             event: "subcontractor-docs-expired",
             subjectRef: s.number,
             date: t,
+            lang: langOf(s.supplierId),
             recipients: addr(s.supplierId),
             vars: { number: s.number, oficio: s.trade },
           });
@@ -10613,7 +11348,12 @@
      * means it does not need a person to approve it before its due date.
      */
     queueCommunication(planned, user) {
-      const tpl = this.commsTemplate(planned.template);
+      /* The language the RECIPIENT reads, carried on the row so the message is
+         rendered the same way whenever it is re-filed — a template edited or a
+         company default changed months later must not silently switch the
+         language of a message already queued for somebody. */
+      const lang = planned.lang || (planned.vars && planned.vars.lang) || "";
+      const tpl = this.commsTemplate(planned.template, lang);
       const rec = {
         id: this._id("cq"),
         key: planned.ruleId + "|" + planned.subjectRef,
@@ -10622,6 +11362,7 @@
         subjectRef: planned.subjectRef,
         templateKey: planned.template,
         templateId: tpl ? tpl.id : null,
+        lang: tpl ? tpl.lang : lang || "es",
         to: planned.to,
         channel: planned.channel,
         dueDate: planned.dueDate,

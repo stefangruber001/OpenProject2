@@ -38,14 +38,20 @@
     };
     erp.configureEntity({
       legalName: "Canei Subirats, S.L.",
+      tradeName: "Canei Subirats",
+      tagline: "Reformes senzillament complexes",
       taxId: "B66666660",
       street: "Carrer de la Creu 74",
       postalCode: "08960",
       city: "Sant Just Desvern",
       phone: "659 87 67 00",
       email: "hola@caneisubirats.com",
+      web: "www.caneisubirats.com",
       iban: "ES9121000418450200051332",
       registry: "R.M. Barcelona",
+      registryTomo: "45.231",
+      registryFolio: "112",
+      registryHoja: "B-486.221",
     });
     erp.state.clauseBlocks.push({
       id: "cb1",

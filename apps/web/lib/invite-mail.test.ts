@@ -35,33 +35,73 @@ describe("the invitation, as HTML", () => {
 
   it("wears the company's identity, not the product's", () => {
     const html = inviteHtml(content({ company: "Reformas Vallès, S.L." }));
-    expect(html).toContain("Reformas Vallès, S.L.");
-    // The monogram stands in for a logo that cannot be loaded. "S.L." is not a
-    // word of the name, so this is RV and never RS.
-    expect(html).toContain(">RV<");
+    // Twice at least: the wordmark at the top and the legal foot at the
+    // bottom. The name is live text in both, which is what makes the identity
+    // survive a client that strips the mark.
+    expect(html.match(/Reformas Vallès, S\.L\./g)?.length).toBeGreaterThanOrEqual(2);
   });
 
   it("is built from green blocks, not one green strip", () => {
     // The brand has to carry down the whole message, which on a phone means
     // bands of colour rather than a header nobody scrolls back up to. Three
-    // greens, each doing a different job: masthead and sign-off, the
-    // credentials, and the steps.
+    // greens, each doing a different job: the credentials, the steps, and the
+    // legal foot that closes the message.
     const html = inviteHtml(content());
-    for (const band of [`background:#31532a`, `background:#48733c`, `background:#e7f0e1`])
+    for (const band of [`background:#31532A`, `background:#48733C`, `background:#E7F0E1`])
       expect(html).toContain(band);
-    // Deep green twice — it opens and closes the message.
-    expect(html.match(/background:#31532a/g)?.length).toBeGreaterThanOrEqual(2);
-    // And the gold rule that separates the masthead from the page.
-    expect(html).toContain("#f2c230");
+    // And the gold rule that separates the masthead from the message.
+    expect(html).toContain("#F2C230");
   });
 
-  it("loads no images at all", () => {
-    // A remote logo is blocked by default in Outlook and Gmail and renders as a
-    // broken box; an inlined one becomes an attachment some clients strip. The
-    // identity here has to survive both, so there is nothing to fetch.
+  it("carries the mark as a cid: part, and fetches nothing", () => {
+    // THIS ASSERTION USED TO SAY «loads no images at all», and it was right
+    // about the reasons: a remote logo is blocked by default in Outlook and
+    // Gmail and renders as a broken box, and an inline <svg> is stripped by
+    // Gmail outright. A `cid:` image is neither — it travels inside the
+    // message and both clients draw it. So the rule is no longer "no images",
+    // it is "nothing fetched, and nothing lost if the image is dropped":
+    // every image is a cid: reference, it carries alt text, and the company's
+    // name is live text beside it.
     const html = inviteHtml(content());
-    expect(html).not.toMatch(/<img\b/i);
+    expect(html).toMatch(/<img\b/i);
+    for (const m of html.match(/<img\b[^>]*>/gi) || []) {
+      expect(m).toMatch(/src="cid:/);
+      expect(m).toMatch(/alt="[^"]+"/);
+    }
+    expect(html).not.toMatch(/src="https?:/i);
     expect(html).not.toMatch(/background-image/i);
+  });
+
+  it("carries the company's legal identity in the foot", () => {
+    // LSSI-CE art. 10: a commercial electronic communication has to let the
+    // reader identify the company behind it. The invitation carried none of
+    // this until the design moved to the shared builder.
+    const html = inviteHtml(
+      content({
+        issuer: {
+          legalName: "Canei Subirats, S.L.",
+          tradeName: "Canei Subirats",
+          taxId: "B66666660",
+          registeredAddress: "Carrer de la Creu 74, 08960 Sant Just Desvern",
+          registry: "R.M. Barcelona · Tomo 45.231",
+          phone: "+34 934 77 12 08",
+          email: "hola@caneisubirats.com",
+          web: "www.caneisubirats.com",
+        },
+      }),
+    );
+    for (const fact of [
+      "Canei Subirats, S.L.",
+      "NIF B66666660",
+      "Carrer de la Creu 74",
+      "R.M. Barcelona",
+      "+34 934 77 12 08",
+      "hola@caneisubirats.com",
+      "www.caneisubirats.com",
+      "confidenciales",
+      "RGPD (UE) 2016/679",
+    ])
+      expect(html).toContain(fact);
   });
 
   it("escapes what it interpolates", () => {

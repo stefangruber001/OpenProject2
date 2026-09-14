@@ -15195,10 +15195,32 @@ async function testSendAndVersions(browser, base) {
         // asking twice must not install twice
         erp.commsTemplate("quote-send");
         const afterSecond = erp.state.commsTemplates.length;
+        /* And every language is installed, not only the first of each key.
+           `ensureCommsTemplates` used to test the key alone, which was right
+           while the library was Spanish-only and silently wrong the moment it
+           was not — the Catalan and English records would have been skipped as
+           duplicates and a Catalan customer would have gone on getting a
+           Spanish email with nothing anywhere saying so. */
+        const langs = [
+          ...new Set(
+            erp.state.commsTemplates.filter((t) => t.key === "quote-send").map((t) => t.lang),
+          ),
+        ].sort();
         erp.state.commsTemplates = kept;
-        return { found: !!tpl, key: tpl && tpl.key, installed, afterSecond };
+        return { found: !!tpl, key: tpl && tpl.key, installed, afterSecond, langs };
       });
-      if (bare.found && bare.key === "quote-send" && bare.installed === 6 && bare.afterSecond === 6)
+      /* A COUNT, NOT A NUMBER. This pinned `installed === 6` and went red the
+         day the library grew — which told us nothing about the behaviour it
+         exists to guard. What matters is that a bare company gets a library,
+         that asking twice does not build a second one, and that no language
+         goes missing. */
+      if (
+        bare.found &&
+        bare.key === "quote-send" &&
+        bare.installed > 0 &&
+        bare.afterSecond === bare.installed &&
+        String(bare.langs) === "ca,en,es"
+      )
         ok("PK-L: a company with no template library installs the standard one on demand");
       else bad("PK-L: standard templates self-install", JSON.stringify(bare));
 

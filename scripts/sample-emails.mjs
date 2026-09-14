@@ -78,7 +78,12 @@ void ERP;
 const erp = Seed.build("2026-05-05");
 const comms = Bridge.comms || null;
 const render = (t, vars) => (comms && comms.available ? comms.render(t, vars) : t);
-const iss = erp._issuerBlock();
+/* The issuer as a MESSAGE needs it: the company record plus the address of the
+   privacy policy the data-protection footnote points at. The product adds the
+   same two things at `emailIssuer()` in erp.html. */
+const iss = Object.assign(erp._issuerBlock(), {
+  privacyUrl: "https://178-105-10-156.sslip.io/privacy.html",
+});
 
 /* ------------------------------------------------------- attachments, by ref
    The same branching `draftAttachmentFor` uses in erp.html: the reference on
@@ -159,6 +164,11 @@ const tplByKey = (k) => templates.find((t) => t.key === k);
    quote-sent event reports. */
 const TRIGGER = {
   "quote-send": { event: "quote-sent", by: "Sent by hand from the quote screen" },
+  "quote-accepted": {
+    event: "quote-accepted",
+    by: "Sent when the customer's acceptance is recorded",
+  },
+  "invoice-send": { event: "invoice-issued", by: "Sent when the invoice is issued" },
   "quote-followup": { event: "quote-sent", by: "Rule · 5 days after the quote was sent" },
   "invoice-reminder": { event: "invoice-overdue", by: "Rule · 3 days after the due date" },
   "works-start": { event: "contract-signed", by: "Rule · when the customer signs" },
@@ -171,6 +181,14 @@ const TRIGGER = {
 
 const samples = [];
 const gaps = [];
+
+/** The attachment's size as the message names it. */
+const kb = (b64) => {
+  const bytes = Math.floor((String(b64 || "").length * 3) / 4);
+  return bytes >= 1024 * 1024
+    ? (bytes / 1024 / 1024).toFixed(1) + " MB"
+    : Math.max(1, Math.round(bytes / 1024)) + " kB";
+};
 
 for (const tpl of templates) {
   const trig = TRIGGER[tpl.key];
@@ -192,13 +210,20 @@ for (const tpl of templates) {
   const vars = ev.vars;
   const to = tpl.family === "proveedores" ? ev.recipients.supplier : ev.recipients.customer;
   const party = erp.state.parties.find((x) => x.email === to);
-  const subject = render(tpl.subject, vars);
-  const text = render(tpl.body, vars);
   const att = attachmentFor(ev.subjectRef);
+  /* THE SAME COMPOSITION THE SEND PATH USES. Not `render(subject)` and
+     `render(body)` as this script once did — that was a second way of building
+     a message, and a pack built a second way is a drawing of the product
+     rather than the product. */
+  const msg = erp.composeCommsMessage(tpl, vars, {
+    issuer: iss,
+    attachment: att ? { name: att.name, size: kb(att.b64) } : null,
+  });
   samples.push({
     n: samples.length + 1,
     key: tpl.key,
     label: tpl.label,
+    lang: tpl.lang,
     family: tpl.family,
     event: ev.event,
     trigger: trig.by,
@@ -207,9 +232,9 @@ for (const tpl of templates) {
     date: ev.date,
     toName: (party && party.name) || vars.cliente || "",
     toEmail: to || "",
-    subject,
-    text,
-    html: CaneiEml.bodyHtml(subject, text, iss),
+    subject: msg.subject,
+    text: CaneiEml.textPart(msg, iss),
+    html: CaneiEml.bodyHtml(msg, iss),
     attach: att,
     declared: tpl.attach || null,
   });
@@ -230,7 +255,9 @@ const invite = await (async () => {
       "tsx",
       "-e",
       `import {inviteHtml,inviteText} from "./apps/web/lib/invite-mail";
-       const base={company:"Canei Subirats, S.L.",to:"mcasals@caneisubirats.example",
+       const base={company:${JSON.stringify(iss.tradeName || iss.legalName)},
+         issuer:${JSON.stringify(iss)},
+         to:"mcasals@caneisubirats.example",
          loginUrl:"https://178-105-10-156.sslip.io/entrar",
          tempPassword:"rura-VENT-9274",
          link:"https://178-105-10-156.sslip.io/clave?t=MUESTRA-NO-VALIDA"};
@@ -288,12 +315,20 @@ for (const s of samples) {
     subject: s.subject,
     text: s.text,
     html: s.html,
+    // The mark travels with the message, as it does on the send path.
+    inline: CaneiEml.inlineParts(),
     // `btoa` on the writer's latin-1 string, exactly as erp.html attaches it.
     attachments: s.attach ? [{ name: s.attach.name, b64: btoa(s.attach.pdf) }] : [],
+    /* A fixed date, so re-running the generator produces the same bytes and a
+       diff of the pack shows what actually changed. */
+    date: "Mon, 05 May 2026 08:00:00 GMT",
   });
   const stem = String(s.n).padStart(2, "0") + "-" + s.key;
   fs.writeFileSync(path.join(PARTS, stem + ".eml"), eml);
-  fs.writeFileSync(path.join(PARTS, stem + ".html"), s.html);
+  /* The .html beside it is for LOOKING at — a browser opening it alone cannot
+     resolve a cid: reference and would show two broken marks. The message that
+     is sent keeps the cid: parts; only this copy inlines them. */
+  fs.writeFileSync(path.join(PARTS, stem + ".html"), CaneiEml.withInlineImages(s.html));
   if (s.attach)
     fs.writeFileSync(
       path.join(PARTS, stem + "-" + s.attach.name),
