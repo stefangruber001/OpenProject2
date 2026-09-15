@@ -252,17 +252,45 @@ if [ -f /etc/systemd/system/canei-deploy.service ] &&
   info "production's deploy unit will now recreate ${EDGE_NET} if it goes missing"
 fi
 
+# WRITTEN AND ENABLED, BUT NOT STARTED — the timer is armed at the END of the
+# next step, once the stack is actually up.
+#
+# `enable --now` here fired the deploy service immediately, and that service
+# runs `docker compose up -d` — at the same moment as the `up -d` below. Two
+# compose operations on one project raced, and the run died on «container name
+# canei-erp-dev-db-1 is already in use». The fix is ordering, not retrying: the
+# timer exists to keep a RUNNING stack current, so it has no business starting
+# before there is one.
 systemctl daemon-reload
-systemctl enable --now canei-deploy-dev.timer >/dev/null 2>&1
-info "canei-deploy-dev.timer enabled (60s, offset from production's)"
+systemctl enable canei-deploy-dev.timer >/dev/null 2>&1
+info "canei-deploy-dev.timer written and enabled (armed after the stack is up)"
 info "no backup timer for dev — deliberate, see the header"
 
 # ── 7 · up ───────────────────────────────────────────────────────────────────
 say "7/8  Starting"
 cd "$DEV_DIR"
+
+# Nothing else may be holding this project while we work on it. Belt and braces
+# against the race above, and against a human who ran the service by hand.
+systemctl stop canei-deploy-dev.timer canei-deploy-dev.service >/dev/null 2>&1 || true
+
 docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml pull --quiet || true
+
+# `down` first, then `up`. On a stack that is already healthy this costs a few
+# seconds; on one left half-created by an interrupted run it is the difference
+# between healing and failing on a name conflict for ever. Named volumes survive
+# `down` (only `down -v` removes them) and dev's database is a bind mount to the
+# capped disk, so nothing here loses data — and dev's data is invented anyway.
+#
+# Scoped to the dev project by COMPOSE_PROJECT_NAME in .env, which step 5 has
+# already refused to proceed without.
+docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml down --remove-orphans >/dev/null 2>&1 || true
 docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml up -d --remove-orphans
 docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml ps
+
+# Now that there is something to keep current, let the timer do it.
+systemctl start canei-deploy-dev.timer >/dev/null 2>&1 || true
+info "canei-deploy-dev.timer started (60s, offset from production's)"
 
 say "Waiting for it to answer"
 OK=""
