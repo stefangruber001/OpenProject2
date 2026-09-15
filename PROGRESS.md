@@ -2386,3 +2386,44 @@ set of pages per branch, so one local reading is not the number CI sees
 (ASSUMPTIONS S77h). `pnpm lint · check-types · test ·
 boundaries · build` green, nav manifest and ownership guard green. No
 capability changed, so the committed `site/erp-factory` bundle is byte-identical.
+
+### PK14-S78 · Datos maestros → Notas (15/09)
+
+A new subsection under Datos maestros: the test phase's feedback intake. Where a
+screen is wrong, what it does now, what it should do and why — with a priority
+and a status, so the list is the plan for the upgrades rather than a pile of
+screenshots.
+
+**The «where» is a real screen.** The dropdown is built from `SECTIONS`, the
+record stores the route key rather than its label, and the cell carries a `↗`
+that opens that screen. So a screen added tomorrow is on the list tomorrow, and
+a note filed on an English phone reads in Spanish on the next one.
+
+**Colour says two things without either one shouting over the other.** Status is
+the pill — Abierta · En curso · Hecha · No se hará — and priority is a 3 px rule
+down the row's left edge, the second use of `cfg.rowClass` after CHG-04 and
+following its two lessons rather than rediscovering them (ASSUMPTIONS S78b). A
+note that has had its decision stops carrying a rule.
+
+**The list is ordered for triage**, not by arrival: open before decided, urgent
+before minor, then newest. And the priority words are this register's own —
+«Alta» already means "Registered" in this dictionary, so using it would have
+repeated the «Pendiente» → "Outstanding" defect the recorrido had just fixed
+(S78c).
+
+The register and the drawer are the shared ones. Whoever fills this in is the
+person testing the ERP, and a feedback screen that behaved unlike every other
+screen would be its own first entry.
+
+On the way past: `.field textarea` had no typeface of its own, so all five
+drawers with a free-text box drew their longest field in the browser's monospace
+(S78h).
+
+Gates on this tree: the new `testNotes` **12/12**; full suite **735 checks**
+with the one failure being the new suite's own stale assertion, fixed and
+re-run green; workspace audit **0/0** across 19 screens; source literals
+**162/162**; rendered pages **91/67**; miss ledger **31/37 EN · 92/97 CA** —
+slack left alone, per S77h. `pnpm lint · check-types · test · boundaries ·
+build` green, nav manifest in sync (Notas appended last, so all four `nav.json`
+copies are byte-identical), ownership guard 27 areas unchanged. No capability
+changed, so the committed `site/erp-factory` bundle is byte-identical.
