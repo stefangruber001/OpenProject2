@@ -182,11 +182,22 @@ fi
 # Production's Caddy needs to know the second name. Added to production's .env
 # rather than hard-coded in the Caddyfile so one machine's address never has to
 # be a fact in the repository.
-if grep -q "^DEV_HOSTNAME=" "$PROD_DIR/.env"; then
-  info "DEV_HOSTNAME already set in production's .env"
+# Corrected, not merely added. A wrong value written once would otherwise be
+# permanent, because the only code that looked at it would skip it for being
+# present — which is exactly how a hostname carrying literal apostrophes
+# survived a run and failed the next one's certificate check.
+# The WHOLE LINE is compared, not the value read out of it: reading strips the
+# quoting, so a stored dev-'178-…' reads back identical to a correct
+# dev-178-…, reports "already correct", and stays broken forever.
+WANT_LINE="DEV_HOSTNAME=\"${DEV_HOST}\""
+CURRENT_LINE="$(grep -m1 '^DEV_HOSTNAME=' "$PROD_DIR/.env" || true)"
+if [ "$CURRENT_LINE" = "$WANT_LINE" ]; then
+  info "DEV_HOSTNAME already correct in production's .env"
 else
-  echo "DEV_HOSTNAME=\"${DEV_HOST}\"" >>"$PROD_DIR/.env"
-  info "DEV_HOSTNAME added to production's .env"
+  [ -n "$CURRENT_LINE" ] && warn "replacing a wrong line: ${CURRENT_LINE}"
+  sed -i '/^DEV_HOSTNAME=/d' "$PROD_DIR/.env"
+  printf 'DEV_HOSTNAME="%s"\n' "$DEV_HOST" >>"$PROD_DIR/.env"
+  info "DEV_HOSTNAME set to ${DEV_HOST} in production's .env"
 fi
 
 # ── 5 · the guard, checked rather than trusted ───────────────────────────────

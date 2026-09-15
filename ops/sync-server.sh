@@ -26,6 +26,7 @@ set -euo pipefail
 
 say() { printf '\n\033[1;32m▸ %s\033[0m\n' "$*"; }
 info() { printf '  %s\n' "$*"; }
+warn() { printf '  \033[1;33m!\033[0m %s\n' "$*"; }
 die() {
   printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2
   exit 1
@@ -100,22 +101,56 @@ ssh "${SSH_OPTS[@]}" "root@${IP}" \
 # The block points at an upstream that may not exist yet and answers 502 until
 # the dev stack is built. That is the right order: the address exists before the
 # thing behind it, not the other way round.
+# THE VALUE IS BUILT HERE, NOT OVER THERE. The first attempt did the reading,
+# stripping and writing inside one remote shell string, three layers of quoting
+# deep. `.env` quotes that value with SINGLE quotes, the `tr` that was supposed
+# to remove them had been escaped into removing only double ones, and the
+# hostname went in as dev-'178-105-10-156.sslip.io' — literal apostrophes and
+# all. Caddy rejected it ("subject does not qualify for certificate") and the
+# validation below refused the deploy, which is the only reason it was not an
+# outage. Remote commands are now the simplest thing that works: read one line,
+# write one line. Anything resembling string handling happens on this side.
+#
+# AND IT CORRECTS, IT DOES NOT SKIP. "Leave it alone if the key is present"
+# would have made that malformed value permanent — the run that wrote it also
+# guaranteed no later run would look at it. The value is recomputed every time
+# and rewritten when it differs, so a bad one heals on the next run.
 say "The development address"
-ssh "${SSH_OPTS[@]}" "root@${IP}" "
-  set -e
-  cd /opt/canei-erp
-  if grep -q '^DEV_HOSTNAME=' .env; then
-    echo \"  already set: \$(sed -n 's/^DEV_HOSTNAME=//p' .env | tr -d '\\\"' | head -1)\"
+read_env() {
+  ssh "${SSH_OPTS[@]}" "root@${IP}" \
+    "sed -n 's/^$1=//p' /opt/canei-erp/.env | head -1" </dev/null 2>/dev/null |
+    tr -d "\"' \r" | head -1
+}
+PROD_HOST="$(read_env PUBLIC_HOSTNAME)"
+
+if [ -z "$PROD_HOST" ]; then
+  info "PUBLIC_HOSTNAME is empty — no front door on this machine, nothing to name"
+else
+  WANT_DEV="dev-${PROD_HOST}"
+  # A shape check before anything downstream trusts it. Caddy's own complaint
+  # ("subject does not qualify for certificate") arrives far from the cause and
+  # only at validation time; this says which value is wrong, here.
+  printf '%s' "$WANT_DEV" | grep -Eq '^[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?$' ||
+    die "Derived development hostname «${WANT_DEV}» is not a hostname. Check PUBLIC_HOSTNAME in the server's .env."
+
+  # THE WHOLE LINE IS COMPARED, NOT THE VALUE READ OUT OF IT. Reading strips the
+  # quoting, which is exactly what makes a broken value look correct: a stored
+  # dev-'178-…' reads back identical to a stored dev-178-…, so a comparison on
+  # the parsed value reports "already correct" and leaves the broken line in
+  # place forever. The raw line cannot be fooled that way.
+  WANT_LINE="DEV_HOSTNAME=\"${WANT_DEV}\""
+  CURRENT_LINE="$(ssh "${SSH_OPTS[@]}" "root@${IP}" \
+    "grep -m1 '^DEV_HOSTNAME=' /opt/canei-erp/.env || true" </dev/null 2>/dev/null | tr -d '\r')"
+
+  if [ "$CURRENT_LINE" = "$WANT_LINE" ]; then
+    info "already correct: ${WANT_DEV}"
   else
-    PH=\"\$(sed -n 's/^PUBLIC_HOSTNAME=//p' .env | tr -d '\\\"' | head -1)\"
-    if [ -n \"\$PH\" ]; then
-      echo \"DEV_HOSTNAME=\\\"dev-\${PH}\\\"\" >> .env
-      echo \"  added: dev-\${PH}\"
-    else
-      echo '  PUBLIC_HOSTNAME is empty — no front door on this machine, nothing to add'
-    fi
+    [ -n "$CURRENT_LINE" ] && warn "replacing a wrong line: ${CURRENT_LINE}"
+    ssh "${SSH_OPTS[@]}" "root@${IP}" \
+      "sed -i '/^DEV_HOSTNAME=/d' /opt/canei-erp/.env && printf 'DEV_HOSTNAME=\"%s\"\n' '${WANT_DEV}' >> /opt/canei-erp/.env" </dev/null
+    info "set: ${WANT_DEV}"
   fi
-" </dev/null
+fi
 
 # ── The Caddyfile parses, BEFORE the container that reads it is restarted ────
 # Caddy will not start on a config it cannot parse, and Caddy is what terminates
