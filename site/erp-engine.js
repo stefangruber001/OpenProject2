@@ -904,6 +904,12 @@
         // backfill in from(), which can only restore collections it can see on
         // a fresh instance.
         feedback: [],
+        /* Tester feedback about the APPLICATION, not about the business — where
+           a screen is wrong, what it should do instead and why. It lives in the
+           state blob rather than in the store's `meta` because `meta` is this
+           device's preferences and a note has to reach the people who can fix
+           it: persisted, synced and exported like every other record. */
+        notes: [],
         supplierPerf: [],
         assignments: [],
         recurring: [],
@@ -10954,6 +10960,63 @@
       this.state.feedback.push(rec);
       this._log(user, "addFeedback", p.code + " " + rec.kind);
       return rec;
+    }
+
+    /* ===================== Notas — feedback about this software =====================
+       The test phase's intake. A tester says WHERE (a route key of this app,
+       never its label — the label is a translation and the key is the address),
+       what it does now, what it should do and why; the office triages it with a
+       priority and walks it to a decision.
+
+       The validation is deliberately thin. A note half-typed on a phone in a
+       corridor has to be savable, or it does not get written at all and we are
+       back to screenshots — so only the two fields that make a note actionable
+       are required, and everything else may be empty and filled in later. */
+    NOTE_STATUS = ["open", "doing", "done", "wontdo"];
+    NOTE_PRIORITY = ["high", "medium", "low"];
+    addNote(n, user) {
+      const rec = Object.assign(
+        {
+          id: this._id("nte"),
+          date: this.state.today,
+          screen: "", // a route key, or "other"
+          screenDetail: "",
+          now: "",
+          should: "",
+          why: "",
+          priority: "medium",
+          status: "open",
+          author: user || "backoffice",
+          closedAt: null,
+        },
+        n,
+      );
+      if (!rec.screen) throw new Error("Una nota necesita decir en qué pantalla");
+      if (!String(rec.should).trim()) throw new Error("Una nota necesita decir cómo debería estar");
+      if (!this.NOTE_STATUS.includes(rec.status)) throw new Error("Unknown note status");
+      if (!this.NOTE_PRIORITY.includes(rec.priority)) throw new Error("Unknown note priority");
+      if (rec.status === "done" || rec.status === "wontdo") rec.closedAt = rec.date;
+      this.state.notes.push(rec);
+      this._log(user, "addNote", rec.screen);
+      return rec;
+    }
+    /** A whitelist, like `updateTask`: a patch from a form must never be able to
+     *  rewrite the id, the author or the date the note was raised. */
+    updateNote(id, patch, user) {
+      const n = this.state.notes.find((x) => x.id === id);
+      if (!n) throw new Error("Note not found");
+      const allowed = ["screen", "screenDetail", "now", "should", "why", "priority", "status"];
+      for (const k of allowed) if (patch[k] !== undefined) n[k] = patch[k];
+      if (!n.screen) throw new Error("Una nota necesita decir en qué pantalla");
+      if (!String(n.should).trim()) throw new Error("Una nota necesita decir cómo debería estar");
+      if (!this.NOTE_STATUS.includes(n.status)) throw new Error("Unknown note status");
+      if (!this.NOTE_PRIORITY.includes(n.priority)) throw new Error("Unknown note priority");
+      /* Stamped when it STOPS being open and cleared when it reopens, so
+         «cerrada el» can never outlive the decision that closed it. */
+      const closed = n.status === "done" || n.status === "wontdo";
+      n.closedAt = closed ? n.closedAt || this.state.today : null;
+      this._log(user, "updateNote", n.screen + " " + n.status);
+      return n;
     }
     validateVisit(visitId, patch, user) {
       // VIS-08: back office completes/corrects/validates the site capture

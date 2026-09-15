@@ -6148,6 +6148,46 @@ window.CANEI_DICT = {
       "Aquí irán las dos pantallas propias de cada persona: apuntar las horas del día y consultar las suyas. Todavía no están construidas; mientras tanto, usa «Todos».",
       "This is where each person's own two screens will go: enter the day's hours and look at their own. They are not built yet; use «All» in the meantime.",
     ],
+    /* ===== DMT-05 · Notas — the test phase's intake =====
+       The one screen in this workspace that is about the SOFTWARE rather than
+       about the business, so most of its vocabulary is its own rather than
+       borrowed from a register. Two words it deliberately does NOT borrow:
+       «Alta» and «Baja», which this dictionary already spends on a registration
+       and its cancellation — a priority column whose English read "Registered"
+       would be the «Pendiente» → "Outstanding" mistake a second time. */
+    ["Nueva nota", "New note"],
+    ["Pantalla", "Screen"],
+    ["Pantalla *", "Screen *"],
+    ["Dónde exactamente", "Where exactly"],
+    ["Cómo está ahora", "How it is now"],
+    ["Cómo debería estar", "How it should be"],
+    ["Cómo debería estar *", "How it should be *"],
+    ["Por qué", "Why"],
+    ["Prioridad", "Priority"],
+    ["No se hará", "Won't do"],
+    ["Urgente", "Urgent"],
+    ["Menor", "Minor"],
+    ["— elegir la pantalla —", "— choose the screen —"],
+    ["Ir a la pantalla", "Go to the screen"],
+    ["＋ Nueva nota", "＋ New note"],
+    ["Buscar por pantalla o por texto", "Search by screen or by text"],
+    ["nota", "note"],
+    ["notas", "notes"],
+    ["Ninguna nota coincide con la búsqueda.", "No note matches the search."],
+    ["Guardar la nota", "Save the note"],
+    ["Guardar los cambios", "Save the changes"],
+    ["Abierta el", "Opened on"],
+    ["Quién la abrió", "Who opened it"],
+    ["Cerrada el", "Closed on"],
+    ["Nota guardada", "Note saved"],
+    ["Nota actualizada", "Note updated"],
+    ["la tarjeta de fase, en el móvil", "the phase card, on a phone"],
+    ["Una nota necesita decir en qué pantalla", "A note has to say which screen"],
+    ["Una nota necesita decir cómo debería estar", "A note has to say how it should be"],
+    [
+      "Qué falla, qué debería hacer y por qué. Cada nota apunta a una pantalla real y se cierra con una decisión.",
+      "What is wrong, what it should do and why. Every note points at a real screen and is closed with a decision.",
+    ],
   ],
   rxEs2En: [
     [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Week $1 – $2"],

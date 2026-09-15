@@ -79,6 +79,7 @@ const ROUTES = [
   // a screen now, so it is measured here, where the screens are — and at the
   // same zero.
   ["journey", "#journey"],
+  ["notes", "#notes"],
 ];
 
 /* Same rules as audit.mjs: a shape wherever possible, never a word, because

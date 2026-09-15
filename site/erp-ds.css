@@ -5526,3 +5526,51 @@ body.siteworker .rail {
     flex: 1 0 100%;
   }
 }
+
+/* --------------------------- 73 · Notas (DMT-05), the test phase's intake
+   Two questions on one row, so two marks that never share a colour: the STATUS
+   is the pill, in its own column, and the PRIORITY is a rule down the row's
+   left edge. Same division CHG-04 already makes on Modificaciones, and the same
+   two lessons taken from it — the selector is keyed on the STATE and not on the
+   screen that happens to show it (the old `tr.xrow.unapproved` silently stopped
+   matching the day that table became a register), and it is a BORDER, because
+   the table is border-collapse:collapse where a shadow on a cell is not painted
+   at all in Chromium.
+
+   Only an open note carries the rule. A note that is done or will not be done
+   has had its decision; leaving a red edge on it would mean the colour marked
+   how loudly it was once filed rather than what is left to do. */
+tr.note-high td:first-child {
+  border-left: 3px solid var(--danger);
+}
+tr.note-medium td:first-child {
+  border-left: 3px solid var(--amber);
+}
+
+/* Three of the six columns are free prose, and a note worth writing is longer
+   than a cell. Two lines here and the whole text in the drawer — the row stays
+   scannable, which is the only reason to put them in a table at all.
+
+   Hooked on a class the column renders, NEVER on `[data-th="Cómo está ahora"]`:
+   `data-th` is in i18n.js's ATTRS and is translated, so an attribute selector
+   here would quietly stop matching the moment somebody switched the workspace to
+   English — the same class of silent miss as the `tr.xrow.unapproved` rule. */
+.nclamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 26ch;
+}
+/* The jump to the screen the note is about, and the detail under its name. */
+.ngo {
+  text-decoration: none;
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 4px;
+}
+.nsub {
+  display: block;
+  font: 12px var(--sans);
+  color: var(--muted);
+}
