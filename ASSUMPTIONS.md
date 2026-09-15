@@ -10726,3 +10726,58 @@ compliance and the age rating are screens in App Store Connect that nothing can
 send. `docs/RELEASE-IOS.md` now answers all three field by field, each answer
 checked against the code, so they are a copy rather than a judgement. A gate that
 pretended to cover them would be worse than one that says it does not.
+
+## S134 · One certificate, reused — and a branch that is a store, not a trunk (2026-09-15)
+
+Run #26 failed on Apple's certificate cap, as S133 recorded. The operator asked
+which certificates were safe to delete, and — having been told the cap would
+refill in three builds — asked for it fixed permanently.
+
+**Why it kept happening.** The `beta` lane signed with
+`-allowProvisioningUpdates`, which tells `xcodebuild` to ask Apple for a NEW
+distribution certificate whenever it cannot find one locally. A runner is a
+fresh machine every time, so it never found one. Every build minted another;
+Apple caps a standard account at three. fastlane's own documentation names this
+exact failure and names `match` as the answer.
+
+**What was actually safe to revoke, and why.** Three `Distribution` and one
+`iOS Distribution`, all created by the CI API key. Each private key existed only
+on the runner that made it and died with that machine, so none of them can sign
+anything anywhere — including on the operator's own Mac. Kept: the
+`Distribution Managed` certificate (Apple holds its key) and the operator's own
+development certificate. The ten `Created via API` development entries are
+clutter, not cause: development certificates have no cap.
+
+**THE STORE IS A BRANCH OF THIS REPOSITORY, AND THAT IS A DELIBERATE EXCEPTION.**
+`CLAUDE.md` says `main` is the only long-lived branch, and mandate §3 forbids
+deleting branches — so a permanent `certificates` branch is furniture that can
+never be removed. It was still the right call, and the alternative is why:
+
+- a separate private repository cannot be reached by `GITHUB_TOKEN`, so it needs
+  a personal access token, base64-encoded with a prefix, pasted into a second
+  secret — and the operator does this from a phone;
+- the GitHub App in this session **cannot create a repository** either (403), so
+  that path starts with manual work as well;
+- `GITHUB_TOKEN` reaches this repository for free, and the basic-auth value can
+  be assembled inside the workflow, so the whole thing costs **one secret**.
+
+The rule it bends exists to stop a second branch carrying CODE that deploys and
+drifts from `main` — two dev branches, one wired to a preview, work landing where
+the tooling was not looking. The `certificates` branch carries no code, nothing
+deploys from it, nothing merges into or out of it, and no gate reads it. It is a
+store that happens to speak git. Written down here so the next person reads a
+decision rather than finding an unexplained branch.
+
+**Read-only is the property that matters.** The build lanes call
+`match(readonly: true)` and sign manually. A build can use what exists and can
+create nothing, so however often it runs it cannot put the account back at the
+cap. Leaving `-allowProvisioningUpdates` in place alongside `match` would have
+made the failure rarer rather than impossible, which is not a fix.
+
+**The demo account.** The operator chose to give App Review their own
+Administrador login and supplied the password in chat. The address went into
+`demo_user.txt`, which is what Apple needs and is not a secret. The password was
+written nowhere: it belongs in `ASC_DEMO_PASSWORD`, and the release lane puts it
+in the metadata for the length of a run only. Recorded with the recommendation
+made once and not repeated: a disposable `revisor` account would be better, since
+App Review shares credentials internally and the account stays live afterwards.

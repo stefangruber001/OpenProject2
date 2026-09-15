@@ -3309,3 +3309,30 @@ cleared.
 **Next:** clear the cap → TestFlight build → (when the Org ID exists) set custom
 distribution in App Store Connect → `ios-release.yml` with `submit: false`, read
 it, then `submit: true`.
+
+## S27 · The signing cap, ended rather than cleared (2026-09-15)
+
+**Done.**
+
+- `ios/fastlane/Matchfile`, a `certificates` lane and
+  `.github/workflows/ios-signing-setup.yml` — one distribution certificate and
+  one profile, created through the App Store Connect API key, encrypted and
+  stored on the `certificates` branch.
+- `beta` no longer signs with `-allowProvisioningUpdates`. It runs
+  `match(readonly: true)` and signs manually, so a build can use the stored
+  identity and **cannot create another**. The dead `asc_key_path` helper and the
+  requires that went with it are gone.
+- `MATCH_GIT_BASIC_AUTHORIZATION` is assembled from `GITHUB_TOKEN` inside both
+  workflows, so `MATCH_PASSWORD` is the only secret to add.
+- `demo_user.txt` = `stefan@caneisubirats.com`. The App Store gate now reports
+  **77/77 with nothing pending**, in both ordinary and `--ready` mode.
+- `docs/RELEASE-IOS.md` — which certificates to revoke and why they are dead,
+  the one-off setup, and how to prove the fix worked (the count goes up by one
+  and never moves again).
+
+**Waiting on the operator, in order:** revoke the four API-created distribution
+certificates · add `MATCH_PASSWORD` · add `ASC_DEMO_PASSWORD`. Then I run
+signing setup, then TestFlight 1.1 (15).
+
+**Waiting on Apple:** the Business Manager verification call. No Organization ID
+means no custom distribution and no submission; everything else is ready.

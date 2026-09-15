@@ -1,0 +1,40 @@
+# fastlane match — ONE signing certificate, reused, instead of a new one per build.
+#
+# WHY THIS FILE EXISTS. The lanes used to sign with `-allowProvisioningUpdates`,
+# which tells xcodebuild to ask Apple for a distribution certificate whenever it
+# cannot find one locally. A CI runner is a fresh machine every time, so it never
+# found one, so every build minted another — and Apple caps a standard account at
+# three. The account hit that cap twice; the second time it stopped a build the
+# day the App Store submission was being prepared. fastlane's own documentation
+# names this exact failure and names match as the answer.
+#
+# WHERE THE CERTIFICATES LIVE. A branch of this repository, carrying nothing but
+# match's AES-encrypted files. Two things make that the right call rather than a
+# second repository:
+#
+#   · a second repository cannot be reached by `GITHUB_TOKEN`, so it would need a
+#     personal access token, base64-encoded, pasted into a secret — four fiddly
+#     steps for the operator instead of one;
+#   · GITHUB_TOKEN reaches THIS repository for free, so the only thing anybody has
+#     to supply is the passphrase.
+#
+# The branch carries no code, nothing deploys from it, nothing merges into or out
+# of it. It is a store that happens to speak git. See ASSUMPTIONS.md for why that
+# is a deliberate exception to "main is the only long-lived branch" rather than a
+# reintroduction of the dev branch that rule exists to prevent.
+#
+# WHAT IS IN IT. Certificates and profiles, encrypted with MATCH_PASSWORD. Anyone
+# who can read the branch reads ciphertext; anyone who cannot read the secret has
+# nothing.
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/stefangruber001/OpenProject2.git")
+git_branch("certificates")
+storage_mode("git")
+
+type("appstore")
+app_identifier([ENV["APP_BUNDLE_ID"] || "com.caneisubirats.erp"])
+team_id(ENV["DEVELOPER_TEAM_ID"] || "5V62K942X6")
+
+# Never create anything by accident. The `certificates` lane turns this off for
+# the one run that creates the certificate; every build lane leaves it on, so a
+# build can only ever USE what is already stored.
+readonly(true)

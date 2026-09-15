@@ -85,20 +85,43 @@ The web content updates by itself on every deploy; a new build is only needed
 when something bundled into the shell changes — the tab bar, the icon,
 permissions, the privacy manifest.
 
-#### Clearing the certificate cap (two minutes, and it is the one thing blocking a build)
+#### The certificate cap — cleared once, and then it stops happening
+
+The cause was structural, not bad luck. The build lane signed with
+`-allowProvisioningUpdates`, which tells `xcodebuild` to **ask Apple for a new
+distribution certificate whenever it cannot find one locally** — and a CI runner
+is a fresh machine every time, so it never found one. Every build minted
+another. Apple caps a standard account at three.
+
+**One-off, yours (five minutes).**
 
 1. developer.apple.com → **Certificates, Identifiers & Profiles → Certificates**.
-2. Revoke every certificate whose _Created By_ is the CI run rather than a
-   person. They are disposable: each was minted for one build and its private
-   key died with that runner, so revoking them can break nothing.
-3. **Keep** your own certificates, and keep the one named _Distribution
-   Managed_, whose key Apple holds.
-4. Re-run **iOS · TestFlight**.
+   Revoke every **Distribution** and **iOS Distribution** certificate whose
+   _Created By_ is an API key. They were minted on runners; each private key
+   died with the machine that made it, so they can sign nothing anywhere,
+   including on your own Mac. **Keep** anything created by a person, and keep
+   **Distribution Managed**, whose key Apple holds. The `Created via API`
+   _Development_ entries are harmless — development certificates have no cap —
+   but you may as well clear them so the list is readable.
+2. GitHub → Settings → Secrets and variables → Actions → **`MATCH_PASSWORD`**.
+   Any long passphrase. Keep a copy where you keep passwords: without it the
+   certificate store cannot be opened and the setup has to be done again.
+3. Actions → **iOS · Signing setup** → Run workflow, typing `CREATE` in the
+   confirmation box. It uses one of the three slots, on purpose, for the last
+   time.
 
-It will refill, because every run mints another. The durable fix — one
-certificate CI reuses, through fastlane `match` — is in
-`INTEGRATIONS_PENDING.md`; it is worth doing if the app starts shipping often,
-and it needs this cap cleared once first either way.
+That lane creates one certificate and one App Store profile, encrypts them with
+your passphrase, and stores them on the `certificates` branch of this
+repository. Every build from then on **downloads and reuses** them: the build
+lanes run `match` in read-only mode, so they can use what exists and can create
+nothing.
+
+There is no second secret. `match` reaches the branch with the workflow's own
+`GITHUB_TOKEN`, assembled at run time.
+
+**How you know it worked:** run **iOS · TestFlight** afterwards and look at the
+certificate list again. The count went up by exactly one, at step 3, and never
+moves again.
 
 ### The listing — written, both languages
 
@@ -170,7 +193,7 @@ you assign licences to people or devices. It never appears in App Store search.
 
 ---
 
-## The three values only you have
+## The values only you have — two of three are now filled
 
 The `release` lane stops and names them rather than submitting without them.
 That is not pedantry: an app a reviewer cannot sign into is rejected under
@@ -182,10 +205,17 @@ That is not pedantry: an app a reviewer cannot sign into is rejected under
 | `demo_user.txt`    | same folder                                 | the reviewer has to get in; there is no sign-up |
 | the demo password  | secret `ASC_DEMO_PASSWORD`, **not** a file  | a password does not belong in git               |
 
-Make the demo account a **real account on the live system** with the
-`Administrador` permission, so the reviewer sees the whole app: Configuración →
-Usuarios → ＋ Nuevo usuario. Then add the secret at Settings → Secrets and
-variables → Actions → `ASC_DEMO_PASSWORD`.
+**Filled on 15 Sep:** the App Review contact number (`+34 659 87 67 00`) and the
+demo account (`stefan@caneisubirats.com`). Only the password is outstanding, and
+it is outstanding on purpose — it goes in Settings → Secrets and variables →
+Actions → **`ASC_DEMO_PASSWORD`**, never in a file.
+
+**One caution about that account.** It is the operator's own Administrador login
+on the live system. App Review shares reviewer credentials internally, and the
+account stays live afterwards. A separate `revisor` account is two minutes —
+Configuración → Usuarios → ＋ Nuevo usuario, `Administrador` so the reviewer sees
+the whole app — and it can be disabled the day the app is approved. Whichever you
+choose, the password belongs in the secret and nowhere else.
 
 You will also want the **Business Manager Organization ID** to hand for step 3
 above. It is not a file in this repository because nothing here sends it.

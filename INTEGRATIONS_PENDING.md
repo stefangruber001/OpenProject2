@@ -147,12 +147,18 @@ the message system and, more importantly for a submission, predates
 `PrivacyInfo.xcprivacy`. Apple has required a privacy manifest since May 2024, so
 the build that goes to review has to be a new one.
 
-**The durable fix, unchanged and still not done here:** fastlane `match` keeps
-one distribution certificate and its profile in a private repository and reuses
-them, so CI stops asking Apple for a new one every time. It can create that
-certificate itself through the App Store Connect API key — no Mac needed — but
-it cannot create one while the account is at the cap, so the two-minute clear
-comes first either way. Left as a recommendation rather than done, because
-rewiring signing is the kind of change that is only safe to make when somebody
-can watch the next build, and the submission is blocked on Business Manager
-regardless.
+**The durable fix is now DONE in this repository, and waiting on one secret.**
+`ios/fastlane/Matchfile` plus a `certificates` lane and the
+`iOS · Signing setup` workflow: one distribution certificate and one profile,
+created through the App Store Connect API key (no Mac), encrypted with
+`MATCH_PASSWORD` and stored on the `certificates` branch. The build lanes run
+`match` in **read-only** mode and sign manually, so a build can use what exists
+and can create nothing — which is the property that ends this failure mode
+rather than making it rarer.
+
+It reaches the branch with the workflow's own `GITHUB_TOKEN`, assembled at run
+time, so `MATCH_PASSWORD` is the only thing anybody has to add.
+
+**Still needed from the operator, once:** revoke the API-created distribution
+certificates to clear the cap, add `MATCH_PASSWORD`, and run
+`iOS · Signing setup`. The full walkthrough is in `docs/RELEASE-IOS.md`.

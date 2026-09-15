@@ -1,0 +1,96 @@
+name: iOS · Signing setup
+
+# RUN THIS ONCE. Then never again until the certificate expires.
+#
+# It creates ONE Apple distribution certificate and ONE App Store provisioning
+# profile, encrypts them with MATCH_PASSWORD, and pushes them to the
+# `certificates` branch of this repository. Every build afterwards downloads and
+# reuses them instead of asking Apple for new ones.
+#
+# WHY IT EXISTS. The build lanes used to sign with `-allowProvisioningUpdates`,
+# which asks Apple for a NEW distribution certificate whenever it cannot find
+# one locally — and a CI runner is a fresh machine every time. So every build
+# minted another, and Apple caps a standard account at three. The account hit
+# that cap twice; the second time it stopped the build on the day the App Store
+# submission was being prepared.
+#
+# BEFORE THE FIRST RUN
+#   1. Clear the cap: developer.apple.com → Certificates, Identifiers & Profiles
+#      → Certificates. Revoke the distribution certificates whose "Created By"
+#      is an API key — they were minted on runners and their private keys died
+#      with those machines, so they can sign nothing anywhere. KEEP the ones
+#      created by a person, and keep "Distribution Managed".
+#   2. Add ONE repository secret: MATCH_PASSWORD — the passphrase the store is
+#      encrypted with. Anything long; write it down somewhere you keep passwords,
+#      because without it the store cannot be opened and this has to be run again.
+#
+# There is no second secret. Match reaches the `certificates` branch with the
+# workflow's own GITHUB_TOKEN, assembled below.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type CREATE to confirm — this uses one of your three certificate slots"
+        required: true
+        default: ""
+
+concurrency:
+  group: ios-signing
+  cancel-in-progress: false
+
+permissions:
+  # match pushes the encrypted store to the `certificates` branch.
+  contents: write
+
+jobs:
+  certificates:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ios
+    steps:
+      - name: Refuse unless confirmed
+        if: inputs.confirm != 'CREATE'
+        run: |
+          echo "This lane CREATES a certificate, and the account only gets three."
+          echo "Re-run it with the confirmation box set to CREATE."
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby + fastlane
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: ios
+
+      # THE SECOND SECRET, WITHOUT A SECOND SECRET. match authenticates to the
+      # store over HTTPS with basic auth, base64 of "user:token". The workflow's
+      # own GITHUB_TOKEN already has write access to this repository, so the
+      # value is assembled here at run time rather than pasted by a person — one
+      # less thing to create, rotate and leak.
+      - name: Authorise match against this repository
+        run: |
+          echo "MATCH_GIT_BASIC_AUTHORIZATION=$(printf 'x-access-token:%s' \
+            "${{ secrets.GITHUB_TOKEN }}" | base64 | tr -d '\n')" >> "$GITHUB_ENV"
+
+      - name: Create and store the signing identity
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
+          APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'com.caneisubirats.erp' }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane certificates
+
+      - name: What just happened
+        run: |
+          echo "One certificate and one profile are now stored, encrypted, on the"
+          echo "'certificates' branch. Every build reuses them; no build creates"
+          echo "another. Check developer.apple.com: the count should go up by"
+          echo "exactly one and then stop moving."
