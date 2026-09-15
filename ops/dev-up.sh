@@ -112,6 +112,10 @@ if ! grep -q "^${DEV_DISK_IMG} " /etc/fstab; then
   echo "${DEV_DISK_IMG} ${DEV_DISK_MNT} ext4 loop,defaults,nofail 0 2" >>/etc/fstab
   info "added to /etc/fstab (nofail: a bad image must not stop the machine booting)"
 fi
+# Postgres gets a SUBDIRECTORY, never the mount root: mkfs leaves a `lost+found`
+# there, and `initdb` refuses a data directory that is not empty. See the note in
+# docker-compose.dev.yml.
+mkdir -p "${DEV_DISK_MNT}/pgdata"
 df -h "$DEV_DISK_MNT" | tail -1 | sed 's/^/  /'
 
 # ── 3 · the directory ────────────────────────────────────────────────────────
@@ -285,7 +289,19 @@ docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml pull --quiet
 # Scoped to the dev project by COMPOSE_PROJECT_NAME in .env, which step 5 has
 # already refused to proceed without.
 docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml down --remove-orphans >/dev/null 2>&1 || true
-docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml up -d --remove-orphans
+
+# A failure here is reported as «dependency failed to start: container … is
+# unhealthy», which says which container gave up and nothing about why. The
+# reason is always in that container's own log, so print it rather than making
+# the next person go and look. Postgres in particular fails for exactly one
+# family of reasons — a data directory it will not accept — and says so plainly.
+if ! docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml up -d --remove-orphans; then
+  warn "the dev stack did not come up — the database's own account of it:"
+  docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml logs --tail 30 db 2>&1 | sed 's/^/    /' || true
+  warn "and the application's:"
+  docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml logs --tail 20 app 2>&1 | sed 's/^/    /' || true
+  die "dev stack failed to start. Production is untouched — it is a separate compose project."
+fi
 docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml ps
 
 # Now that there is something to keep current, let the timer do it.

@@ -37,8 +37,13 @@ services:
     #
     # Compose merges volume lists by TARGET, so this replaces the named volume
     # from the production file rather than fighting with it.
+    # A SUBDIRECTORY of the mount, never the mount itself. `mkfs.ext4` leaves a
+    # `lost+found` in the root of every new filesystem, and `initdb` refuses a
+    # data directory that is not empty — so mounting the filesystem straight in
+    # gives a Postgres that will not start and a compose run that fails with a
+    # bare "container is unhealthy". It did exactly that on the first attempt.
     volumes:
-      - /var/lib/canei-dev-db:/var/lib/postgresql/data
+      - /var/lib/canei-dev-db/pgdata:/var/lib/postgresql/data
     # Postgres will take what it is given. On a box shared with production, an
     # unbounded dev database competing for page cache is a production slowdown
     # nobody would connect to the dev system.
