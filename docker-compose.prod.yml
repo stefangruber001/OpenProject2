@@ -179,6 +179,21 @@ services:
     environment:
       PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME}
       ACME_EMAIL: ${ACME_EMAIL}
+      # The development stack's address, when there is one.
+      #
+      # THE DEFAULT MUST NOT BE EMPTY, and that is not a style preference. The
+      # Caddyfile writes this as `{$DEV_HOSTNAME:dev.invalid}`, and Caddy applies
+      # a placeholder default only when the variable is UNSET — not when it is
+      # set to an empty string, which is exactly what `${DEV_HOSTNAME:-}` would
+      # hand it. The result is a site block with no address, which Caddy reads as
+      # a misplaced global options block and refuses to load, which stops this
+      # container starting, which takes the REAL system's TLS down.
+      #
+      # That is not hypothetical: it is what the first attempt did, caught by the
+      # `caddy validate` in ops/sync-server.sh before anything was restarted.
+      # `.invalid` is reserved by RFC 2606, so it can never resolve and can never
+      # be issued a certificate — the block exists and serves nobody.
+      DEV_HOSTNAME: ${DEV_HOSTNAME:-dev.invalid}
     ports:
       # 80 is not optional: it is how the certificate is issued and renewed.
       - "80:80"

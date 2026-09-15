@@ -289,7 +289,7 @@ set +a
 if docker run --rm \
   -e PUBLIC_HOSTNAME="${PUBLIC_HOSTNAME:-}" \
   -e ACME_EMAIL="${ACME_EMAIL:-}" \
-  -e DEV_HOSTNAME="${DEV_HOSTNAME:-}" \
+  -e DEV_HOSTNAME="${DEV_HOSTNAME:-dev.invalid}" \
   -v "$PROD_DIR/ops/Caddyfile:/etc/caddy/Caddyfile:ro" \
   caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
   docker compose -f docker-compose.prod.yml --profile pilot up -d web

@@ -82,6 +82,41 @@ say "Shared network"
 ssh "${SSH_OPTS[@]}" "root@${IP}" \
   "docker network inspect canei-edge >/dev/null 2>&1 || docker network create canei-edge >/dev/null; docker network inspect canei-edge --format 'canei-edge: {{.Id}}' | cut -c1-24" </dev/null
 
+# ── The second address, named before the config that mentions it is read ────
+# The Caddyfile carries a site block for the development stack, written as
+# `{$DEV_HOSTNAME:dev.invalid}`. The default is a genuine last resort, not the
+# normal path, for two reasons: Caddy applies a placeholder default only when the
+# variable is UNSET (an empty string is a value, and produces a site block with
+# no address, which does not parse); and Caddy asks Let's Encrypt for a
+# certificate for every address it serves at start-up, so a placeholder that
+# can never resolve means a failing ACME attempt on every boot.
+#
+# Both disappear if the real name is simply present. It is derived, not
+# configured — `dev-` in front of the production hostname — because sslip.io
+# answers any name containing an address, so this resolves to this machine with
+# no registrar and no DNS record. A SIBLING of the production name rather than a
+# subdomain of it, so nothing scoped to one host is in scope for the other.
+#
+# The block points at an upstream that may not exist yet and answers 502 until
+# the dev stack is built. That is the right order: the address exists before the
+# thing behind it, not the other way round.
+say "The development address"
+ssh "${SSH_OPTS[@]}" "root@${IP}" "
+  set -e
+  cd /opt/canei-erp
+  if grep -q '^DEV_HOSTNAME=' .env; then
+    echo \"  already set: \$(sed -n 's/^DEV_HOSTNAME=//p' .env | tr -d '\\\"' | head -1)\"
+  else
+    PH=\"\$(sed -n 's/^PUBLIC_HOSTNAME=//p' .env | tr -d '\\\"' | head -1)\"
+    if [ -n \"\$PH\" ]; then
+      echo \"DEV_HOSTNAME=\\\"dev-\${PH}\\\"\" >> .env
+      echo \"  added: dev-\${PH}\"
+    else
+      echo '  PUBLIC_HOSTNAME is empty — no front door on this machine, nothing to add'
+    fi
+  fi
+" </dev/null
+
 # ── The Caddyfile parses, BEFORE the container that reads it is restarted ────
 # Caddy will not start on a config it cannot parse, and Caddy is what terminates
 # TLS for the real system. A typo here — or a `{$DEV_HOSTNAME}` with nothing
@@ -96,7 +131,7 @@ ssh "${SSH_OPTS[@]}" "root@${IP}" "
   docker run --rm \
     -e PUBLIC_HOSTNAME=\"\${PUBLIC_HOSTNAME:-}\" \
     -e ACME_EMAIL=\"\${ACME_EMAIL:-}\" \
-    -e DEV_HOSTNAME=\"\${DEV_HOSTNAME:-}\" \
+    -e DEV_HOSTNAME=\"\${DEV_HOSTNAME:-dev.invalid}\" \
     -v /opt/canei-erp/ops/Caddyfile:/etc/caddy/Caddyfile:ro \
     caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 " </dev/null || die "The Caddyfile does not parse. NOTHING has been restarted; production is untouched."
