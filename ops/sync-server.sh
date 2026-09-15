@@ -60,12 +60,47 @@ ssh "${SSH_OPTS[@]}" "root@${IP}" \
 info "previous compose file kept as docker-compose.prod.yml.bak"
 
 say "Copying the stack definition and ops scripts"
-scp "${SSH_OPTS[@]}" -q docker-compose.prod.yml "root@${IP}:/opt/canei-erp/docker-compose.prod.yml"
+scp "${SSH_OPTS[@]}" -q docker-compose.prod.yml docker-compose.dev.yml \
+  "root@${IP}:/opt/canei-erp/"
 scp "${SSH_OPTS[@]}" -q \
   ops/Caddyfile ops/backup.sh ops/restore.sh ops/harden-db-role.sh \
+  ops/import-erp-state.sh ops/dev-up.sh \
   "root@${IP}:/opt/canei-erp/ops/"
 ssh "${SSH_OPTS[@]}" "root@${IP}" "chmod +x /opt/canei-erp/ops/*.sh" </dev/null
-info "docker-compose.prod.yml, Caddyfile, backup.sh, restore.sh, harden-db-role.sh"
+info "compose (prod + dev), Caddyfile, backup, restore, harden-db-role, import-erp-state, dev-up"
+
+# ── The shared network, BEFORE anything is brought up ────────────────────────
+# docker-compose.prod.yml declares `canei-edge` as an EXTERNAL network, which
+# Caddy uses to reach the development stack's app. An external network that does
+# not exist is not a warning — `docker compose up` refuses to start ANYTHING,
+# and that file is production.
+#
+# So it is created here, idempotently, before the restart below, and again by an
+# ExecStartPre on the deploy timer so a machine that loses it heals itself
+# rather than staying down until somebody reads a runbook.
+say "Shared network"
+ssh "${SSH_OPTS[@]}" "root@${IP}" \
+  "docker network inspect canei-edge >/dev/null 2>&1 || docker network create canei-edge >/dev/null; docker network inspect canei-edge --format 'canei-edge: {{.Id}}' | cut -c1-24" </dev/null
+
+# ── The Caddyfile parses, BEFORE the container that reads it is restarted ────
+# Caddy will not start on a config it cannot parse, and Caddy is what terminates
+# TLS for the real system. A typo here — or a `{$DEV_HOSTNAME}` with nothing
+# behind it and no default — takes the company's ERP off the internet, as a side
+# effect of a change to a development feature. Validating first turns that from
+# an outage into a refusal.
+say "Validating the Caddyfile"
+ssh "${SSH_OPTS[@]}" "root@${IP}" "
+  set -e
+  cd /opt/canei-erp
+  set -a; . ./.env; set +a
+  docker run --rm \
+    -e PUBLIC_HOSTNAME=\"\${PUBLIC_HOSTNAME:-}\" \
+    -e ACME_EMAIL=\"\${ACME_EMAIL:-}\" \
+    -e DEV_HOSTNAME=\"\${DEV_HOSTNAME:-}\" \
+    -v /opt/canei-erp/ops/Caddyfile:/etc/caddy/Caddyfile:ro \
+    caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+" </dev/null || die "The Caddyfile does not parse. NOTHING has been restarted; production is untouched."
+info "parses — safe to restart the front door"
 
 # The `pilot` profile is only started when the machine is configured for it.
 # Starting Caddy on a server with no PUBLIC_HOSTNAME leaves a container in a

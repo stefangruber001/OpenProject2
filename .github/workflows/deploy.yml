@@ -68,8 +68,23 @@ jobs:
           # `main` now moves in the `promote` job, which needs: smoke. A sha tag
           # is addressable but nothing follows it, so publishing it early is
           # harmless and is what lets `smoke` test the real artifact.
+          #
+          # `dev` IS published here, ungated, and that is the point of it. The
+          # development stack is the environment that is SUPPOSED to receive a
+          # build before anything has decided whether it works — that is what it
+          # is for. It is the same digest production will get; it simply arrives
+          # about eight minutes and one gate earlier. Dev is never a different
+          # build, only an earlier one.
+          #
+          # It moves on a manual dispatch from a branch too, which is the
+          # look-before-live path: build a short-lived `claude/**` branch, look at
+          # it running on dev, and `:main` still cannot move because `promote` is
+          # guarded on the ref. No branch name is written into this file — the ref
+          # is whatever the person pressing the button chose, which is the whole
+          # difference between this and the dev branch CLAUDE.md forbids.
           tags: |
             type=sha,format=long
+            type=raw,value=dev
 
       - uses: docker/build-push-action@v6
         with:

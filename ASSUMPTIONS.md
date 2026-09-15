@@ -10781,3 +10781,103 @@ written nowhere: it belongs in `ASC_DEMO_PASSWORD`, and the release lane puts it
 in the metadata for the length of a run only. Recorded with the recommendation
 made once and not repeated: a disposable `revisor` account would be better, since
 App Review shares credentials internally and the account stays live afterwards.
+
+## S135 · A second system on the same machine, and the guards that make it safe (2026-09-15)
+
+**What was asked.** A development system mirroring production, on the same
+server, with the app unchanged and TestFlight remaining its staging path. Later
+simplified twice by the operator: no second machine, and **invented data rather
+than an anonymised copy of the real register**.
+
+**The shape.** Environments, not branches. `CLAUDE.md` forbids reintroducing a
+dev branch and gives the reason — two once existed, only one was wired to the
+preview, and `/preview` served nine-session-old content while nothing went red.
+So the build already publishes `:sha`, gates it in `smoke`, and moves `:main` in
+`promote`; dev simply follows a `:dev` tag published in the same `images` job,
+ungated. Same digest, roughly eight minutes and one gate earlier. Dev is never a
+different build, only an earlier one. A manual dispatch can publish `:dev` from
+any ref, which is the look-before-live path — and no branch name is written into
+any workflow, because the ref is whatever the person pressing the button chose.
+
+**The data decision, and why it is the cheap one.** The first plan was an
+anonymised copy of production. Research changed it: the AEPD names using real
+data in test environments as one of the infractions it most often finds, and
+names two acceptable alternatives — synthetic data, or anonymisation performed
+**before the copy leaves production**. Under the EDPB's three cumulative tests
+(singling out, linkability, inference) what we could realistically have built
+would have been pseudonymisation, not anonymisation, because the amounts, dates
+and invoice sequence numbers that make the data worth testing against are also
+what single a customer out. That would have left dev holding personal data and
+needing a `LEGAL_REVIEW.md` entry, a necessity analysis and equivalent controls.
+The operator chose invented data instead. `site/erp-seed.js` already builds a
+company of real shape — 26 counterparties, 19 quotes, 26 invoices, 14 projects,
+~1150 audit entries across 2024–2028 — so the realistic option cost nothing and
+**there is no personal data on the development system at all**. No LEGAL_REVIEW
+entry is needed and none was written; inventing one would have been noise.
+
+**`reformas-demo`, not `diorka`.** Tenant specs are baked into the image and
+`diorka` is the real company's — its name, address, tax id and bank details.
+Running the invented spec means nothing about Canei Subirats appears on dev even
+before the band loads, which removes the confusion risk by construction instead
+of by warning. The cost is that dev exercises a different tenant configuration;
+when a production-config change needs rehearsing, `diorka` is also in the image
+and can be seeded there with invented data for that session.
+
+**Three guards, because the machine is shared.** Each replaces a property a
+separate server would have had for free. See `OBJECTIONS.md` #7.
+
+- **The project name.** `docker-compose.prod.yml` carries `name: canei-erp`.
+  Brought up without an override the dev stack would land inside the production
+  project — same container names, same volumes — and `up -d --remove-orphans`
+  would delete the production containers it did not recognise. Verified rather
+  than assumed: compose resolves the name from `-p`, then
+  `COMPOSE_PROJECT_NAME`, then the file's `name:` key, and the `.env` beside the
+  compose file wins — read from the **compose file's** directory, not the working
+  directory, so an operator in the wrong folder still gets the right project.
+  Checked in three places: the generated `.env`, an `ExecStartPre` on the deploy
+  unit, and `dev-up.sh` refusing to start a stack that resolves to anything else.
+- **The disk.** One 80 GB disk, and dev exists to be broken. Dev's database sits
+  on a 12 GB loopback ext4 image with a `nofail` fstab entry. Rejected:
+  `storage_opt` (wrong storage driver), XFS project quotas (the filesystem is
+  ext4), a second Hetzner volume (costs money, which is what one box was for).
+- **TLS.** Two things cannot both bind 443, so production's Caddy grows a second
+  site block rather than dev getting its own ingress. Caddy will not start on a
+  config it cannot parse, so an empty `{$DEV_HOSTNAME}` would expand to an empty
+  site address and take the **real** ERP off the internet as a side effect of a
+  development feature. Hence the `{$DEV_HOSTNAME:dev.invalid}` default —
+  `.invalid` is reserved by RFC 2606 and can never resolve — and a
+  `caddy validate` before every reload, in both `sync-server.sh` and `dev-up.sh`.
+
+**The band fails open, and that direction is the decision.** Only an explicit
+marker makes a system show "ENTORNO DE PRUEBAS"; unset, empty or misspelt reads
+as production and shows nothing. The two failures are not symmetrical: a missing
+band on dev costs a moment's confusion between systems that already differ by
+address and by password, while a band wrongly drawn over a real company's
+invoices tells them their own books are invented. The workspace is a static file
+baked into the image and cannot read a server variable, so it asks `/api/health`
+at boot — in its own try/catch, last, unable to stop the page loading.
+
+**Separate ops actions rather than a prod/dev target selector.** The plan said a
+`target` input. Building it, a selector turned out to mean guarding _every_
+existing step, and a step whose guard was forgotten is a dev request that runs
+against the real system. `dev-up` and `dev-reset` are their own actions and no
+production step was modified, so there is nothing to forget.
+
+**Two pre-existing breaks fixed in passing.** `vars.APP_URL` was never set, so
+`deploy.yml`'s `verify` job has never once passed. And `ERP_PUBLIC_URL` is read
+by `apps/web/lib/public-origin.ts` but was not in the compose file's environment
+at all, so generated links have been falling back to the forwarded host.
+
+**Postscript — the band's first attempt put a 404 in every console.** It fetched
+`/api/health` unconditionally. The browser suite serves `site/` as static files
+over plain HTTP with no API behind it, so every page load logged a failed request
+and thirty-five "no console errors" assertions went red; the published
+demonstration copy on Pages would have done the same. The defect was not the
+band. It was inventing a second answer to a question the codebase had already
+answered: `recheckBuild` in `site/erp.html` was ALREADY fetching `/api/health` to
+notice new builds, already guarded by `ErpStore.isRemote()`, and already parsing
+the reply. The band now reads `environment` off that same response — one request
+instead of two, the existing server-detection instead of a new one, and nothing
+asks anything when there is no server to ask. Same shape as the compose project
+name above, and as the `PK-L` gate that pinned a number instead of a rule: the
+repository usually already knows, and the bug is in not looking.

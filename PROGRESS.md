@@ -3336,3 +3336,42 @@ signing setup, then TestFlight 1.1 (15).
 
 **Waiting on Apple:** the Business Manager verification call. No Organization ID
 means no custom distribution and no submission; everything else is ready.
+
+## S28 · A development system beside the real one (2026-09-15)
+
+**Done.**
+
+- **One build, two environments.** `deploy.yml`'s `images` job now also tags
+  `:dev`, ungated. Production still follows `:main`, which only moves after
+  `smoke` passes. Dev is the same digest about eight minutes earlier — never a
+  different build. `promote` stays guarded on the ref, so a dispatch from a
+  `claude/**` branch reaches dev and can never reach production.
+- **A second compose project on the same box**, not a fork of the stack.
+  `docker-compose.dev.yml` is a thin overlay; everything else differs through
+  `/opt/canei-erp-dev/.env`. Production's resolved config changes by exactly four
+  lines, verified with a `docker compose config` diff: two new (empty) variables,
+  the shared network on Caddy, and the network declaration.
+- **Invented data, not a copy.** `ops/dev-seed.mjs` builds the demonstration
+  company from `site/erp-seed.js` — ~26 counterparties, 26 invoices, 14 projects,
+  1150 audit entries, 2024–2028, half a megabyte — and `ops/import-erp-state.sh`
+  loads it. No production data is copied and none is anonymised, so there is no
+  personal data on the development system and no GDPR question to answer.
+- **Three guards for a shared machine**: a compose project name checked in three
+  places, a 12 GB capped filesystem for dev's database, and `caddy validate`
+  before any reload of the container that terminates production's TLS. See
+  `ASSUMPTIONS.md` S135 and `OBJECTIONS.md` #7.
+- **`ENTORNO DE PRUEBAS`** on every surface, server-rendered on the Next pages
+  and fetched from `/api/health` by the static workspace. Fails open by design:
+  only an explicit marker shows it, so it can never appear on production.
+- **Buttons**: Ops → `dev-up` (idempotent; creates or repairs the whole stack)
+  and Ops → `dev-reset` (wipes dev and reloads the invented company, refusing to
+  run unless the compose project, `ERP_ENVIRONMENT` and the database name all
+  three say development).
+- **Fixed in passing**: `vars.APP_URL` was unset, so `deploy.yml`'s `verify` job
+  had never passed; and `ERP_PUBLIC_URL` was read by the app but never passed by
+  the compose file.
+
+**The app is unchanged**, deliberately. It stays pointed at production and
+TestFlight remains its staging path — and that rule is already enforced in code:
+`ios/fastlane/Fastfile` submits with `skip_binary_upload: true`, so the App Store
+can only ever receive a binary that went through TestFlight first.
