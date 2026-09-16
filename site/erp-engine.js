@@ -1549,10 +1549,47 @@
     }
 
     /* ---------- internals ---------- */
+    /**
+     * The id minter, and the one line in the engine that must not be able to
+     * throw an unreadable error.
+     *
+     * `from()` restores a missing counter on the way in, and that is where the
+     * repair belongs. This is the second lock, here because `from()` is not the
+     * only way a document reaches an engine and because the failure it prevents
+     * is indistinguishable from a broken application: `this.state.seq.id` on an
+     * absent `seq` reads «undefined is not an object (evaluating
+     * 'this.state.seq.id')», which names neither the document nor the cause, and
+     * it fires on EVERY verb that mints anything — so the operator sees an ERP
+     * that cannot save a customer, a note or an invoice, with no clue why.
+     *
+     * One known producer strips it for real: the server redacts the document for
+     * an account without `erp.read.all`, and the redaction is built field by
+     * field with no `seq` in it. Healing here keeps that from presenting as a
+     * broken build.
+     *
+     * It resumes past the ids the document already holds — never at 1, which
+     * would hand out identities records already carry — and says so in the audit
+     * trail, because a counter that silently rebuilt itself is exactly the kind
+     * of thing somebody needs to find later.
+     */
     _id(p) {
-      return p + "_" + this.state.seq.id++;
+      const s = this.state;
+      if (!s.seq || !Number.isFinite(s.seq.id) || s.seq.id < 1) {
+        s.seq = { id: highestIdIn(s) + 1 };
+        if (Array.isArray(s.audit))
+          s.audit.push({
+            ts: s.today,
+            user: "system",
+            action: "rebuiltIdCounter",
+            ref: String(s.seq.id),
+          });
+      }
+      return p + "_" + s.seq.id++;
     }
     _log(user, action, ref) {
+      /* Same reasoning as `_id`: a document that arrived without its audit array
+         must not turn every write into an unreadable crash. */
+      if (!Array.isArray(this.state.audit)) this.state.audit = [];
       this.state.audit.push({ ts: this.state.today, user: user || "system", action, ref });
     } // ORG-07
     setToday(d) {

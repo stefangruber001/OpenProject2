@@ -1053,6 +1053,70 @@ throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws
   const healthy = ERP.from(JSON.parse(JSON.stringify(full)));
   assert(healthy.state.seq.id === full.seq.id, "a healthy counter is not touched");
 
+  /* THE SECOND LOCK, on the paths `from()` cannot reach. A document can lose
+     its counter AFTER the engine was built — the server redacts for an account
+     without `erp.read.all` and the view it builds field by field has no `seq`
+     in it — and `_id()` is where that surfaces, as a message naming neither the
+     document nor the cause, on every verb that mints anything. */
+  const damaged = [
+    ["deleted after from()", (s) => delete s.seq],
+    ["present but empty", (s) => (s.seq = {})],
+    ["id is not a number", (s) => (s.seq = { id: "nonsense" })],
+    ["id below one", (s) => (s.seq = { id: 0 })],
+  ];
+  for (const [what, damage] of damaged) {
+    const e3 = ERP.from(JSON.parse(JSON.stringify(full)));
+    damage(e3.state);
+    try {
+      const r = e3.addNote({ screen: "items", should: "x" }, "sim");
+      assert(
+        !!r && !existing.has(r.id) && e3.state.seq.id > 1,
+        `_id() heals a counter ${what}`,
+        `minted ${r && r.id}`,
+      );
+    } catch (err) {
+      assert(false, `_id() heals a counter ${what}`, err.message);
+    }
+  }
+  // the rebuild leaves a trace, because a counter that silently repaired itself
+  // is exactly what somebody needs to find later
+  {
+    const e4 = ERP.from(JSON.parse(JSON.stringify(full)));
+    delete e4.state.seq;
+    try {
+      e4.addNote({ screen: "items", should: "x" }, "sim");
+      assert(
+        e4.state.audit.some((a) => a.action === "rebuiltIdCounter"),
+        "a rebuilt counter is recorded in the audit trail",
+      );
+    } catch (err) {
+      assert(false, "a rebuilt counter is recorded in the audit trail", err.message);
+    }
+    const e5 = ERP.from(JSON.parse(JSON.stringify(full)));
+    e5.addNote({ screen: "items", should: "x" }, "sim");
+    assert(
+      !e5.state.audit.some((a) => a.action === "rebuiltIdCounter"),
+      "and a healthy counter is never recorded as rebuilt",
+    );
+  }
+  // a redaction-shaped view — no seq, no audit, none of the registers
+  try {
+    const view = ERP.from({
+      today: "2026-09-16",
+      workers: [],
+      labour: [],
+      assignments: [],
+      projects: [],
+    });
+    const r = view.addNote({ screen: "items", should: "x" }, "sim");
+    assert(
+      !!r && Array.isArray(view.state.audit),
+      "a redaction-shaped view can still mint and log",
+    );
+  } catch (err) {
+    assert(false, "a redaction-shaped view can still mint and log", err.message);
+  }
+
   // and the degenerate case still boots rather than throwing
   try {
     const empty = ERP.from({});
