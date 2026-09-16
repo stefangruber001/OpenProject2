@@ -3375,3 +3375,20 @@ means no custom distribution and no submission; everything else is ready.
 TestFlight remains its staging path — and that rule is already enforced in code:
 `ios/fastlane/Fastfile` submits with `skip_binary_upload: true`, so the App Store
 can only ever receive a binary that went through TestFlight first.
+
+**Live since 2026-09-16.** `https://dev-178-105-10-156.sslip.io`, one shared
+password (in the server's `.env` and in the `dev-up` run log — never in git).
+Proved in one run, both systems answering side by side:
+
+|             | revision   | environment | database  |
+| ----------- | ---------- | ----------- | --------- |
+| production  | `9724ef2e` | _(absent)_  | connected |
+| development | `9408235`  | `dev`       | connected |
+
+Production reports no environment and therefore shows no band; dev declares
+itself and does. Six attempts to bring it up, and the `caddy validate` guard
+refused two of them before anything restarted — which is the only reason a
+development feature did not take the real ERP's TLS down. The others were mine:
+a timer racing the stack it was meant to maintain, a Postgres handed a
+freshly-formatted filesystem with a `lost+found` in it, and an importer older
+than the login it was talking to.
