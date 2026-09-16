@@ -396,6 +396,22 @@
       { code: "noResponse", es: "Sin respuesta", ca: "Sense resposta" },
       { code: "withdrew", es: "Desistió", ca: "Va desistir" },
     ],
+    /* The grouping ABOVE the catalogue's chapter tree, and the only list that
+       ships EMPTY on purpose.
+
+       A título is a heading a company puts over a run of partidas — "Reforma
+       de baño", "Instalaciones" — and which partidas belong under which is a
+       statement about how that company sells, not a fact about the trade. A
+       seeded taxonomy would arrive in a price book somebody is already using
+       and would have to be argued with before it could be deleted; an empty
+       list is invisible until the first título is typed, which is also what
+       makes the whole feature opt-in per company with no flag to maintain.
+
+       Empty also keeps it out of tests/i18n/coverage.mjs, which requires EN and
+       CA for every SHIPPED Spanish value. A título the owner types is their
+       data, in their words, and is not translated — the same status as a
+       chapter name they add themselves. */
+    itemTitles: [],
     // DMC-01. The catalogue's chapter tree, and the reason it is a LIST and
     // not a derived set of the distinct values on items: a tree the owner can
     // drag into order needs somewhere to keep that order, and a chapter with
@@ -1352,6 +1368,21 @@
         opportunities: [],
         visits: [],
         catalogue: [],
+        /* Which partidas sit under which título, one row per membership:
+           {titleCode, chapterCode, order}. A separate collection rather than an
+           array hung on the `itemTitles` entry, because `addListEntry` builds a
+           literal {code, es, ca, active} and `updateListEntry` patches only
+           es/ca — anything else on a list entry is dropped the first time it
+           passes through either, silently. `accounts` already lives with that
+           trap for its `cost`/`overhead` keys; a membership table that lost its
+           rows on a rename would be worse.
+
+           Many-to-many by construction: one partida may appear under several
+           títulos, which is the point — fontanería belongs to a bathroom and to
+           a kitchen alike. That is safe here and nowhere else: nothing joins
+           this to a budget's chapters, so a membership can never reach a total,
+           a progress mark or a printed number. */
+        itemTitleLinks: [],
         packages: [],
         prices: [],
         budgets: [], // {id,number,partyId,propertyId,activityLine, versions:[], currentVersionId, acceptedVersionId, status}
@@ -2738,6 +2769,12 @@
           num: String(v.chapters.length + 1),
           manualNum: false, // COM-03 free numbering — see _renumber
           name: "",
+          /* The heading this partida prints under, as words rather than a
+             code — schema v22 says why. Empty is the normal value: a company
+             with no títulos never sees it, and the document is byte-identical
+             to one written before the field existed. Never a key: nothing
+             finds, buckets or sums by it. */
+          title: "",
           section: "base",
           order: v.chapters.length,
           progress: "notStarted",
