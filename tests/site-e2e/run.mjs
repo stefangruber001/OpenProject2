@@ -3643,6 +3643,34 @@ async function testBudgetBuilder(browser, base) {
       ok(`catalogue: a partida reads in the ERP's own language ("${trio.en}" in English)`);
     else bad("catalogue: follows the interface language", JSON.stringify(trio));
 
+    /* Marca and modelo are EDITABLE, and this is here because they were not:
+       the register showed them in two columns, the starter price book arrived
+       with them filled and the engine stored them, but the editor had no boxes
+       — so a subpartida created through the screen was born without them for
+       ever. They are what decides a price: the same punto de agua at two
+       qualities is two prices and an argument on site six months later,
+       settled by what the presupuesto said the brand was. */
+    await useLang("es");
+    const spec = await pg.evaluate(async () => {
+      const it = erp.state.catalogue.find((i) => i.active !== false && i.chapter);
+      catChapter = it.chapter;
+      render();
+      catalogueItemDrawer(it.id);
+      await new Promise((r) => setTimeout(r, 300));
+      const has = !!document.querySelector("#ci_brand") && !!document.querySelector("#ci_model");
+      if (has) {
+        document.querySelector("#ci_brand").value = "E2E Grohe";
+        document.querySelector("#ci_model").value = "E2E Grohtherm";
+        document.querySelector("#ci_save").click();
+      }
+      await new Promise((r) => setTimeout(r, 600));
+      const after = erp.state.catalogue.find((i) => i.id === it.id);
+      return { has, brand: after.brand, model: after.model, code: after.code };
+    });
+    if (spec.has && spec.brand === "E2E Grohe" && spec.model === "E2E Grohtherm")
+      ok(`catalogue: marca and modelo can be typed and are stored (${spec.code})`);
+    else bad("catalogue: marca/modelo editable", JSON.stringify(spec));
+
     /* And the same partida on a quote LINE, which is a snapshot and had to be
        taught the difference between "still the catalogue's words" and "the
        operator's words now". */
