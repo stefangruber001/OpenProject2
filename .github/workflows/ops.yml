@@ -42,6 +42,7 @@ on:
           # is nothing to forget if the production steps are never reachable
           # from a dev action at all.
           - dev-up
+          - dev-down
           - dev-reset
 
 concurrency:
@@ -231,6 +232,25 @@ jobs:
           SSH="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ops/.provisioned/id_ed25519 root@${IP}"
           # </dev/null on every remote command — see backup-now for why.
           $SSH "bash /opt/canei-erp/ops/dev-up.sh" </dev/null
+
+      # Stops the dev stack and hands production's address back. The one to
+      # reach for when the company's own URL is answering with invented data —
+      # see ASSUMPTIONS S138. Not destructive: the dev database and its disk
+      # stay, and `dev-up` brings the containers back.
+      - name: dev-down
+        if: inputs.action == 'dev-down'
+        run: |
+          IP="$(curl -sS -H "Authorization: Bearer ${{ secrets.HCLOUD_TOKEN }}" \
+                 "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME:-canei-erp-prod}" \
+               | jq -r '.servers[0].public_net.ipv4.ip')"
+          SSHOPTS="-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ops/.provisioned/id_ed25519"
+          # Copied every time rather than assumed present: this button has to
+          # work on a server that has never seen it, which is exactly the server
+          # you are on when you need it.
+          scp $SSHOPTS -q ops/dev-down.sh "root@${IP}:/opt/canei-erp/ops/"
+          # shellcheck disable=SC2086
+          ssh $SSHOPTS "root@${IP}" \
+            "chmod +x /opt/canei-erp/ops/dev-down.sh && bash /opt/canei-erp/ops/dev-down.sh" </dev/null
 
       # Wipes the dev database and reloads the invented company. The seed is
       # built HERE, on the runner, because it comes from site/erp-seed.js in this
