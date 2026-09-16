@@ -568,6 +568,19 @@
   };
   /** The four kinds DMC-03/04/05 maintain, in the order those screens show them. */
   const LIST_KINDS = Object.keys(LIST_DEFAULTS);
+  /*
+   * Lists that are allowed to hold nothing.
+   *
+   * Every other list answers a question the system must always be able to ask
+   * — what unit, what payment method, what accounting account — so emptying
+   * one would leave a form with no valid answer, and `setListEntryActive`
+   * refuses it. `itemTitles` answers a question nobody has to ask: a company
+   * with no títulos prints its partidas exactly as it did before the level
+   * existed. Without this the list would ship empty and then be impossible to
+   * return to empty after the first título, which is a door that only opens
+   * one way.
+   */
+  const OPTIONAL_LISTS = new Set(["itemTitles"]);
   /** A fresh copy — callers mutate what they get back, seeds must not drift. */
   function seedLists() {
     const out = {};
@@ -1557,7 +1570,12 @@
     setListEntryActive(kind, code, active, user) {
       const hit = this.listAll(kind).find((e) => e.code === code);
       if (!hit) throw new Error("No such entry in " + kind + ": " + code);
-      if (!active && this.listActive(kind).length <= 1 && hit.active !== false)
+      if (
+        !active &&
+        !OPTIONAL_LISTS.has(kind) &&
+        this.listActive(kind).length <= 1 &&
+        hit.active !== false
+      )
         throw new Error("A list cannot be left with no active entries");
       hit.active = !!active;
       this._log(user, active ? "activateListEntry" : "deactivateListEntry", kind + "/" + code);
@@ -1577,6 +1595,131 @@
       rows.splice(to, 0, rows.splice(from, 1)[0]);
       this._log(user, "moveListEntry", kind + "/" + code + "→" + to);
       return rows;
+    }
+
+    /* =========================================================================
+       TÍTULOS — the grouping above the catalogue's partidas.
+
+       Everything a título needs in order to BE a list is already above:
+       `addListEntry("itemTitles", …)` creates one, `updateListEntry` renames
+       it, `moveListEntry` orders it. What follows is only what a título has
+       that the other lists do not — a membership, and a real delete.
+
+       WHY A REAL DELETE, against the system-wide "retire, never remove" rule.
+       That rule exists because a retired code is still written on records that
+       must keep rendering: `listLabel` resolves it for ever. Nothing carries a
+       título's CODE. A budget chapter stores the título's WORDS (schema v22),
+       so a deleted título cannot orphan a presupuesto, a contract or a printed
+       page — the document keeps reading exactly as it was sent. The only rows
+       pointing at the code are the memberships, and they go with it. A heading
+       somebody typed by mistake should be removable, not permanently greyed.
+       ====================================================================== */
+
+    /** The membership rows, created on first use like every other collection. */
+    titleLinks() {
+      if (!Array.isArray(this.state.itemTitleLinks)) this.state.itemTitleLinks = [];
+      return this.state.itemTitleLinks;
+    }
+    /** The partidas filed under a título, in the order the owner put them. */
+    titlePartidas(titleCode) {
+      return this.titleLinks()
+        .filter((l) => l.titleCode === titleCode)
+        .slice()
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map((l) => l.chapterCode);
+    }
+    /** The títulos a partida appears under. More than one is the normal case. */
+    partidaTitles(chapterCode) {
+      return this.titleLinks()
+        .filter((l) => l.chapterCode === chapterCode)
+        .map((l) => l.titleCode);
+    }
+    /** Codes that exist in a list, retired ones included — a membership may name either. */
+    _knownCode(kind, code) {
+      return this.listAll(kind).some((e) => e.code === code);
+    }
+    /**
+     * Replace which partidas sit under one título.
+     *
+     * Stated as the whole set rather than add/remove one at a time, because
+     * that is how the screen asks it: a person ticks boxes and presses save,
+     * and a half-applied set is not a state the list should be able to reach.
+     */
+    setTitlePartidas(titleCode, chapterCodes, user) {
+      if (!this._knownCode("itemTitles", titleCode))
+        throw new Error("No such título: " + titleCode);
+      const wanted = [];
+      for (const raw of chapterCodes || []) {
+        const code = String(raw || "").trim();
+        if (!code || wanted.includes(code)) continue;
+        if (!this._knownCode("itemChapters", code)) throw new Error("No such partida: " + code);
+        wanted.push(code);
+      }
+      const links = this.titleLinks();
+      const kept = links.filter((l) => l.titleCode !== titleCode);
+      this.state.itemTitleLinks = kept.concat(
+        wanted.map((chapterCode, order) => ({ titleCode, chapterCode, order })),
+      );
+      this._log(user, "setTitlePartidas", titleCode + " ×" + wanted.length);
+      return this.titlePartidas(titleCode);
+    }
+    /**
+     * The same membership from the partida's side — "assign it to a título or
+     * several", which is the operator's own wording for the Modify Partida
+     * panel. A partida joins each título at the end of its run, so ticking a
+     * box never silently reorders a título somebody else arranged.
+     */
+    setPartidaTitles(chapterCode, titleCodes, user) {
+      if (!this._knownCode("itemChapters", chapterCode))
+        throw new Error("No such partida: " + chapterCode);
+      const wanted = [];
+      for (const raw of titleCodes || []) {
+        const code = String(raw || "").trim();
+        if (!code || wanted.includes(code)) continue;
+        if (!this._knownCode("itemTitles", code)) throw new Error("No such título: " + code);
+        wanted.push(code);
+      }
+      const links = this.titleLinks();
+      const others = links.filter((l) => l.chapterCode !== chapterCode);
+      const mine = links.filter((l) => l.chapterCode === chapterCode);
+      // A membership this partida already had is kept as the row it is, so its
+      // position inside that título survives a save that only ticked a
+      // different box. A new one joins at the end of that título's run.
+      const rows = wanted.map(
+        (titleCode) =>
+          mine.find((l) => l.titleCode === titleCode) || {
+            titleCode,
+            chapterCode,
+            order: others.filter((l) => l.titleCode === titleCode).length,
+          },
+      );
+      this.state.itemTitleLinks = others.concat(rows);
+      this._log(user, "setPartidaTitles", chapterCode + " ×" + wanted.length);
+      return this.partidaTitles(chapterCode);
+    }
+    /** Delete a título and every membership that named it. See the block above. */
+    removeTitle(code, user) {
+      const rows = this.listAll("itemTitles");
+      const at = rows.findIndex((e) => e.code === code);
+      if (at < 0) throw new Error("No such título: " + code);
+      const gone = rows[at];
+      const dropped = this.titlePartidas(code).length;
+      rows.splice(at, 1);
+      this.state.itemTitleLinks = this.titleLinks().filter((l) => l.titleCode !== code);
+      this._log(user, "removeTitle", code + " · " + gone.es + " (" + dropped + " partidas)");
+      return gone;
+    }
+    /**
+     * Drop a partida's memberships. Called when a partida is retired, so the
+     * títulos stop offering a trade the company no longer works in — the entry
+     * itself is retired, not deleted, exactly as before.
+     */
+    clearPartidaTitles(chapterCode, user) {
+      const before = this.titleLinks().length;
+      this.state.itemTitleLinks = this.titleLinks().filter((l) => l.chapterCode !== chapterCode);
+      const removed = before - this.state.itemTitleLinks.length;
+      if (removed) this._log(user, "clearPartidaTitles", chapterCode + " ×" + removed);
+      return removed;
     }
     /** How many stored records still carry this code — shown before retiring one. */
     listEntryUsage(kind, code) {
