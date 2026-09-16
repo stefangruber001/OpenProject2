@@ -83,16 +83,46 @@ check(
   JSON.stringify(plain.groups.map((g) => g.bandOpen)),
 );
 
-const brand = { legal: "Canei Subirats S.L.", nif: "B26942003" };
+/* The SAME WinAnsi mapping and the same brand block the other PDF gate uses,
+   and not because it is tidier. With a pass-through translator the writer gets
+   UTF-8 where it expects WinAnsi, and the file renders «Reforma de baÃ±o» and
+   «Â€» — so the gate would be reading a document the product never produces,
+   and a real accent bug in a título would hide behind the noise. The product
+   passes `CaneiDocI18n.tr(lang)`; this is its shape. */
+const tr = (s) =>
+  String(s)
+    .replace(/€/g, "\x80")
+    .replace(/[·•]/g, "-")
+    .replace(/[–—]/g, "-")
+    .replace(/[’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/×/g, "x")
+    .replace(/[^\x20-\x7e\x80\xa0-\xff]/g, "");
+
+const brand = {
+  wordmark: "CaneiSubirats",
+  legal: "Canei Subirats, S.L.",
+  slogan: "Reformes senzillament complexes",
+  cif: "NIF B-6712 3456",
+  address: "Carrer de la Creu 18, 08960 Sant Just Desvern",
+  phone: "+34 934 77 12 08",
+  from: "if@2iberia.com",
+  iban: "ES91 2100 0418 4502 0005 1332",
+};
 const out = resolve(ROOT, "dist/doc-band-check");
 mkdirSync(out, { recursive: true });
 
-const pdf = PDF.build(doc, brand, (s) => s);
-writeFileSync(`${out}/presupuesto-con-titulos.pdf`, Buffer.from(pdf));
+const pdf = PDF.build(doc, brand, tr);
+// `build` returns a STRING of latin-1 bytes. `Buffer.from(s)` would encode it
+// as UTF-8 and double every byte above 0x7f — «baÃ±o», «Â€» — corrupting the
+// file AFTER the writer got it right. The other PDF gates write it this way.
+writeFileSync(`${out}/presupuesto-con-titulos.pdf`, Buffer.from(pdf, "latin1"));
 let text = "";
 try {
+  // pdftotext emits UTF-8. Reading it as latin-1 turns «baño» into two
+  // characters and an accent assertion into a lie in the other direction.
   text = execFileSync("pdftotext", ["-layout", `${out}/presupuesto-con-titulos.pdf`, "-"], {
-    encoding: "latin1",
+    encoding: "utf8",
   });
 } catch (e) {
   console.error(
@@ -102,16 +132,23 @@ try {
   );
   process.exit(1);
 }
-check("the PDF prints the first título", text.includes("Reforma de ba"), "not in the text layer");
+// The ACCENT is part of the assertion, not decoration: a título is company
+// wording and «baño» printed as «baÃ±o» is a document nobody would send. It
+// also pins the encoding, which is exactly what went wrong writing this file.
+check(
+  "the PDF prints the first título, accent and all",
+  text.includes("Reforma de baño"),
+  "not in the text layer",
+);
 check("the PDF prints the second", text.includes("Reforma de cocina"), "not in the text layer");
 check("the PDF names its band total", /Total Reforma de/.test(text), "no «Total <título>» line");
 
-const html = SHEET.render(doc, brand, (s) => s);
+const html = SHEET.render(doc, brand, tr);
 check("the sheet rules a band above the run", html.includes('class="titleband"'), "no band row");
 check("the sheet closes it with a total", html.includes('class="titlebandsum"'), "no total row");
 check("the sheet names the título", html.includes("Reforma de cocina"), "título missing");
 
-const docx = DOCX.build(doc, brand, (s) => s);
+const docx = DOCX.build(doc, brand, tr);
 check(
   "Word still produces a file with bands in it",
   !!docx && docx.length > 1000,
