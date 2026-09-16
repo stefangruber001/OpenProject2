@@ -10943,3 +10943,41 @@ a use for it.
 **Operator data, not a repo fix.** The `jor` unit in the live workspace reads
 "day rate" in the Spanish column where _jornada_ belongs. It is an entry the
 owner added; the shipped units list has no `jor` at all.
+
+## S137 · Releasing becomes a decision instead of a side effect (2026-09-16)
+
+**What it was.** Every push to `main` moved the `:main` tag and the client's
+server pulled it within 60 seconds. From commit to the client's screen was about
+four minutes, with nobody required to look. That was true on the day the company
+was handed a freshly blanked document to start working in.
+
+**What changed.** `promote` now needs `inputs.release`, which only a
+`workflow_dispatch` can set. A push to `main` still builds, publishes `:sha` and
+`:dev`, and runs `smoke` — so the development system is current and the artifact
+is tested. The only thing that waits is production.
+
+**Why this is not the dev branch CLAUDE.md forbids.** No branch name is written
+into any workflow. The thing that gates production is a tick box on a run of
+`main`; the thing that feeds dev is the ordinary build. `promote` keeps its ref
+guard, so dispatching from a `claude/**` branch builds it, smokes it and puts it
+on dev while `:main` stays where it is — which is the look-before-live path the
+governance file asks for, without a second source of truth.
+
+**What it does NOT change.** Rollback: re-tag `:main` onto an older `:sha`, as
+before, with `DEPLOY_PINNED` declaring the freeze. The bytes released are still
+the bytes `smoke` tested — `imagetools create` retags inside the registry and
+rebuilds nothing.
+
+**The cost, stated plainly.** A fix now needs two acts instead of one, and a
+release that nobody presses is a fix the client does not have. The gate makes
+forgetting possible where before it was impossible. That is the trade the
+operator asked for, and the reason `:dev` is ungated is that forgetting to look
+must not also mean forgetting to build.
+
+**Verify is still red until `APP_URL` is set.** It reads `/api/health` and
+compares the revision, and the variable has never been set, so it has never
+passed. It runs after `promote` and cannot block a release — but it is the only
+thing that would notice a server that has stopped following `:main`, and
+production once spent 25 hours on an image 19 commits behind while six
+consecutive deploys passed. Setting the variable is one line in repository
+settings and turns a permanently red job into a real check.

@@ -19,6 +19,11 @@ on:
       - "pnpm-lock.yaml"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Move :main onto this build — the client's server picks it up within a minute"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -299,12 +304,30 @@ jobs:
   # here instead would ship an artifact no test had ever run against.
   promote:
     needs: smoke
-    # `workflow_dispatch` can be fired from ANY branch, and without this guard a
-    # manual run from a feature branch would build that branch and point `:main`
-    # at it — a deploy to production from a branch nobody reviewed, one dropdown
-    # away. Dispatching from a branch still builds and smokes it; it just does
-    # not release it.
-    if: github.ref == 'refs/heads/main'
+    # TWO CONDITIONS, AND THEY GUARD DIFFERENT THINGS.
+    #
+    # The ref: `workflow_dispatch` can be fired from ANY branch, and without this
+    # a manual run from a feature branch would build that branch and point
+    # `:main` at it — a deploy to production from a branch nobody reviewed, one
+    # dropdown away. Dispatching from a branch still builds and smokes it; it
+    # just does not release it.
+    #
+    # The input: releasing is now a DECISION rather than a side effect of
+    # merging. Until this line, every push to `main` moved the tag and the
+    # client's server had the change inside four minutes, whether or not a
+    # person had looked at it — and `:dev` receives the same digest eight
+    # minutes earlier, so there was somewhere to look and no reason the
+    # release waited for anyone to do it.
+    #
+    # What a push to `main` still does: build, publish `:sha`, publish `:dev`,
+    # and run `smoke`. So the development system is up to date and the artifact
+    # is tested; the only thing that waits is the client.
+    #
+    # To release: Actions → Deploy → Run workflow, from `main`, tick `release`.
+    # It rebuilds from the same commit, smokes it again, and only then moves the
+    # tag. Rollback is unchanged and needs no button: re-tag `:main` onto an
+    # older `:sha` (see docs/HANDOVER-OPS.md).
+    if: github.ref == 'refs/heads/main' && inputs.release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -348,7 +371,11 @@ jobs:
   # the image is good and the box did not take it.
   verify:
     needs: promote
-    if: github.ref == 'refs/heads/main'
+    # The same condition as `promote`, restated rather than relied upon. A job
+    # whose `needs` were skipped is skipped too, so this would be redundant —
+    # but a reader checking whether production is being watched should not have
+    # to know that rule to see that this only runs when something was released.
+    if: github.ref == 'refs/heads/main' && inputs.release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

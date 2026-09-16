@@ -260,6 +260,8 @@ window.CANEI_DICT.ca = {
   "Reporte a gestoría": "Informe a la gestoria",
   "Personal interno": "Personal intern",
   "Partidas y subpartidas": "Partides i subpartides",
+  "ENTORNO DE PRUEBAS · los datos aquí son inventados · TEST ENVIRONMENT":
+    "ENTORN DE PROVES · les dades d'aquí són inventades · TEST ENVIRONMENT",
   Títulos: "Títols",
   "Nuevo título": "Nou títol",
   "＋ Nuevo título": "＋ Nou títol",

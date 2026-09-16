@@ -61,6 +61,33 @@ unreadable. It is deliberately not on the server. Confirm you can reach it
 
 ## 3. Daily operations
 
+### Releasing to production
+
+Merging is not releasing. A push to `main` builds the images, publishes `:sha`
+and `:dev`, and runs `smoke` — so the **development system has the change within
+minutes** and the artifact has been tested. Production is still serving what it
+was serving.
+
+To put it in front of the client:
+
+> **Actions → Deploy (build & publish images) → Run workflow**, branch `main`,
+> tick **release**.
+
+It rebuilds from the same commit, smokes it again, moves `:main`, and the server
+pulls within 60 seconds. `verify` then reads `/api/health` and fails if the box
+did not take it.
+
+Two things worth knowing:
+
+- **Dispatching from a branch never releases.** It builds, it smokes, it moves
+  `:dev` — and `promote` is guarded on the ref, so `:main` cannot move. That is
+  the look-before-live path: put a `claude/**` branch on dev, look at it, then
+  merge and release from `main`.
+- **Rollback needs no button.** Re-tag `:main` onto an older `:sha` (§5), and
+  set the `DEPLOY_PINNED` repository variable to `true` while you do, so a
+  deliberately frozen box is a thing somebody chose rather than a thing nobody
+  noticed.
+
 All commands run from `/opt/canei-erp` on the server.
 
 ```bash

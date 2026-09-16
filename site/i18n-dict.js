@@ -44,6 +44,15 @@ window.CANEI_DICT = {
     /* The grouping above a line item. "Section", never "Chapter" — the client
        renamed capítulo to Partida in all three languages and the coverage gate
        fails any EN value that brings the old word back. */
+    /* The development band. Bilingual in the source because it must be
+       unmissable to anyone who lands on the test system, whatever the interface
+       is set to — which is exactly what left it with no EN entry and ate the
+       last of the literal headroom. Translated now: each language gets its own
+       unmissable sentence, which is the same promise kept properly. */
+    [
+      "ENTORNO DE PRUEBAS · los datos aquí son inventados · TEST ENVIRONMENT",
+      "TEST ENVIRONMENT · the data here is invented · ENTORNO DE PRUEBAS",
+    ],
     ["Títulos", "Sections"],
     ["Nuevo título", "New section"],
     ["＋ Nuevo título", "＋ New section"],
