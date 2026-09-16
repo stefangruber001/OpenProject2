@@ -6440,6 +6440,7 @@ window.CANEI_DICT = {
     ["nota", "note"],
     ["notas", "notes"],
     ["Ninguna nota coincide con la búsqueda.", "No note matches the search."],
+    ["Ninguna nota en este estado.", "No note in this status."],
     ["Guardar la nota", "Save the note"],
     ["Guardar los cambios", "Save the changes"],
     ["Abierta el", "Opened on"],

@@ -12349,6 +12349,11 @@
          «No se hará» is the plain grey pill on purpose. It is a decision, and a
          decision that something will not be done should be quiet — a red one
          would read as a failure every time somebody scrolled past it. */
+      /* Which status the register is showing, "" for all. Module-level like
+         `chgStage` on Modificaciones, and for the same reason: the view is a
+         pure function of state re-run by `render()`, so a filter kept inside it
+         would reset on every keystroke in the search box. */
+      let jnStatus = "";
       const NOTE_STATUS = {
         open: ["Abierta", "y"],
         doing: ["En curso", "b"],
@@ -17609,7 +17614,10 @@
               ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>`
               : "";
           const opts = titleRows
-            .map((t) => `<option value="${esc(t.es)}"${t.es === cur ? " selected" : ""}>${esc(t.es)}</option>`)
+            .map(
+              (t) =>
+                `<option value="${esc(t.es)}"${t.es === cur ? " selected" : ""}>${esc(t.es)}</option>`,
+            )
             .join("");
           const none = `<option value=""${cur ? "" : " selected"}>— sin título —</option>`;
           return `<select class="chaptitle" data-chaptitle="${c.id}" title="Título bajo el que se agrupa esta partida">${none}${stray}${opts}</select>`;
@@ -21868,8 +21876,47 @@
         notes(v) {
           $("#sub").textContent =
             "Qué falla, qué debería hacer y por qué. Cada nota apunta a una pantalla real y se cierra con una decisión.";
-          renderMasterList(v, {
-            id: "notes",
+          /* THE TALLY AND THE FILTER, which is what «seguir los cierres» needs a
+             list to have. The register alone says how many notes there are; this
+             says how many are still open, and lets you ask for exactly those.
+             Same shape Modificaciones uses for its etapa — a header above the
+             register, and the filter baked into the list id so paging resets
+             with it instead of leaving you on page 3 of a shorter list.
+
+             Each count is `<span>word</span> <b>number</b>`, never one string:
+             a number welded to a word is one text node no dictionary can hold,
+             which is `countTag`'s lesson and the reason the pill beside
+             «Sin aprobar» is built the same way. */
+          const allNotes = erp.state.notes || [];
+          const tally = { open: 0, doing: 0, done: 0, wontdo: 0 };
+          allNotes.forEach((n) => {
+            if (tally[n.status] != null) tally[n.status]++;
+          });
+          v.innerHTML = `<div id="ntHead" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+             <label style="font-size:12px;color:var(--muted)"><span>Estado</span>
+              <select id="ntStatus" style="font:inherit;font-size:12px;margin-left:6px;padding:5px 7px;border:1px solid var(--line);border-radius: 0;background:var(--paper);color:var(--ink)">
+               <option value="">Todas</option>
+               ${Object.keys(NOTE_STATUS)
+                 .map(
+                   (k) =>
+                     `<option value="${k}"${jnStatus === k ? " selected" : ""}>${esc(NOTE_STATUS[k][0])}</option>`,
+                 )
+                 .join("")}
+              </select></label>
+             <span style="flex:1"></span>
+             ${Object.keys(NOTE_STATUS)
+               .map(
+                 (k) =>
+                   `<span class="pill ${NOTE_STATUS[k][1]}"><span>${esc(NOTE_STATUS[k][0])}</span> <b>${tally[k]}</b></span>`,
+               )
+               .join(" ")}
+            </div><div id="ntList"></div>`;
+          $("#ntStatus").onchange = (e) => {
+            jnStatus = e.target.value;
+            render();
+          };
+          renderMasterList($("#ntList"), {
+            id: "notes-" + (jnStatus || "all"),
             ids: {
               q: "ntQ",
               size: "ntSize",
@@ -21892,8 +21939,9 @@
                «plan the upgrades needed». So the order is outstanding before
                decided, then urgent before minor, and only then newest first — the
                same three questions a person triaging asks, in that order. */
-            baseRows: (erp.state.notes || [])
+            baseRows: allNotes
               .map((n, i) => ({ n, i }))
+              .filter((x) => !jnStatus || x.n.status === jnStatus)
               .sort(
                 (a, b) =>
                   NOTE_OPEN(a.n) - NOTE_OPEN(b.n) ||
@@ -21957,7 +22005,9 @@
             onRowClick: (id) => noteDrawer(id),
             exportFile: "notas",
             exportSheetName: "Notas",
-            emptyText: "Ninguna nota coincide con la búsqueda.",
+            emptyText: jnStatus
+              ? "Ninguna nota en este estado."
+              : "Ninguna nota coincide con la búsqueda.",
           });
           /* The jump lives on the cell, so it must not also open the row's
              drawer — `renderMasterList` binds the click on the whole `tr`. */
@@ -23088,8 +23138,7 @@
             nounSingular: "partida",
             nounPlural: "partidas",
             baseRows: rows,
-            matches: (c, s) =>
-              c.code.toLowerCase().includes(s) || c.es.toLowerCase().includes(s),
+            matches: (c, s) => c.code.toLowerCase().includes(s) || c.es.toLowerCase().includes(s),
             columns: [
               { label: "Código", primary: true, get: (c) => c.code },
               { label: "Nombre", primary: true, get: (c) => c.es },
@@ -29455,16 +29504,15 @@
            renderBudgetDoc drops pending lines and a band that counted them
            would not match the rows above it. */
         const titles = doc.chapters.map((c) => c.title || "");
-        const bandCents = doc.chapters.map((c) =>
-          c.lines.reduce((s, l) => s + l.totalCents, 0),
-        );
+        const bandCents = doc.chapters.map((c) => c.lines.reduce((s, l) => s + l.totalCents, 0));
         const runTotal = (i) => {
           let total = 0;
           for (let j = i; j < titles.length && titles[j] === titles[i]; j++) total += bandCents[j];
           return total;
         };
         doc.chapters.forEach((c, i) => {
-          if (titles[i] && titles[i - 1] !== titles[i]) rows.push(["", "", titles[i], "", "", "", ""]);
+          if (titles[i] && titles[i - 1] !== titles[i])
+            rows.push(["", "", titles[i], "", "", "", ""]);
           // The chapter as its own banner row, so the file reads in the same
           // order and the same groups as the paper does.
           rows.push([c.num, "", c.name, "", "", "", ""]);

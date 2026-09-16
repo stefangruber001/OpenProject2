@@ -17824,6 +17824,83 @@ async function testNotes(browser, base) {
       ok(`notas: the register exports (${file.suggestedFilename()})`);
     else bad("notas: export produces a file", file ? file.suggestedFilename() : "(none)");
 
+    // ── THE TALLY AND THE FILTER, which is what following the closures needs.
+    //    The counts are per status and the picker narrows the register to one.
+    const band = await pg.evaluate(() => ({
+      pills: [...document.querySelectorAll("#ntHead .pill")].map((p) =>
+        p.innerText.replace(/\s+/g, " ").trim(),
+      ),
+      all: document.querySelectorAll("#ntList tr.click[data-id]").length,
+    }));
+    if (band.pills.length === 4 && band.pills.every((p) => /\d/.test(p)))
+      ok(`notas: the head counts every status (${band.pills.join(" · ")})`);
+    else bad("notas: status tally", JSON.stringify(band.pills));
+
+    await pg.selectOption("#ntStatus", "open");
+    await pg.waitForTimeout(600);
+    const onlyOpen = await pg.evaluate(() => ({
+      rows: document.querySelectorAll("#ntList tr.click[data-id]").length,
+      states: [...document.querySelectorAll("#ntList tr.click")].map(
+        (t) => t.querySelectorAll(".pill")[1]?.textContent,
+      ),
+      open: (erp.state.notes || []).filter((n) => n.status === "open").length,
+    }));
+    const narrowed =
+      onlyOpen.rows === onlyOpen.open &&
+      onlyOpen.rows > 0 &&
+      onlyOpen.rows < band.all &&
+      new Set(onlyOpen.states).size === 1;
+    if (narrowed) ok(`notas: filtering by status shows only those (${onlyOpen.rows} open)`);
+    else bad("notas: status filter narrows the list", JSON.stringify(onlyOpen));
+    await pg.selectOption("#ntStatus", "");
+    await pg.waitForTimeout(600);
+    if (
+      (await pg.evaluate(() => document.querySelectorAll("#ntList tr.click").length)) === band.all
+    )
+      ok("notas: «Todas» puts every note back");
+    else bad("notas: filter resets", "count did not return");
+
+    /* ── A DOCUMENT WITH NO `seq` MUST STILL SAVE. The operator hit this on the
+       development system: every verb that mints an id died on «undefined is not
+       an object (evaluating 'this.state.seq.id')», because `ERP.from()` restored
+       the arrays and let the objects through. Driven here the way it actually
+       happened — the engine rebuilt from a document with the key removed, then
+       a note entered through the form. The id must also NOT restart at 1, or the
+       counter hands out identities records already hold. */
+    const existingIds = await pg.evaluate(() => {
+      const ids = new Set();
+      (function walk(n, d) {
+        if (!n || typeof n !== "object" || d > 12) return;
+        if (Array.isArray(n)) return n.forEach((x) => walk(x, d + 1));
+        if (typeof n.id === "string") ids.add(n.id);
+        for (const k of Object.keys(n)) walk(n[k], d + 1);
+      })(erp.toJSON(), 0);
+      const doc = JSON.parse(JSON.stringify(erp.toJSON()));
+      delete doc.seq;
+      erp = ErpEngine.ERP.from(doc);
+      return { all: [...ids], seq: erp.state.seq && erp.state.seq.id };
+    });
+    await pg.goto(`${base}/erp.html#notes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+    await pg.click("#ntNew");
+    await pg.waitForTimeout(350);
+    await pg.selectOption("#n_screen", "items");
+    await pg.fill("#n_should", "It saves on a document with no counter");
+    await pg.click("#n_save");
+    await pg.waitForTimeout(700);
+    const healed = await pg.evaluate((known) => {
+      const last = (erp.state.notes || []).slice(-1)[0];
+      return {
+        saved: !!last && last.should === "It saves on a document with no counter",
+        id: last && last.id,
+        reused: !!last && known.includes(last.id),
+        toast: document.querySelector("#toast")?.textContent || "",
+      };
+    }, existingIds.all);
+    if (healed.saved && !healed.reused)
+      ok(`notas: a document with no counter still saves, without reusing an id (${healed.id})`);
+    else bad("notas: seq-less document saves", JSON.stringify(healed));
+
     if (!errors.length) ok("notas: no console/page errors");
     else bad("notas: console clean", errors.slice(0, 3).join(" | ").slice(0, 300));
   } catch (e) {

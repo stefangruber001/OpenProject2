@@ -5099,6 +5099,7 @@ window.CANEI_DICT.ca = {
   nota: "nota",
   notas: "notes",
   "Ninguna nota coincide con la búsqueda.": "Cap nota coincideix amb la cerca.",
+  "Ninguna nota en este estado.": "Cap nota en aquest estat.",
   "Guardar la nota": "Desar la nota",
   "Guardar los cambios": "Desar els canvis",
   "Abierta el": "Oberta el",

@@ -958,6 +958,115 @@ throws(
 // a far-future blob must also throw, not wrap around
 throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws");
 
+/* ============ `from()` restores the OBJECTS, not only the arrays ============
+ *
+ * The ladder is not the only door. `ERP.from()` assigns the incoming document
+ * verbatim and `toJSON()` hands that same object straight back, so whatever
+ * shape reaches `POST /erp/import` is the shape the tenant then holds — for
+ * ever, because no migration adds these keys either.
+ *
+ * It restored arrays and `lists` and let four more objects through, two of them
+ * load-bearing: `_id()` reads `seq.id` and `nextNumber()` reads `series`. A
+ * document missing `seq` took down every verb that mints anything — which is
+ * most of the application — with a message naming neither the document nor the
+ * cause: «undefined is not an object (evaluating 'this.state.seq.id')» on
+ * pressing Save. Reported from the development system against a real tenant.
+ */
+{
+  const full = M.migrate(JSON.parse(JSON.stringify(v1))).state;
+  const OBJECT_KEYS = ["seq", "series", "alertOverrides", "imports", "plans", "lists"];
+
+  // every id the document already holds, nested ones included — one counter
+  // mints them all, so a restored counter must clear the deepest of them
+  const idsIn = (doc) => {
+    const out = new Set();
+    (function walk(n, d) {
+      if (!n || typeof n !== "object" || d > 12) return;
+      if (Array.isArray(n)) return n.forEach((x) => walk(x, d + 1));
+      if (typeof n.id === "string") out.add(n.id);
+      for (const k of Object.keys(n)) walk(n[k], d + 1);
+    })(doc, 0);
+    return out;
+  };
+
+  for (const key of OBJECT_KEYS) {
+    const holed = JSON.parse(JSON.stringify(full));
+    delete holed[key];
+    const e = ERP.from(holed);
+    assert(
+      e.state[key] && typeof e.state[key] === "object",
+      `from() restores a missing '${key}'`,
+      `still ${typeof e.state[key]}`,
+    );
+  }
+
+  // all six at once, then actually use the engine
+  const bare = JSON.parse(JSON.stringify(full));
+  for (const key of OBJECT_KEYS) delete bare[key];
+  const e = ERP.from(bare);
+  assert(
+    OBJECT_KEYS.every((k) => e.state[k] && typeof e.state[k] === "object"),
+    "from() restores all six object keys at once",
+  );
+  try {
+    const minted = e.addNote({ screen: "items", should: "regression" }, "sim");
+    assert(!!minted && !!minted.id, "a document with no seq can still mint an id");
+  } catch (err) {
+    assert(false, "a document with no seq can still mint an id", err.message);
+  }
+  try {
+    assert(!!e.nextNumber("budget"), "a document with no series can still mint a number");
+  } catch (err) {
+    assert(false, "a document with no series can still mint a number", err.message);
+  }
+
+  /* THE PART THAT MATTERS MORE THAN THE CRASH. Restoring the fresh `{id:1}`
+     onto a populated document would stop the error and start handing out ids
+     that records already hold — the second one silently taking the first one's
+     identity, which nothing ever reports. The counter has to resume past the
+     high-water mark of the document it was rebuilt from. */
+  const existing = idsIn(full);
+  const noSeq = JSON.parse(JSON.stringify(full));
+  delete noSeq.seq;
+  const e2 = ERP.from(noSeq);
+  // Read defensively: without the restore this is the very `undefined` the
+  // whole section is about, and the runner should report that as a failed
+  // check rather than dying before it prints the report.
+  const rebuilt = e2.state.seq && e2.state.seq.id;
+  assert(
+    Number.isFinite(rebuilt) && rebuilt >= full.seq.id,
+    "a rebuilt counter resumes past the ids already in the document",
+    `rebuilt ${rebuilt} vs real ${full.seq.id}`,
+  );
+  let collisions = 0;
+  try {
+    for (let i = 0; i < 200; i++) {
+      const r = e2.addNote({ screen: "items", should: "x" }, "sim");
+      if (existing.has(r.id)) collisions++;
+    }
+    assert(collisions === 0, "and mints 200 ids without reusing one", `${collisions} collisions`);
+  } catch (err) {
+    assert(false, "and mints 200 ids without reusing one", err.message);
+  }
+
+  // a healthy document is left exactly as it was
+  const healthy = ERP.from(JSON.parse(JSON.stringify(full)));
+  assert(healthy.state.seq.id === full.seq.id, "a healthy counter is not touched");
+
+  // and the degenerate case still boots rather than throwing
+  try {
+    const empty = ERP.from({});
+    assert(
+      empty.state.seq &&
+        empty.state.seq.id === 1 &&
+        !!empty.addNote({ screen: "items", should: "y" }, "sim"),
+      "an empty document boots and mints from 1",
+    );
+  } catch (err) {
+    assert(false, "an empty document boots and mints from 1", err.message);
+  }
+}
+
 /* ---------------- report ---------------- */
 const failed = checks.filter((c) => !c.pass);
 console.log(`\n──── schema migration simulation ────`);
