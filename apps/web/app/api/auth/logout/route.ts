@@ -11,6 +11,7 @@
  * POST only. A GET would let any page on the internet sign somebody out by
  * including an image pointing at this URL.
  */
+import { NO_STORE } from "@/lib/api";
 import { clearedCookie } from "@/lib/session-token";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,13 @@ export async function POST(req: Request): Promise<Response> {
   const secure = proto ? proto === "https" : new URL(req.url).protocol === "https:";
   // Relative Location: behind a TLS-terminating proxy, a URL rebuilt from
   // req.url points at the internal http:// address of the container.
-  const res = new Response(null, { status: 303, headers: { Location: "/login" } });
+  // Never stored: this response is what CLEARS the cookie. Replayed from a
+  // cache without its Set-Cookie, signing out would appear to work and leave
+  // the session intact.
+  const res = new Response(null, {
+    status: 303,
+    headers: { Location: "/login", "cache-control": NO_STORE },
+  });
   res.headers.append("Set-Cookie", clearedCookie(secure));
   return res;
 }

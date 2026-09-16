@@ -1,6 +1,6 @@
 import Foundation
 
-/// A single destination in the app. Declared as data in `Config.tabs` so the
+/// A single destination in the app. Declared as data in `nav.json` so the
 /// navigation is driven by configuration, mirroring the web app's own
 /// data-driven approach.
 struct WebTab: Identifiable, Hashable {
@@ -35,7 +35,7 @@ struct WebTab: Identifiable, Hashable {
         // WKWebView is handed the URL itself; resolving here keeps the base out
         // of every caller.
         URL(string: path, relativeTo: Config.baseURL)?.absoluteURL
-            // Unparseable means a typo in `Config.tabs`, which no operator can
+            // Unparseable means a typo in `nav.json`, which no operator can
             // act on. The workspace root is a real screen; re-encoding the way
             // that caused this is not a fallback, it is the bug again.
             ?? Config.baseURL

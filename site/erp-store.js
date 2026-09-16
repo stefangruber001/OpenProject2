@@ -81,8 +81,17 @@
      reason two people can use this at the same time. */
   var remoteVersion = 0;
 
+  /* Whether the document this browser holds is a REDACTED VIEW of the company's
+     rather than the whole of it — set from the server's own `scoped` flag on
+     every read. A scoped document is never sent back; see `remoteLoadState`. */
+  var scoped = false;
+
   function stateUrl() {
     return REMOTE + "/api/" + SELF_TENANT + "/erp/state";
+  }
+
+  function commandUrl() {
+    return REMOTE + "/api/" + SELF_TENANT + "/erp/command?include=state";
   }
 
   /**
@@ -164,7 +173,13 @@
   }
 
   function remoteLoadState() {
+    /* NEVER FROM A CACHE. This response is redacted for whoever asked — a site
+       worker's document has no invoice register and no bank lines in it — so a
+       stored copy replayed into the next session on the same device is exactly
+       the boundary R2.3 exists to hold. The server sends no-store now; asking
+       for it here too means the rule does not depend on every hop agreeing. */
     return fetch(stateUrl(), {
+      cache: "no-store",
       credentials: "same-origin",
       headers: { accept: "application/json" },
     })
@@ -182,11 +197,29 @@
         // running it a different number of times per person, which is not a
         // property worth having in an invoice register.
         //
+        /* THIS DOCUMENT IS A VIEW, AND THE SERVER SAYS SO. For a site account
+           the response is redacted — no invoice register, no bank lines,
+           nobody else's worker record — and it is flagged `scoped`.
+
+           That flag used to be dropped right here, and dropping it is what
+           made the workspace unusable for the crew. Believing it held the
+           whole company document, the store would PUT it back on the first
+           ordinary save; the server refuses that (R2.3), correctly and every
+           single time; and the refusal was painted as «your session has
+           expired, your latest changes are NOT saved» over a session that was
+           perfectly valid. Signing in again fixed nothing, because the next
+           save did it again.
+
+           Worth being plain about what the server's refusal is protecting: if
+           such a save ever SUCCEEDED it would store the redacted view as the
+           whole company document, and the invoice register would be gone. The
+           client must not be trying it in the first place. */
+        scoped = body.scoped === true;
         // An empty company comes back as a valid empty document, not null.
         // Returning null would make the workspace seed its demonstration data —
         // onto the live server, into the real register. Empty and honest beats
         // populated and fictional.
-        return { state: body.state || null, migration: null, remote: true };
+        return { state: body.state || null, migration: null, remote: true, scoped: scoped };
       });
   }
 
@@ -246,6 +279,15 @@
           );
         } else if (res.status === 401) {
           saveFailed("Your session has expired.", "Please sign in again.");
+        } else if (res.status === 403) {
+          /* SIGNED IN, AND NOT ALLOWED. Two opposite messages used to arrive as
+             the same 401, so the workspace advised signing in again — useless
+             to somebody already signed in, and alarming, because it also says
+             their work was lost. It says what the server said instead. */
+          saveFailed(
+            "This account may not save this.",
+            (res.body && res.body.message) || "Ask an administrator.",
+          );
         } else {
           saveFailed("Could not save to the server.", (res.body && res.body.message) || "");
         }
@@ -468,8 +510,90 @@
   }
 
   function saveState(state) {
+    /* A SCOPED DOCUMENT IS NEVER SENT BACK, and this is not an error to report.
+       For a site account the whole-document route is closed by design, so a
+       refusal here is the system working; showing a red banner for it once per
+       save would be telling the crew their work is broken every time they use
+       the app. Their writes go through `POST /erp/command`, which is checked
+       one call at a time and is unaffected by this.
+
+       Resolved rather than rejected, so `persistNow()` and every caller that
+       waits on a save carry on normally. */
+    if (REMOTE !== null && scoped) return Promise.resolve(null);
     if (REMOTE !== null) return remoteSaveState(state);
     return put(KV, STATE_KEY, state);
+  }
+
+  /**
+   * Run ONE command against the stored document, and get the document back.
+   *
+   * THE OTHER HALF OF `saveState` ABOVE, AND IT WAS NEVER WRITTEN. That comment
+   * has said since the boundary shipped that a site account's writes "go
+   * through POST /erp/command". They did not: nothing in this file, or in
+   * erp.html, ever called that endpoint — the only mentions of it anywhere in
+   * the client were comments describing a call that did not exist. So the crew
+   * pressed Guardar, `saveState` resolved null by the rule above, the row was
+   * already in the in-memory document so the screen redrew WITH IT, and the
+   * toast said it was saved. It was not. It was gone on the next reload.
+   *
+   * The server side was complete the whole time — the route, the allow-list,
+   * and the own-hours-only narrowing. Only the door was missing.
+   *
+   * `include=state` because this client renders from the whole document: the
+   * alternative is a GET straight after every command, the same bytes over two
+   * round trips. The response is redacted under the same rule as the GET (see
+   * the route), so what comes back here is what this account may see.
+   */
+  function command(name, args) {
+    if (REMOTE === null) return Promise.reject(new Error("No server to command."));
+    return fetch(commandUrl(), {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        command: name,
+        args: args || [],
+        expectedVersion: remoteVersion,
+      }),
+    })
+      .then(function (r) {
+        return r.json().then(function (body) {
+          return { ok: r.ok, status: r.status, body: body };
+        });
+      })
+      .then(function (res) {
+        if (res.ok) {
+          remoteVersion = res.body.version;
+          if (res.body.scoped === true || res.body.scoped === false) {
+            scoped = res.body.scoped === true;
+          }
+          return res.body;
+        }
+        if (res.status === 409) {
+          saveFailed(
+            "Somebody else saved before you.",
+            "Reload to see their changes, then enter yours again.",
+          );
+        } else if (res.status === 401) {
+          saveFailed("Your session has expired.", "Please sign in again.");
+        } else if (res.status === 403) {
+          /* The server's own sentence, not one invented here. It already says
+             the useful thing — whose hours, which site, which week. */
+          saveFailed(
+            "This account may not do that.",
+            (res.body && res.body.message) || "Ask an administrator.",
+          );
+        } else {
+          saveFailed("Could not save to the server.", (res.body && res.body.message) || "");
+        }
+        throw new Error("command refused: HTTP " + res.status);
+      })
+      .catch(function (e) {
+        if (e && /^command refused/.test(e.message || "")) throw e;
+        saveFailed("No connection to the server.", "");
+        throw e;
+      });
   }
 
   /* ------------------------------------------------------------------ *
@@ -699,6 +823,20 @@
     open: open,
     loadState: loadState,
     saveState: saveState,
+    /** One checked command, for the writes the whole-document PUT cannot carry. */
+    command: command,
+    /**
+     * True when the document in hand is a REDACTED one, so the whole-document
+     * PUT is closed and writes must go one command at a time.
+     *
+     * The server said so (`scoped` on the state response); it is not inferred
+     * from the role here. Those two agree today, and the day a fifth role holds
+     * `erp.read.all` without being an administrator they would stop agreeing —
+     * and the one that decides what may be SENT is the server's.
+     */
+    isScoped: function () {
+      return REMOTE !== null && scoped === true;
+    },
     putBlob: function (k, blob) {
       return REMOTE !== null ? remotePutBlob(k, blob) : put(BLOBS, k, blob);
     },

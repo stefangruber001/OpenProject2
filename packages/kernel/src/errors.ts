@@ -24,6 +24,15 @@ export type FactoryErrorCode =
   // Nobody proved who they are. Distinct from BAD_REQUEST because the caller's
   // recovery is completely different — not "fix your payload" but "log in".
   | "UNAUTHENTICATED"
+  // We know exactly who they are, and they may not do this. The distinction
+  // from UNAUTHENTICATED is the whole point and it is not pedantry: the
+  // recoveries are opposites. "Log in" is useless advice to somebody already
+  // logged in, and telling them so is worse than useless — the workspace read
+  // a permission refusal as an expired session and showed a site worker a red
+  // «your session has expired, your changes are NOT saved» on a session that
+  // was perfectly valid, on every load, with signing in again as the only
+  // suggested cure. It was the correct refusal, wearing the wrong name.
+  | "FORBIDDEN"
   // A system we depend on but do not control refused or failed — a mail server,
   // a payment gateway, a tax authority. Deliberately distinct from BAD_REQUEST:
   // the caller's payload was fine and there is nothing for them to fix, so

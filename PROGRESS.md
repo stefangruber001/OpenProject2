@@ -43,7 +43,7 @@ output; the factory is the product.
    reduced-rate decision engine w/ persisted justification, SHA-256 invoice
    chain, Spanish labels, IRPF retention profiles, **hard resolve-time gate on
    verifactu.enabled**. `@repo/pack-vertical-construction-reformas` —
-   mediciones, construction.* attribute contract, terminology config. 21 tests.
+   mediciones, construction.\* attribute contract, terminology config. 21 tests.
 7. `@repo/boundary-lint` — layer matrix + forbidden-literal scan in CI
    (`pnpm boundaries`), committed violation fixtures proven caught; already
    caught+fixed a real locale leak in kernel docs.
@@ -2076,10 +2076,10 @@ are honest and current, and for a while these were neither.
 
 ## Package 13 — the 04/09 UAT stream (started 2026-09-04)
 
-Nine reports from the operator against the live workspace, arriving faster than
-they could be batched, and every one of them a screen that was silent rather
-than wrong. Four shipped commits, each one green on the unfiltered browser run
-before it was made.
+Twenty-eight reports from the operator against the live workspace, arriving
+faster than they could be batched, and almost every one of them a screen that
+was silent rather than wrong. One commit per report or per pair, each one green
+on the unfiltered browser run before it was made.
 
 **S1 · «Where is the button?»** The `＋ Días de los adicionales` control rendered
 only when a breakdown per partida had already been typed, and the only screen
@@ -2194,6 +2194,558 @@ suite carried no session cookie. Both fixed and pinned. A third — an invitatio
 issued for a tenant that is not the deployment's own leaves an account that can
 never sign in — is real, is not mine, and is written down as ASSUMPTIONS.md S74
 rather than patched at speed on a deploy gate.
+
+**S12 · The reader had no fields for half the header.** «Whenever I do the Alta
+desde documento, it does not read all the information from the doc» — a supplier
+created from an invoice that prints the street, the town, the province and the
+telephone, arriving with all four empty and every one marked required. Nothing
+was lost in transit: the extraction capability scanned for eleven things and a
+postal address was not among them, so a party record built from a document was
+incomplete BY CONSTRUCTION and had to be finished by hand from the page just
+photographed — the work the route exists to remove.
+
+Six generic keys added (`issuerAddress`, `issuerPostcode`, `issuerCity`,
+`issuerRegion`, `issuerPhone`, `issuerEmail`), found by a different method from
+everything else in that file: an amount is announced by a label, an address is a
+SHAPE in a POSITION. The pass anchors on the postal code — the one token an
+address always carries and nothing else resembles — above the recipient
+boundary, which is the same fact that already stops the issuer's tax id being
+confused with ours. The telephone alone needs its label, because nine digits in
+three groups is also what a registry code looks like and this operator's own
+document carries one two segments away; a wrong telephone on a supplier record
+is worse than an empty one, since somebody dials it. Spanish shapes stayed in
+the jurisdiction pack: a postal code here is five digits whose first two are a
+province, 01 to 52. A profile that describes no address loses the fields, not
+the document.
+
+**Merged with the partner's session** — six tabs, session identity, the mobile
+shell, the Apple route — a 4 200-line change to `site/erp.html` beside this one.
+Clean textually, which proves nothing, so the whole battery was re-run on the
+merged tree before pushing: 736/736. Merged again on 07/09 with that session's
+worker-assignment fix (S89), and `main` at `ab8f71d` is **738/738 unfiltered**
+plus `tests/site-sync` 20/20 in CI — 736 plus the two checks that fix brought,
+so nothing was lost in either direction.
+
+**S13 · The card settlement was there, and no workspace could find it.** «I
+still don't see the Credit Card Statement to be conciliated in the Bank Account
+conciliation» — a bank line reading «ADEUDO MENSUAL DE TARJETA … su desglose
+figura en el extracto de tarjeta adjunto», opened in Conciliación, with nothing
+anywhere on the panel about a card.
+
+The product has modelled this correctly since PK7-B: the purchases on the card
+are the costs, the bank's monthly charge is not, and «Identificar como… →
+Liquidación de tarjeta» classifies it an internal transfer naming the card so
+nothing is counted twice. But `cardSettleGroup` returned `""` when the
+workspace had no card account, and the seed ships two bank accounts and no
+card. In every workspace that has not yet created one — which is every workspace
+on its first day — the whole answer was suppressed. Not disabled, not
+explained: absent, with «Marcar sin respaldo» as the only exit that looked
+honest.
+
+Shown refused now, with what it waits for, which is the recorrido's own rule
+from PK14-S77. And the gate had the product's blind spot: the browser suite
+covered this path thoroughly — a card created through the product, its
+statement imported through the real file input, the settlement written — but it
+CREATED the card first, so the one state every real tenant starts in was the
+one state never exercised. The new check runs before the run's own card exists,
+because afterwards that state is unreachable.
+
+**Next, from the same report:** the settlement names the card and not WHICH
+statement, so a report to the accountant cannot show the movements a charge
+covers; and the caja-chica cycle has no register, only a card inside one
+movement's drawer. ASSUMPTIONS S93 and S94.
+
+Gates: site E2E **739/739 unfiltered** (738 on `main` plus this check), site-sync
+20/20, boundaries, site syntax, i18n coverage 4219 complete in three languages,
+source literals 162/162, workspace audit 0/0.
+
+**S14 · The annex says what it is, carries its signed paper, and can be taken
+back.** Two reports and an authorisation, all on the adicionales chain the
+operator called _"very very unclear"_ — the checked redesign is
+`docs/ADICIONALES-PLAN.md`; this is the part of it that stands on its own.
+
+**The three «sin adjuntar» rows were a miss, not an empty slot.** The contract's
+Anexos tab read the motivo and the backing document out of the legacy change
+register through `a.changeId`, and annexes written by the route that replaced it
+leave that null. No upload would ever have appeared there. It reads the annex's
+own fields now — which adicional, the motivo, the signature — and keeps the old
+lookup as the fallback it has become.
+
+**The signed annex can be attached and opened**, through the same control the
+contract uses, or recorded as agreed verbally with the name of whoever agreed
+it. Deliberately inert: it records the fact and moves nothing, because moving
+the gate that applies an adicional is the plan's phase 4 and needs that phase's
+migration.
+
+**And an annex can now be withdrawn.** It could be granted and never taken back
+— third instance of a shape this repo has named twice — so an adicional accepted
+by mistake stayed in the contract, the milestones and the completion date for
+good. Withdrawal removes everything it put in, including the accepted pointer
+that put its partidas in the job, and refuses on an invoiced milestone or on
+progress marked over the scope it brought. Built as an explicit guarded verb
+rather than a migration that runs on load: permission to delete is not
+permission to delete invisibly.
+
+Two of mine that the tests caught: the progress guard refused on the base scope
+of a running job, because an adicional version is a clone carrying every line
+and its progress; and giving the days back through `extendProjectDeadline`
+silently did nothing, since that verb returns null on anything at or below zero.
+The second reported «4 days» in its result with the date unchanged.
+
+Gates: site E2E **746/746 unfiltered** (the annex suite 5 → 13 checks),
+site-sync 20/20, boundaries, site syntax, i18n coverage complete in three
+languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S95–S98.
+
+**S15 · Accepting an adicional stops moving the job.** The operator, twice,
+correcting the phasing of the plan: _"Acceptance camming from Budget tool do
+nothing until we accept it on Contracts/Annex. This is key."_ The second time
+they quoted the sentence where the last commit called the annex signature inert
+and deferred this to a later phase. They were right: it is not a later phase, it
+is the point, and building the screens around an unchanged rule would have left
+the product saying one thing and doing another.
+
+Two different events had been one. A customer agreeing a price and an annex to a
+signed contract are not the same fact, and acceptance moved scope, completion
+date and money in a single step — so there was no state in which an extra was
+agreed commercially and not yet part of the job, which is most of the life of a
+real adicional. Accepting writes the annex and stops. Agreeing it on the
+contract — signed document or verbally, with a name — is what puts the partidas
+in the scope, the hito in the contract and the days on the end date.
+
+One predicate does it: `projectVariations` is the single walk Alcance, both
+progress readers, cost allocation and certification all resolve through, so the
+gate is one line and everything downstream follows.
+
+**And the migration dissolved.** An ABSENT `applied` flag reads as applied, so
+every annex written before today keeps its scope, its milestone and its days
+untouched, and only new rows are governed. The plan had called a stamping
+migration the most dangerous part of this work; a field that means "applied" by
+its absence removes the danger instead of managing it.
+
+Three of mine, and the last two were caught only by the unfiltered run: a job
+with no contract and the legacy change register keep the old one-step rule, both
+on purpose; I wrote the gate and forgot to set `applied: false`, so it was open
+by construction and every test that goes through it still passed; and
+`testVariationBudget` booked a cost under the comment "what is NEW is the join
+on acceptance" — the exact rule this overturns. Rewritten to measure the
+economics before the signature and after, it is now the second witness of the
+gate.
+
+Gates: site E2E **749/749 unfiltered**, site-sync 20/20, boundaries, site
+syntax, i18n coverage complete in three languages, source literals 162/162,
+workspace audit 0/0. ASSUMPTIONS S99. Still open, written down rather than
+fixed here: no screen yet says the annex is waiting (S99e).
+
+**S16 · Presupuestos becomes two registers, and the adicional becomes its own
+record.** The operator's items 1 and 2, and the reason the model had to change
+first: in their screenshot `PRE-2026-0009 · Adicional · ADI-2026-0001` WAS the
+original budget of P-2026-0009 wearing its adicional's badge. One record, two
+lifecycles, one Estado column that could only report one of them. A tab split is
+impossible while an adicional is a version of the original budget, because they
+are the same row.
+
+«Nuevos» and «Adicionales», each with its own door. **＋ Adicional asks for the
+contract it amends** — not a job, because an adicional becomes an annex to a
+signed document and naming it at creation is what stops the two drifting apart —
+and then opens the builder EMPTY. That part needed no work at all:
+`createVariationBudget` has always made a fresh budget with one blank version.
+The route that cloned the accepted scope was the version route, and it is the
+one being retired; ＋ Presupuesto no longer offers it and says where it moved.
+
+Each adicional carries an **ADI number of its own** for the customer's document.
+That was the single good argument for the version model — a customer handed a
+PRE number reads a re-quote of the whole job — and it was always about the paper
+rather than the record, so it survives the move.
+
+Two things found on the way, both consequences of S15 that S15 missed: the days
+were still applying on acceptance on BOTH routes, because
+`setVariationScheduleDays` and `setAdditionalScheduleDays` gated on
+`acceptedVersionId` rather than on the annex; and S99e is closed — an accepted
+adicional whose annex is unsigned now says «Anexo sin firmar» in the register,
+instead of reading «Aceptado» while the job correctly showed nothing.
+
+Gates: site E2E **754/754 unfiltered**, site-sync 20/20, iOS routes 7/7,
+boundaries, site syntax, i18n coverage complete in three languages, source
+literals 162/162, workspace audit 0/0. ASSUMPTIONS S100.
+
+**S17 · Adicionales leaves Contratos, and the days move to where they take
+effect.** The operator's item 5, and it could not be done by deleting first:
+«Formalizar un adicional» was the only place the days per partida and the
+customer's answer were captured. Both separate cleanly along the line S15 drew —
+the answer belongs to the presupuesto and is given there like any other; the
+days belong to the moment they apply, which is no longer acceptance but the
+annex. So the signing panel asks for them, which is the operator's own item 4.
+
+One verb serves both routes, so the screen never has to know which shape of
+adicional it is looking at. The variation-budget route gained a per-partida
+breakdown it never had: the schedule consumes one delay per partida, and an
+adicional that moves a completion date but not the bars underneath it is half a
+plan.
+
+Then the tab went, with its rows, its columns, its 112-line drawer and the
+back-link special case that existed only to return to it.
+
+Two found by the tests, and the second is one the operator would have hit: the
+days verb THREW on an annex with no adicional behind it, which would have
+refused a SIGNATURE over a field that should never have been offered; and
+switching between «Anexo firmado» and «Aprobado verbalmente» wiped the days
+already typed, because `paint()` re-read them from the values the drawer opened
+with. The second is the rule the evidence field in the same file already states,
+and it was found only because the test types the days and THEN picks the method,
+which is the order a person uses.
+
+With this, all five of the operator's items are in.
+
+Gates: site E2E **756/756 unfiltered**, site-sync 20/20, iOS routes 7/7,
+boundaries, site syntax, i18n coverage complete in three languages, source
+literals 162/162, workspace audit 0/0. ASSUMPTIONS S101.
+
+**Read with S13, not instead of it.** The two were written in parallel against
+the same operator stream and they answer different halves: S13 is the workspace
+with no card account at all, where the whole answer was suppressed and the panel
+said nothing; S18 is the workspace that HAS its cards and its statement, where
+the answer existed and only somebody already shown it could find it. Neither
+supersedes the other and both are on this tree.
+
+**S18 · The card settlement is proposed, not hunted for.** «I have all the
+credit card conciliated but I can not match the Account movement with the
+Credit card movement. How can we do this? There is no Propuestas.» There could
+not be: Propuestas has only ever argued about DOCUMENTS — invoices and bills
+scored on amount, date, reference and counterparty — and a card settlement is
+explained by no document at all, being one account paying another. The matcher
+was right to say nothing, and the mechanism that does record it was an
+`<optgroup>` inside a dropdown of unrelated identifications: present, correct,
+and reachable only by somebody who had already been shown it. The fourth
+instance this package of a rule whose door is the part that is missing.
+
+The evidence was on the line all along. «ADEUDO MENSUAL DE TARJETA ...8442
+LIQUIDACION 01/11/2026-30/11/2026» states the period in plain digits, so the
+window is not inferred: the card's own movements inside it are summed and
+compared with what left the bank. A month of purchases adding to the cent to
+the charge that pays for them is not a coincidence, and the card named in the
+concept corroborates it. Neither acts alone — it proposes, a person presses —
+and accepting goes through `markCardSettlement`, the same door the dropdown
+uses, because a proposal with its own route to the same state is two
+implementations of one rule waiting to drift. Falls back to the calendar month
+before the charge when the bank does not spell the period out.
+
+**Merged with the partner again** — assigning somebody to an obra, which no
+screen could do. Re-run whole on the merged tree rather than on either half:
+**740/740**.
+
+**S19 · Three annex buttons that could never have worked.** «I cant sign annex
+or delete annex», from the live server, on the screens S14–S17 built. The
+contract panel is built from `renderContractDoc(...)` — the printable document,
+which has a number, a date and a customer and no id at all — and the three annex
+buttons passed `d.id`. Every click called the drawer with `undefined`, the
+lookup found no contract, and the function returned at its first guard: a drawer
+opened, empty, silently. `conWork.id` is what every other handler on that screen
+already used.
+
+Both drawers throw now instead of returning, so the next id that resolves to
+nothing says so.
+
+**And the suite was green through all of it**, because it opened the drawer by
+calling the function with the arguments the screen was supposed to supply. It
+clicks the buttons now, and the checks were verified by putting the bug back and
+watching them fail. Third instance in this package of one shape — a function
+that exists with no working way in.
+
+The temporary deploy marker went with it, and the literal ceiling it bought:
+`ci.yml` asked whoever removed the span to put 163 back to 162 in the same
+commit, and this is that commit.
+
+Gates: site E2E **762/762 unfiltered**, `pnpm test` 173/173, manageability
+simulation **513/513**, site-sync 20/20, boundaries, site syntax, i18n coverage
+complete in three languages, source literals **162/162** against the restored
+ceiling, workspace audit 0/0. ASSUMPTIONS S107.
+
+**S20 · The credit note was adding to the debt.** «I have emitted this invoice
+to correct the other one with the amount but it does not appear in the list of
+Ingresos» — and behind that report, a worse figure the operator had not asked
+about: `FAC-2026-0003`, total 1.628 €, showing **2.068 €** outstanding. The gap
+was exactly twice its two abonos.
+
+One root, two faults. Nothing has ever forced a sign on a credit note —
+`issueInvoice` takes whatever the lines sum to — so an abono typed negative, as
+a rectificativa reads, met two consumers that subtract and therefore assume
+positive. `invoiceOutstandingCents` turned `- credited` into `- (-220)` and
+handed the money back to the debt; the certification path's `billedBase` did the
+same to what had been billed. Both read the MAGNITUDE now, which is a deliberate
+departure from the instruction to flip the signs: flipping fixes an abono
+entered negative and breaks one entered positive, and the data holds both
+because no rule ever settled it.
+
+And `invoiceRegister` opened with a filter that excluded credit notes, so a
+numbered, gapless, immutable document was issued and appeared on no register.
+They are listed now, owing nothing themselves, and «emitido» nets.
+
+Verified against the bug rather than only against the fix: the old code reports
+`198040 → 208040`, the new one `198040 → 188040`.
+
+Gates: site E2E **764/764 unfiltered**, `pnpm test` 173/173 across 27 tasks,
+manageability simulation 513/513, site-sync 20/20, boundaries, i18n complete in
+three languages, source literals 162/162, workspace audit 0/0. ASSUMPTIONS S108.
+
+**S21 · The invoice stops collecting money.** «we don't need Registro de Cobro
+because this is done on Bank Conciliation» — and it is the same fault `payBills`
+was removed for in package 12, at the other end of the same journey: a form that
+wrote a receipt against no bank line. A collection is recorded now by matching a
+statement movement to the invoice in Conciliación, where the money actually
+appears. `recordCollection` stays in the engine because the bank matcher calls
+it; what went is the manual door.
+
+The drawer keeps a card that names Conciliación and offers the route, and the
+check asserts both halves — the form absent, and the button actually landing on
+the queue. A control removed in silence reads as a screen that cannot do
+anything, which is the report this package opened on.
+
+The recorrido's phase 11 needed it too: its verb was labelled «Registrar cobro»
+and opened the invoice drawer, which after this change is named after something
+that drawer can no longer do. It walks to Conciliación.
+
+Gates: site E2E **765/765 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 162/162 in both, workspace audit 0/0. ASSUMPTIONS S109.
+
+**S22 · A supplier's name printed under «Presupuestado».** «The information in
+read shoudl appear in a different window/popup or whatever you think is better,
+becasue as it is I don't see it correct.» The documents behind a subpartida were
+a third level of rows in the per-partida table, and a cost document has nothing
+to put in a header of seven money columns: the supplier landed under
+«Presupuestado», the tax id under «Desviación», the date under «%». The header
+made a claim about every cell beneath it and was wrong about five of the seven.
+
+They open in a panel of their own now, with the columns they actually have —
+fecha, origen, referencia, proveedor, NIF, tipo, importe. The subpartida row
+stops being a toggle and carries a button with the count.
+
+What the old shape bought was a vertical check: the amounts sat under the
+subtotal, so the eye could confirm they added up. That is kept as a printed
+claim rather than a geometry — the panel foots its own documents against the
+subpartida's accumulated cost and says whether they agree. And the check PRESSES
+THE BUTTON instead of calling the panel with the arguments the screen is meant
+to supply, which is the lesson S19 paid for.
+
+**S23 · A saving printed in the same red as an overrun.** «Can you see this
+columns (- or + signs) and look for best practice on project economic control? I
+need to improve this further.» The first thing behind that question was a defect:
+the deviation cell applied the danger class whether the figure was positive or
+negative, so a partida twenty-four euros UNDER budget printed red and bold,
+exactly like one four hundred over — on the one screen whose job is to tell those
+two states apart. Over budget is red and keeps its plus; under budget takes the
+green the margin columns already use; dead on is neither.
+
+Then the missing half. The table showed spend only — presupuestado, real,
+desviación, margen — and a cost report that shows only spend cannot answer the
+question it is opened for: where does this partida end up. A second view,
+**«Proyección»**, beside the existing **«Ejecutado»**: comprometido (orders and
+awards, invoiced or not), avance, proyectado, the deviation against budget, the
+margin that survives it, and a total row.
+
+Two views rather than eleven columns on one row: they answer different questions,
+are read at different moments, and a report that puts spend and forecast
+side by side on a phone is a report nobody finishes.
+
+The projection is **computed and cannot be typed** — that was settled when the
+operator removed the «Ajustar» button, because the budget is fixed and only an
+adicional to the contract moves it. Cost at completion is
+`real + presupuestado × (1 − avance)`, floored at what is already spent and at
+what is already committed. The obvious alternative, `real ÷ avance`, assumes
+every future euro is as inefficient as every past one and reports a catastrophe
+at five per cent progress on any partida that buys its material on day one.
+
+It stops at the partida and says so on screen: an order and an award are signed
+against a partida, and splitting them across subpartidas would invent a figure
+nobody recorded.
+
+Gates: site E2E **772/772 unfiltered**, `pnpm test` 27/27 tasks, `check-types`
+29/29, manageability 513/513, site-sync 20/20, boundaries, i18n complete in three
+languages, source literals 162/162 in both, workspace audit 0/0, iOS routes 9/9.
+ASSUMPTIONS S112, S113, S113a.
+
+**S24 · The accountant's workbook carried the movements and not the documents.**
+«Whenever I download the Report for the Gestoría, the excel is empty but we have
+three invoices.» Both halves true at once, and the second explains the first: the
+spreadsheet had exactly one loop feeding it, over `pkg.bankMovements`. The
+package carries five things — movements, facturas recibidas, facturas emitidas,
+IVA and IRPF — and four of the five never reached a cell. The bills had one job
+in that function, copying their PDFs into `docs/`, so the archive was exactly
+what the operator saw: three real invoices in the folder, a header row and
+nothing under it in the sheet, because that quarter has no imported statement.
+
+The gestor was receiving a folder of files with no sheet saying what they were,
+from whom, for how much, or with what tax on them.
+
+One workbook, four tabs now — **Conciliación** (as before), **Facturas
+recibidas**, **Facturas emitidas**, **Resumen** (IVA repercutido y soportado por
+tipo, resultado del trimestre, IRPF). The document tabs name the PDF of each
+document, so the sheet points at the folder instead of the folder standing alone.
+An empty reconciliation tab now says why it is empty, and the download says so
+too — the operator found this out by opening the file.
+
+Underneath: `xlsxBlob` could only ever write one sheet, so it split into a
+per-sheet builder and a workbook packer with every existing caller untouched;
+`parseXlsxRows` learned an optional sheet index; and `txFromInvoice` gained the
+client's **NIF**, which the supplier half of the same dictionary already carried.
+
+**And the check could not have found it.** The existing assertion picks the
+quarter with the MOST movements — it guaranteed itself a non-empty sheet. The new
+one takes the opposite quarter, and there was one in the fixture all along:
+2024-Q3, two bills, three issued invoices, no movements. Put the single-sheet
+build back and it reports `sheets:1, billRows:null, modelBills:2` — the
+screenshot in JSON. Fourth time in two packages a gate passed by sampling the
+case that works.
+
+Gates: site E2E **774/774 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals **161/161** in both with the CI ceiling ratcheted down to match,
+workspace audit 0/0. ASSUMPTIONS S114, S114a–S114d.
+
+**S25 · Caja chica: the two ends worked and the middle had no door.** «how it
+works the withdrawal, expense and deposite of the difference[?]» Declaring the
+reintegro worked. Declaring the devolución worked. Attaching the receipts could
+not be done at all.
+
+`markCashWithdrawal` classifies the line, `classifyMovement` marks it allocated
+and out of the profit and loss — both correct — and `unreconciledMovements` wants
+neither, so the withdrawal leaves the queue the instant it is declared. And
+`matchDrawer`, the only screen with Candidatos, the split matcher and the
+withdrawal card, had exactly one caller: that queue's `onRowClick`. The
+Conciliados list showed the row and did nothing with it.
+
+So `documentedCents` could never move. A withdrawal spent entirely on tickets read
+100% «en efectivo todavía» forever, and since that figure is the `cashOutstanding`
+exception, every quarter holding one would have blocked the gestoría archive over
+a number nobody could bring down.
+
+Two doors: a **Conciliados row opens its panel** (the general form — any explained
+line needing a second document had to lose the first), and Conciliación grows an
+**«Efectivo pendiente de justificar»** card listing each open withdrawal with what
+is left and a button in. The queue is deliberately untouched: putting a withdrawal
+back in it would block sealing the quarter over cash in somebody's pocket, which
+the operator has already called ordinary. And the card ignores the period, because
+money taken out in March is spent in April.
+
+Also: `matchMovementSplit` was setting the class to `projectCost` on a matched
+withdrawal. `excludedFromPL` survived, so nothing double-counted, but the class
+and the flag disagreed; it keeps `internalTransfer` now.
+
+**And the check pressed the room, not the door.** It called `matchDrawer(w.id)`
+directly, and asserted the cash returned and the remainder while never asserting
+anything was documented. It clicks now and requires the figure to move — 14.000c →
+3.110c. Verified against the fault, where it reports `noDoor:true` and
+`documented 0 → 0`. One of the three new checks PASSED against the fault on its
+first run, because `#dbody` survives a closed drawer; it reads `.drawer.on #dbody`
+now.
+
+Gates: site E2E **776/776 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S115, S115a–S115c.
+
+**S26 · A column that could only print zero, and a forecast that trusted a figure
+nobody had entered.** «we are not using Purchase orders anymore. That is why I am
+telling you that is difficult to forecast. We only can have the Budget against
+that has been spend.» Half right, and the wrong half was the more useful one.
+
+**Comprometido was structurally empty for this operator.** `committedByChapter`
+reads purchase orders and subcontract awards and nothing else, so with no orders
+the column could print zero for ever, in a table already short of width. It is
+hidden when the obra has no commitment at all — computed, not configured, so the
+day an award names a partida it comes back on its own with nothing to migrate.
+
+**But the forecast never depended on it.** The missing input was the avance, and
+that one they do have. On their own screen, partida 3 had spent 2.123 against a
+budget of 1.860 while still registering 0%, and `real + presupuestado × (1 −
+avance)` added the whole budget on top of money already spent: 3.983 €, of which
+1.860 was phantom, out of a 4.722 total deviation — from one row.
+
+Nought per cent beside real money means nobody recorded the progress, not that
+nothing was built. Such a partida now reports a **floor**, the greater of budgeted
+and spent, and carries a «sin avance» pill saying so. A floor understates a
+partida that really does have work left, and that is the right way to be wrong:
+the mark says the figure is provisional, and the remedy — recording the avance —
+is the same act that makes the column mean anything.
+
+Structurally, `ecoForecastModel` now computes and `ecoForecastRows` renders: the
+header has to know whether the column shows and whether anything is floored, and a
+template cannot ask a question whose answer it prints above itself.
+
+**Both checks verified against their faults**, and the branch the operator lives
+in — no orders, no awards — does not exist in the fixture, so it is stubbed for one
+render and put back: the column goes, the rows narrow with it, and it returns.
+
+Gates: site E2E **778/778 unfiltered**, `pnpm test` 27/27 tasks, manageability
+513/513, site-sync 20/20, boundaries, i18n complete in three languages, source
+literals 161/161 in both, workspace audit 0/0. ASSUMPTIONS S116, S116a–S116c.
+
+**S27 · Tres pantallas señaladas a la vez.** El operador marcó en verde, rojo y
+naranja tres partes de Maestros, y las tres resultaron ser el mismo fallo con
+distinta cara: algo que no comparte el primitivo que todos los demás comparten.
+
+**Verde — el catálogo era el único registro sin paginar.** 209 subpartidas
+dibujaban 209 filas, con tabla propia y sin tamaño de página, mientras Clientes y
+Proveedores usan `renderMasterList` desde hace tres paquetes. Ahora lo usa: filas
+por pantalla, anterior/siguiente y exportación que no tenía. Y el primitivo
+aprendió columnas numéricas, que no soportaba, para que Coste, Precio y Margen
+sigan alineados — lo ganan todas las listas.
+
+**Rojo — los paquetes de trabajo, muertos por los dos extremos.** Ninguna pantalla
+podía crear uno y `packageCostCents` no alimentaba nada salvo las dos tablas que
+lo imprimían. Retiradas. Los métodos del motor se quedan porque los afirma la
+simulación, sin puerta y anotado como tal.
+
+**Naranja — dos cosas con un nombre.** `Maestros > Subcontratas` era un filtro por
+rol sobre el mismo `parties` que Proveedores: retirada. `Obra > Subcontratos` son
+las adjudicaciones, con certificaciones y documentación con caducidad, y alimentan
+la columna Comprometido: se queda.
+
+**Y retirarla abría una trampa.** Proveedores nombraba dos de los tres roles y su
+alta fijaba `supplier`, así que un industrial se habría quedado sin registro y sin
+forma de crearse — mientras el selector que les adjudica obra leía los tres desde
+siempre. Proveedores lee `SUPPLIER_ROLES` y el alta ofrece los tres roles.
+
+Gates: site E2E **780/780 unfiltered**, `pnpm test` 27/27, manageability 513/513,
+site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
+workspace audit 0/0, rutas iOS 9/9. ASSUMPTIONS S117, S117a–S117c.
+
+**S28 · «Al 50 % de avance» hacía imposible crear el contrato.** El operador lo
+contó como que no podía poner la otra mitad al terminar; el fallo era mayor. La
+fila de hito lleva un `<select>` con dos hechos dentro, `atProgressPct:50`, y
+`readHitos` los separa bien — pero `save` copiaba el trigger y **tiraba el
+umbral**, y CON-04 lo exige. `createContract` lanzaba «A progress milestone needs
+one of 10, 20, … 90 per cent», nombrando un campo que la pantalla nunca enseñó.
+Con esa fila puesta no había contrato.
+
+Probado contra el motor antes de tocar nada: sin umbral se rechaza, con umbral se
+acepta, y `onCompletion` se acepta — la otra mitad sí tenía sitio. Y no existe «al
+100 % de avance» a propósito: los umbrales van de 10 a 90 y el cien por cien es «A
+la finalización».
+
+La comprobación pulsa el select en vez de llamar a la función, y se verificó
+contra el fallo, donde informa `created:false` — el síntoma del operador en JSON.
+
+**Dos peticiones más quedan propuestas y sin implementar, a petición expresa:**
+heredar el reparto de pago del presupuesto (hoy `paymentConditions` es prosa, no
+datos; la propuesta le añade un `installments` opcional) y los **Títulos** sobre
+las partidas (como etiqueta de la partida, no como contenedor, porque `chapterNum`
+lo lee todo el sistema). Ambas en ASSUMPTIONS S119b.
+
+Gates: site E2E **781/781 unfiltered**, `pnpm test` 27/27, manageability 513/513,
+site-sync 20/20, boundaries, i18n completa en tres idiomas, literales 161/161,
+workspace audit 0/0. ASSUMPTIONS S119, S119a, S119b.
+
+**Where the parallel stream is.** S10 and S11 above, and everything on `main`
+after them, come from the session working the hours redesign and the site-worker
+boundary in Spanish. Its six commits since S11 are NOT narrated here yet; they
+are logged in ASSUMPTIONS.md as **S83–S89** and are all on `main`: six sections
+in the mobile bar and a one-line header (S83), not one API response telling the
+browser not to store it (S84), a permission refusal read as an expired session
+(S85), the site worker's shell rather than their screens (S86), six tabs holding
+six identities (S87), a site account being sent what its jobs sell for, cost and
+earn (S88), and the whole site-worker feature unreachable because
+`assignWorkerDrawer` had no caller (S89). Read those before taking this section
+as a description of the tree.
 
 **Still open.** iOS parity and TestFlight, deferred by the operator on 04/09
 ("Forget about this for the moment") and still the oldest unanswered item. It
@@ -2387,9 +2939,495 @@ set of pages per branch, so one local reading is not the number CI sees
 boundaries · build` green, nav manifest and ownership guard green. No
 capability changed, so the committed `site/erp-factory` bundle is byte-identical.
 
-### PK14-S78 · Datos maestros → Notas (15/09)
+## N · The App is ready for Apple, and two ways it would have failed quietly
 
-A new subsection under Datos maestros: the test phase's feedback intake. Where a
+`main` carries the whole Apple path: `site/privacy.html` published,
+`ios/fastlane/metadata/` in `deliver`'s layout in both languages, the App Review
+notes written for a **Custom App** distributed through Apple Business Manager,
+the `release` lane that refuses to submit without a demo account, and
+`.github/workflows/ios-release.yml` behind one button. TestFlight run **#24** is
+green on `8830f42` and carries the current web work; nothing bundled into the
+shell has changed since, so no rebuild is owed. `docs/RELEASE-IOS.md` opens with
+the one question that decides whether tomorrow is possible at all — whether the
+company is already enrolled in Business Manager — and says plainly that
+enrolment takes days and that TestFlight keeps working meanwhile.
+
+Two defects found by checking the release path rather than the screens, both of
+the kind nothing goes red for:
+
+- **The ten screenshots were gitignored** and existed only in the container that
+  made them. The submission runs from a clean checkout, so the listing would
+  have gone to review with an empty gallery (ASSUMPTIONS S81).
+- **The App Review password was left in a tracked file** after the lane ran.
+  Harmless in CI, one `git add -A` from a committed secret on a real machine
+  (S82).
+
+Next, and only the operator can do it: the Business Manager Organization ID, the
+contact phone, and a working demo account.
+
+**Where a fresh session picks up.** Package 13 is eighteen items, all shipped and
+pushed; `main` is the only branch and deploys from `site/**`. The oldest open
+item remains iOS parity and TestFlight, deferred by the operator on 04/09 and
+never answered in full. The pattern worth carrying forward is in the S-notes
+above: most of these were the product being confidently silent rather than
+wrong, and every one was found by a person using it while the suite stayed
+green — because those tests asked the ENGINE what the SCREEN does.
+
+## S12 · The administrator with one tab, and the server that stopped listening
+
+Two faults reported together and independent of each other.
+
+**The tab bar now follows the account.** `AppState` owns the tabs as published
+state and rebuilds them when a page reports a different role; the role is
+cleared on sign-out as well as written on sign-in, and announced on every
+session recheck rather than only on a full page boot. The page keeps its own
+section rail whenever the shell reports a bar that cannot reach the rest of the
+app, so a wrong bar can never again mean no navigation at all. Reaches the phone
+only through a new TestFlight build — the fix is in the app binary.
+
+**A stale server is now a red tick.** `deploy.yml` gained a `verify` job that
+asks `/api/health` whether the revision answering is the one just built;
+`ops/status.sh` asks whether the deploy service's last run succeeded, whether
+`IMAGE_APP` still follows `:main`, and which commit is actually replying. Both
+the deploy checker and the workflow read one list of image paths.
+
+Not done here, and only the operator can do it: production was 19 commits behind
+when this was written and this session cannot reach the host. `./ops/deploy-now.sh`
+from a checkout with `ops/provision.conf`, or the three commands in S103.
+
+See ASSUMPTIONS S102, S102a, S103, S103a.
+
+## S13 · The crew's hours could not be saved, and nothing said so
+
+The operator signed in as a site worker. Three faults, of which only two are
+visible in a screenshot.
+
+**The write had no door.** `#me_save` mutated memory, drew the row, and said
+«Horas guardadas». `ErpStore.saveState` refuses to PUT a redacted document —
+correctly — and its comment claimed the worker's writes went through
+`POST /erp/command`; no client had ever called it, and `ErpStore` had no
+`command` method. The row was gone on the next reload. `ErpStore.command()` now
+exists and the three worker handlers (save, Cambiar, Eliminar) go through it;
+the office keeps its whole-document PUT, deliberately.
+
+**Its `?include=state` receipt was the whole company file.** The branch returned
+`erp.toJSON()` unredacted to anyone allowed to run a command, which now includes
+a site worker — so saving a timesheet would have answered with every invoice,
+every bank line and everybody's pay. Unreachable only while no client existed.
+Scoped in the same commit as the client, by the state route's own rule and on
+the permission rather than the role name.
+
+**`boot()` was a third door with no lock.** `go()` and `hashchange` clamp a site
+worker to the hours screen; `boot()` did not, and the shell loads every tab at
+its own hash, so neither of the other two ever fires. The office's screens
+rendered over the redacted document — `0 €`, "0 clients", "No projects yet".
+Clamped in `boot()`, in `toggleSection`, and as a backstop in `render()`, which
+is the single point every door leads to.
+
+**And the gates that let all of it through are now two-sided.**
+`tests/server-e2e` had four refusals for the site worker and no admission — it
+passed just as well against an endpoint that refused him everything, which is
+what shipped. It now asserts the legitimate `recordHours` returns 200 and that
+the state coming back with it carries no amount in cents and nobody else's
+record. `tests/site-e2e` asserted `(form || approved)`, which the empty state
+satisfies, and pressed `#me_save` nowhere. It now fills the form, presses the
+button, RELOADS THE PAGE, requires the row to still be there, and deletes it
+again.
+
+Not done here, and only the operator can do it: put the worker's sign-in address
+in the worker record's **Email** field (Master data → Personal), assign that
+worker to an open job (**Obras asignadas → ＋ Asignar a la obra**), set the
+repository variable `APP_URL`, and trigger a TestFlight build — the installed
+app predates the tab-bar fix, which Part 2 above makes harmless rather than
+merely untidy in the meantime.
+
+See ASSUMPTIONS S110, S110a, S110b, S110c, S110d.
+
+## S14 · Two quick ones on the recorrido (2026-09-12)
+
+**The strip says which phase the job is in.** The middle of the three names
+under the dots was always Contrato — a fixed milestone that the operator read
+as a statement about the job. The two ends stay; between them the only named
+dot is the one the ring is on, in the accent colour. Which labels fit is
+measured in all three languages at four widths, and Catalan is what set the
+thresholds: a Spanish-only measurement would have shipped two overlaps.
+
+**Finishing a phase moves you on to the next.** The screen kept the phase you
+were looking at, so completing a visit recoloured a dot and left the next action
+behind a button. It follows the work now — but only on a real transition, so a
+completed phase can still be opened and read without being thrown forward.
+
+Both are covered by browser checks that fail when the old behaviour is put back:
+156 label positions across es/ca/en, and the 2 → 3 jump the operator described.
+
+See ASSUMPTIONS S119, S119a, S119b, S120.
+
+## S15 · The recorrido follows the work through the quote and the contract (2026-09-12)
+
+Two more from the operator, with two different causes.
+
+**Sending the quote no longer leaves the screen.** `sendBudgetDrawer` declared a
+local `opts` that shadowed its own parameter — the one carrying `{ stay: true }`
+— so the send walked to the quotes register while the comment beside it said it
+would stay. Renamed; the two register callers pass no options and are untouched.
+
+**And finishing with a phase moves you on, even when it is not finished.** A
+quote sent is «waiting», not done: there is nothing left to press and the next
+verb is one phase along. The rule now turns on the verb disappearing rather than
+the colour changing — which is also why a contract created but NOT signed keeps
+you where you are, because its verb becomes «Firmar».
+
+Three browser checks, each verified against its own fault: the 2 → 3 jump, the
+sent quote moving to the answer, and the real Send button staying on the
+recorrido — that last one because the first version called the engine directly
+and would have passed with the navigation bug live.
+
+See ASSUMPTIONS S121, S122, S122a.
+
+## S16 · The PDFs that were never files (2026-09-12)
+
+The operator: some PDFs are not opening. Only the quote had a real PDF writer
+behind it; the contract, invoice, rectificativa, receipt and job sheet built
+the on-screen sheet and called `window.print()`. A browser answers that with a
+dialog; a WKWebView answers it with nothing, so inside the app those buttons
+were inert — and the quote working is what made it look like «some».
+
+`downloadPdf` is now the Word path with the PDF writer on the end: the same
+descriptor `docFor` already produced for all twenty kinds. The print route and
+its `@media print` rules are deleted, not left beside it.
+
+The test that covered this asserted the print mechanism — it stubbed
+`window.print` and checked the sheet was laid out — so it passed throughout.
+It now asserts a download event with a `%PDF-` header, as does a new one on the
+ledger, plus a sweep that builds a PDF for every kind the ledger offers.
+
+See ASSUMPTIONS S123, S123a, S123b.
+
+## S17 · The phase rail opens where the job is (2026-09-12)
+
+Thirteen chips, a phone shows five, and the strip always started at chip one —
+so a job at phase 8 opened with that phase off the right-hand edge. It is now
+scrolled so the current chip is centred, clamped at both ends, and still freely
+draggable. It moves only when the selected phase changes, so a redraw cannot
+haul it back under the operator's thumb.
+
+Checked at phone width, because at desktop width the whole rail fits and the
+assertion would pass against no implementation at all.
+
+See ASSUMPTIONS S124, S124a.
+
+## S18 · The plan moves into the recorrido (2026-09-12)
+
+Ejecución carried five money figures, no verb, and a link to another screen —
+so the operator could neither edit the plan nor follow the work from the one
+screen meant to walk them through the job.
+
+It now draws the real chart and task list, off one shared `ganttContext`, with
+the same drag/tap gestures bound by the same `ganttWire`. It reports the
+schedule as well as the money — planned finish, critical path, baseline drift —
+and turns `late` when the drift is positive. The verbs are «＋ Tarea» and
+«◆ Hito», or «Derivar del presupuesto» when there is no plan yet, disabled with
+its reason when there is no accepted budget behind it.
+
+The full screen keeps zoom, baseline, calendar, the S-curve and the payment
+recalculation, and is still one tap away.
+
+See ASSUMPTIONS S125, S125a, S125b, S125c.
+
+## S19 · Every document, both formats — and a deploy that reaches the phone (2026-09-12)
+
+«PDF invoice download not possible. General check all documents download word
+and pdf in whole customer journey that it is working.»
+
+The invoice buttons could not be reproduced as broken: in a browser `⤓ PDF` and
+`⤓ Word` both wrote their file. What reproduces the report is a page loaded
+before the fix deployed, which is a real fault and a wider one — the shell holds
+one web view per tab from launch, so nothing published reaches a phone that is
+already open. Three reports in one afternoon were that same fault underneath.
+
+Two things landed:
+
+- **The page notices a new build.** `/api/health` already answers with the
+  commit the running image was built from. The page remembers the first
+  revision it sees and reloads when the server starts answering with another —
+  never at boot, never on `unknown`, and never over an open drawer or a focused
+  field.
+- **The sweep became a gate.** Every document of every recorrido, in both
+  formats, through `historyDocFile` — the button's own route one layer down.
+  **176 documents · 352 files**, all of them a real PDF or a real Word file:
+  presupuesto 55, contrato 46, factura 45, fichaProyecto 24, recibo 6.
+
+See ASSUMPTIONS S126, S126a, S126b.
+
+## S20 · Every email the system composes, as one pack — and the braces it found (2026-09-12)
+
+«Create sample emails and emails attachments for everything the ERP system will
+ever create on emails so far. Then share the one pdf.»
+
+**Eight emails, six families, four attachments**, in one 23-page PDF: the six
+standard message templates (quote sent, quote followed up, invoice chased,
+works starting, subcontractor paperwork expired, post-completion check) and the
+two account emails the server composes (activation, password reset). Each gets
+the envelope it is sent with, the plain-text part a phone notification shows,
+and the branded HTML body — and where it carries a document, the real file
+follows immediately.
+
+Generated, not drawn: the library from the engine, the token fill from the
+messaging capability, the body from the same function the send path uses, the
+attachments from the same writer that produces the customer's download.
+
+**Generating it found a live defect.** Two of the six messages had never had
+their tokens supplied, so a customer received «Hola {{cliente}},» under
+«Comenzamos su obra el {{fecha}}». Visible only in the sent mail, because every
+screen shows the template. Fixed in `commsEvents()` and gated by
+`tests/comms-tokens/run.mjs`.
+
+See ASSUMPTIONS S127, S127a, S127b, S127c.
+
+## S21 · The Barcelona tenant roadmap, run end to end overnight (2026-09-13)
+
+Twelve phases, each on the model the roadmap named, each gated before commit:
+reference case, market map, ICP and rubric, regulatory trigger map, sourcing
+plan, 128-firm prospect list with a 10 % re-derivation audit, scoring into four
+tiers, value case per segment, tailoring economics measured against the real
+CLI, route to market, outreach kit in Castilian and Catalan, pilot
+specification, a red team in a fresh context, and a decision document.
+
+`docs/market/barcelona/12-SYNTHESIS.md` is the one to read: seven design-partner
+candidates, an ask of €55,000 over thirteen weeks, eight yes/no decisions the
+operator can take separately, and three stop conditions written before starting.
+The bound PDF is 183 pages; the decision document is its first nine.
+
+Two findings the operator should weigh before anything else: the prospect list
+cannot be used for outreach until it is enriched from a paid registry (only web
+search reaches outside this environment), and the fifteen-minute tenant claim
+holds for the specification but not for a sign-in-able tenant — 8–16 hours
+today, with two structural blockers named.
+
+See ASSUMPTIONS S128, S128a, S128b, S128c, S128d.
+
+## S22 · The Barcelona pipeline workbook (2026-09-13)
+
+`docs/market/barcelona/BARCELONA-PIPELINE.xlsx`: the 128 firms tiered and
+ranked, with published contacts (enriched for Tier A+B), a stage-by-stage
+playbook whose next action, script and exit criterion appear on each firm's
+row, the Castilian and Catalan scripts, the twelve objections, the triggers with
+their openers, pricing and pilot term sheet, an activity log and a formula-driven
+dashboard with the three stop conditions. Rebuild with
+`python3 scripts/market-pipeline-xlsx.py`. See ASSUMPTIONS S129–S129b.
+
+## S23 · The pipeline, researched and audited (2026-09-13)
+
+All 128 firms researched on the open web and the results audited on a 15-row
+sample before shipping: CNAE on 103, addresses on 97, 55 telephones, 40
+websites, 27 emails, 33 named administrators, 40 Tier D firms whose recovered
+CNAE puts them back in the target family. Three firms — two dissolved, one with
+no registry record — are flagged DO NOT CALL and removed from the working set.
+Zero measured error on the fields a seller acts on. See ASSUMPTIONS S130–S130d.
+
+## S24 · Why the phone numbers are missing, and the three ways to get them (2026-09-13)
+
+Established by testing rather than assumption: this session cannot fetch a web
+page — the egress proxy refuses every host. `docs/market/barcelona/ENRICHMENT-OPTIONS.md`
+sets out the three doors with costs (environment Network access → Full, free;
+an MCP connector, free; Google Places, free at this volume) and what each fills
+column by column. `scripts/market-enrich.mjs` implements all three, probes which
+are open, and refuses to run on snippets alone. The workbook already reads the
+output file and has the columns waiting. See ASSUMPTIONS S131–S131b.
+
+## S25 · Every email the ERP can send, on one premium template (2026-09-14)
+
+**Done.**
+
+- `site/erp-eml.js` is now one builder for the envelope **and** the design:
+  block vocabulary (masthead · prose · facts · payment · note · attachment ·
+  credentials · steps · button · sign-off · legal foot), tables and inline
+  styles only, every band stating its own ground, a `cid:` mark with a
+  live-text wordmark beside it, a preheader, and a plain part written to be
+  read. RFC 2047 on the subject, a `Date:` header and an escaped apostrophe
+  fixed on the way past.
+- `scripts/email-logo.mjs` regenerates the two marks (green for the masthead,
+  white for the legal foot) from the house outline.
+- `STANDARD_COMMS_TEMPLATES` rewritten around those blocks in **es · ca · en**,
+  and `commsEvents()` now supplies the figures: due date, days overdue, amount
+  as a person reads it, the site the job is on, the account to pay into, the
+  quote's validity. `composeCommsMessage()` joins template and event once; the
+  HTML part, the plain part and the WhatsApp text all render from it.
+- **Two emails the catalogue promised and the product could not send** —
+  `quote-accepted` and `invoice-send` — raised by two new events built from data
+  the system already held.
+- `apps/web/lib/invite-mail.ts` composes against the same builder, so the two
+  account emails gained the legal foot they never had.
+- `site/documentos/01-cliente/17–20-email-*.html` are generated by
+  `scripts/email-docs.mjs` from the message library instead of hand-drawn.
+- `tests/comms-tokens/run.mjs` grew from one assertion to twenty per template
+  per language, on the rendered message — **678 checks**, with a floor asserted
+  so an empty sweep fails.
+- `dist/sample-emails/EMAIL-SAMPLE-PACK.pdf` — 26 emails, 133 pages, every one
+  rendered by the code that sends it.
+
+**Gates green:** lint · check-types · boundaries · test (174) · test:pdf (44) ·
+test:docx (124) · test:docs (21 documents, all searchable) · test:mailbox (55) ·
+command-arity (5) · site-syntax · nav manifest · ios-routes (9) · i18n audits at
+their ceilings · simulation (import 25, manageability 513, migrations 104,
+scheduling 30, year 149) · comms gate 678 · site-e2e unfiltered.
+
+**Next:** nothing outstanding on the messaging path. Operator-only items
+unchanged — repository variable `APP_URL`, the worker record's sign-in address,
+TestFlight #25, Canva and Stripe reauthorisation.
+
+## S26 · The App Store route confirmed, and everything that can be ready is (2026-09-14)
+
+**Done.**
+
+- **`ios/CaneiSubirats/Resources/PrivacyInfo.xcprivacy`** — the one real gap.
+  Required since May 2024, absent, and the most-cited privacy rejection for an
+  app using `UserDefaults`. No tracking, no collected data, `CA92.1` for
+  UserDefaults.
+- **`tests/app-store/run.mjs`** — 76 checks over the listing, the screenshots,
+  the review information and the manifest, in both locales; in CI on every
+  commit and in the release workflow with `--ready`. Proven red on a too-long
+  subtitle and a wrong-size screenshot.
+- Release notes rewritten in both languages for what the build actually
+  contains; App Review contact phone filled.
+- `docs/RELEASE-IOS.md` — Business Manager enrolment walkthrough, the App
+  Privacy / export-compliance / age-rating answers field by field, the
+  certificate-cap clear, and what the preflight covers.
+- `INTEGRATIONS_PENDING.md` — both blockers recorded with their remedies.
+
+**Blocked, and both are operator-only.**
+
+1. **Apple Business Manager enrolment** — no Organization ID, so no custom
+   distribution, so no submission. D-U-N-S + a verification call; days.
+2. **Signing certificate cap** — run #26 failed on it. Two minutes at
+   developer.apple.com, and it must be cleared before any new build.
+
+**Immediately available regardless:** TestFlight, 100 internal testers, no Apple
+review. It holds 1.1 (14) from 8 Sep; 1.1 (15) goes up the moment the cap is
+cleared.
+
+**Next:** clear the cap → TestFlight build → (when the Org ID exists) set custom
+distribution in App Store Connect → `ios-release.yml` with `submit: false`, read
+it, then `submit: true`.
+
+## S27 · The signing cap, ended rather than cleared (2026-09-15)
+
+**Done.**
+
+- `ios/fastlane/Matchfile`, a `certificates` lane and
+  `.github/workflows/ios-signing-setup.yml` — one distribution certificate and
+  one profile, created through the App Store Connect API key, encrypted and
+  stored on the `certificates` branch.
+- `beta` no longer signs with `-allowProvisioningUpdates`. It runs
+  `match(readonly: true)` and signs manually, so a build can use the stored
+  identity and **cannot create another**. The dead `asc_key_path` helper and the
+  requires that went with it are gone.
+- `MATCH_GIT_BASIC_AUTHORIZATION` is assembled from `GITHUB_TOKEN` inside both
+  workflows, so `MATCH_PASSWORD` is the only secret to add.
+- `demo_user.txt` = `stefan@caneisubirats.com`. The App Store gate now reports
+  **77/77 with nothing pending**, in both ordinary and `--ready` mode.
+- `docs/RELEASE-IOS.md` — which certificates to revoke and why they are dead,
+  the one-off setup, and how to prove the fix worked (the count goes up by one
+  and never moves again).
+
+**Waiting on the operator, in order:** revoke the four API-created distribution
+certificates · add `MATCH_PASSWORD` · add `ASC_DEMO_PASSWORD`. Then I run
+signing setup, then TestFlight 1.1 (15).
+
+**Waiting on Apple:** the Business Manager verification call. No Organization ID
+means no custom distribution and no submission; everything else is ready.
+
+## S28 · A development system beside the real one (2026-09-15)
+
+**Done.**
+
+- **One build, two environments.** `deploy.yml`'s `images` job now also tags
+  `:dev`, ungated. Production still follows `:main`, which only moves after
+  `smoke` passes. Dev is the same digest about eight minutes earlier — never a
+  different build. `promote` stays guarded on the ref, so a dispatch from a
+  `claude/**` branch reaches dev and can never reach production.
+- **A second compose project on the same box**, not a fork of the stack.
+  `docker-compose.dev.yml` is a thin overlay; everything else differs through
+  `/opt/canei-erp-dev/.env`. Production's resolved config changes by exactly four
+  lines, verified with a `docker compose config` diff: two new (empty) variables,
+  the shared network on Caddy, and the network declaration.
+- **Invented data, not a copy.** `ops/dev-seed.mjs` builds the demonstration
+  company from `site/erp-seed.js` — ~26 counterparties, 26 invoices, 14 projects,
+  1150 audit entries, 2024–2028, half a megabyte — and `ops/import-erp-state.sh`
+  loads it. No production data is copied and none is anonymised, so there is no
+  personal data on the development system and no GDPR question to answer.
+- **Three guards for a shared machine**: a compose project name checked in three
+  places, a 12 GB capped filesystem for dev's database, and `caddy validate`
+  before any reload of the container that terminates production's TLS. See
+  `ASSUMPTIONS.md` S135 and `OBJECTIONS.md` #7.
+- **`ENTORNO DE PRUEBAS`** on every surface, server-rendered on the Next pages
+  and fetched from `/api/health` by the static workspace. Fails open by design:
+  only an explicit marker shows it, so it can never appear on production.
+- **Buttons**: Ops → `dev-up` (idempotent; creates or repairs the whole stack)
+  and Ops → `dev-reset` (wipes dev and reloads the invented company, refusing to
+  run unless the compose project, `ERP_ENVIRONMENT` and the database name all
+  three say development).
+- **Fixed in passing**: `vars.APP_URL` was unset, so `deploy.yml`'s `verify` job
+  had never passed; and `ERP_PUBLIC_URL` was read by the app but never passed by
+  the compose file.
+
+**The app is unchanged**, deliberately. It stays pointed at production and
+TestFlight remains its staging path — and that rule is already enforced in code:
+`ios/fastlane/Fastfile` submits with `skip_binary_upload: true`, so the App Store
+can only ever receive a binary that went through TestFlight first.
+
+**Live since 2026-09-16.** `https://dev-178-105-10-156.sslip.io`, one shared
+password (in the server's `.env` and in the `dev-up` run log — never in git).
+Proved in one run, both systems answering side by side:
+
+|             | revision   | environment | database  |
+| ----------- | ---------- | ----------- | --------- |
+| production  | `9724ef2e` | _(absent)_  | connected |
+| development | `9408235`  | `dev`       | connected |
+
+Production reports no environment and therefore shows no band; dev declares
+itself and does. Six attempts to bring it up, and the `caddy validate` guard
+refused two of them before anything restarted — which is the only reason a
+development feature did not take the real ERP's TLS down. The others were mine:
+a timer racing the stack it was meant to maintain, a Postgres handed a
+freshly-formatted filesystem with a `lost+found` in it, and an importer older
+than the login it was talking to.
+
+## Package 14 · Título, Partida, Subpartida — the third level (2026-09-16)
+
+Seven commits on `claude/package-13-progress-37g71k`, each green on its own.
+
+- **Schema v22** — `chapter.title`, `lists.itemTitles`, `itemTitleLinks`.
+  Additive and idempotent; the ladder still runs v1→v22 with 104/104.
+- **The engine** — membership in both directions, and a real delete for
+  títulos (safe because nothing stores a título's code). Fixed a latent trap on
+  the way: the "a list cannot be left with no active entries" guard would have
+  made it impossible to return to zero títulos after creating the first one.
+- **Configuración › Títulos** — títulos left with their counts, their partidas
+  right, four doors, drag to reorder, and a «sin título» branch for the
+  partidas nobody has filed yet.
+- **`setChapterTitle` + `chapterBands`** — the run-ordering rule, and the bands
+  a document draws.
+- **The presupuestador** — a band with a live subtotal, and a picker that only
+  appears once the company has títulos.
+- **The paper** — PDF, Word, the HTML sheet and the hand-rolled Excel, plus a
+  new gate (`pnpm test:band`) that reads the PDF back with pdftotext and
+  asserts that the band totals its own partidas while the base stays the sum
+  over partidas.
+- **Governance** — the glossary gained _section / título_ and _sub-line item /
+  subpartida_, and the forbidden-literal linter gained the compound it had
+  always missed.
+
+**Section 2 needed no work:** _Partidas y subpartidas_ was already two-pane
+with an editor carrying cost, price, live margin, description and images.
+
+**Not merged to `main`.** Everything is on the branch, so the client's system is
+untouched. Still open: the manual-release gate, so these do not auto-deploy on
+merge.
+
+## S29 · Configuración → Notas, the test phase's intake (16/09)
+
+A new subsection under Configuración: the test phase's feedback intake. Where a
 screen is wrong, what it does now, what it should do and why — with a priority
 and a status, so the list is the plan for the upgrades rather than a pile of
 screenshots.
@@ -2402,14 +3440,14 @@ a note filed on an English phone reads in Spanish on the next one.
 **Colour says two things without either one shouting over the other.** Status is
 the pill — Abierta · En curso · Hecha · No se hará — and priority is a 3 px rule
 down the row's left edge, the second use of `cfg.rowClass` after CHG-04 and
-following its two lessons rather than rediscovering them (ASSUMPTIONS S78b). A
+following its two lessons rather than rediscovering them (ASSUMPTIONS S140b). A
 note that has had its decision stops carrying a rule.
 
 **The list is ordered for triage**, not by arrival: open before decided, urgent
 before minor, then newest. And the priority words are this register's own —
 «Alta» already means "Registered" in this dictionary, so using it would have
 repeated the «Pendiente» → "Outstanding" defect the recorrido had just fixed
-(S78c).
+(S140c).
 
 The register and the drawer are the shared ones. Whoever fills this in is the
 person testing the ERP, and a feedback screen that behaved unlike every other
@@ -2417,7 +3455,7 @@ screen would be its own first entry.
 
 On the way past: `.field textarea` had no typeface of its own, so all five
 drawers with a free-text box drew their longest field in the browser's monospace
-(S78h).
+(S140h).
 
 Gates on this tree: the new `testNotes` **12/12**; full suite **735 checks**
 with the one failure being the new suite's own stale assertion, fixed and

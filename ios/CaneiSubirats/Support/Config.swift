@@ -49,7 +49,9 @@ enum Config {
     /// build keeps working against a newer site. Keep the prefix.
     static let userAgentMarker = "CaneiApp/1.1 (iOS; native-shell)"
 
-    /// The tabs of the app, READ FROM `nav.json` — never written here.
+    /// Where the tabs come from — the list itself is owned by `AppState`,
+    /// which can rebuild it; this note stays here because it is about
+    /// `nav.json`, which every surface reads.
     ///
     /// They used to be six hardcoded English strings, and Android had six
     /// hardcoded Spanish ones, and the web had a third set that actually
@@ -67,22 +69,40 @@ enum Config {
     /// Bundled rather than fetched: the tab bar exists before the first request
     /// completes, and a bar that appears empty for a second is worse than one
     /// that is a build behind. The bundled copy is refreshed on every app build.
+
     /// The ERP role of the account the web layer last signed in as.
     ///
     /// Written by the web app over the `native` bridge once its session is
-    /// resolved, read here at launch. It is deliberately the same arrangement
-    /// as `uiLanguage` below, with the same honest limitation: the bar follows
-    /// on the NEXT launch, because a tab bar that appears after the first
-    /// request completes is worse than one that is a launch behind.
+    /// resolved. It seeds the tab bar at launch so the bar exists before the
+    /// first request completes; from then on `AppState` rebuilds the bar the
+    /// moment the web layer reports a different account.
+    ///
+    /// It used to be read once into a `static let tabs`, which is how an
+    /// administrator ended up holding a site worker's single tab: the value is
+    /// remembered on the device, the bar was built from it before any page had
+    /// spoken, and nothing rebuilt the bar afterwards. Signing out did not
+    /// clear it either, so the previous account's shape outlived the previous
+    /// account. Both halves are fixed — this is now cleared as well as set, and
+    /// nothing caches a bar built from it.
     ///
     /// Nothing here is a permission. The web app sends a site worker back to
     /// the hours screen from every route, and the server refuses every write
-    /// this account may not make — so a stale bar is a tidiness problem.
+    /// this account may not make.
     static var erpRole: String? {
-        UserDefaults.standard.string(forKey: "canei_role")
+        get { UserDefaults.standard.string(forKey: "canei_role") }
+        set {
+            // An account with no role is not the same as the last account that
+            // had one. Removing rather than storing "" is what lets the bar
+            // fall back to the full set, which is the safe direction: the full
+            // bar over-offers and the web app resolves what the account may not
+            // reach, whereas a reduced bar can leave somebody with no way out.
+            if let role = newValue, !role.isEmpty {
+                UserDefaults.standard.set(role, forKey: "canei_role")
+            } else {
+                UserDefaults.standard.removeObject(forKey: "canei_role")
+            }
+        }
     }
-
-    static let tabs: [WebTab] = NavManifest.load(role: erpRole)
 
     /// The language the tab bar is drawn in.
     ///

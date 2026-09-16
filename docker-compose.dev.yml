@@ -1,0 +1,69 @@
+# =============================================================================
+# The DEVELOPMENT stack. An overlay on docker-compose.prod.yml, never a fork.
+#
+#   cd /opt/canei-erp-dev
+#   docker compose -f docker-compose.prod.yml -f docker-compose.dev.yml up -d
+#
+# Everything that makes dev different is either here or in /opt/canei-erp-dev/.env.
+# The production file is the same file on both stacks, so a change to how the ERP
+# runs cannot apply to one and not the other — which is the entire point of having
+# a rehearsal environment.
+#
+# THE ONE LINE THAT MATTERS is not in this file. It is in the dev `.env`:
+#
+#     COMPOSE_PROJECT_NAME=canei-erp-dev
+#
+# Compose takes the project name from (in order) `-p`, COMPOSE_PROJECT_NAME, then
+# the `name:` key inside the compose file. Production's file says
+# `name: canei-erp`. Without the override the dev stack would come up INSIDE the
+# production project: same container names, same volumes, and
+# `up -d --remove-orphans` would delete the production containers it did not
+# recognise. ops/dev-up.sh writes the variable and the deploy unit refuses to run
+# without it, because "remember to set it" is not a safety mechanism.
+#
+# Verified rather than assumed (docker compose v2, 2026-09): the `.env` beside the
+# compose file wins over the file's `name:` key, and it is read from the compose
+# file's directory rather than the working directory — so the unit gets the right
+# project even if it is invoked from somewhere else.
+# =============================================================================
+
+services:
+  db:
+    # Dev's data directory is a FIXED-SIZE filesystem, not the shared 80 GB disk.
+    # Dev exists to be broken; a runaway import or a migration that writes a huge
+    # table must not be able to fill the disk that production's Postgres writes
+    # invoices to. Mounted by ops/dev-up.sh from a loopback image; filling it
+    # breaks dev and nothing else.
+    #
+    # Compose merges volume lists by TARGET, so this replaces the named volume
+    # from the production file rather than fighting with it.
+    # A SUBDIRECTORY of the mount, never the mount itself. `mkfs.ext4` leaves a
+    # `lost+found` in the root of every new filesystem, and `initdb` refuses a
+    # data directory that is not empty — so mounting the filesystem straight in
+    # gives a Postgres that will not start and a compose run that fails with a
+    # bare "container is unhealthy". It did exactly that on the first attempt.
+    volumes:
+      - /var/lib/canei-dev-db/pgdata:/var/lib/postgresql/data
+    # Postgres will take what it is given. On a box shared with production, an
+    # unbounded dev database competing for page cache is a production slowdown
+    # nobody would connect to the dev system.
+    mem_limit: 1g
+    cpus: 1.0
+
+  app:
+    # The second name on the shared network. Production's Caddy proxies the dev
+    # hostname here; see ops/Caddyfile. Production's own app is NOT on this
+    # network, so this is a one-way door: the ingress can reach dev, dev cannot
+    # reach production.
+    networks:
+      default: {}
+      edge:
+        aliases:
+          - app-dev
+    mem_limit: 1g
+    cpus: 1.0
+
+  # Neither ingress runs here. `web` and `tunnel` sit behind profiles, and the
+  # dev stack is brought up with no profile at all, so production's Caddy stays
+  # the only thing bound to 80/443. Stated because "it works because of a profile
+  # somewhere else" is exactly the kind of thing that gets undone by accident.

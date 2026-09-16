@@ -122,6 +122,11 @@
     ".sheet tbody td b,.sheet tbody td strong{color:#000}",
     ".num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}",
     '.sheet tr.chapter td{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:9.2pt;color:#375A2E;padding:10px 8px 4px;border-bottom:1.5px solid #48733C;background:#fff}',
+    /* The título band. Not `.band` — that name is already the audience device
+       at the head of the sheet, and two things called the same thing in one
+       stylesheet is how a document quietly starts printing the wrong one. */
+    '.sheet tr.titleband td{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:11.5pt;color:#000;padding:16px 8px 5px;border-bottom:2px solid #48733C;background:#fff}',
+    '.sheet tr.titlebandsum td{font-family:"Roboto Serif",Georgia,serif;font-weight:600;font-size:9.6pt;color:#000;padding:7px 8px 12px;border-top:1px solid #48733C;background:#fff}',
     ".sheet tr.sub td{font-weight:600;color:#000;background:#FAFAF8;border-bottom:1px solid #E0E0E0}",
     ".sheet tr.sub td.cap{font-weight:400;color:#767676;text-align:right}",
     ".small{font-size:8pt;line-height:1.5}",
@@ -306,7 +311,7 @@
     "tfoot{display:table-footer-group}",
     "tr{break-inside:avoid;page-break-inside:avoid}",
     ".box,.note,.sig,.facts,.meta,.docfoot,.totals,.parties,.ckl,.kvgrid{break-inside:avoid;page-break-inside:avoid}",
-    "h1,h2,h3,.band,tr.chapter,.doctype{break-after:avoid;page-break-after:avoid}",
+    "h1,h2,h3,.band,tr.titleband,tr.chapter,.doctype{break-after:avoid;page-break-after:avoid}",
     "tr.chapter+tr{break-before:avoid;page-break-before:avoid}",
     "p,li,td{orphans:3;widows:3}",
     "table{break-inside:auto}",
@@ -484,6 +489,14 @@
         "</th></tr></thead>",
     );
     for (const g of d.groups) {
+      // The título band opens its run. A sheet has no page furniture to fight
+      // with, so it is one row that reads as a heading.
+      if (g.bandOpen)
+        h.push(
+          '<tbody class="chap"><tr class="titleband"><td colspan="5">' +
+            esc(g.bandOpen) +
+            "</td></tr></tbody>",
+        );
       h.push(
         '<tbody class="chap"><tr class="chapter"><td colspan="5">' + esc(g.chapter) + "</td></tr>",
       );
@@ -521,6 +534,16 @@
           esc(g.subtotal) +
           "</td></tr></tbody>",
       );
+      if (g.bandTotal)
+        h.push(
+          '<tbody class="chap"><tr class="titlebandsum"><td colspan="4" class="cap">' +
+            this.T("Total") +
+            " " +
+            esc(g.band) +
+            '</td><td class="num">' +
+            esc(g.bandTotal) +
+            "</td></tr></tbody>",
+        );
     }
     h.push("</table>");
     this.push(h.join(""));

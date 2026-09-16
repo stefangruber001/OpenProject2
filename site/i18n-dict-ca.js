@@ -260,6 +260,40 @@ window.CANEI_DICT.ca = {
   "Reporte a gestoría": "Informe a la gestoria",
   "Personal interno": "Personal intern",
   "Partidas y subpartidas": "Partides i subpartides",
+  "ENTORNO DE PRUEBAS · los datos aquí son inventados · TEST ENVIRONMENT":
+    "ENTORN DE PROVES · les dades d'aquí són inventades · TEST ENVIRONMENT",
+  Títulos: "Títols",
+  "Nuevo título": "Nou títol",
+  "＋ Nuevo título": "＋ Nou títol",
+  "＋ Nueva partida": "＋ Nova partida",
+  "✎ Modificar título": "✎ Modificar títol",
+  "Eliminar título": "Eliminar títol",
+  "Buscar título…": "Cercar títol…",
+  "Buscar por código o nombre": "Cercar per codi o nom",
+  "Todas las partidas": "Totes les partides",
+  "Sin título": "Sense títol",
+  "Nombre (ES) *": "Nom (ES) *",
+  "Partidas de este título": "Partides d'aquest títol",
+  "Títulos en los que aparece": "Títols on apareix",
+  "No agrupa ninguna partida todavía.": "Encara no agrupa cap partida.",
+  "Título creado": "Títol creat",
+  "Título actualizado": "Títol actualitzat",
+  "Título eliminado": "Títol eliminat",
+  "Orden de títulos actualizado": "Ordre de títols actualitzat",
+  "— sin título —": "— sense títol —",
+  "Título bajo el que se agrupa esta partida": "Títol sota el qual s'agrupa aquesta partida",
+  "Partida agrupada": "Partida agrupada",
+  "Partida sin título": "Partida sense títol",
+  "Partida creada": "Partida creada",
+  "Partida actualizada": "Partida actualitzada",
+  "Partida retirada": "Partida retirada",
+  "Partida reactivada": "Partida reactivada",
+  "· retirada": "· retirada",
+  "· retirado": "· retirat",
+  "Todavía no hay títulos. Créalos con «＋ Nuevo título».":
+    "Encara no hi ha títols. Crea'ls amb «＋ Nou títol».",
+  "Todavía no hay títulos. Crea el primero y arrastra las partidas que lo forman.":
+    "Encara no hi ha títols. Crea el primer i arrossega-hi les partides que el formen.",
   "Fuentes de leads": "Fonts de leads",
   "Formas de pago": "Formes de pagament",
   Usuarios: "Usuaris",
@@ -669,6 +703,9 @@ window.CANEI_DICT.ca = {
   Aceptada: "Acceptada",
   Emitida: "Emesa",
   "Base imponible": "Base imposable",
+  "Calle y número": "Carrer i número",
+  "Fijo o móvil": "Fix o mòbil",
+  Municipio: "Municipi",
   "IVA (€)": "IVA (€)",
   "Total (€)": "Total (€)",
   "Guardar los datos del documento": "Desa les dades del document",
@@ -841,8 +878,78 @@ window.CANEI_DICT.ca = {
     "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
   "Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos":
     "Per a una factura que no arriba com a document — la majoria es pugen o es fotografien a Documents",
+  "Al firmarlo": "En signar-lo",
+  "Sus partidas entran en el alcance de la obra.": "Les seves partides entren a l'abast de l'obra.",
+  "Su hito de pago se añade al contrato.": "La seva fita de pagament s'afegeix al contracte.",
+  "Sus días se suman a la fecha de fin.": "Els seus dies se sumen a la data de fi.",
+  "Todavía no está en la obra: ni sus partidas, ni su hito de pago, ni sus días. Se incorpora al firmarlo.":
+    "Encara no és a l'obra: ni les seves partides, ni la seva fita de pagament, ni els seus dies. S'incorpora en signar-lo.",
+  Nuevos: "Nous",
+  "＋ Adicional": "＋ Addicional",
+  "Nuevo adicional": "Nou addicional",
+  "Crear adicional": "Crear addicional",
+  "Adicional creado": "Addicional creat",
+  "Anexo sin firmar": "Annex sense signar",
+  "Ningún adicional coincide con la búsqueda.": "Cap addicional coincideix amb la cerca.",
+  "Ningún contrato en marcha": "Cap contracte en marxa",
+  "¿A qué contrato?": "A quin contracte?",
+  "Contrato en marcha": "Contracte en marxa",
+  "Cómo sigue": "Com segueix",
+  "Ir a Contratos": "Anar a Contractes",
+  "Los adicionales de obras en marcha. Se crean sobre un contrato y se incorporan a la obra al firmar su anexo.":
+    "Els addicionals d'obres en marxa. Es creen sobre un contracte i s'incorporen a l'obra en signar el seu annex.",
+  "Un adicional modifica un contrato vivo, así que primero hace falta uno con su obra abierta.":
+    "Un addicional modifica un contracte viu, així que primer cal un amb la seva obra oberta.",
+  "Se abre el presupuestador vacío y el adicional se escribe partida a partida.":
+    "S'obre el pressupostador buit i l'addicional s'escriu partida a partida.",
+  "Cuando el cliente lo acepte, aparecerá en el contrato como anexo pendiente de firma.":
+    "Quan el client l'accepti, apareixerà al contracte com a annex pendent de signatura.",
+  "Se incorpora a la obra al firmar ese anexo, con sus días.":
+    "S'incorpora a l'obra en signar aquest annex, amb els seus dies.",
+  "Un adicional de una obra en marcha se crea en la pestaña Adicionales, sobre el contrato que modifica.":
+    "Un addicional d'una obra en marxa es crea a la pestanya Addicionals, sobre el contracte que modifica.",
+  "No encuentro ese anexo": "No trobo aquest annex",
+  "No encuentro ese contrato": "No trobo aquest contracte",
+  "Cómo se cobra": "Com es cobra",
+  "Ir a Conciliación": "Anar a Conciliació",
+  "El cobro se registra al conciliar el movimiento del banco con esta factura, no a mano desde aquí.":
+    "El cobrament es registra en conciliar el moviment del banc amb aquesta factura, no a mà des d'aquí.",
+  "Anexo firmado": "Annex signat",
+  "✍ Firmar anexo": "✍ Signar l'annex",
+  "Nombre y apellidos": "Nom i cognoms",
+  "Anexo retirado": "Annex retirat",
+  "Aprobado verbalmente": "Aprovat verbalment",
+  "Cambiar la firma": "Canviar la signatura",
+  "El documento firmado": "El document signat",
+  "Firma retirada": "Signatura retirada",
+  "Importe que sale del contrato": "Import que surt del contracte",
+  "Lo aprobó": "Ho va aprovar",
+  "Quién lo aprobó": "Qui ho va aprovar",
+  "Qué se deshace": "Què es desfà",
+  "Quitar anexo": "Treure l'annex",
+  "Quitar la firma": "Treure la signatura",
+  "Quitar todos los anexos": "Treure tots els annexos",
+  "Y con ello": "I amb això",
+  "El documento que firmó el cliente, como el contrato.":
+    "El document que va signar el client, com el contracte.",
+  "Queda registrado como lo que es: sin documento, y con el nombre de quien lo aprobó.":
+    "Queda registrat com el que és: sense document, i amb el nom de qui ho va aprovar.",
+  "El hito de pago que cada anexo añadió.": "La fita de pagament que cada annex va afegir.",
+  "Los días que sumó a la fecha de fin.": "Els dies que va sumar a la data de fi.",
+  "Sus partidas dejan de estar en el alcance de la obra.":
+    "Les seves partides deixen d'estar a l'abast de l'obra.",
+  "Se niega si el hito ya está facturado o si hay avance marcado sobre sus partidas.":
+    "Es nega si la fita ja està facturada o si hi ha avanç marcat sobre les seves partides.",
+  "Un anexo firmado necesita el documento firmado": "Un annex signat necessita el document signat",
+  "Di quién lo aprobó verbalmente": "Digues qui ho va aprovar verbalment",
+  "El hito de este anexo ya se ha facturado. Rectifica la factura antes de quitarlo.":
+    "La fita d'aquest annex ja s'ha facturat. Rectifica la factura abans de treure'l.",
+  "Hay avance marcado sobre las partidas de este anexo. Ponlo a cero antes de quitarlo.":
+    "Hi ha avanç marcat sobre les partides d'aquest annex. Posa'l a zero abans de treure'l.",
   "Cuentas y tarjetas": "Comptes i targetes",
   "Ir a Configuración › Empresa": "Anar a Configuració › Empresa",
+  "Primero crea la tarjeta en Configuración › Empresa":
+    "Primer crea la targeta a Configuració › Empresa",
   "Las cuentas y las tarjetas se crean en Configuración › Empresa.":
     "Els comptes i les targetes es creen a Configuració › Empresa.",
   Desactivar: "Desactivar",
@@ -917,8 +1024,57 @@ window.CANEI_DICT.ca = {
   "Todo el coste de esta obra tiene partida. La tabla cuadra con el proyecto.":
     "Tot el cost d'aquesta obra té partida. La taula quadra amb el projecte.",
   "La tabla no cuadra con el coste del proyecto.": "La taula no quadra amb el cost del projecte.",
-  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y una subpartida para ver los documentos que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
-    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. Premi una partida per veure les seves subpartides, i una subpartida per veure els documents que hi ha darrere. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
+  "Las cifras son las reales: lo presupuestado, lo gastado y la diferencia entre ambos. Pulse una partida para ver sus subpartidas, y el botón de documentos de una subpartida para ver lo que hay detrás. El presupuesto no se ajusta desde aquí — se cambia con un adicional al contrato, que es lo que lo modifica.":
+    "Les xifres són les reals: el pressupostat, el gastat i la diferència entre tots dos. Premi una partida per veure les seves subpartides, i el botó de documents d'una subpartida per veure què hi ha darrere. El pressupost no s'ajusta des d'aquí — es canvia amb un addicional al contracte, que és el que el modifica.",
+  Proyección: "Projecció",
+  Proyectado: "Projectat",
+  "Documentos ·": "Documents ·",
+  "Esta subpartida": "Aquesta subpartida",
+  "Costes sin subpartida": "Costos sense subpartida",
+  "Sin documentos": "Sense documents",
+  "Esta subpartida no tiene documentos todavía.": "Aquesta subpartida encara no té documents.",
+  "Los documentos de abajo suman exactamente el acumulado de esta subpartida.":
+    "Els documents de sota sumen exactament l'acumulat d'aquesta subpartida.",
+  "Los documentos de abajo no suman el acumulado de esta subpartida.":
+    "Els documents de sota no sumen l'acumulat d'aquesta subpartida.",
+  "Esta vista llega hasta la partida y no baja a la subpartida: un pedido y una adjudicación se firman contra una partida, y repartirlos entre subpartidas sería inventar un dato que nadie ha registrado.":
+    "Aquesta vista arriba fins a la partida i no baixa a la subpartida: una comanda i una adjudicació es signen contra una partida, i repartir-les entre subpartides seria inventar una dada que ningú ha registrat.",
+  "El coste se asigna a la subpartida desde Gastos y desde Horas; desde aquí solo se consulta.":
+    "El cost s'assigna a la subpartida des de Despeses i des d'Hores; des d'aquí només es consulta.",
+  "Base (€)": "Base (€)",
+  "Cuota IVA (€)": "Quota IVA (€)",
+  "Cuota (€)": "Quota (€)",
+  "Retención (€)": "Retenció (€)",
+  "Pagado (€)": "Pagat (€)",
+  "Cobrado (€)": "Cobrat (€)",
+  "Facturas recibidas ·": "Factures rebudes ·",
+  "Facturas emitidas ·": "Factures emeses ·",
+  "Resumen del trimestre ·": "Resum del trimestre ·",
+  "IVA repercutido por tipo": "IVA repercutit per tipus",
+  "IVA soportado por tipo": "IVA suportat per tipus",
+  Repercutido: "Repercutit",
+  Soportado: "Suportat",
+  "Resultado del trimestre": "Resultat del trimestre",
+  IRPF: "IRPF",
+  "Practicada a terceros": "Practicada a tercers",
+  "Soportada por clientes": "Suportada per clients",
+  "Sin movimientos de banco en este trimestre — importe el extracto en Conciliación. Las facturas del trimestre están en las otras hojas.":
+    "Sense moviments de banc en aquest trimestre — importi l'extracte a Conciliació. Les factures del trimestre són a les altres pestanyes.",
+  "El trimestre no tiene movimientos de banco todavía, así que la hoja de conciliación va vacía. Las facturas del trimestre sí van, en sus propias hojas.":
+    "El trimestre encara no té moviments de banc, així que el full de conciliació va buit. Les factures del trimestre sí que hi van, en fulls propis.",
+  "Efectivo pendiente de justificar": "Efectiu pendent de justificar",
+  justificado: "justificat",
+  devuelto: "retornat",
+  "Un reintegro se explica con los tickets que pagó y con lo que vuelve al banco. Ábrelo para adjuntarle sus documentos; lo que sobre se devuelve identificando el ingreso como devolución de efectivo.":
+    "Un reintegrament s'explica amb els tiquets que va pagar i amb el que torna al banc. Obri'l per adjuntar-hi els seus documents; el que sobri es torna identificant l'ingrés com a devolució d'efectiu.",
+  "sin avance": "sense avanç",
+  "Proyectado es a dónde va la partida a este ritmo: lo gastado más el presupuesto del trabajo que queda. Desviación es proyectado menos presupuestado.":
+    "Projectat és cap a on va la partida a aquest ritme: el gastat més el pressupost de la feina que queda. Desviació és projectat menys pressupostat.",
+  "Comprometido es lo ya pedido o adjudicado, esté facturado o no, y el proyectado nunca baja de ahí.":
+    "Compromès és el que ja s'ha demanat o adjudicat, estigui facturat o no, i el projectat mai no baixa d'aquí.",
+  "Una partida con gasto y sin avance registrado no se puede proyectar: se muestra el suelo, lo mayor entre lo presupuestado y lo gastado, y se marca «sin avance». Registra el avance en Avance físico para que la proyección signifique algo.":
+    "Una partida amb despesa i sense avanç registrat no es pot projectar: es mostra el terra, el més gran entre el pressupostat i el gastat, i es marca «sense avanç». Registra l'avanç a Avanç físic perquè la projecció signifiqui alguna cosa.",
+  "Buscar proveedor o industrial por nombre o NIF": "Cerca proveidor o industrial per nom o NIF",
   "Motivo del adicional": "Motiu de l'addicional",
   "Días de plazo que añade": "Dies de termini que afegeix",
   "Ampliación de la instalación eléctrica": "Ampliació de la instal·lació elèctrica",
@@ -1527,6 +1683,13 @@ window.CANEI_DICT.ca = {
   "Sin documento": "Sense document",
   "mismo día": "mateix dia",
   "importe exacto": "import exacte",
+  "tarjeta citada": "targeta citada",
+  "periodo en el concepto": "període en el concepte",
+  Liquidación: "Liquidació",
+  "movimientos entre": "moviments entre",
+  "Liquidación de tarjeta registrada": "Liquidació de targeta registrada",
+  "Pagar la tarjeta no es un gasto: lo son las compras que ya están en su cuenta. Se marca como traspaso interno.":
+    "Pagar la targeta no és una despesa: ho són les compres que ja són al seu compte. Es marca com a traspàs intern.",
   "pago parcial": "pagament parcial",
   "más. Busca para acotar.": "més. Cerca per acotar.",
   "El extracto no nombra a la contraparte. Compruébalo antes de conciliar.":
@@ -2498,7 +2661,6 @@ window.CANEI_DICT.ca = {
   "Web propia": "Web propi",
   "Administrador de fincas": "Administrador de finques",
   "Plataforma de leads": "Plataforma de leads",
-  "⚙️ Configuración": "⚙️ Configuració",
   Leads: "Leads",
   "＋ Crear": "＋ Crear",
   "🗒️ Nueva tarea": "🗒️ Nova tasca",
@@ -2506,10 +2668,21 @@ window.CANEI_DICT.ca = {
   Trimestre: "Trimestre",
   Mes: "Mes",
   Rango: "Interval",
+  "🏁 Guía de puesta en marcha": "🏁 Guia de posada en marxa",
   "📘 Guía de operaciones": "📘 Guia d'operacions",
-  "📱 Guía de la beta": "📱 Guia de la beta",
-  "▶️ Recorrido completo": "▶️ Recorregut complet",
   "⤓ Exportar datos": "⤓ Exportar dades",
+  "Obras asignadas": "Obres assignades",
+  "＋ Asignar a la obra": "＋ Assignar a l'obra",
+  "Sin obras asignadas.": "Sense obres assignades.",
+  "Trabajador asignado a la obra": "Treballador assignat a l'obra",
+  "Asignación retirada": "Assignació retirada",
+  "Asignación no encontrada": "Assignació no trobada",
+  "Sin una obra asignada, esta persona no puede apuntar horas: sólo recibe las obras en las que está.":
+    "Sense una obra assignada, aquesta persona no pot apuntar hores: només rep les obres on és.",
+  Quitar: "Treure",
+  "Todavía no estás asignado a ninguna obra. Habla con la oficina para que te asignen y podrás apuntar tus horas aquí.":
+    "Encara no estàs assignat a cap obra. Parla amb l'oficina perquè t'assignin i podràs apuntar les teves hores aquí.",
+  "⇥ Cerrar sesión": "⇥ Tancar la sessió",
   "＋ Oportunidad/visita": "＋ Oportunitat/visita",
   "＋ Tarea": "＋ Tasca",
   "＋ Presupuesto": "＋ Pressupost",
@@ -2856,6 +3029,21 @@ window.CANEI_DICT.ca = {
   "Entrada añadida": "Entrada afegida",
   "Enlace copiado": "Enllaç copiat",
   "Seleccionado — copie con Ctrl+C": "Seleccionat — copieu amb Ctrl+C",
+  "Copia archivada": "Còpia arxivada",
+  "Sin más detalle": "Sense més detall",
+  "Página de acceso": "Pàgina d'accés",
+  "Contraseña temporal": "Contrasenya temporal",
+  "Copiar contraseña": "Copiar contrasenya",
+  "Copiar todo": "Copiar-ho tot",
+  "Contraseña copiada": "Contrasenya copiada",
+  "Datos de acceso copiados": "Dades d'accés copiades",
+  "Perfil y ayuda —": "Perfil i ajuda —",
+  "Funciona ya. Es temporal y tú la conoces, así que pídele que la cambie al entrar.":
+    "Funciona ja. És temporal i tu la coneixes, així que demana-li que la canviï en entrar.",
+  "No se ha podido asignar una contraseña a esta cuenta, así que la única entrada es el enlace de abajo.":
+    "No s'ha pogut assignar una contrasenya a aquest compte, així que l'única entrada és l'enllaç de sota.",
+  "Se creará la cuenta con una contraseña temporal y se dejará el correo escrito en Borradores.":
+    "Es crearà el compte amb una contrasenya temporal i es deixarà el correu escrit a Esborranys.",
   "Usuario actualizado": "Usuari actualitzat",
   "Cliente eliminado": "Client eliminat",
   "Datos de demostración recargados — 2024 a 2026":
@@ -4925,6 +5113,11 @@ window.CANEI_DICT.ca = {
     "Què falla, què hauria de fer i per què. Cada nota apunta a una pantalla real i es tanca amb una decisió.",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  /* See the note on the English side. Origen and Alta are the Catalan words
+     too, so the output matches the input — but the rule MATCHING is the point:
+     it is the difference between a string nobody has translated and one whose
+     translation happens to be identical, and only the first is a gap. */
+  [new RegExp("^Origen: (.+) · Alta: (.+)$"), "Origen: $1 · Alta: $2"],
   [new RegExp("^Semana (\\d\\d/\\d\\d) – (\\d\\d/\\d\\d)$"), "Setmana $1 – $2"],
   [new RegExp("^mes (\\d{4}-\\d{2})$"), "mes $1"],
   [new RegExp("^Revisar ([\\d.,]+) sin aprobar$"), "Revisar $1 sense aprovar"],

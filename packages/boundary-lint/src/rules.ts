@@ -48,7 +48,16 @@ export const FORBIDDEN_LITERALS: { pattern: RegExp; why: string }[] = [
   { pattern: /\bVerifactu\b/i, why: "Spanish anti-fraud regime — jurisdiction pack" },
   { pattern: /\bAEAT\b/, why: "Spanish tax agency — jurisdiction pack" },
   { pattern: /Modelo\s?\d{3}\b/, why: "Spanish tax filing — jurisdiction pack" },
-  { pattern: /\bpartida/i, why: "construction vocabulary — vertical pack" },
+  /* No leading word boundary, deliberately. `\bpartida` does not match the
+     "partida" inside "subpartida" — there is no boundary between `sub` and
+     `partida` — so a capability could ship the sector's own word for a budget
+     line and pass this gate in silence. Found by an audit of the rules rather
+     than by a failure, which is the only way a hole in a linter is ever found. */
+  { pattern: /partida/i, why: "construction vocabulary — vertical pack" },
+  /* The level above a line item, added in schema v22. The kernel and the
+     capabilities have no business naming it either, and putting it here on the
+     day it was invented is cheaper than discovering it in a capability later. */
+  { pattern: /t[ií]tulo/i, why: "construction vocabulary — vertical pack" },
   { pattern: /\bmedici[oó]n/i, why: "construction vocabulary — vertical pack" },
   { pattern: /\bcertificaci[oó]n/i, why: "construction vocabulary — vertical pack" },
   { pattern: /\b0\.21\b|\b0\.10\b|\b0\.04\b/, why: "hardcoded tax-rate-like constant" },

@@ -90,6 +90,10 @@ export interface CommsEvent {
   date: string;
   /** Addresses by recipient role: {customer: "a@b.c"}. */
   recipients?: Record<string, string>;
+  /** Which language the recipient reads, when the host knows. Carried through
+   *  to the planned message so the right wording is chosen; never interpreted
+   *  here, because what a language code means is the host's business. */
+  lang?: string;
   /** Template variables, and the flags a rule's `requiresFlag` can test. */
   vars?: Record<string, string | number>;
   flags?: Record<string, boolean>;
@@ -112,6 +116,8 @@ export interface PlannedMessage {
   vars: Record<string, string | number>;
   /** True once `dueDate` has arrived. Earlier ones sit in the queue. */
   due: boolean;
+  /** The event's language, carried through unread. */
+  lang?: string;
   /** Why it is NOT plannable, when that is the case. */
   blocked?: "noRecipient";
 }
@@ -160,6 +166,7 @@ export function planMessages(
         dueDate,
         mode: rule.mode,
         vars: event.vars ?? {},
+        ...(event.lang ? { lang: event.lang } : {}),
         due: dueDate <= options.asOf,
         ...(to ? {} : { blocked: "noRecipient" as const }),
       });

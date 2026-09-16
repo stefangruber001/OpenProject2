@@ -1,0 +1,6 @@
+• Every message the system sends is now on one design: the company mark, the figures the message is about, the payment details where money is owed, the attachment named in the body, and a proper legal footer — NIF, registered office, Registro Mercantil entry and data-protection notice.
+• Messages follow the customer's own language. A customer whose invoices come out in Catalan now gets Catalan email; the same for English.
+• Two messages that were missing entirely: the confirmation a customer gets when they accept a quote, and the invoice itself. The system had a payment reminder for an invoice nobody had ever emailed.
+• Customer journey: every job shows its true stage over the live records, with the real document at each stage and the full history attached.
+• Hours: the crew book their own day on the phone and see only their own; the office reviews and approves the week.
+• Quotes, contracts, invoices, receipts and the quarterly accountant package all download as PDF and Word, in the language the customer reads.

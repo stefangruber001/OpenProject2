@@ -15,6 +15,7 @@
  * one place, rather than a preference that has to be made twice.
  */
 import { NextResponse } from "next/server";
+import { NO_STORE } from "@/lib/api";
 import { safeReturnPath } from "@/lib/return-path";
 import { LANG_COOKIE, asLanguage } from "@/lib/ui-language";
 
@@ -35,7 +36,12 @@ export async function GET(req: Request) {
   // `https://0.0.0.0:3000/login`. A relative Location is resolved by the
   // BROWSER against the address it actually used, which is correct under any
   // proxy, any port, any hostname.
-  const res = new NextResponse(null, { status: 303, headers: { Location: next } });
+  // Never stored: this response is what SETS the language cookie, and one
+  // replayed from a cache is a switch that appears to work and changes nothing.
+  const res = new NextResponse(null, {
+    status: 303,
+    headers: { Location: next, "cache-control": NO_STORE },
+  });
   if (to) {
     res.cookies.set(LANG_COOKIE, to, {
       path: "/",

@@ -34,12 +34,90 @@ interface AssignmentLike {
   from?: string;
   to?: string;
 }
+interface BudgetLineLike {
+  id?: string;
+  num?: string;
+  code?: string;
+  desc?: string;
+}
+interface BudgetChapterLike {
+  num?: string;
+  name?: string;
+  lines?: BudgetLineLike[];
+}
+interface BudgetVersionLike {
+  id?: string;
+  chapters?: BudgetChapterLike[];
+}
+interface BudgetLike {
+  id?: string;
+  versions?: BudgetVersionLike[];
+}
+interface ProjectLike {
+  id?: string;
+  code?: string;
+  name?: string;
+  closed?: boolean;
+  budgetId?: string;
+  acceptedVersionId?: string;
+  baseline?: { chapters?: BudgetChapterLike[] };
+  [k: string]: unknown;
+}
 interface StateLike {
   workers?: WorkerLike[];
   labour?: LabourLike[];
   assignments?: AssignmentLike[];
-  projects?: Record<string, unknown>[];
+  projects?: ProjectLike[];
+  budgets?: BudgetLike[];
   [k: string]: unknown;
+}
+
+/**
+ * One job, as the person working on it may see it.
+ *
+ * BUILT, NOT FILTERED — the same rule the top level already states, and this is
+ * where it was missing. Projects used to be passed through WHOLE, and a project
+ * carries `baseline`: `revenueCents`, `costCents`, `marginCents`, and for every
+ * chapter its `saleCents` and `costCents`. So a site account assigned to a job
+ * was receiving what that job sells for, what it costs and what it earns, on
+ * every read. The docstring above said "everything with money in it is removed
+ * rather than blanked"; the code said otherwise.
+ *
+ * The screen never printed those numbers, which is why it went unnoticed — and
+ * why "not one euro sign on it" is a test of the SCREEN and not of the wire.
+ *
+ * What is left is what the two worker screens actually use: the code to
+ * recognise the job by, whether it is still open, and the chapters and lines
+ * their hours have to name. No amounts, no customer, no address.
+ */
+function scopeProject(p: ProjectLike, budgets: BudgetLike[]): ProjectLike {
+  /* The lines a chapter offers live in the accepted budget version, and the
+     budget itself is NOT sent — it is priced from end to end. So the few fields
+     the picker needs are lifted onto the chapter here, money-free. Without this
+     the Subpartida list was empty for every site account, always: the client
+     looked the budget up, did not find it, and silently offered nothing. */
+  const version = (budgets.find((b) => b.id === p.budgetId)?.versions ?? []).find(
+    (v) => v.id === p.acceptedVersionId,
+  );
+  const linesFor = (num?: string): BudgetLineLike[] =>
+    ((version?.chapters ?? []).find((c) => String(c.num) === String(num))?.lines ?? []).map(
+      (l) => ({ id: l.id, num: l.num, code: l.code, desc: l.desc }),
+    );
+  return {
+    id: p.id,
+    code: p.code,
+    name: p.name,
+    closed: p.closed,
+    budgetId: p.budgetId,
+    acceptedVersionId: p.acceptedVersionId,
+    baseline: {
+      chapters: (p.baseline?.chapters ?? []).map((c) => ({
+        num: c.num,
+        name: c.name,
+        lines: linesFor(c.num),
+      })),
+    },
+  };
 }
 
 const norm = (v: unknown) =>
@@ -72,7 +150,9 @@ export function redactForWorker(state: StateLike, workerId: string | null): Stat
   /* Their own past hours name jobs they may no longer be assigned to. Dropping
      those projects would leave the worker's own history pointing at nothing. */
   for (const l of labour) if (l.projectId) allowed.add(l.projectId);
-  const projects = (state.projects ?? []).filter((p) => allowed.has(String(p.id)));
+  const projects = (state.projects ?? [])
+    .filter((p) => allowed.has(String(p.id)))
+    .map((p) => scopeProject(p, state.budgets ?? []));
   return {
     today: state.today,
     company: undefined,

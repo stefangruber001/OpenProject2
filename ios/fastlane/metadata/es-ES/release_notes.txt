@@ -1,0 +1,6 @@
+• Todos los mensajes que envía el sistema comparten un mismo diseño: la marca de la empresa, las cifras de las que habla el mensaje, los datos de pago cuando hay algo pendiente, el adjunto nombrado en el cuerpo y un pie legal completo — NIF, domicilio social, Registro Mercantil y la cláusula de protección de datos.
+• Los mensajes siguen el idioma del cliente. Quien recibe las facturas en catalán recibe ahora también el correo en catalán; igual en inglés.
+• Dos mensajes que faltaban por completo: la confirmación que recibe el cliente al aceptar un presupuesto, y la propia factura. El sistema tenía un recordatorio de pago de una factura que nunca se había enviado por correo.
+• Recorrido del cliente: cada obra muestra su fase real sobre los registros vivos, con el documento de verdad en cada fase y el historial completo adjunto.
+• Horas: el equipo apunta su jornada desde el móvil y ve sólo la suya; la oficina revisa y aprueba la semana.
+• Presupuestos, contratos, facturas, recibos y el paquete trimestral para la gestoría se descargan en PDF y Word, en el idioma que lee el cliente.

@@ -19,6 +19,11 @@ on:
       - "pnpm-lock.yaml"
       - ".github/workflows/deploy.yml"
   workflow_dispatch:
+    inputs:
+      release:
+        description: "Move :main onto this build — the client's server picks it up within a minute"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -68,8 +73,23 @@ jobs:
           # `main` now moves in the `promote` job, which needs: smoke. A sha tag
           # is addressable but nothing follows it, so publishing it early is
           # harmless and is what lets `smoke` test the real artifact.
+          #
+          # `dev` IS published here, ungated, and that is the point of it. The
+          # development stack is the environment that is SUPPOSED to receive a
+          # build before anything has decided whether it works — that is what it
+          # is for. It is the same digest production will get; it simply arrives
+          # about eight minutes and one gate earlier. Dev is never a different
+          # build, only an earlier one.
+          #
+          # It moves on a manual dispatch from a branch too, which is the
+          # look-before-live path: build a short-lived `claude/**` branch, look at
+          # it running on dev, and `:main` still cannot move because `promote` is
+          # guarded on the ref. No branch name is written into this file — the ref
+          # is whatever the person pressing the button chose, which is the whole
+          # difference between this and the dev branch CLAUDE.md forbids.
           tags: |
             type=sha,format=long
+            type=raw,value=dev
 
       - uses: docker/build-push-action@v6
         with:
@@ -284,12 +304,30 @@ jobs:
   # here instead would ship an artifact no test had ever run against.
   promote:
     needs: smoke
-    # `workflow_dispatch` can be fired from ANY branch, and without this guard a
-    # manual run from a feature branch would build that branch and point `:main`
-    # at it — a deploy to production from a branch nobody reviewed, one dropdown
-    # away. Dispatching from a branch still builds and smokes it; it just does
-    # not release it.
-    if: github.ref == 'refs/heads/main'
+    # TWO CONDITIONS, AND THEY GUARD DIFFERENT THINGS.
+    #
+    # The ref: `workflow_dispatch` can be fired from ANY branch, and without this
+    # a manual run from a feature branch would build that branch and point
+    # `:main` at it — a deploy to production from a branch nobody reviewed, one
+    # dropdown away. Dispatching from a branch still builds and smokes it; it
+    # just does not release it.
+    #
+    # The input: releasing is now a DECISION rather than a side effect of
+    # merging. Until this line, every push to `main` moved the tag and the
+    # client's server had the change inside four minutes, whether or not a
+    # person had looked at it — and `:dev` receives the same digest eight
+    # minutes earlier, so there was somewhere to look and no reason the
+    # release waited for anyone to do it.
+    #
+    # What a push to `main` still does: build, publish `:sha`, publish `:dev`,
+    # and run `smoke`. So the development system is up to date and the artifact
+    # is tested; the only thing that waits is the client.
+    #
+    # To release: Actions → Deploy → Run workflow, from `main`, tick `release`.
+    # It rebuilds from the same commit, smokes it again, and only then moves the
+    # tag. Rollback is unchanged and needs no button: re-tag `:main` onto an
+    # older `:sha` (see docs/HANDOVER-OPS.md).
+    if: github.ref == 'refs/heads/main' && inputs.release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -311,3 +349,85 @@ jobs:
           BASE="${REGISTRY}/${GITHUB_REPOSITORY,,}/${{ matrix.image }}"
           docker buildx imagetools create -t "$BASE:main" "$BASE:sha-${GITHUB_SHA}"
           echo "::notice::${{ matrix.image }} promoted — the server will pull it within 60s."
+
+  # ---------------------------------------------------------------------------
+  # Did it actually arrive?
+  #
+  # Everything above this job ends at the registry. `promote` retags `:main` and
+  # the workflow goes green — and that is ALL green has ever meant here. The
+  # server pulls on its own timer, and when it stops pulling nothing says so:
+  # the ticks are green, the timer reports active, the container is healthy, and
+  # the code answering is days old. That is not a hypothetical. Production spent
+  # 25 hours on an image 19 commits behind `main` while six consecutive deploys
+  # passed, and it was the operator who noticed, not this pipeline.
+  #
+  # `/api/health` has reported the commit it was built from since the last time
+  # this happened. The probe was there; nothing read it. So this job reads it,
+  # and a server that has stopped following `main` turns the commit that exposed
+  # it red within a few minutes instead of hiding until somebody complains.
+  #
+  # It never blocks a release: `promote` has already happened by the time this
+  # runs. A red `verify` over a green `promote` says exactly the right thing —
+  # the image is good and the box did not take it.
+  verify:
+    needs: promote
+    # The same condition as `promote`, restated rather than relied upon. A job
+    # whose `needs` were skipped is skipped too, so this would be redundant —
+    # but a reader checking whether production is being watched should not have
+    # to know that rule to see that this only runs when something was released.
+    if: github.ref == 'refs/heads/main' && inputs.release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: The revision answering must be the one just built
+        env:
+          # Required. An unset variable FAILS this job — see the run below.
+          APP_URL: ${{ vars.APP_URL }}
+          # Set this repository variable to `true` while the server is
+          # deliberately pinned to an older image (see docs/HANDOVER-OPS.md).
+          # A rollback is a decision; this is where it gets declared, so that a
+          # frozen box is a thing somebody chose rather than a thing nobody
+          # noticed. Unset it when you put `:main` back.
+          PINNED: ${{ vars.DEPLOY_PINNED }}
+        run: |
+          set -uo pipefail
+          # THIS USED TO WARN AND PASS, AND THE FIRST RUN PROVED WHY IT MUST NOT.
+          # `vars.APP_URL` was never set, so the very first `verify` — written to
+          # catch a green pipeline over a stale server — exited 0 in under a
+          # second having checked nothing, and reported success. A gate that
+          # cannot see its subject must say so in the only way a pipeline
+          # communicates: by failing. «I could not look» and «I looked and it is
+          # fine» are the same colour otherwise, which is the whole bug.
+          if [ -z "${APP_URL}" ]; then
+            echo "::error::APP_URL is not set, so nothing here checked what production is running."
+            echo "Set it under Settings → Secrets and variables → Actions → Variables,"
+            echo "as the public address of the server, e.g. https://<host>"
+            echo "It is the same variable NEXT_PUBLIC_APP_URL is built from (see the images job),"
+            echo "which is also empty in every image built while it was unset."
+            exit 1
+          fi
+          if [ "${PINNED}" = "true" ]; then
+            echo "::warning::DEPLOY_PINNED is set — the server is deliberately not following :main."
+            exit 0
+          fi
+
+          # The timer pulls every 60s and the container needs a moment to come
+          # up, so give it a few minutes before calling it stuck.
+          for i in $(seq 1 20); do
+            BODY="$(curl -fsS --max-time 15 "${APP_URL%/}/api/health" || true)"
+            GOT="$(printf '%s' "$BODY" | sed -n 's/.*"revision"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+            if [ "$GOT" = "${GITHUB_SHA}" ]; then
+              echo "::notice::production is serving ${GITHUB_SHA} — the deploy arrived."
+              exit 0
+            fi
+            echo "attempt ${i}/20: production reports '${GOT:-no answer}'"
+            sleep 15
+          done
+
+          echo "::error::production is still serving '${GOT:-no answer}', not ${GITHUB_SHA}."
+          echo "The image is published and tested; the server has not taken it."
+          echo "On the box:  systemctl status canei-deploy.service"
+          echo "             journalctl -u canei-deploy.service -n 50 --no-pager"
+          echo "             grep IMAGE_ /opt/canei-erp/.env   # must end :main"
+          echo "Or from a checkout with ops/provision.conf:  ./ops/deploy-now.sh"
+          exit 1

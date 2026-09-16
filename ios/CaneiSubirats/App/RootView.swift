@@ -17,8 +17,10 @@ struct RootView: View {
 
             // Keep every tab's web view alive; show only the selected one.
             // Hidden tabs still load in the background for instant switching.
+            // `app.tabs`, not a constant: the bar follows whoever is signed
+            // in, and an account change adds or removes screens here.
             ZStack {
-                ForEach(Config.tabs) { tab in
+                ForEach(app.tabs) { tab in
                     // Sharing still reaches `app.shareURL`, through the store's
                     // own `onShare` (see AppState) which the page's `share`
                     // bridge action calls. The container no longer needs to be
@@ -33,7 +35,7 @@ struct RootView: View {
             // is laid out ABOVE it (never hidden behind it) — the idiomatic,
             // best-in-class layout. It stays put when the keyboard appears.
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                TabBar(tabs: Config.tabs, selection: $app.selection) { id in
+                TabBar(tabs: app.tabs, selection: $app.selection) { id in
                     // Re-tapping the active tab opens (or dismisses) that
                     // section's sheet of screens.
                     //

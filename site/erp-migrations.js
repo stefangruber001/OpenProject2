@@ -946,6 +946,61 @@
         return s;
       },
     },
+    {
+      to: 22,
+      name: "a heading above the partidas, and the empty list it comes from",
+      /*
+       * THE THIRD LEVEL, AND WHY IT IS ONLY A WORD.
+       *
+       * A company asked to put a heading over groups of partidas — título,
+       * partida, subpartida — so a quote reads by room or by trade rather than
+       * as one long table. What it must NOT become is a third identity. Two
+       * things in this system address a partida, and both address it by its
+       * NUMBER: `markProgress` finds one chapter by num, and every cost bucket
+       * is a plain object keyed by num and read back find-first. Let the same
+       * num appear twice in a version and the foreman marks half a partida
+       * done while the other half stays open, and the margin table sums to
+       * double the real cost — both silently. So this step adds a label and
+       * NOTHING else: no id, no membership, no second axis. `chapters` is not
+       * reordered, not renumbered, not regrouped, and every existing number
+       * still means exactly what it meant yesterday.
+       *
+       * THE NAME, NOT A CODE. `title` holds the words, the way `name` does on
+       * the chapter beside it. A título is master data that can be renamed,
+       * and a sent presupuesto is a document somebody has in their inbox: if
+       * the chapter stored a code and the paper resolved it at print time,
+       * renaming "Baño" to "Aseo" would rewrite a quote the customer already
+       * accepted. The catalogue keeps codes because it is live; the document
+       * keeps words because it is frozen.
+       *
+       * WHY THE BASELINE IS NOT TOUCHED. `project.baseline.chapters` is the
+       * execution copy — {num, name, saleCents, costCents, billToPartyId} —
+       * and this heading is for the budget and its paper only, by instruction.
+       * Nothing on the obra, the avance económico or the certification reads
+       * it, so giving it the field would be inventing a use.
+       *
+       * Additive and idempotent: a chapter that already carries a `title`
+       * keeps it, the two new collections are only created when absent, and
+       * re-running changes nothing.
+       */
+      up: function (s) {
+        if (!s.lists || typeof s.lists !== "object") s.lists = {};
+        if (!Array.isArray(s.lists.itemTitles)) s.lists.itemTitles = [];
+        if (!Array.isArray(s.itemTitleLinks)) s.itemTitleLinks = [];
+
+        var budgets = Array.isArray(s.budgets) ? s.budgets : [];
+        for (var i = 0; i < budgets.length; i++) {
+          var versions = (budgets[i] && budgets[i].versions) || [];
+          for (var j = 0; j < versions.length; j++) {
+            var chapters = (versions[j] && versions[j].chapters) || [];
+            for (var k = 0; k < chapters.length; k++) {
+              if (typeof chapters[k].title !== "string") chapters[k].title = "";
+            }
+          }
+        }
+        return s;
+      },
+    },
   ];
 
   /**

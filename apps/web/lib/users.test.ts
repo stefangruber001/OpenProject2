@@ -106,11 +106,30 @@ describe("signing in", () => {
     ).toBeNull();
   });
 
-  it("refuses an invitation that has not been accepted yet", async () => {
+  it("refuses an invitation that has no password yet", async () => {
     // No password has been set, so there is nothing to match. An empty hash
-    // must never behave like an empty password.
+    // must never behave like an empty password. This is the test that still
+    // does the work now that "invited" alone no longer refuses.
     const users = [base({ state: "invited", hash: "" })];
     expect(await authenticateAgainst(users, "ana@example.com", "")).toBeNull();
+    expect(await authenticateAgainst(users, "ana@example.com", "anything")).toBeNull();
+  });
+
+  it("accepts an invited account with the temporary password it was given", async () => {
+    // The invitation now carries a password as well as a link, so "invited"
+    // means "has credentials, has not used them yet". Refusing it here would
+    // refuse the very password the invitation was written to hand over —
+    // which is what shipped before, and why the operator only ever saw a link.
+    const users = [base({ state: "invited", hash: await hashPassword("ABCD-EFGH-JKMN") })];
+    expect(await authenticateAgainst(users, "ana@example.com", "ABCD-EFGH-JKMN")).toBeTruthy();
+    expect(await authenticateAgainst(users, "ana@example.com", "ABCD-EFGH-JKMX")).toBeNull();
+  });
+
+  it("still refuses a disabled account that has a password", async () => {
+    // The widening is to "invited" only. Disabled has to stay closed, or
+    // disabling somebody would stop meaning anything.
+    const users = [base({ state: "disabled", hash: await hashPassword("pw") })];
+    expect(await authenticateAgainst(users, "ana@example.com", "pw")).toBeNull();
   });
 
   it("refuses an unknown address without saying so", async () => {

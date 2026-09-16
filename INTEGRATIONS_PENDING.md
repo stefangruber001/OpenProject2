@@ -16,7 +16,7 @@ repo; none were invented (mandate §3).
 | `price-db-import@1`                      | none                                                        | FIEBDC-3 `.bc3` import (BEDEC/CYPE/Preoc)                                                                                                                 | P2; adoption-critical                                                                                                                                                         |
 | `legacy-data-import@1` (Diorka)          | none                                                        | migration from Excel workbooks (Comparatiu, catalogues); NB cane.gestortectic.com is their **public marketing site** (WordPress/Avada), not a data source | BRD §7.3; credentials stay out of the repo                                                                                                                                    |
 | `brand-assets@1` (Canei Subirats)        | typographic wordmark stand-in                               | real logo SVGs (`logo-Caneisubirats-2.svg`, `_blanc-1.svg`, `caneisubirats_verd.png`, `picto-groc.png`) from their WP media library                       | see docs/clients/canei-subirats/BRAND.md; swap at handover                                                                                                                    |
-| `google-play-publishing@1` (Android)     | CI builds debug-signed `.aab` artifact                      | signed upload + Play API release via `android-play.yml` (secrets: ANDROID_KEYSTORE_*, PLAY_SERVICE_ACCOUNT_JSON)                                          | needs owner: Play account ($25), upload keystore, service account — PLAY-SETUP.md has the 30-min checklist; pipeline already runs end to end without them                     |
+| `google-play-publishing@1` (Android)     | CI builds debug-signed `.aab` artifact                      | signed upload + Play API release via `android-play.yml` (secrets: ANDROID*KEYSTORE*\*, PLAY_SERVICE_ACCOUNT_JSON)                                         | needs owner: Play account ($25), upload keystore, service account — PLAY-SETUP.md has the 30-min checklist; pipeline already runs end to end without them                     |
 
 ## SMTP — sending an invitation (S1c, 2026-08-09)
 
@@ -59,7 +59,7 @@ fails SPF/DKIM land in spam, which looks exactly like the feature not working.
 | `price-db-import@1`                      | none                                                        | FIEBDC-3 `.bc3` import (BEDEC/CYPE/Preoc)                                                                                                                                                      | P2; adoption-critical                                                                                                                                                                                                                       |
 | `legacy-data-import@1` (Diorka)          | none                                                        | migration from Excel workbooks (Comparatiu, catalogues); NB cane.gestortectic.com is their **public marketing site** (WordPress/Avada), not a data source                                      | BRD §7.3; credentials stay out of the repo                                                                                                                                                                                                  |
 | `brand-assets@1` (Canei Subirats)        | typographic wordmark stand-in                               | real logo SVGs (`logo-Caneisubirats-2.svg`, `_blanc-1.svg`, `caneisubirats_verd.png`, `picto-groc.png`) from their WP media library                                                            | see docs/clients/canei-subirats/BRAND.md; swap at handover                                                                                                                                                                                  |
-| `google-play-publishing@1` (Android)     | CI builds debug-signed `.aab` artifact                      | signed upload + Play API release via `android-play.yml` (secrets: ANDROID_KEYSTORE_*, PLAY_SERVICE_ACCOUNT_JSON)                                                                               | needs owner: Play account ($25), upload keystore, service account — PLAY-SETUP.md has the 30-min checklist; pipeline already runs end to end without them                                                                                   |
+| `google-play-publishing@1` (Android)     | CI builds debug-signed `.aab` artifact                      | signed upload + Play API release via `android-play.yml` (secrets: ANDROID*KEYSTORE*\*, PLAY_SERVICE_ACCOUNT_JSON)                                                                              | needs owner: Play account ($25), upload keystore, service account — PLAY-SETUP.md has the 30-min checklist; pipeline already runs end to end without them                                                                                   |
 
 ## Apple signing certificates — the TestFlight lane mints one per run
 
@@ -109,3 +109,56 @@ and the account owner, which is why neither is wired.
 server, so build 6 started showing v101 the moment deploy promoted it. The only
 thing the cap ever froze was the native shell — in practice one screen's
 wording — and build 7 closed that gap. See `RELEASES.md`.
+
+## Apple Business Manager — not enrolled, and it blocks the App Store submission
+
+Noted 14 Sep 2026. The app ships as a **Custom App**: distributed privately to
+one organisation rather than listed publicly, because a single-company ERP with
+no public sign-up fails the public App Store twice over — guideline 4.2 (a
+web-view shell reads as a repackaged website) and 3.2 (an app for one
+organisation rather than a general audience).
+
+A Custom App is distributed **to an organisation identified by its Apple
+Business Manager Organization ID**, and Canei has no Business Manager account.
+Until it does:
+
+- App Store Connect cannot be set to custom distribution;
+- a submission made anyway goes in as a PUBLIC app, into the rejection above.
+
+**What unblocks it:** enrol at <https://business.apple.com> — free, needs a
+D-U-N-S number and a verification telephone call from Apple. Days, sometimes a
+week. The walkthrough is in `docs/RELEASE-IOS.md`.
+
+**Nothing is stranded meanwhile.** TestFlight takes 100 internal testers with no
+Apple review at all, and that is how the company already uses the app.
+
+## Apple signing — the cap refilled, and run #26 hit it
+
+Predicted by the note above about CI minting a certificate per run, and
+confirmed on 14 Sep: `ios-testflight.yml` run #26 failed in thirteen seconds
+with
+
+> Choose a certificate to revoke. Your account has reached the maximum number of
+> certificates.
+
+The two-minute clear is in `docs/RELEASE-IOS.md`. It matters more than it did,
+because the build now in TestFlight is **1.1 (14)** from 8 September: it predates
+the message system and, more importantly for a submission, predates
+`PrivacyInfo.xcprivacy`. Apple has required a privacy manifest since May 2024, so
+the build that goes to review has to be a new one.
+
+**The durable fix is now DONE in this repository, and waiting on one secret.**
+`ios/fastlane/Matchfile` plus a `certificates` lane and the
+`iOS · Signing setup` workflow: one distribution certificate and one profile,
+created through the App Store Connect API key (no Mac), encrypted with
+`MATCH_PASSWORD` and stored on the `certificates` branch. The build lanes run
+`match` in **read-only** mode and sign manually, so a build can use what exists
+and can create nothing — which is the property that ends this failure mode
+rather than making it rarer.
+
+It reaches the branch with the workflow's own `GITHUB_TOKEN`, assembled at run
+time, so `MATCH_PASSWORD` is the only thing anybody has to add.
+
+**Still needed from the operator, once:** revoke the API-created distribution
+certificates to clear the cap, add `MATCH_PASSWORD`, and run
+`iOS · Signing setup`. The full walkthrough is in `docs/RELEASE-IOS.md`.

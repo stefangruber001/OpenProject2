@@ -427,7 +427,7 @@ languages: es-ES # source: synthetic
   touching the pipeline.
 - **#44 — Session-limit pause honoured per operator mandate (2026-07-28).** The i18n-extraction
   and field-audit agent fleets hit the platform session limit (resets 20:30 UTC). Completed
-  results were banked (scratchpad *-partial.json), high-value fixes continued in the main loop,
+  results were banked (scratchpad \*-partial.json), high-value fixes continued in the main loop,
   and both workflows are scheduled to resume automatically after the reset — matching the
   operator's standing instruction to pause on empty cloud quota and restart when it returns.
 - **#45 — CANEI functional-spec programme, session 1: close the CI gap before any feature work
@@ -6039,7 +6039,7 @@ pass, not a redesign" is exactly the plan's own instruction.
 **Verified:** manageability-sim 396/396 (2 new red-first checks: the refusal,
 and no fabricated Tipo), import-sim/migrations-sim/scheduling-sim/year-sim/
 bank-import(-pdf) all green, full site-e2e 624/624, i18n gates unchanged at
-207/207 (one new label "Partida *" added to both dictionaries; a second
+207/207 (one new label "Partida \*" added to both dictionaries; a second
 scanner false-positive from the register's own seed-chapter ternary was
 avoided by restructuring rather than translating, matching the ASSUMPTIONS
 #183 precedent), lint/boundaries/check-types/test/build all green.
@@ -8517,6 +8517,12 @@ failed with «34 … ceiling 33». Reverted in `f31a1c2`. The ceilings are 37 an
 97 and they are meant to have slack in them; anyone tidying that slack away
 should first measure twice, in both places.
 
+> **Two entries are numbered S77.** The one above — the crawl's ±1 between
+> here and CI — was written in this session; the section below was written in
+> the parallel one, and both landed on `main` in the same merge. Neither is
+> renumbered, because each is referenced by its own number elsewhere. Read
+> S77 as an ambiguous label and the following entries (S78–S80) as unique.
+
 ## S77 · The recorrido as the operator uses it: a timeline, work in place, and a record (2026-09-05)
 
 Three requests and four defects, all of them from the operator's own
@@ -8609,8 +8615,2456 @@ quietly.
 Historial modal's date column has been blank since it was written. The fields
 are `budget.date`, `contract.signature.customerSignedAt`, `project.dates.start`
 and `invoice.date`. Found on the way past, fixed on the way past.
+**S78 · Removing «⚙️ Configuración» from the profile menu costs the phone its
+only route to that section, so the header grew a ⚙️ button.** The operator
+struck three entries off the menu — the beta guide, the recorrido and
+Configuración. The first two are straightforward: the beta guide was written for
+a TestFlight round that has shipped, and the recorrido stopped being a page when
+it became `erp.html#journey`.
 
-## S78 · Datos maestros → Notas, the test phase's intake (2026-09-15)
+Configuración is not. `.secitem[data-sec="settings"]` is hidden below 860px
+because the bottom bar holds five icons and there are six sections, and the CSS
+comment naming the profile menu as its replacement route was written at the same
+time. Deleting the entry without replacing it would have left a phone with no way
+to reach the company record, the workers or the chapters — the screens the new
+first-run guide sends people to.
+
+So `#btnCog` sits in the header, phone-only, and opens the section exactly as the
+rail icon does. The menu is what was asked for; the function is still there. Two
+things fell out of writing it: `.mobonly` is declared AFTER its own media query
+and equal in specificity, so it has been a no-op wherever a more specific rule
+did not rescue it — which is why `#uSettings` was visible on desktop too, and why
+the check that "Configuración is reachable on mobile" would have passed with the
+button doing nothing. The new check asserts the section actually opens.
+
+**S79 · The two guides stopped loading the i18n layer, and their PDFs are now
+printed rather than made by hand.** Both are English by design (operator,
+2026-08-17; `ENGLISH_BY_DESIGN` in `tests/i18n/audit.mjs`) and both were loading
+the dictionaries anyway. With the stored language Spanish and the page declared
+`lang="en"`, the runtime translated back through the reverse map and reached only
+the phrases that happen to have a Spanish form: the cover read «Reformas,
+sencillamente complejas.», the meta strip «DOCUMENTO», the contents «7 · Horas:
+site to payroll». An English document patched with Spanish is worse than either
+language alone, and it was invisible on screen until the page was printed.
+
+`site/Canei-Subirats-ERP-Operations-Guide.pdf` was made by hand on 13 Aug and
+nothing regenerated it, so the largest button on a rewritten page handed the
+reader the previous version. `scripts/guides-pdf.mjs` prints both guides from the
+published HTML with the same browser the e2e suite uses. Deliberately NOT a gate:
+a browser binary is not available in every checkout, and a gate that cannot run
+everywhere is a gate that gets skipped. It is a command, written down next to the
+thing it maintains — run it after editing either guide.
+
+**S80 · There are THREE harvesters, and they all excused the language switcher
+by an id that no longer exists.** `tests/i18n/harvest.mjs`, `workspace-audit.mjs`
+and `audit.mjs` each carry their own copy of the "collect every visible string"
+walker, and each one skipped `#canei-lang-pill` — the floating switcher that was
+retired when the choice moved to Configuración → Idioma. Putting a switcher back
+in the profile menu made all three count `ES`, `CA`, `EN`, `Español`, `Català`
+and `English` as untranslated, which they are and always will be: a switcher
+names each language in its own language, and counting it is counting the ruler
+as part of what it measures.
+
+All three now read `translate="no"`, the standard HTML opt-out, which
+`site/i18n.js` already honours and the pill already sets on itself. That is one
+attribute the runtime and the measurement share, instead of an id three files
+copy and none of them owns.
+
+`audit.mjs` was the interesting one. The pill is INJECTED, so whether its six
+strings landed in the report depended on winning a race with a 700 ms wait —
+a silent thirty-string swing inside a budget of ninety-one. The ceiling has
+been sitting exactly on 91 and 67 with that coin-flip underneath it. It is
+stable now; if either number moves, something real moved.
+
+**Two comment traps caught again in one session**, both already known and both
+re-learned the hard way: a quoted phrase inside a comment is counted by
+`source-audit.mjs` as a user-visible string — in ENGLISH too, not only Spanish
+— and a backtick inside a comment that lives within a template literal ends the
+string and makes the file a syntax error. Both are now stated in the comments
+where they happened, because knowing the rule in the abstract did not stop me
+writing an example name in quotes twice.
+
+**S81 · A release asset that CI must read has to be committed, and `.gitignore`
+will not tell you it is missing.** `ios/.gitignore` ignored
+`fastlane/screenshots/**/*.png`. That is the right rule while the folder is
+fastlane `snapshot`'s scratch output; it is the wrong rule once the folder holds
+the App Store listing. The ten captures for the submission existed only in the
+container that generated them: the commit that "added" them carried the
+generator and nothing else, git dropped the images without a word, `git status`
+came back clean, and the one-click submission would have uploaded the whole
+listing to review with an empty gallery. Nothing would have gone red — the
+`release` lane's own guard treats "no screenshots present" as
+`skip_screenshots: true`, which is the correct behaviour for a lane that must
+not crash and exactly the wrong signal here.
+
+They are committed now, 2.4 MB, with the reason written where the ignore rule
+was. The general form: **when a workflow reads a file from a clean checkout, the
+file is source, whatever folder it happens to live in.** The staged/ignored
+distinction is about how a file was made, not about who needs it.
+
+**S82 · A secret that has to reach a tool through a file is put back afterwards
+in an `ensure`.** `deliver` reads the App Review demo password from
+`fastlane/metadata/review_information/demo_password.txt`, a TRACKED file holding
+a `FILL-ME` placeholder, so `ASC_DEMO_PASSWORD` had to be written into the
+working copy. In CI that is harmless. On the operator's own machine it left a
+real password inside a tracked file, showing in `git status` as an ordinary
+modification and one `git add -A` away from being committed — against the
+mandate's "never commit secrets", which has to hold where a person is sitting
+and not only in a disposable container.
+
+`with_demo_password` restores the original contents in an `ensure`, so it also
+cleans up when the upload throws — which is precisely when nobody thinks to
+look. Verified across all four paths (variable set, unset, exception, restore).
+
+**S83 · «Five icons and they FIT» was never measured, and six do.** The mobile
+bottom bar dropped Configuración and the header grew a ⚙️ to compensate — a
+button whose entire existence was a workaround for that one CSS rule (S71). The
+rule's own comment asserted the constraint as fact. Measured now: six tabs fit
+at every width down to **320px** in all three languages, with no scroll on the
+bar, no overflow on the page, not one truncated label, and a narrowest tab of
+**46 × 59px** — above Apple's 44pt minimum on a screen narrower than anything
+Apple still sells.
+
+The workaround also duplicated a route the app already had: `site/nav.json`
+gives the native shell **six** tabs including Configuración, so inside the app
+the gear was a second door to a tab already on screen. That is what the operator
+saw and asked to remove.
+
+Two things follow. **A constraint written as a comment is a claim, not a
+measurement** — this one shaped the navigation and a header button for months on
+nobody's arithmetic. And with the gear gone the header collapses from three rows
+to one on a phone: **163px → 107px**, 56px of a 390px screen returned to the
+work, because the brand and the action cluster were 12px over the width and
+wrapping.
+
+Below 360px the wordmark now hides so that row still fits; the mark alone stays
+the way home, since the convention is the shape in the corner and not the
+letters beside it. The breakpoint is 359px because that is where the row stops
+fitting — not one famous phone's width.
+
+The test that pinned the old shape counted to five; it counts to six now and
+also fails on a label so squeezed its own name is cut, which is the bar saying
+it is full one section before a scrollbar says so.
+
+**S84 · Not one API response told the browser not to store it, and two accounts
+on one phone is where that surfaced.** `dynamic = "force-dynamic"` governs the
+SERVER's own caching and emits no header at all — measured against a running
+build, these responses went out with nothing but a content-type: no
+`Cache-Control`, no `Expires`, no `ETag`, no `Last-Modified`. A 200 with no
+freshness information and no validator is one a browser may store and hand back
+later, on the same device, to whoever signs in next.
+
+The operator found it by doing the obvious thing: sign out as the administrator,
+sign in as a site worker. The workspace painted the administrator's name and
+ADMINISTRATOR permission from a stored `/api/~/session`, while every write was
+correctly refused — client and server disagreeing about who was holding the
+phone. Signing back in as the administrator then showed «no permission to
+user.manage», which is a sentence only a site worker's session can produce: the
+401 from the previous session had been stored under the same URL and replayed.
+
+**The label was the visible half.** The same silence covered `/erp/state`, which
+is redacted per role — a site worker's document carries no invoice register and
+no bank lines. A stale administrator copy replayed into a site-worker session is
+exactly the boundary R2.3 exists to hold, and nothing anywhere would have said
+so.
+
+Fixed at `json()`, the one helper every route answers through, errors included,
+plus the four routes that build a `Response` themselves — login and logout
+_carry_ the cookie, and one replayed without its `Set-Cookie` is a sign-in that
+appears to work and leaves you signed out.
+
+Two things worth keeping:
+
+**`no-store` does not evict what is already stored.** Shipping the header fixes
+every response from then on and does nothing for the copies already on a device.
+That is why the three requests whose answer depends on who asked — session,
+state, users — also pass `cache: "no-store"` on the REQUEST: such a request
+skips the store entirely, so a poisoned device is correct on next launch instead
+of needing somebody to clear the app by hand.
+
+**`require_` throws `UNAUTHENTICATED` for a permission failure.** That is how
+the operator's screenshot could be read at all — the code says "not signed in"
+where the truth is "signed in, not allowed". It is not wrong enough to change
+under a caching fix, but it costs a minute of misdiagnosis every time somebody
+reads it, and the honest code is FORBIDDEN.
+
+**S85 · «No puedes» y «no sé quién eres» eran el mismo 401, y un operario se
+quedaba fuera de su propia aplicación.** Reported from a laptop: signed in as a
+site account, the workspace showed a red «Your session has expired. Please sign
+in again. Your latest changes are NOT saved.» The session was perfectly valid,
+Reload changed nothing, and it came back on every load.
+
+The chain, and every link was working as designed except the last:
+
+1. `GET /erp/state` answers a site account with a REDACTED document and
+   `scoped: true`.
+2. `remoteLoadState` **dropped that flag**, so the store believed it held the
+   whole company document.
+3. Any ordinary interaction debounces a whole-document `PUT /erp/state`.
+4. The server refuses it — R2.3, deliberate, asserted by the server suite.
+5. `require_` threw **`UNAUTHENTICATED`** → HTTP 401.
+6. `putState` reads 401 as an expired session, and says so, stickily.
+
+**What the refusal was protecting is worth stating.** Had that save ever
+succeeded it would have stored the redacted view AS the whole document, and the
+invoice register would have been gone. The server saying no is the only thing
+between a site worker's browser and that; the client must not be attempting it.
+
+`FORBIDDEN` now exists in the kernel's error union and maps to 403. The
+distinction is not pedantry — the recoveries are opposites, and "log in" is
+useless advice to somebody already logged in. `UNAUTHENTICATED` keeps its stated
+meaning (the union's own comment already said it means "log in"); genuine
+authentication failures in `session.ts` and the middleware are untouched.
+
+Two lessons, and the first is mine. **I found this exact conflation while fixing
+S84, wrote it down as "not wrong enough to change under a caching fix", and left
+it.** It was already breaking the crew's app at that moment. A wrong error code
+is not cosmetic when a client branches on it; the cost of leaving it was the
+operator's morning.
+
+And: **a client that ignores a field the server took the trouble to send will
+eventually act on a document it does not have.** `scoped` was returned for
+exactly this reason and was thrown away one line after arriving.
+
+**S86 · The site worker's SHELL was never looked at, only their screens.** The
+hours screens were right and had been tested since R2.4. What a site account
+actually received around them had not: no bottom bar at all, and an
+administrator's red banner over the top.
+
+**No bar.** `buildSections()` emptied `#p1` and returned, on the reasoning that
+one destination needs no navigation. What that produced on a phone was a page
+with nothing to press, nothing saying where you were, and no route to the hours
+screen except the first paint. It also disagreed with the app, which builds its
+tabs from `site/nav.json` and gives a site account one tab. The bar is now built
+from `visibleSubs`, the same filtered truth the panels use, and lists SCREENS
+rather than sections — «Admin.» is the name of the section labour happens to
+live in and means nothing to somebody whose whole use of the system is typing
+hours.
+
+**A banner that was not even true.** `renderCompanyBar()` checked no role, so a
+site worker was told the company details were missing, with a button to a screen
+they may not open. And `companyMissing()` was reading a REDACTED document: the
+company record is removed before it leaves the server, so all four fields came
+back missing on a company whose details are complete. It was reporting the
+redaction as a gap — the third time today the same shape of bug appeared, after
+the cached session (S84) and the dropped `scoped` flag (S85).
+
+**The general rule this session keeps re-teaching: a partial document cannot be
+used to judge the whole.** Anything that says "X is missing" must first know
+whether X was ever sent.
+
+Also: «Todavía no hay proyectos» became «nobody has assigned you to a job yet»
+for a site account — an empty project list means something different when the
+list was filtered to what you are assigned to — and the demonstration-data
+reload is no longer offered on a server, where `resetData()` always refused it.
+`renderSeedBar` already stated that rule: do not advertise what will not be
+honoured.
+
+One trap worth naming: the new empty-state sentence was first written as two
+concatenated literals, and `source-audit.mjs` reported no new untranslated
+string — a FALSE PASS. A sentence split across a `+` is invisible to the audit
+and could never match a dictionary key either. One literal, one key.
+
+**S87 · Six tabs, six pages, six identities.** Reported from the phone: signed
+in as a site worker, the Torre tab said SITE WORKER with zeros while Comercial
+and Administración, in the same app at the same moment, still said ADMINISTRATOR
+and were still showing the previous account's quotes and 3.480 € of labour cost.
+
+Nothing was wrong with the server. The shell owns ONE LONG-LIVED WEB VIEW PER
+TAB — `AppState`'s own comment says why, "so pages keep their state when you
+switch tabs" — so six tabs are six independent pages, each holding the identity
+it booted with. Signing out and back in reloads the tab you did it in and leaves
+the other five exactly as they were.
+
+Stale pixels rather than a fresh read; the server would refuse those requests
+now. But they are the office's figures on a phone signed in as the crew, which
+is the whole point of the boundary.
+
+**`visibilitychange` is the obvious fix and it does not work here.** `RootView`
+stacks all six tabs and hides the inactive ones with `.opacity(0)`, leaving them
+in the view hierarchy — so `visibilityState` stays "visible" in all six and the
+event never fires on a tab switch. It would have looked correct and done
+nothing. The lesson generalises past this app: _hidden to the user is not hidden
+to the page_, and any freshness rule hung on visibility has to be checked
+against how the container actually hides things.
+
+So the check has three triggers, and the periodic one is the only one guaranteed
+inside the app: every minute; on `visibilitychange` (right in a browser, inert
+here, kept because it is free); and on `window.caneiRecheckSession()`, which
+`AppState.didSelect` now calls so a tab switch checks immediately — that half
+needs a TestFlight build, the web half does not.
+
+It reloads only when the answer CHANGED, so the normal case is one small request
+a minute and no disturbance. `recheckIdentity` takes its reload function as a
+parameter with the real one as default, which is what lets the suite assert the
+DECISION — reload on a changed account, on a changed permission for the same
+account, and on a 401; do nothing when unchanged, and nothing when offline. The
+last two matter most: a page that reloaded every minute, or every time a lift
+lost signal, would be worse than the bug.
+
+**S88 · A site account was being sent what its jobs sell for, cost and earn —
+and the test written to prevent that had never been given a job to look at.**
+
+`redactForWorker` passed PROJECTS THROUGH WHOLE. A project carries `baseline`:
+`revenueCents`, `costCents`, `marginCents`, and for every chapter its
+`saleCents` and `costCents`. So any site account assigned to a job received the
+job's revenue, cost and margin and every chapter's sale and cost price, on every
+read — against that same function's docstring, which says everything with money
+in it is removed rather than blanked and that the account never receives the
+number at all. The screens never printed it, which is why nobody saw it.
+
+**The guard existed and was vacuous.** `tests/server-e2e` created the site
+worker and never assigned them to anything, so `assignments` was empty, the
+scoped read carried NO projects, and «not one amount in cents» ran over an empty
+list for as long as it has existed. A fixture that cannot fail is not a test —
+the third false green in three days, after the concatenated string (S86) and the
+crawl ceilings. **When an assertion is about what a collection may contain, the
+fixture must put something in the collection**, and that belongs in the test's
+own comment where the next person will read it.
+
+Projects are now BUILT, not filtered — the rule the top of that function already
+stated and the one place it was not applied. What is left is what the two worker
+screens use: the code, whether the job is open, and the chapters with their
+lines.
+
+**And the lines are why the crew could not book hours at all.** `lineOptionsFor`
+reads a chapter's lines out of the accepted BUDGET, and the budget is not sent —
+it is priced end to end. `erp.version` threw, the catch returned "", and the
+Subpartida select was hidden. Silently: it read as a job with no sub-chapters
+rather than as data that never arrived, and the hours were then booked against a
+chapter with no line, losing exactly the attribution `lineId` exists for. The
+few line fields are lifted onto the baseline chapter, money-free, and the client
+falls back to them when there is no budget.
+
+**One of yesterday's fixes made a message worse.** The «not assigned to any job»
+early return sits ABOVE `horasMine`'s precise «this account is not linked to any
+worker record», so an unlinked account was told to ask for an assignment — which
+would not have helped, because there is nothing to assign to. Two problems the
+office fixes in two different places must not share a sentence.
+
+**S89 · The whole site-worker feature was unreachable, and the missing piece was
+a button.** `assignWorkerDrawer` sits in `erp.html`, complete, calling
+`assignResource` which has existed since PLN-02 — and NOTHING EVER CALLED IT.
+One match in the whole file: its own definition.
+
+So on a real server no worker could be assigned to a job. That is not cosmetic.
+An assignment decides which jobs a site account is SENT — `redactForWorker`
+carries the jobs a worker is assigned to and nothing else. No assignment, no
+jobs; no jobs, no chapters; no chapters, nowhere to book hours. The crew's
+screen said «you are not assigned to any job» and was telling the exact truth,
+permanently.
+
+It also explains why three days of fixes each got one step further and stopped:
+the bar appeared (S86), the message became honest (S86), the money stopped
+leaking and the sub-chapters got their data (S88) — and the thing actually
+missing was a control nobody had wired.
+
+**A feature is not shipped when its functions exist.** `assignResource`,
+`assignWorkerDrawer` and the scoped read were all written, reviewed and tested
+in their own layers; the product was still impossible to use. Nothing in the
+gates asks "can a person reach this from a screen", which is why a whole
+release could pass every check and do nothing. The new test drives it through
+the screen, both ways, for exactly that reason.
+
+`unassignResource` did not exist either. An assignment that can be granted and
+not withdrawn leaves somebody holding a job's chapters until the document is
+edited by hand — the grant and the removal are one feature, not two.
+
+Two details worth keeping: «Hasta» defaults to EMPTY, because a date defaulted
+to today ends the assignment the same evening and reads as the app not working;
+and the card shows the LIST as well as the form, because an assignment that can
+be created and not seen is the next version of this bug.
+
+**S90 · An address is found by SHAPE and POSITION, not by a label.** Everything
+else the extraction capability reads is announced by a word — a total, a date, a
+tax id all have a caption beside them. A postal address has none: it is four
+lines of text in a block near the top of the page. So the pass anchors on the
+postal code, the one token an address always carries and nothing else on an
+invoice resembles, and takes the block around it — above the recipient boundary,
+which is the same fact that already keeps the issuer's tax id from being
+confused with ours.
+
+The telephone is the exception and takes its label. Nine digits in three groups
+is also the shape of a registry code, and this operator's own document carries
+one two segments away from the phone. A wrong telephone on a supplier record is
+worse than an empty one, because somebody dials it; an empty field is visibly
+empty and gets filled.
+
+Shapes stay in the jurisdiction pack: a postal code here is five digits whose
+first two are a province, 01 to 52, and that sentence is a fact about one
+country, so `jurisdiction-es-es` states it and the capability asks. A profile
+that describes no address loses the six fields, not the document — the reader
+still returns everything else it found.
+
+Six generic keys, named for what they are and not for where they came from:
+`issuerAddress`, `issuerPostcode`, `issuerCity`, `issuerRegion`, `issuerPhone`,
+`issuerEmail`.
+
+**S91 · Two sessions, one numbered list, and the collision it already
+produced.** PROGRESS.md's Package 13 is appended to by both working sessions,
+each numbering its own next entry. Both reached S10 independently: the hours
+redesign wrote «S10 · The hours screen becomes two screens» and this stream
+wrote «S10 · The reader had no fields for half the header», which also landed at
+the END of the file, below Package 14 and the Apple section, where a fresh
+session told to start at Package 13 would never read it.
+
+Moved into Package 13 and renumbered **S12**, which is the most reversible fix
+available: it takes the first free number and renumbers nothing anybody else
+wrote. The next entry from either session is S13.
+
+The deeper fact is that six commits of shipped product work — S83 to S89 in this
+file — are on `main` and not in PROGRESS.md at all, so the file understates the
+tree by three days. Narrating another session's work in its own voice is not
+this one's call, so Package 13 gets an INDEX of those seven entries instead: one
+line each, pointing here. A fresh session that reads Package 13 now learns that
+there is more on `main` than the section describes, which is the failure mode
+that mattered.
+
+**S92 · A precondition nobody can read is a feature nobody can find.**
+Reported from the live workspace: a bank line reading «ADEUDO MENSUAL DE
+TARJETA \*\*\*8442 LIQUIDACION 01/11/2026-30/11/2026 … su desglose figura en el
+extracto de tarjeta adjunto», opened in Conciliación, and NOTHING on the panel
+about a card. Propuestas 0, two candidates differing by 1.553 € and 2.879 €,
+and «Marcar sin respaldo» as the only honest-looking way out.
+
+The product models this correctly and has since PK7-B. `markCardSettlement`
+knows the money truth — the PURCHASES on the card are the costs, the bank's
+monthly charge is not, and counting it too counts every purchase twice — and
+the way in is «Identificar como… → Liquidación de tarjeta». But
+`cardSettleGroup` ended `if (!cards.length) return ""`, and the seeded
+workspace ships two bank accounts and no card. So in every workspace that has
+not yet created a card account, the entire answer was suppressed: not disabled,
+not explained, absent. The only way to learn the feature exists was to read the
+source.
+
+Shown refused now, with what it waits for — the recorrido's rule (S77c), which
+is the rule this repo keeps having to rediscover. Disabled, so pressing
+Identificar writes nothing.
+
+**And the gate had the same blind spot the product did.** The e2e suite covered
+this path well — a card created through the product, its statement imported
+through the real file input, the settlement written and classified — but it
+CREATED the card first, so the state every real tenant starts in was the one
+state never exercised. A fixture that builds the precondition before checking
+the screen cannot see a missing precondition. The new check runs at the top of
+the banking suite, before the run's own card exists, because afterwards the
+state is unreachable. Fourth false-green of this shape in a week (S86's
+concatenated chain, S88's empty assignments, the crawl ceilings).
+
+**S93 · The settlement names the card but not WHICH statement, and that is the
+next unit.** The operator's follow-up, and it is right: `cardSettlement` stores
+`{ accountId }` alone, so a report to the accountant can say «Liquidación de
+tarjeta · Visa» and cannot show the movements that charge covers. The data is
+almost there — every imported movement carries `importId`, `importBatches`
+holds `{ accountId, from, to, count }` per statement, and the bank line's own
+concept quotes the period.
+
+The identifier will be the PERIOD on the card account, not the `importId`: an
+importId identifies the file somebody uploaded, which breaks on a re-import, on
+a statement split across two files, and on movements imported before imports
+were batched (those carry no importId at all). A period is what a card
+statement IS, it survives re-import, and it is what is printed on the paper and
+on the bank line. The check worth having falls out of it: the covered purchases
+must foot to the charge, and nothing verifies that today.
+
+**S94 · `cashGroup` has the same closed door, one function below the one just
+fixed.** For money coming IN it returns "" when no withdrawal is open, so a
+deposit of unspent cash entered before the withdrawal was declared offers
+«Devolución de efectivo» nowhere and says nothing. Left standing in this commit
+because it is a different screen state and belongs with the caja-chica register
+S93 needs, not because it is acceptable.
+
+**S95 · An adicional that starts empty can only ADD, and that is the trade.**
+Settled with the operator on 07/09: _"agree"_, against the cost stated in full
+before it was taken. Under the redesign an adicional is its own budget record
+started from scratch, not a clone of the accepted scope, so it cannot modify or
+reduce a line that is already agreed. Reductions become explicit negative
+lines — honest on the customer's paper, and `writeContractAnnex` already
+accepts a negative annex — and editing an agreed line in place goes away.
+
+That capability is the one thing PK12-S13's version model bought and this
+gives back: _"the same partida stays the same partida, so a cost booked to it
+still lands where it was booked"_. It is the right thing to lose. An agreed
+line is a thing the customer signed, and a product that lets it be edited in
+place is a product where the scope somebody agreed to can change without a new
+piece of paper. The decision is recorded here rather than left to be
+rediscovered in phase 2, which is where it would otherwise have surfaced.
+
+**S96 · An annex could be granted and never withdrawn.** `writeContractAnnex`
+was the only thing in the engine that ever touched `con.annexes`. So an
+adicional accepted by mistake stayed in the contract, in the milestones and in
+the completion date permanently, and the only way out was editing the state
+document by hand. Third instance of the shape this repo has now named twice
+(`undoImport`, `clearCashReturn`, S89's assignment): granting and withdrawing
+are one feature, not two.
+
+`removeContractAnnex` takes out everything the annex put in — the row, the
+milestone it appended, the days it added, and the accepted pointer that put its
+partidas in the job. A half-undo is worse than none: remove only the row and
+the job silently keeps the scope and the date of something the contract no
+longer mentions. It refuses on two facts somebody already relied on, an
+invoiced milestone and progress marked on the scope it brought, and both
+refusals name what the operator has to do first.
+
+The operator authorised this on 07/09 — _"eliminate all annex of the project if
+required"_ — as permission to clear rather than migrate. It is built as an
+explicit, guarded, logged verb behind a confirmation that names the three
+consequences, NOT as a migration that runs on load: a silent wipe of scope,
+milestones and dates on a running job is exactly what the plan's own migration
+warning was about, and permission to delete is not permission to delete
+invisibly.
+
+**S96a · The progress guard first refused on scope the annex never brought.**
+An adicional version is a CLONE of the version it revises, ids and progress
+preserved, so reading its whole chapter list found every line of the base scope
+of a job in execution. It reads only the lines absent from `additionalOf`; an
+annex naming a version with no `additionalOf` revised nothing and brought no
+scope of its own.
+
+**S96b · `extendProjectDeadline(-4)` silently did nothing.** It returns null on
+anything at or below zero, correctly — it is the verb for "this extra takes
+longer", and a caller handing it a negative has the direction confused.
+Withdrawal reported `days: 4` in its result while the completion date did not
+move, which is the false-green shape this package keeps meeting. Its own
+private verb now gives the days back, by exactly what the annex moved forward
+and never further.
+
+**S97 · «Justificante: sin adjuntar» was a miss, not an empty slot.** The
+contract's Anexos tab read the motivo and the backing document from
+`state.changes` through `a.changeId`. That register is the LEGACY route:
+PK12-S13 replaced it with the adicional version, whose annexes carry
+`budgetId`, `versionId` and `ref` and leave `changeId` null. So on every annex
+written since, the lookup could not succeed and no upload would ever have shown
+there — which is what the operator photographed, three times on one contract.
+The tab reads the annex's own fields now, with the change record kept as the
+fallback it has become.
+
+**S98 · The annex signature is deliberately NOT the contract's, and it is
+inert.** `signContract` refuses without a document (CON-11) because a job's
+first invoice opens on the strength of it. An annex agreed on site does not
+work that way, and the operator named two options, the second of which has no
+paper. Refusing the verbal one would not produce more signed paper; it would
+produce a blank page scanned to get past the gate, which is worse than the
+truth because it LOOKS like evidence. Both are accepted, the record says which,
+and a verbal one names the person who agreed it — the only field standing in
+for a signature.
+
+It records the fact and moves nothing. Scope, plan and money still arrive on
+acceptance exactly as they do today; moving that gate is the plan's phase 4,
+with the migration that phase needs. Shipping the field first means the paper
+the operator already has can be attached while the rest is built.
+
+**S99 · Acceptance in the budget tool does nothing until the annex is agreed
+on the contract.** The operator, correcting the phasing of the adicionales
+plan: _"Acceptance camming from Budget tool do nothing until we accept it on
+Contracts/Annex. This is key."_ Said twice, the second time pointing at the
+sentence where the previous commit had called the annex signature inert and
+deferred the gate to a later phase. They were right that this is not a later
+phase — it is the point of the redesign, and shipping the screens around an
+unchanged rule would have left the product saying one thing and doing another.
+
+The product used to treat two different events as one. A customer agreeing a
+price and an annex to a signed contract are not the same fact, and acceptance
+moved the scope, the completion date and the money in a single step — so there
+was no state in which an extra was agreed commercially and not yet part of the
+job. That state is most of the life of a real adicional.
+
+Accepting now writes the annex and stops. `_applyContractAnnex` holds
+everything that used to happen on acceptance and runs when the annex is signed;
+`_unapplyContractAnnex` is its exact inverse and is shared by withdrawing a
+signature and removing the annex, because a half-undo is the same bug either
+way. `projectVariations` — the single walk everything chapter-addressed goes
+through — asks whether the annex was agreed, which is why one predicate gates
+Alcance, both progress readers, the cost allocation targets and certification
+at once.
+
+**S99a · The migration dissolved, and that is worth keeping.** `_annexApplied`
+reads an ABSENT `applied` flag as applied. Every annex written before the gate
+existed was applied the moment it was created, so a workspace saved before this
+change keeps every one of them and no data is touched; only rows written from
+here start `false`, which is the only population the gate can safely govern. The
+plan called a stamping migration the single most dangerous part of the work. A
+field that means "applied" by its absence removes the danger rather than
+managing it — a stamping pass could have missed a row; an absent field cannot.
+
+**S99b · Two states keep the old rule, both deliberately.** A job with no
+contract has no annex to sign, so its adicional applies on acceptance as it
+always did — refusing would strand work behind a signature with nowhere to be
+given, which is the principle `writeContractAnnex` already stated when it chose
+to return null rather than throw. And the legacy `state.changes` register keeps
+its one-step approval: half-gating it — an annex with no milestone but its days
+applied two lines later — would have recreated the "half the consequence
+missing" bug that method exists to fix.
+
+**S99c · I wrote the gate and forgot to arm it.** `writeContractAnnex` never set
+`applied: false`, so `_annexApplied` answered true for every new annex and
+`_applyContractAnnex` returned at its first line. Every check still passed
+except the one reading the flag through `contractValue` — the effects were all
+correct because the signature applied them, and nothing was gated because
+nothing was ever unapplied. A gate that is open by construction passes every
+test that only measures what happens when you go through it.
+
+**S99d · A test's comment named the rule it was defending.** `testVariationBudget`
+booked a cost onto a variation's partida under the line "what is NEW is the join
+on acceptance", and broke on «Unknown subpartida» — correct behaviour, obsolete
+test. Rewritten to measure the economics before the signature and after it, so
+it is now the second witness of the gate on the variation-BUDGET route where the
+new checks cover the adicional-VERSION one. Found only by the unfiltered run:
+both targeted suites and every static gate were green with this broken.
+
+**S99e · Nothing yet tells the operator where to go.** After accepting an
+adicional the Gantt and the economics correctly show nothing, and no screen says
+the annex is waiting to be signed. That is the same closed-door shape as the
+card settlement and it is NOT fixed here; it belongs with the register split,
+where the two lists make the pending ones visible. Written down rather than
+left to be rediscovered.
+
+**S100 · Two registers, because one row could not mean two things.** The
+operator's opening complaint — _"I think our way to manage the Adicionales is
+very very unclear"_ — over a list where `PRE-2026-0009 · Adicional ·
+ADI-2026-0001` was the ORIGINAL budget of its job wearing its adicional's badge.
+One record with two lifecycles, an Estado column that could only report one of
+them, and two kinds of row that read identically.
+
+The tab split was impossible while an adicional was a version of the original
+budget, because they are the same record. Making an adicional its own budget is
+what makes the two lists possible, and the lists are why it was worth doing:
+`Nuevos` is budgets with no `variationOf`, `Adicionales` is the rest.
+
+**S100a · The empty builder needed no work.** `createVariationBudget` has always
+produced a fresh budget with one blank version, which is exactly the operator's
+"gives you the Budgeting tool with no lines to start from scratch". The route
+that CLONED the accepted scope was the adicional VERSION, and that is the one
+being retired. The model the redesign wanted already existed and had been hidden
+behind a menu flag.
+
+**S100b · A CONTRACT, not a job.** `createAdicionalBudget` takes a contract id
+and reaches the obra through it. That is substance rather than wording: an
+adicional becomes an annex to a signed document, so naming the document at the
+moment it is created is what stops the two drifting apart — the drift that left
+`writeContractAnnex` keyed on `changeId` and unable to find anything (S97). The
+door refuses a finished or cancelled contract and a closed job, and when there
+is no live contract at all it says so and offers the way to Contratos rather
+than rendering an empty picker.
+
+**S100c · The ADI number survives the move.** It was the one good argument for
+the version model: a customer handed «PRE-2026-0014» reads a re-quote of the
+whole job, and the paper they should receive prices only the extra. That
+argument was always about the PAPER, not the record, so the budget carries an
+`adiNumber` of its own and the register shows it.
+
+**S100d · The days were still applying on acceptance, on both routes.**
+`setVariationScheduleDays` and `setAdditionalScheduleDays` each gated on
+`acceptedVersionId`, which PK13-S15 had made the wrong question — an adicional
+whose price is accepted but whose annex is unsigned is still a proposal as far
+as the job is concerned. Both ask `_annexApplied` now. The number is recorded
+when it is typed and applied when the annex joins. Missed in the gate commit
+because both live far from `acceptVersion` and neither is reached by the paths
+that commit's tests drove.
+
+**S100e · S99e is closed, in the register rather than with a banner.** An
+accepted adicional whose annex is unsigned shows «Anexo sin firmar» beside
+«Aceptado». Reading «Aceptado» alone, with the Gantt and the economics correctly
+showing nothing, was the closed door the gate had left behind.
+
+**S100f · A test asserted a badge; the answer became a register.**
+`testVariationBudget` checked that the row said «Adicional» — the old answer to
+the operator's "it does not identify as an Additional Budget". The new answer is
+a list of its own, so it asserts the adicional is ABSENT from «Nuevos» and
+PRESENT in «Adicionales», which a pill on a shared list could never give. The
+new door is driven end to end through the screen, both ends, because a verb no
+screen reaches is the failure this package has already met twice (S89, S92).
+
+**S101 · The days had to move before the tab could go.** The operator's item 5
+— «we eliminate Adicionales from Contratos» — and the tab could not simply be
+deleted, because «Formalizar un adicional» was the only place two things were
+captured: the days per partida, and the customer's answer. Both had to have a
+home first or the capability would have been removed rather than relocated.
+
+They separate cleanly along the line PK13-S15 drew. The customer's answer
+belongs to the presupuesto and is given there like any other; the days belong to
+the moment they take effect, which is no longer acceptance but the annex. So the
+signing panel asks for them — the operator's own item 4, "select the impact on
+delivery time" as part of agreeing the annex.
+
+`setAnnexScheduleDays` serves both routes so the screen never has to know which
+shape of adicional it is looking at; that is exactly the knowledge the
+two-register split exists to keep out of every caller. The variation BUDGET
+route gained a per-partida breakdown it never had — it only ever carried a
+total — because the schedule consumes one delay per partida through
+`applyChapterDelay`, and an adicional that moves a completion date but not the
+bars underneath it is half a plan.
+
+**S101a · A missing field must never block a signature.** `setAnnexScheduleDays`
+threw «Only an adicional carries days of its own» for an annex whose version is
+not an adicional. It runs on the way to signing, so the throw would have refused
+to AGREE AN ANNEX because of a field that should never have been offered for it.
+Those annexes are now asked for no days and the verb returns null: the guard
+belongs on the offer, not on the save.
+
+**S101b · Switching the signature method wiped the days.** `paint()` re-renders
+the whole drawer on every switch between «Anexo firmado» and «Aprobado
+verbalmente», and the breakdown was read back off `sched` — the values as they
+were when the drawer opened. Type the days, pick verbal, lose the days, and
+nothing says so. It is the rule the evidence field in this same file already
+carries and states: what a person has typed lives in the closure, not in the
+markup that is about to be replaced. Found because the test types the days and
+THEN picks the method, which is the order a person uses; a test that had signed
+first would have passed over it.
+
+**S101c · What «Contratos vigentes» keeps its name.** With the middle tab gone
+the strip is two contract tabs again, and «Vigentes» would read correctly once
+more. It stays as it is: renaming a tab the operator navigates by is a change
+they did not ask for, and the word costs nothing.
+
+**S102 · An administrator on the crew's tab bar.** The operator opened the app
+signed in as an administrator and found a single «Horas» tab — the site
+worker's bar — while the profile menu correctly read ADMINISTRADOR. The page
+knew who it was; the navigation did not. Inside the shell the web app stands its
+own section rail down, because the native tab bar does that job, so this was not
+a wrong bar. It was a screen with no way off it.
+
+Three things had to be true at once, and each was defensible alone. The role the
+web layer reports was cached on the device and only ever written FORWARD —
+signing out did not clear it, so the last account to use a phone decided the
+shape of the bar for every account after it. The bar itself was a `static let`,
+resolved once per cold launch from that cache before any page had spoken. And
+the rail is hidden whenever the shell is present, unconditionally, on the
+assumption that the bar above it is always the right one.
+
+Fixed in the order that matters: the bar is now `@Published` state on
+`AppState`, rebuilt the moment a page reports a different account; the role is
+cleared as well as set, and announced on every session check rather than only on
+a full page boot; and the page keeps its rail whenever the shell reports a bar
+that cannot reach the rest of the app. That last one is the important one — the
+first two make the bar correct, the third makes being wrong survivable.
+
+**S102a · The reduced bar stays.** The alternative was to delete `roleTabs`
+altogether and let every account have six tabs, since the web app already
+resolves every route to the hours screen for a site worker and the server
+refuses the rest. That would have made this class of bug impossible. It was not
+taken: the crew's one-screen phone is a thing the operator asked for, and the
+guard above makes the failure recoverable without spending it. The narrower
+rule is now in the gate instead — no full-access role may be given a reduced
+bar, which is the shape of the mistake, not this instance of it.
+
+**S103 · A probe nothing reads on a schedule is not monitoring.** Production ran
+25 hours on an image 19 commits behind `main` while six consecutive deploys went
+green. Every part reported itself well: the ticks passed, `promote` genuinely retagged
+`:main` (its log names the digest), the timer was active, the container was
+healthy. `/api/health` has reported the commit it was built from since the LAST
+time this happened, and its own comment says why. Nothing read it. `ops/status.sh`
+asked `systemctl is-active canei-deploy.timer`, which is true while the service
+it fires fails every minute and true while the stack is pinned to a tag that
+will never move.
+
+So `deploy.yml` gained a `verify` job that polls `/api/health` after `promote`
+and fails when the revision answering is not the one just built, and
+`status.sh` now asks the three questions the timer cannot answer: did the last
+run succeed, is `IMAGE_APP` still following `:main`, and which commit is
+actually replying. A deliberate rollback declares itself through a repository
+variable rather than staying quietly red.
+
+**S103a · One list of image paths, not two.** `ops/deploy-now.sh` decided which
+commit the server ought to be running from a hand-written
+`(apps packages site tenants ops)`, while `deploy.yml` also builds for
+`tests/server-e2e`, the `Dockerfile` and the lockfile. A commit touching only
+those built an image the server took, and the checker compared against an older
+commit and called it fine. Both now read the list out of the workflow
+(`ops/image-paths.sh`). Two lists cannot be kept in step by intention.
+
+**S104 · A ceiling raised for a string that is meant to be deleted.** The
+source-literal gate went 162 → 163 because `ef4f04a` added a temporary «Hello
+World» span to the header, checked in so that it would deploy at all and answer
+whether the build in front of the operator had changed. It is a real text node,
+so the scanner is right about it — this is not the 206 → 207 case, where the
+ceiling was the honest fix because the string was developer prose in a comment.
+
+The ceiling moved anyway, rather than the span being deleted, because the span
+belongs to a session that is still using it and removing another agent's live
+instrument mid-question is the less reversible of the two. The note in `ci.yml`
+says who puts it back and when: whoever deletes the span returns the number to
+162 in the same commit. It is one of headroom on a gate whose own comment says
+headroom is what a ratchet must not have, and it is recorded here so that it
+cannot become permanent by being forgotten.
+
+Worth saying plainly: the question the marker exists to answer is now answered
+twice over. The operator reported it never reached the server, and `deploy.yml`
+has a `verify` job that asks `/api/health` whether the revision answering is the
+one just built. Nothing needs a span in the header to find that out any more.
+
+**S103b · The check written to catch a silent pass, passed silently.** The first
+run of the new `verify` job finished in under a second and reported success. It
+had checked nothing: `vars.APP_URL` has never been set in this repository, and
+the job's own guard warned and exited 0 on an empty value — «cannot check» was
+wearing the same colour as «checked, and it is fine». That is the identical
+shape of the incident it was written for, reproduced inside the fix for it,
+within one run.
+
+It now fails on an unset `APP_URL` and says where to set it. The rule this
+earns, and it generalises past this job: **a gate that cannot see its subject
+must fail, not warn.** A warning is invisible in a green tick, and green is the
+only thing anyone reads.
+
+**S103c · And the same variable is a build argument.** `deploy.yml` passes
+`NEXT_PUBLIC_APP_URL=${{ vars.APP_URL }}` when building the image. Unset means
+every image published so far carries an empty public address. That is a separate
+question from the deploy — it governs absolute links and preview cards, not
+whether the server updates — but it is the same missing setting, and setting the
+variable fixes both. Noted rather than chased here.
+
+**S105 · The engine moved and its simulation stayed.** `main` was red for about
+twenty hours on six manageability checks (503/509), and not one of them was a
+defect. PK12-S13 deliberately split one event into two on the operator's own
+instruction — _«Acceptance coming from Budget tool do nothing until we accept it
+on Contracts/Annex. This is key.»_ — so accepting an adicional now writes the
+annex and stops, and `_applyContractAnnex` moves the scope, the baseline, the
+milestone and the completion date when the annex is SIGNED. The four commits
+that made that change (`d943eec`, `d18d3f3`, `3295f47`, `475af39`) each touched
+`site/erp-engine.js`. None touched `tests/simulation/manageability-sim.mjs`,
+which went on asserting the behaviour they had just removed.
+
+The six assertions are now twelve, split across the gate: what must NOT have
+moved after acceptance, then what must have moved after signing. That order is
+the point. A test written only against the second half would pass against an
+engine that applied everything at acceptance — that is, against exactly the bug
+the change was made to remove — so each property is asserted false and then
+true. 513/513, and `site/erp-engine.js` is untouched.
+
+**S105a · The legacy change register keeps its one-step behaviour, and that is
+not an inconsistency.** Approving a change still moves the date immediately, and
+its own comment in `approveChange` says why: `state.changes` is the route this
+work replaced and the menu already hides, so half-gating it would leave an annex
+with no milestone and its days applied two lines below. The tests assert both
+rules because the product has both.
+
+**S105b · A doc-comment that now says the opposite of its code.** The block above
+`signContractAnnex` still reads _«Inert for now, on purpose: it records the fact
+and moves nothing… still arrives on acceptance, exactly as it does today»_, while
+the function beneath it calls `_applyContractAnnex`. Left alone deliberately —
+this session did not write that feature and the change is one line of prose in
+another session's area — but flagged here, because a comment asserting the
+reverse of its own function is a trap for whoever reads it next.
+
+**S106 · A deploy that arrived, reported as one that hadn't.** After the
+token fix (S103b/S103c's `set-ghcr-token`), the operator ran `deploy-now` and
+it reported the server "25 commit(s) behind" — `running revision 6f1ab3be,
+this checkout is fb54acba`. It was not behind. Run 227 had already built,
+smoke-tested and promoted an image from `6f1ab3be` — the actual `main` HEAD —
+twelve minutes before the token was even fixed, and `6f1ab3be` is a direct
+descendant of `fb54acba`, so the promoted image already carried everything the
+comparison thought was missing.
+
+The bug was in the yardstick, not the server. "The newest commit that builds
+an image" was computed per commit (`git log -1 -- IMAGE_PATHS`), and a push
+had landed two commits together — one touching `ops/**`, the next touching
+only docs. GitHub's own trigger works at the PUSH, so it built from the push's
+tip (`6f1ab3be`) regardless; the local computation, walking commits one at a
+time, never credited the docs-only tip with carrying the change forward, and
+named the earlier commit as "wanted" instead.
+
+Fixed in both `ops/deploy-now.sh` and `ops/status.sh`: before calling a
+mismatch "behind", they now ask whether anything the image is actually BUILT
+FROM differs between the running revision and the current checkout
+(`git diff --quiet "$RUNNING" HEAD -- "${IMAGE_PATHS[@]}"`). A SHA mismatch
+with no content difference is content-current and is reported as such; a real
+gap still reports behind, with the commit count, exactly as before. Content is
+what a deploy promises — the SHA was only ever a proxy for it, and the proxy
+broke the moment a push carried more than one commit.
+
+**S107 · Three buttons that called a function with an id that does not
+exist.** The operator, on the live server: «I cant sign annex or delete annex».
+The contract screen builds its panel from `d = renderContractDoc(conWork.id)` —
+the PRINTABLE DOCUMENT, which carries a number, a date, a customer and its
+milestones, and no `id` at all. The three annex buttons passed `d.id`, so every
+click called `signAnnexDrawer(undefined, "CTR-…-A2")`, the contract lookup found
+nothing, and the function returned at its first guard. A drawer opened, empty,
+and nothing anywhere said why. Every other handler on that screen already used
+`conWork.id`; these three were the only ones that did not.
+
+**S107a · And a silent return is what made it look like a dead button.** Both
+drawers now THROW when the id resolves to nothing. `mutate` and the console both
+report a throw, so the next wiring mistake of this shape is visible in a second
+rather than in a screenshot taken by the operator two days later.
+
+**S107b · The test could not have caught it, by construction.** The suite opened
+the drawer with `pg.evaluate(() => signAnnexDrawer(contractId, number))` — it
+supplied the arguments THE SCREEN is supposed to supply. So it proved the drawer
+works and said nothing about whether anything reaches it, and stayed green
+through every one of the three broken buttons. It clicks them now, and the check
+was verified the only way a regression test can be: the old code was put back
+and it failed (`form:false, methods:0`), then passed on the fix.
+
+That is the third instance of this exact shape in this package — S89's
+`assignWorkerDrawer` with no caller, S92's suppressed optgroup, and now a caller
+with the wrong argument. The rule the suite keeps having to relearn: drive the
+door, not the room behind it.
+
+**S107c · The deploy marker is gone, and its ceiling with it.** `ci.yml` said in
+so many words: «Whoever removes that span puts this back to 162 in the same
+commit.» The span, its mobile CSS rule, the comment and the 163 are all removed
+together; the audit measures 162 exactly. The two new error strings are in both
+dictionaries, and the annex one dropped its concatenated number so the literal
+the audit extracts is the literal the dictionary holds.
+
+**S108 · An abono was ADDING to the debt, and was on no register at all.**
+Reported from the live workspace as an invoice of 1.628 € showing 2.068 €
+outstanding — the difference exactly twice its two credit notes of 220 € — and
+as a rectificativa the operator had issued and could not find anywhere.
+
+Two faults with one root: **nothing in this product has ever forced a sign on a
+credit note.** `issueInvoice` takes whatever the lines sum to, so an abono typed
+with negative amounts — which is how a rectificativa reads, and what the
+operator typed — is stored negative, while two consumers both subtract and
+therefore both assume positive. `invoiceOutstandingCents` turned `- credited`
+into `- (-220)` and gave the money back to the debt; `billedBase` in the
+certification path did the same to what had been billed.
+
+Fixed BY MAGNITUDE rather than by flipping the sign, which is a deliberate
+departure from the operator's own instruction («store negative and flip the two
+subtractions»). Flipping would have corrected a negative abono and broken a
+positive one, and both exist in the data precisely because no rule ever settled
+it. Only the magnitude was ever meaningful: a credit note reduces what is owed
+by its amount, whichever way it was entered. The sign convention itself is left
+open — settling it is a data question, not a code one, and this stops the
+arithmetic depending on the answer.
+
+**S108a · And `invoiceRegister` excluded credit notes outright.** Its first line
+was `.filter((i) => i.kind !== "creditNote")`, so a numbered, gapless, immutable
+fiscal document was issued and then appeared on no screen that lists issued
+documents. They are in the register now; their own outstanding is zero, so no
+chase list changes, and `emitido` nets the way a register reads.
+
+**S108b · The regression test was verified against the bug.** With the old
+arithmetic it reports `198040 → 208040` — the debt growing by the credit note —
+and with the fix `198040 → 188040`. A test for a sign error that has only ever
+been run against the corrected code proves nothing about the direction.
+
+**S109 · «Registrar cobro» leaves the invoice, because money arriving is a fact
+of the bank.** The operator: «we don't need Registro de Cobro because this is
+done on Bank Conciliation». Typing a collection on the invoice wrote a receipt
+against no bank line — the same fault `payBills` was removed for in package 12,
+at the other end of the same journey. It is recorded now only by matching a
+statement movement to the invoice in Conciliación, where the money actually
+appears.
+
+`recordCollection` STAYS in the engine, untouched: it is what the bank matcher
+calls (`matchMovement` and `matchMovementSplit`). What went is the manual door,
+not the verb.
+
+**S109a · And the door says where it moved to.** A removed control that leaves
+nothing behind reads as a screen that cannot do anything — the report this whole
+package opened on. The invoice drawer keeps a card, «Cómo se cobra», that names
+Conciliación and offers the route; the check asserts both the absence of the
+form AND that the button lands on the queue, because a route that names a screen
+it does not reach is the same failure wearing a label.
+
+**S109b · The recorrido's phase 11 pointed at the form.** Its verb was labelled
+«Registrar cobro» and opened the invoice drawer — after this change, a verb named
+after something the screen it opens can no longer do. It walks to Conciliación
+now.
+
+**S109c · The literal audit read my own comment.** The comment explaining this
+change quoted the operator with apostrophes — «the operator's own instruction
+(«we don't need…»)» — and the source audit pairs apostrophes as quotes, so a
+fragment of a code comment was counted as an untranslated user-visible string.
+CLAUDE.md records this exact trap, and it caught a comment written to explain a
+fix while the fix was being written. Rewritten without them.
+
+**S110 · The write had no door, and the product said it did.** A site worker
+could not record hours at all, and was told they were saved.
+`site/erp-store.js` refuses to PUT a redacted document back — correctly, since
+that would blank the company — and its comment said the site worker's writes
+"go through `POST /erp/command`". They did not. A repo-wide search for
+`erp/command` in the client returned only comments describing a call nobody had
+written; `ErpStore` had no `command` method at all. So `#me_save` mutated the
+in-memory engine, `persist()` got `Promise.resolve(null)` and swallowed it,
+`render()` redrew the row from memory, and the toast said «Horas guardadas».
+On the next reload the server sent the real document and the row was gone.
+
+The server half had been finished for weeks: the endpoint, the three commands
+whitelisted at `erp.write.site`, and `refuseOutsideOwnHours` narrowing them to
+own hours, on an assigned site, in an unapproved week. This is S89 again — a
+feature is not shipped when its functions exist — on the write side, where the
+cost is lost work rather than an unreachable screen. `ErpStore.command()` now
+exists and the three worker handlers call it; the office keeps its
+whole-document PUT, deliberately, because rerouting that is a different change
+from fixing this one.
+
+**S110a · Building the obvious client would have opened a leak.** The endpoint's
+own doc-comment recommends `?include=state` for an interactive client, and that
+branch returned `erp.toJSON()` unredacted to anybody allowed to run a command —
+which now includes a site worker. He would have received every invoice, every
+bank line and everybody's pay AS THE ANSWER TO SAVING HIS OWN TIMESHEET. It was
+unreachable only for as long as no client existed, so the change that makes the
+endpoint useful is the same change that would have made the leak live. The
+branch is now scoped by the state route's own rule — `may(…, "erp.read.all")`,
+then `redactForWorker` — tested on the permission and not on the role name, so
+the two paths cannot drift into disagreeing about who sees what. Fixed in the
+same commit as the client, on purpose.
+
+**S110b · The third door, and no view has a lock.** Three paths set the current
+screen: `go()` clamps a site worker to `labour`, `hashchange` clamps, and
+`boot()` did not. The shell keeps one long-lived web view per tab, each loaded
+at its own URL from `site/nav.json`, so every tab boots straight into its own
+hash — `hashchange` never fires and `go()` is never called. The role arrives
+from the session fetch AFTER `cur` is set, so the chrome hid correctly while the
+office's own screens rendered over the redacted document: Control tower at
+`0 €`, Customers at "0 clients", Sites at "No projects yet". None of that is a
+leak — the wire was correct — but "0 clients" is not a refusal, it reads as a
+statement that the company has no customers.
+
+Clamped in `boot()` after the session resolves (not where `cur` is assigned,
+where `SESSION.role` is still the permissive default; the hash is corrected too,
+so the address bar and the screen agree), in `toggleSection` — once, on the
+callee's side, because the shell's two entry points arrive without passing
+through `go()` — and, the one that matters, as a backstop in `render()` itself,
+the single point every door leads to. A rule that each door has to remember is
+one new door away from being broken again. With the backstop, a fourth door
+opening later lands on the hours screen instead of on a screen of zeros that
+reads as fact. It also makes true the premise `ios/…/NavManifest.swift:36-39`
+gives
+for falling back to the six-tab bar — _"the web app resolves every route to the
+hours screen"_ — which was false when it was written, and is why the crew's
+installed build is harmless rather than merely untidy until TestFlight catches
+up.
+
+**S110c · Four refusals and no admission is not a boundary.** Every gate that
+should have caught the above passed. `tests/server-e2e` had four negative
+checks on the site worker (another's hours, an unassigned site, approving a
+week, PUTting the document) and not one positive: nothing asserted that a
+legitimate `recordHours` returns 200, so the whole suite passed just as well
+against an endpoint that refused a site worker everything — which is what
+shipped. `tests/site-e2e` asserted `(mineEntry.form || mineEntry.approved)`,
+which the empty state satisfies, and `#me_save` was pressed by nothing in the
+repository. Both are now two-sided: the positive write and its scoped receipt on
+the server, and on the browser side the button is actually pressed, the page is
+RELOADED, and the row has to still be there — then deleted again, so the suite
+leaves the register as it found it. A boundary is two statements; only one of
+them had been written down.
+
+**S110d · `mutate`'s toast still fires before the office's save lands, and that
+is left alone.** The plan for S107 also proposed making `mutate`'s success
+message conditional on the write having happened. It is not, and the reason is
+that the lie was specific: `saveState` resolving `null` for a redacted document
+returned a SUCCESS that no banner followed. The office's path is different —
+`persist()` debounces and swallows deliberately (a toast per keystroke is
+unreadable, and `persistNow` exists for the one screen that asks in so many
+words), and a real failure raises the store's own «could not save» banner over
+the toast. Making the toast wait would turn every mutation in the application
+into an awaited network round trip, which is a far larger change than this fault
+justifies and touches the write path of a live invoice register. Recorded here
+rather than done.
+
+**S111 · The administrator's one tab: a bar that can be narrowed and never
+widened, in a binary two days too old.** The operator, signed in as
+`stefan@caneisubirats.com` with ADMINISTRATOR on the profile card, had a single
+«Horas» tab. Nothing about it is a permission fault and nothing about it is new
+— it is the shape of the build that is installed, read out of that commit's own
+source rather than inferred:
+
+- `Config.erpRole` at `8830f42` is a GETTER ONLY, and the message handler beside
+  it writes `canei_role` under `if !role.isEmpty` — so a role can be recorded and
+  can never be cleared. Signing out leaves the last account's role on the device.
+- `Config.tabs` is a `static let`, so the bar is computed ONCE PER LAUNCH and the
+  running process cannot change its mind.
+
+So testing the crew's hours screen on this phone wrote `canei_role = "site"`, the
+next launch built `roleTabs["site"]` — one tab — and signing back in as an
+administrator did overwrite the stored value with `"admin"` while the bar, being
+a `static let`, stayed exactly where it was. **The remedy on the installed build
+is to force-quit and reopen**: the stored role is already correct, so the next
+launch reads `"admin"`, finds no `roleTabs` entry for it, and draws the full six.
+
+The durable fix has existed since `53bda8f` (7 Sep) and had never been built.
+`AppState` owns the tabs as published state and rebuilds them when a page reports
+a different role; `Config.erpRole` REMOVES the key on an empty role instead of
+ignoring it; and the page announces on every session recheck, not only on a full
+boot. The last TestFlight run was #24 from `8830f42` on 5 September — two days
+before that landed — so the fix has been sitting on `main` unshipped for a day.
+Triggered from `main` at `95f6d82`, which `iOS · compiles` #40 had already built.
+
+**S111a · The web layer's own safety net cannot fire on the build that needs
+it.** `syncNativeNav()` gives the section rail back when the shell drew one tab
+for an account that is not a site worker — written for exactly this. It reads
+`window.__caneiTabs`, which the shell injects, and `8830f42` does not inject it:
+the net is dark on every build old enough to need it. That is not fixable from
+the web side, and it is the general shape worth remembering — **a shell fault
+can only be repaired by a shell, and a shell ships on Apple's clock, not ours.**
+Which is the argument for the rule the new build already follows: the native bar
+must be able to widen as readily as it narrows, because the narrowing is the half
+that strands somebody.
+
+**S112 · The documents behind a subpartida left the table, because seven money
+columns had nothing to put in them.** The operator, on the third level of Avance
+económico: the information should appear in a different window, because as it is
+they cannot read it. They were right about the cause as well as the symptom. A
+partida row is four money columns and two percentages; a cost document is a
+supplier, a tax id, a date and an amount. Rendered as a third level of the same
+table, the supplier landed under «Presupuestado», the tax id under «Desviación»
+and the date under «%» — the header made a claim about every cell beneath it and
+was wrong about five of the seven.
+
+The comment that lived there argued the opposite, and its argument is worth
+recording because it was a real one: the amount sat in the same column as the
+subtotal above it, so the eye could check that the documents added up to the line
+they hang off. That check is not lost, it is **stated**: the panel foots its own
+documents and prints the subpartida's accumulated cost beside the sum with a
+pill that says whether they agree. A footing asserted in words beats one the
+reader has to perform, and it fails loudly when it stops being true.
+
+The subpartida row stops being a toggle and gets a button, and the check PRESSES
+IT rather than calling the panel with the arguments the screen is supposed to
+supply — the lesson `983cda6` paid for three times in this package.
+
+**S113 · A saving printed in the same red as an overrun.** The operator asked to
+see the columns of the economic-control table against best practice, pointing at
+the plus and minus signs. The first thing there was a defect, not a design
+question: the deviation cell was `money(cents, true)`, and `warn` was applied
+whether the figure was positive or negative — so a partida twenty-four euros
+UNDER budget printed in danger red and bold, exactly like one four hundred over.
+On the one screen whose job is to tell those two states apart. Over budget is
+red and carries its plus; under budget takes the green the margin columns
+already use; dead on is neither.
+
+Then the missing half. What the table showed was spend — budget, actual,
+deviation, margin — and a construction cost report that shows only spend cannot
+answer the question it is opened for: where is this partida going to end up.
+Added as a second view, «Proyección», beside the existing «Ejecutado»:
+comprometido (orders and awards, invoiced or not), avance, proyectado, the
+deviation against budget and the margin that survives it, with a total row.
+
+**Two views rather than eleven columns on one row.** They answer different
+questions and are read at different moments, and a report that puts spend and
+forecast side by side on a phone is a report nobody finishes.
+
+**The projection is computed and cannot be typed, and that was already settled.**
+This screen used to carry an «Ajustar» button over `setForecastOverride`; the
+operator removed it because the budget is fixed and the only thing that moves it
+is an adicional to the contract. That ruling decides this column too — nothing in
+the new view writes, so there is still exactly one place a chapter's number
+changes.
+
+**The formula, and why this one.** Cost at completion is
+`real + presupuestado × (1 − avance)`: spend to date plus the budget for the work
+still to do. The obvious alternative, `real ÷ avance`, assumes every future euro
+will be as inefficient as every past one, and on a partida that buys its material
+on day one it reports a catastrophe at five per cent progress and recants at
+fifty. This one is the budget at nought per cent, the real cost at a hundred, and
+in between it moves by what actually overran. Floored at what is already spent
+and at what is already committed: a forecast below an order that cannot be
+unplaced is a wish.
+
+**It stops at the partida.** A purchase order and a subcontract award are signed
+against a partida and `committedByChapter` is keyed that way; splitting them
+across subpartidas would invent a figure nobody recorded. The view says so on
+screen rather than showing a column of dashes.
+
+**S113a · A greater-than and a less-than in one expression are a tag pair to the
+source audit.** `(cents > 0 ? "num warn" : cents < 0 ? …)` was reported as a
+user-visible string running from the first operator to the second, because the
+audit's markup rule matches `>…<`. Sixth variant of that trap in this file, and
+the second one this session — the other being a `.join()` sitting between two
+template literals in the new panel. Fixed by indexing an array with
+`Math.sign(cents) + 1`, which removes both operators, and by building every
+fragment of the panel before the page rather than inside it.
+
+**S114 · The gestoría package shipped the documents and not the register that
+names them.** The operator: whenever they download the report for the gestoría
+the Excel is empty although there are three invoices. Both halves of that were
+true at once, and the second is what explains the first.
+
+`buildAccountantZip` had exactly one loop feeding the spreadsheet —
+`for (const m of pkg.bankMovements)`. The package `quarterlyPackage` hands it
+carries five things: `bankMovements`, `receivedBills`, `issuedInvoices`, `vat`
+and `irpf`. **Four of the five never reached a cell.** The bills had one job in
+that function, copying their PDFs into `docs/`, which is why the archive looked
+exactly as reported: three real supplier invoices in the folder, and a sheet with
+a header row and nothing under it, because the quarter has no imported bank
+movement yet.
+
+So the gestor received a folder of files with no sheet saying what they were,
+from whom, for how much, or with what tax on them. The deliverable of §5.6 is
+the quarter's books; what it shipped was a reconciliation of a statement that had
+not been imported.
+
+**One workbook, four tabs** — Conciliación (as before), Facturas recibidas,
+Facturas emitidas, Resumen (IVA repercutido y soportado por tipo, resultado del
+trimestre, IRPF). The document tabs name the file of each PDF in `docs/`, so the
+sheet points at the folder rather than the folder standing alone.
+
+**An empty sheet says why it is empty.** A quarter with no movements now carries
+one line explaining that the statement has not been imported and that the
+invoices are on the other tabs, and the download says the same thing at the door
+— the operator found this out by opening the file.
+
+**S114a · `xlsxBlob` could only ever write one sheet.** `sheet1.xml` was
+hard-coded in three places — the content types, the workbook and its
+relationships. Split into `xlsxSheetPart` (unchanged, per sheet) and
+`xlsxWorkbookBlob` (the package), with `xlsxBlob` kept as a one-sheet wrapper so
+not one of its existing callers changes. `parseXlsxRows` takes an optional
+1-based sheet index for the same reason, defaulting to the first.
+
+**S114b · The sales half of the transaction dictionary had no tax id.**
+`txFromBill` carried `partyTaxId` and `txFromInvoice` carried the name and the
+code and not the NIF. The four fields an accountant works from are the number,
+the date, the counterparty and its tax id; the purchase side knew that and the
+sales side did not.
+
+**S114c · The check could not have found it, by construction.** The existing 1G
+assertion picks the quarter with the MOST bank movements — it guaranteed itself a
+non-empty sheet. The new one takes the opposite quarter, documents and no
+statement, and there was one sitting in the fixture the whole time: **2024-Q3,
+two bills and three issued invoices, zero movements**. Verified against the fault
+— with the single-sheet build restored it reports `sheets:1, billRows:null,
+modelBills:2, modelInvoices:3`, which is the operator's screenshot in JSON.
+
+Fourth time in two packages that a gate passed because it sampled the case that
+works. The rule this repository keeps re-learning: **choose the fixture that
+would embarrass the feature, not the one that flatters it.**
+
+**S114d · Source literals 162 → 161, and the ceiling follows it down.** The sheet
+path stopped being the literal `xl/worksheets/sheet1.xml` and became a built one,
+so a code fragment the audit had always counted as prose left the list. Every
+string the four sheets print got an entry in both dictionaries in the same
+commit. `ci.yml` moves to 161 because the ceiling is the measurement, not a
+budget — a spare slot is where the next untranslated label hides.
+
+**S115 · Caja chica: the two ends worked and the middle had no door.** The
+operator asked how the withdrawal, the expenses and the deposit of the difference
+work now. Declaring the withdrawal worked; declaring the return worked; attaching
+the receipts could not be done at all, and the reason is a closed door of exactly
+the shape this package keeps finding.
+
+`markCashWithdrawal` calls `classifyMovement`, which sets `status = "allocated"`
+and `excludedFromPL = true`. Both are RIGHT — a declared withdrawal is not an
+unexplained line, and at the moment the cash comes out nothing has been bought.
+But `unreconciledMovements` wants `status === "unallocated" && !excludedFromPL`,
+so the line leaves the queue the instant it is declared; and `matchDrawer` — the
+only screen carrying Candidatos, the split matcher and the withdrawal card with
+its three figures — had exactly one caller, `onRowClick` on that queue. The
+Conciliados list showed the row and its `onRowClick` was `() => {}`.
+
+So `m.matched.documents`, which is what `cashWithdrawalState` counts as
+`documentedCents`, could never be written after the declaration. **A withdrawal
+spent entirely on receipts read 100% «en efectivo todavía» forever**, and the only
+thing that could reduce it was putting cash back in the bank. Worse, that figure
+is the `cashOutstanding` exception, and `quarterlyPackage` refuses to build while
+an exception is unjustified — so every quarter with a withdrawal would have
+blocked the archive over a number nobody could bring down.
+
+**Two doors, not a change to the queue.** The Conciliados row opens its panel —
+the general form of the fault, since any explained line that later needs a second
+document had to lose the first. And Conciliación grows a card,
+«Efectivo pendiente de justificar», listing every open withdrawal with what is
+left on it and a button in.
+
+**The queue is deliberately NOT changed.** A withdrawal is literally a line that
+is not yet explained, so putting it back in the queue is tempting and wrong: it
+would block `closeBankPeriod` on cash sitting in somebody's pocket, and the
+operator has already said that state is ordinary rather than a fault.
+
+**And the card is not scoped to the period.** Money taken out in March is spent in
+April and its receipts arrive in May; a list respecting the period on screen would
+hide the withdrawals open longest, which are the ones worth chasing.
+`openCashWithdrawals(accountId)` filters by account and by nothing else.
+
+**S115a · A matched withdrawal stopped being a transfer.** `matchMovementSplit`
+sets the class to what the match means — `projectCost` or `customerReceipt` — and
+for a cash withdrawal both are wrong: the receipts are the cost, and the line is
+the company moving its own money into a pocket. `excludedFromPL` survived the
+call, so nothing was ever counted twice, but the class and the flag disagreed and
+a report keyed on either would have told a different story. It keeps
+`internalTransfer` now, asserted.
+
+**S115b · The check exercised the room and not the way in.** It called
+`matchDrawer(w.id)` from `pg.evaluate`, handing the panel the argument the SCREEN
+is supposed to supply — so it proved the panel renders and said nothing about
+whether anything opens it, and stayed green with no door at all. It also asserted
+`returned > 0` and `outstanding > 0` and never once asserted that anything was
+DOCUMENTED, which is the whole middle step. Now it presses the button, matches a
+real bill from inside the panel, and requires `documentedCents` to move by that
+amount: 14.000c → 3.110c on the fixture. Fourth instance in two packages.
+
+**S115c · A check that passed against the fault it was written for.** The
+explained-row assertion read `#dbody` — and the drawer element STAYS IN THE
+DOCUMENT when it is closed, so it read the previous drawer and a row that did
+nothing looked like a row that worked. Caught only because the fault was actually
+restored and the check run against it. Reads `.drawer.on #dbody` now, which cannot
+pass unless a panel is genuinely open. The rule this pays for again: a regression
+check is not written until it has been seen to FAIL.
+
+**S116 · A column that could only ever print zero, and a forecast that trusted a
+figure nobody had entered.** The operator, on the projection view: they are not
+using purchase orders any more, and that is why forecasting is difficult —
+budget against spend is all there is. Half right, and the half that was wrong is
+the more useful half.
+
+**Comprometido was structurally empty for them.** `committedByChapter` reads two
+things and only two: purchase orders and subcontract awards, both required to name
+a partida. No orders means the column can print nothing but zero for ever, in a
+table already short of width. A column that can only ever be empty is worse than
+no column — it takes the space and implies the data exists.
+
+Hidden when the obra has no commitment at all, **computed rather than configured**:
+the day an award names a partida it comes back on its own, with no setting to
+remember and nothing to migrate. Not deleted, because the rule is still right for
+an obra that does award work.
+
+**But the forecast never depended on it.** The missing input was the AVANCE, and
+that one they do have. On their own screen, partida 3 had spent 2.123 against a
+budget of 1.860 while still registering 0%, and `real + presupuestado × (1 −
+avance)` dutifully added the entire budget on top of money that had demonstrably
+already been spent building something: **3.983 €, of which 1.860 was phantom, out
+of a 4.722 total deviation from one row.**
+
+Nought per cent beside real money means nobody recorded the progress, not that
+nothing was built. So a partida in that state now reports a **floor** — the greater
+of budgeted and spent — and carries a «sin avance» pill saying that is what it is.
+A floor understates a partida that genuinely has work left, and that is the right
+way to be wrong: the mark tells the reader the figure is provisional, and the
+remedy is the same act that makes the whole column mean something.
+
+**The honest summary of the operator's constraint**, which belongs here because it
+will be asked again: with budget, spend and progress a reforma forecasts perfectly
+well. What cannot be forecast is a partida nobody has told the system anything
+about, and the table now says which of the two it is looking at.
+
+**S116a · The model split from the rendering, because a header cannot ask a
+question it also has to print.** Whether the column shows and whether any row is
+floored are answers about the DATA, needed above the table. The first shape of this
+handed them back through the renderer as a property on the function object —
+correct only while the template happened to read it after calling it.
+`ecoForecastModel` computes; `ecoForecastRows` renders.
+
+**S116b · Both checks verified against their own faults, and one branch stubbed
+into existence.** Forcing `noProgress` false and `showCommitted` true reports
+`{stale:2, marked:false, floored:false, note:false}` and `{cols:8, says:true}`.
+And the fixture HAS commitments, so the branch the operator actually lives in —
+no orders, no awards, column empty — was never rendered by the run: it is stubbed
+for exactly one render and put back, asserting the column goes, the rows narrow
+with it (a stale colspan is how a table that hides a column comes out a cell short
+of its own headings), and it returns. A branch nothing exercises is a branch that
+breaks quietly.
+
+**S116c · Seventh variant of the literal trap, this time two pills.** The
+variación and «sin avance» tags were one expression, which put a greater-than and
+a less-than either side of the code between them; the audit read that as a tag
+pair and reported the code as a sentence awaiting translation. Each pill is its
+own statement now. The old combined footer paragraph was retired from both
+dictionaries rather than left behind, because the notes are printed conditionally
+now and a dead entry is a thing that drifts.
+
+**S117 · Tres pantallas señaladas a la vez, y las tres tenían razón.** El operador
+marcó en verde, rojo y naranja tres partes de la misma zona de Maestros. Las tres
+resultaron ser el mismo tipo de fallo con distinta cara.
+
+**El catálogo era el único registro sin paginar.** Doscientas nueve subpartidas
+dibujaban doscientas nueve filas: tabla escrita a mano, buscador propio, sin
+tamaño de página y sin forma de avanzar — mientras Clientes, Proveedores, Personal
+y la cola de conciliación comparten `renderMasterList` desde hace tres paquetes.
+Ahora lo comparte también, y gana lo que ese primitivo trae de serie: filas por
+pantalla, anterior y siguiente, y exportación a xlsx/csv que no tenía. El id de la
+lista lleva el capítulo dentro, así que cambiar de partida no hereda ni la página
+ni la búsqueda de la anterior — la misma regla que sigue la cola con la cuenta.
+
+**Y `renderMasterList` no sabía de columnas numéricas.** Coste, Precio y Margen
+habrían quedado alineados a la izquierda. Una línea en el primitivo, y la ganan
+todas las listas del producto.
+
+**S117a · Los paquetes de trabajo estaban muertos por los dos extremos.** Ninguna
+pantalla podía crear uno: `addWorkPackage` solo se llama desde el seed y desde las
+simulaciones. Y `packageCostCents` no alimentaba nada — su único consumidor eran
+las dos tablas que lo imprimían. Ni puerta de entrada ni consumidor: la definición
+exacta de código que ocupa sitio y no hace nada. Se van las dos tarjetas.
+
+**Los métodos del motor se quedan**, y esto es una decisión, no un olvido: los
+afirma `manageability-sim` y retirarlos tocaría 513 comprobaciones a cambio de
+nada visible. Quedan sin puerta, que es el patrón que este paquete lleva
+encontrando toda la semana; anotado aquí para que la próxima sesión lo vea escrito
+en vez de volver a descubrirlo.
+
+**S117b · Subcontratas eran dos cosas con un solo nombre, y el operador leía la
+que sobraba.** `Maestros > Subcontratas` era un filtro por rol sobre el MISMO
+`state.parties` que Proveedores: dos pantallas, una colección. Retirada.
+`Obra > Subcontratos` no es eso: son las adjudicaciones, con certificado,
+retención y documentación obligatoria con caducidad, y es lo que alimenta la
+columna Comprometido de Proyección. Esa se queda.
+
+**Y retirarla abría una trampa que casi se cuela.** La lista de Proveedores
+nombraba `supplier` y `selfEmployed` y su alta FIJABA `supplier`. Sin la pantalla
+de Maestros, un industrial se habría quedado sin registro Y sin forma de darse de
+alta — mientras `supplierOptions`, el selector que les adjudica obra, llevaba
+leyendo los tres roles desde siempre. Tres sitios y tres respuestas distintas
+sobre qué es un proveedor. Ahora Proveedores lee `SUPPLIER_ROLES`, y
+`newPartyDrawer` acepta `roleChoices` para que una pantalla ofrezca los roles de
+los que trata sin fijar uno. La comprobación afirma las dos mitades: que el
+industrial se lista y que se puede crear.
+
+**S117c · Dos comprobaciones cayeron por el cambio, y las dos decían algo.** La
+del idioma buscaba DEM-101 en la primera página, y en un registro paginado y
+ordenado por código eso está muy lejos de la fila veinticinco: ahora lo BUSCA, que
+es lo que hace una persona, y de paso ejerce el buscador de la lista. La de la
+forma del shell fijaba 31 subsecciones y ahora son 30; repinchada con el motivo al
+lado, que es para lo que sirve fijarla.
+
+**S118 · Both halves green, against two different contracts.** The crew's first
+real attempt to save hours was refused by the server: _«"recordHours" (record
+hours) takes 1 argument(s), got 2. Your latest changes are NOT saved.»_ The
+client S110 shipped sent the acting user as a trailing argument. It must not.
+`erp-commands.ts` says so at the top of the file — _«`user` is deliberately NOT
+part of `arity`. Every mutating engine method takes the acting user as its last
+argument… the server appends it from the session, so a caller cannot claim to be
+somebody else by putting a name in the request body»_ — and `runCommand` counts
+the arguments and refuses the call. The rule was written down, enforced, and
+read by nobody on the way past.
+
+The wire now carries the command's own arguments and nothing else. `COMMAND_LOCAL`
+appends the user itself, because the local copy has no session to read; that
+asymmetry is the point rather than an oversight, and it is stated where the table
+is defined.
+
+**S118a · Neither gate could see it, and both were green.** This is the sharper
+half. The two suites test the two halves of one contract against two different
+ideas of what it is:
+
+- `tests/site-e2e` drives the real screen but serves `site/` from disk with NO
+  SERVER, so `commandMutate` takes its local branch and calls the engine
+  directly — where the user IS the last argument and two is correct. It pressed
+  the button, reloaded the page, found the row, and was right about everything
+  it could see.
+- `tests/server-e2e` calls the endpoint, but with an argument list it writes
+  itself. It proved the server's contract against the server's own idea of it
+  and never once looked at what the client would send.
+
+So the yesterday's fix carried a positive test on each side of a boundary that
+nothing crossed. **A contract tested from both ends by two parties who each
+supply their own copy of it is not tested.**
+
+`tests/command-arity/run.mjs` compares the two directly: it reads the arity out
+of the whitelist, parses every `commandMutate("…", […])` call site out of
+`site/erp.html`, and fails when they disagree — naming the file, the line and,
+for the off-by-one that caused this, the reason. It needs no browser, no
+database and no network and runs in milliseconds. Verified the way a gate has to
+be: the bug was reintroduced, the gate failed with the right sentence and exit
+code 1, and passed again when it was removed. It also fails if it finds NO call
+sites, because S103b's lesson applies here too — a gate that cannot see its
+subject must fail rather than report nothing wrong.
+**S119 · Elegir «Al 50 % de avance» hacía imposible crear el contrato.** El
+operador lo contó como que no podía poner la otra mitad al terminar. El fallo era
+mayor: el contrato ENTERO se rechazaba.
+
+Una fila de hito lleva un solo `<select>` con dos hechos dentro —
+`atProgressPct:50`— y `readHitos` los separa correctamente en un trigger y un
+`progressPct`. `save` construía los `installments` copiando `trigger`, `pct` y
+`expectedDate`, y **tiraba el umbral**. `_validateContractTerms` lo exige por
+CON-04, así que `createContract` lanzaba «A progress milestone needs one of 10,
+20, … 90 per cent» — nombrando un campo que la pantalla nunca enseñó y que el
+operador no podía rellenar. Con la fila del 50 % puesta, no había contrato.
+
+**Probado contra el motor antes de tocar nada**, porque la sospecha y la causa no
+son lo mismo: `{trigger:"atProgressPct", pct:50}` se rechaza,
+`{trigger:"atProgressPct", pct:50, progressPct:50}` se acepta, y
+`{trigger:"onCompletion", pct:50}` se acepta. La otra mitad SÍ tenía sitio; lo que
+no se podía guardar era el contrato con la primera dentro.
+
+**Y no existe «al 100 % de avance», a propósito.** `progressTriggerSteps` va de 10
+a 90: el cien por cien es «A la finalización», que es un trigger propio. Anotado
+porque es la pregunta que sigue a este arreglo.
+
+**S119a · La comprobación PULSA el select, no llama a la función.** Elige el
+trigger en la fila, rellena las dos mitades, guarda, y afirma lo que el MOTOR
+acaba teniendo: un `atProgressPct` con `progressPct: 50` y un `onCompletion`
+conviviendo. Verificada contra el fallo, donde informa `created:false` — el
+síntoma exacto del operador en JSON. Quinta vez en dos paquetes que la regla vale
+la pena: ejercer la puerta, no la habitación.
+
+**S119b · Dos peticiones quedan PROPUESTAS, sin implementar, a petición expresa.**
+
+_Heredar el reparto de pago del presupuesto._ Hoy no hay nada estructurado que
+heredar: `paymentConditions` es una lista de FRASES —el código y la etiqueta son
+la misma cadena, «40% a la firma · 40% a mitad de obra · 20% a la finalización»— y
+el comentario del cajón ya rechaza parsearla, con razón. La propuesta es que cada
+entrada de esa lista lleve un `installments` opcional y estructurado; el contrato
+siembra sus filas cuando existe y se teclea como hoy cuando no. Coste: un campo
+opcional en una lista que el propietario ya mantiene, el seed de las cuatro
+condiciones existentes, y una línea en `newContractDrawer`. Cero en el motor.
+
+_Títulos sobre las partidas._ La partida es la unidad que lee TODO: `chapterNum`
+viaja en cada asignación de gasto, en las certificaciones, en `chapterEconomics`,
+`chapterProgress`, `committedByChapter`, los anexos y el paquete de gestoría. Un
+tercer nivel real toca todo eso. La propuesta es que el título sea una ETIQUETA de
+la partida y no un contenedor: un campo `title` opcional en el capítulo, y el
+documento agrupa bajo una cabecera las partidas consecutivas que lo comparten.
+`addChapter` ya hace `Object.assign` sobre sus valores por defecto, así que el
+motor lo almacena sin cambiar una línea. El precio, dicho por delante: un título
+no puede partirse en dos tramos no consecutivos sin imprimirse dos veces, y no se
+reordena de golpe — se mueven sus partidas.
+
+**S119 · The strip's middle word was always Contrato, whatever phase the job was
+in.** The register names three of the thirteen phases under the dots — start,
+commitment, end — and the operator read the middle one as a statement about the
+job: a ring sitting on Compras with CONTRATO under the nearest labelled dot says
+the wrong thing to anybody not counting dots. The two ends stay, because they
+are what the strip runs BETWEEN; the middle label is now the phase the job is
+on, in the accent colour, so it reads as a position rather than as a third
+milestone.
+
+**S119a · Which labels fit was measured in three languages, and CATALAN is what
+set the limits.** The thresholds — opening word from phase 6 onward, closing
+word up to phase 6 — come from measuring all thirteen phases at 262 / 300 / 356
+/ 420px of track. A Spanish-only measurement would have shipped two overlaps:
+Tancament i ressenya and Enviament al client are long enough to collide where
+their Spanish equivalents clear by 29px. The first draft of this change WAS
+Spanish-only and the sweep found them.
+
+They are dot COUNTS rather than pixel sums on purpose. i18n rewrites these words
+after render, so any width computed in the client is measured in the language
+the source happens to be written in and is wrong in the other two — the same
+shape of hidden dependency as S112. What keeps a dot count honest is the browser
+check that now asserts, for every phase in every language at four widths, that
+no two labels overlap, that none hangs off the strip, and that the current phase
+is named: 156 positions, and it fails 156/156 with the fixed middle label back.
+
+**S119b · A label near an edge grows inward, which is what makes it
+language-proof.** Centred on its own dot, the late phases run off the end —
+Pagos a proveedores is 113px wide on a dot 22px from the right edge. The
+opening and closing words have never been centred for exactly that reason, and
+the current label now borrows their alignment inside their zone. Alignment does
+the work rather than arithmetic over a string, so nothing here depends on how
+long a word is in a given language.
+
+**S120 · Finishing a phase left you standing on it.** The operator: after phase
+2 I have to move to phase 3 by hand before I can make the quote. The recorrido
+kept two different ideas of where you are — the phase the JOB is in, and the
+phase you are LOOKING AT — and only the first moved when work completed. So
+recording the visit recoloured a dot and left the next action behind a button
+that had to be found and pressed, on the one screen whose whole purpose is to
+say what to do next.
+
+The view now follows the work. What it does NOT do is move you off a phase you
+went back to read: the rule needs a TRANSITION — the phase you are standing on
+going from unfinished to finished while you stand on it — which no amount of
+navigating can produce. A simpler rule (if this phase is done, go forward) would
+have made every completed phase unreadable, and that half is asserted too: all
+thirteen are opened in turn and each has to stay where it was opened.
+
+`Ir a la fase N` stays. Following the work and going where you ask are different
+things, and the button is the second one.
+
+**S121 · A local variable named `opts` hid the caller's `opts`, and the quote
+send walked off the screen.** The operator: after the quote is sent it jumps to
+the main overview. `sendBudgetDrawer(id, opts)` takes the caller's options, and
+the recorrido passes `{ stay: true }`. Inside the send handler a local
+`const opts = { channel: ch }` was declared for the engine call — shadowing the
+parameter for the whole block, including the `afterCreate(opts, …)` at the end
+of it. So the caller's intent was unreachable from the one line written to read
+it, and every send from the recorrido landed on the quotes register.
+
+The comment immediately above that line already said what should happen —
+_«Unless the caller asked to stay… the recorrido does»_ — which is the part
+worth keeping: the code and its own documentation disagreed, and the
+documentation was right. Renamed to `issue`, which is what it is. Only the
+recorrido passes options at all, so the two register callers are untouched.
+
+**S122 · Turning green was the wrong test for «is there anything left here».**
+S120 moved the screen on when the phase under it finished. That caught the
+visit and missed two more, both reported the same day: a quote SENT goes to
+`waiting` — it is with the customer, not finished — and has nothing left to
+press, while the next verb sits one phase along. `journeyNext` does not help
+either: it answers what is unfinished, and a quote with the customer is
+unfinished while offering nothing to do.
+
+So the rule now turns on the VERB rather than the colour: the phase had an
+action you could take, and after what you did it has none. Where it goes is the
+next phase you can act on, with `journeyNext` as the fallback.
+
+That is also what keeps it from doing harm. Create a contract without signing
+it and the verb does not vanish — it becomes «Firmar» — so the screen stays
+exactly where it is rather than marching the operator around their own
+signature. Same rule, opposite answer, and the second half is the one that
+would have cost something.
+
+**S122a · A check that called the engine could not see the bug in the drawer.**
+The first test written for the sent-quote jump called `issueVersion` directly,
+because the drawer is covered elsewhere and what was under test was the
+screen's reaction. It passed with S121 live: the navigation fault was in the
+drawer, and a test that skips the drawer skips the fault. A second check now
+drives the real button — and with the shadowing put back it reports
+`hash: "#quotes", onJourney: false`, which is the operator's sentence in the
+suite's own words. Same lesson as S112a, one layer along: a test that stubs the
+thing the bug is in is a test of something else.
+
+**S123 · «Some PDFs do not open» — the ones that were never files.** Only the
+quote had a real PDF. The contract, the invoice, the rectificativa, the receipt
+and the job sheet produced theirs by laying the on-screen sheet out on the page
+and calling `window.print()`. In a browser that opens the print dialog and the
+operator picks save-as-PDF, which the old comment called the established
+pattern. **A WKWebView has no print dialog**, so inside the app those buttons
+did nothing whatsoever — no file, no error, no dialog. And because the quote
+took the other route and worked, what the operator saw was exactly what they
+reported: some PDFs open and some do not.
+
+Nothing had to be invented to fix it. `CaneiPdf.build` takes a descriptor, and
+`docFor` has produced a descriptor for all twenty document kinds since the Word
+mirror shipped — which is why the Word button beside every one of these worked
+all along. So `downloadPdf` is `downloadDocx` with the other writer on the end
+of it: same descriptor, same facts, same language, and a file on every
+platform. The print route is deleted rather than left beside it, along with the
+`@media print` rules that only it could reach: a half-removed feature is how
+somebody reintroduces this in a year by reaching for the function that is still
+there.
+
+The desktop behaviour changes and it changes for the better — a button labelled
+with a download arrow now downloads, as its Word twin always did, instead of
+opening a print dialog.
+
+**S123a · The test asserted the mechanism, so it could not see the fault.**
+`COM-04: contract download` stubbed `window.print`, clicked the button, and
+checked that the approved sheet had been laid out on the page for the dialog.
+That is a faithful test OF PRINTING, and it passed on every run while the
+button did nothing on the only device the crew uses. The mechanism was the bug;
+a test written against it inherits the bug's blind spot.
+
+It now asserts the artefact: a download event, a `%PDF-` header and a plausible
+size. That is the one thing the print route could never produce anywhere, and
+it fails with `name: null` the moment the button goes inert again — which is
+how it was verified. The ledger check beside it does the same, plus a sweep
+that builds a PDF for every document kind the ledger can offer, because a
+download test only ever exercises whichever row happens to come first.
+
+**S123b · Source literals 161 → 158, and the CI ceiling follows.** Deleting the
+print route took three Spanish strings with it. Lowered in the same commit, per
+the rule that ceilings only ever move down.
+
+**S124 · The rail opened on chip one, whatever phase the job was in.** Thirteen
+phase chips are about a thousand pixels wide and a phone shows five, so the
+strip always started at the left: a job at phase 8 opened with the phase the
+operator came to see off the right-hand edge, and the first thing they did was
+drag. Measured without the fix, on a 390px screen: phase 7 sits 307px past the
+edge and phase 13 604px past it.
+
+The scroller is now set so the current chip is centred, and the browser clamps
+the number — which is why phase 1 sits against the left edge and phase 13
+against the right rather than centred against empty space. The box keeps
+`overflow-x: auto`, so dragging it anywhere still works exactly as before.
+
+**S124a · It moves only when the selected phase changes, which is the same rule
+as S120.** Re-centring on every render would haul the strip back under the
+thumb of somebody who had just scrolled it somewhere else — the yanking problem
+one card above, in a second place. `jRailAt` remembers where the rail was last
+put, so a redraw that changes nothing changes nothing. The check asserts both
+halves: the clamped-centre position to within 2px at phases 1, 7 and 13, and a
+manual scroll surviving an unrelated redraw.
+
+It is measured at PHONE WIDTH deliberately. At the desktop width the rest of
+this suite runs at, the whole rail fits and there is nothing to centre — the
+assertion would pass against any implementation, including none.
+
+`getBoundingClientRect` rather than `offsetLeft` because the offset parent is
+not the scroller, and `scrollIntoView({inline:"center"})` is avoided because it
+drags the PAGE vertically as well as the strip sideways.
+
+**S125 · The Gantt was not integrated into the recorrido; it was linked from
+it.** The operator: the chart is very badly integrated in the customer journey,
+I cannot edit the plan or monitor the execution. Both halves were true, and the
+phase's own comment said why without noticing it was the complaint — «no verb
+of its own, on purpose… progress is marked on the chart», where the chart was
+on a different screen. What Ejecución actually carried was five figures about
+MONEY, no verb at all, and a link out.
+
+Money is not execution. A job can be 80 % billed and a fortnight late, and
+nothing on that phase could say so.
+
+The phase now draws the plan: the same `ganttChart` and `ganttList` the full
+screen draws, off the same `ganttContext`, with `ganttWire` binding the same
+gestures — drag a bar, pull an edge, tap to open the task. Not a smaller second
+chart: two renderers for one plan is how two screens come to disagree about
+when a job finishes, and the Gantt block's own header already forbids
+recomputing a date locally.
+
+It also reports the SCHEDULE — planned finish, critical path, drift against the
+frozen baseline — and the phase goes `late` on positive drift rather than
+staying amber at 80 % done.
+
+**S125a · The verbs came back because the reason for their absence did.** The
+phase had no action deliberately: the thing to do was on the chart. With the
+chart here, «＋ Tarea» and «◆ Hito» belong here, and for a job with NO plan the
+verb is the one that builds one — «Derivar del presupuesto», disabled with its
+reason when there is no accepted budget to derive from, because a verb that can
+only fail is worse than none. That last state is the one the operator could not
+reach from the recorrido at all.
+
+**S125b · One gatherer, two screens.** `ganttContext(pid)` returns the plan, the
+schedule, the payment milestones, the baseline comparison and whether the job
+can be derived from its budget. The full screen was rewritten to use it rather
+than keeping its own copy of those twenty lines, so the recorrido cannot drift
+from it. The legend moved the same way: an unexplained red bar is precisely the
+complaint that put the chart on the phase.
+
+The full screen keeps what does not belong on a phase — zoom, the baseline
+toggle, the working calendar, the S-curve, recalculating the payment milestones
+— and «Abrir la carta Gantt ↗» still goes there.
+
+**S125c · The check has to survive a tap, not just find an `<svg>`.** A picture
+of a chart would satisfy any assertion about elements being present. So the
+browser check counts bars against the plan's own task count, requires the
+handler `ganttWire` binds, and then TAPS a bar and requires the task drawer to
+open. Verified by taking the chart back out: `svg:false, bars:0, wired:false`
+and the tap times out.
+
+**S126 · The fault was not in the button; it was in the page holding it.** The
+report said the invoice PDF would not download. It downloads: clicked in a
+browser, `#iv_pdf` and `#iv_word` both write their file, and a sweep of all 26
+invoices built both formats without one failure. What reproduces the report is
+a page loaded before the fix deployed — the shell keeps one long-lived web view
+per tab, all loaded at launch, so nothing published to `site/` reaches a phone
+that is already open. Three faults reported in one afternoon were that same
+fault underneath, and «force-quit the app» is not a fix, it is a habit the
+product is asking a person to have.
+
+So the page watches `/api/health`, which already answers with the commit the
+running image was built from — it exists because this project kept getting
+exactly this wrong. It remembers the first revision it sees and reloads when
+the server starts answering with a different one. Three refusals are as
+load-bearing as the reload: never on the first read (nothing to compare
+against, and it would loop), never on `unknown` (a static copy and any build
+made without `BUILD_REVISION` answer that, for ever), and never over an open
+drawer or a focused field — a deploy lands several times a day and a reload
+would throw somebody's work away. Verified by removing each guard in turn: the
+browser check reports `first:1`, `typing:1` and `first:1` respectively.
+
+**S126a · Sweeping by hand proves a day; a gate proves every day.** The general
+check the operator asked for — every document in the whole recorrido, Word and
+PDF — was run by hand and came back clean. That is worth exactly one afternoon.
+It is now `tests/site-e2e`: every ledger row of every recorrido, both formats,
+**176 documents · 352 files** — presupuesto 55, contrato 46, factura 45,
+fichaProyecto 24, recibo 6 — each asserted to start `%PDF-` or `PK`, to exceed
+a thousand bytes, and to carry the right extension.
+
+The count is asserted too, and not as decoration: a sweep that found nothing to
+sweep would otherwise report every document healthy. Verified by emptying the
+list of recorridos — `docs:0` fails, where before it would have passed.
+
+**S126b · A sweep that rebuilds the route is a test of the sweep.** The obvious
+way to write it is to assemble the references itself and call the writers. That
+passes while the button is broken, because the button's own reference-building
+is the half that is not being exercised. So `downloadHistoryDoc` was split:
+`historyDocFile(row, format)` returns the bytes and the name, and the download
+handler is now that function plus `downloadBlob`. The sweep calls it — the
+button's route one layer down — and cannot drift from the button without the
+button breaking too. Verified by making one kind throw: `factura·pdf` fails 45
+times, which is the shape of the operator's report.
+
+**S127 · Two emails were sending braces to customers, and only a customer would
+have seen it.** Asked for a sample of every email the system composes, the only
+honest way to make one was to generate it from the product's own code. Doing
+that read the messages the way a recipient reads them for the first time —
+every screen in the app shows the TEMPLATE, so `{{cliente}}` on a template
+screen looks like a token doing its job — and two of the six standard messages
+had never had their tokens supplied. `works-start` went out under the subject
+«Comenzamos su obra el {{fecha}}» and opened «Hola {{cliente}},»;
+`warranty-followup` opened the same way.
+
+The fault is a contract with no gate: a template names the variables it needs,
+`commsEvents()` supplies them, and nothing compared the two. `renderTemplate`
+leaves an unsupplied token visible, which is the right choice — a sentence that
+silently loses its subject is worse than one that obviously did — but it means
+the disagreement is only visible in the sent mail.
+
+Fixed where the send path sees it: `contract-signed` and `works-finished` now
+carry `cliente` and `fecha`, and `fecha` is formatted dd/mm/yyyy because it
+lands in a subject line a customer reads, not in a field. Gated by
+`tests/comms-tokens/run.mjs`, which renders every standard template against the
+event that raises it and fails on a surviving brace — and fails too when a
+template has no event to raise it, because an email that cannot be produced is
+an email this sweep did not check.
+
+**S127a · The sample pack is generated, or it is a drawing of the product.** A
+pack assembled by hand agrees with the code on the day it is made and drifts
+silently afterwards, which is how a client approves wording that changed two
+sessions ago. So `scripts/sample-emails.mjs` takes the message library from the
+engine, the token fill from the messaging capability, the branded body from the
+same function the send path uses, and the attachments from the same writer that
+produces the customer's download. Nothing in it writes a sentence, an address or
+a figure.
+
+That had one consequence worth recording: `draftEmailHtml` moved out of
+erp.html into `CaneiEml.bodyHtml`, beside the MIME assembly, for the reason that
+file's own docstring already gave about two copies disagreeing within a month.
+The body is as much part of what gets sent as the envelope around it.
+
+**S127b · A generator that fills its own gaps hides them.** The first version of
+the script topped up `cliente` from the party record when the event did not
+carry it. The pack then read perfectly while the product sent braces — the
+sample would have certified the bug. The patch was removed and the gap fixed in
+the engine instead: what the pack shows has to be what the send path produces,
+including where that is wrong.
+
+**S127c · What the pack does not claim.** A quote the app sends goes through the
+budget route, which resolves a line's photographs into a graphic annex; that
+route draws in a browser and cannot run in the generator. It matters only for a
+quote that HAS photographs, so rather than assert the files are identical, each
+quote attachment states whether that quote has any — the seeded one does not, so
+its annex is empty and the sample is the whole of what is sent.
+
+**S128 · The Barcelona roadmap was run unattended, and what that run could and
+could not see.** The operator approved a twelve-phase, IESE-style process for
+identifying the next tenants in the Barcelona region and asked for it to be run
+overnight without questions, with one operational rule: if a result is empty,
+wait and restart. Each phase ran as its own agent on the model the roadmap
+named; each artefact had to pass `scripts/market-gate.mjs` — exists, long
+enough to be an answer, every section its phase asked for, none of the phrases a
+model uses to file a non-answer — before it was committed. Thirteen artefacts,
+one commit each, all on `main` under `docs/market/barcelona/`, bound into one
+PDF by `scripts/market-pack.mjs`.
+
+**Zero gate failures on first submission. One interruption**: Phase 11 hit the
+API session limit during its final reply, after its file was complete and
+gate-accepted; no retry was needed. **One agent committed its own artefact**
+(Phase 1) without pushing; the commit was kept — no history rewrite — and later
+agents were told not to.
+
+**S128a · Only web search reaches outside this environment.** Phase 4a probed
+every source it was asked to use and found that every direct fetch — open-data
+portals, procurement platforms, guild directories, company registries, BOE —
+answers 403 to the proxy; search-surfaced text is all that is legible. That
+bounded the whole run: the 128-firm prospect list carries honest nulls in most
+fields, Phase 4c found `municipality` wrong in 30.8 % of its sample and cleared
+only name, NIF and CNAE for scoring, and every score in Phase 5 is therefore
+capped at 63.6/100 with three rubric dimensions marked PROVISIONAL. The
+synthesis says so in its body, and its sixth decision is that no message leaves
+the building against the current list until it is enriched. A day with SABI or
+eInforma access changes this; nothing in this repository can.
+
+**S128b · The fifteen-minute claim, measured.** Phase 7 ran the factory CLI on
+a probe tenant: `new-tenant` 0.9 s, `resolve` 1.1 s, `validate` 0.9 s — the
+SPECIFICATION meets the Definition of Done with room to spare. A firm that can
+sign in with its own branding, series and clause blocks measures 8–16
+engineering hours, 32–64× the target, for two structural reasons with file
+paths: tenant specs are baked into the container image, and the session carries
+no tenant claim while accounts span every tenant, so two customers cannot yet
+share one stack. That finding was carried into the pilot design (two pilots at
+once, each on its own stack) and is the synthesis's first engineering ask.
+The probe tenant was removed and `tenants/INDEX.md` restored before commit.
+
+**S128c · The red team read the plan without knowing who wrote it.** A fresh
+agent was handed the artefacts as files and framed as a sceptical supervisor.
+Its verdict — proceed with conditions, and stop if the first experiment fails —
+is quoted in the synthesis, and the synthesis concedes where it was right: the
+revenue-per-employee figure is restated, the compliance half of the value case
+is priced at zero until the submission channel ships, and outreach claim C9 is
+struck. A plan that survives a polite review has not been reviewed.
+
+**S128d · GDPR posture for prospect data, fixed in advance.** Company-level
+data only; `directors[]` from registry sources only (and empty in practice,
+since none were reachable); no personal emails or mobiles; legal basis
+legitimate interest with the balancing test written in Phase 4a and carried
+into Phase 10 as the pilot's art. 28 posture. Committing the list to the
+private repository was judged the more reversible choice than keeping it only
+on disk overnight.
+
+**S129 · The pipeline workbook is generated from the artefacts, and its blanks
+are honest.** The operator asked for one Excel to start approaching prospects:
+the target list with contacts, ordered by priority, and a guided selling
+process. `scripts/market-pipeline-xlsx.py` builds it from the roadmap files
+rather than from typed cells, so a re-scoring or an enrichment rebuilds it
+without anybody copying a row. Every lookup is INDEX/MATCH so the verifying
+LibreOffice can evaluate it (the Calc component had to be installed first —
+the sandbox shipped core and common only); 1,447 formulas, zero errors.
+
+**S129a · Contact enrichment, and what it could not find.** A targeted pass
+over the 37 Tier A+B firms, by web search only, found published company-level
+channels for 17 of them — 16 phones, 8 emails, 8 websites, one company LinkedIn
+page — every value with its source URL, written to `04b-CONTACTS.jsonl` and
+labelled unaudited; the audited `04-PROSPECTS.jsonl` was not touched. Twenty
+Focus firms still have no channel at all, one of them in Tier A. The Dashboard
+counts that number rather than hiding it, because the cheapest next step is a
+paid registry pull, not another search.
+
+**S129b · The workbook does not pretend the product is finished.** The README
+carries the two facts a seller must not contradict: the 15-minute tenant claim
+holds for the specification and not for a sign-in-able tenant, so a demo on
+their data is an engineering booking of 8–16 hours; and the product is not yet
+Verifactu-compliant on day one, so objection 9 is answered honestly. Headers
+and guidance are in English, consistent with the artefacts the operator reads;
+the outreach copy stays Castilian and Catalan.
+
+**S130 · The pipeline was researched on the open web, and audited before anyone
+could dial it.** The operator asked for every column filled for all 128 firms.
+Six workers researched them by web search — the only route out of this
+environment, direct fetches being refused by the egress proxy — and a seventh
+re-derived a 15-row sample field by field before the workbook shipped.
+
+Coverage across the 128: CNAE 46 → 103, address 0 → 97, activity 0 → 114,
+telephone 15 → 55, website 13 → 40, email 4 → 27, year founded 10 → 58,
+employee band 19 → 53, and 33 administrators where there were none. **Forty
+Tier D firms recovered a CNAE inside the target family**; they were declined
+only for lacking one, so each is flagged a re-score candidate — flagged, not
+promoted, because the tiering is Phase 5's to redo deliberately.
+
+**S130a · Three firms must never be called, and the audit is the only reason we
+know.** Two are dissolved — `Construcciones Y Reformas Decorhogar SL` (Tier B,
+and therefore on next week's call list) and `Reformas Terrassa SL` — both
+_Extinguida_ in the registry. One, `Reformas y Diseño a Medida SL`, has no
+registry record at all under any search. All three carry a DO NOT CALL reason,
+turn the row red, and are excluded from Focus, which fell from 37 to 36.
+Measured error on the fields a seller acts on was zero: NIF 0/13, CNAE 0/10,
+address 0/12, phone 0/3, email 0/5, website 0/5, activity 0/13. `owner_role`
+had one contradiction in two checkable values and is provisional.
+
+**S130b · Owner names, and the rule that kept them clean.** Administrators of a
+Spanish S.L. are public record in the Registro Mercantil. Every one of the 33
+came from a registry republisher — Axesor, Iberinform, Empresite, Infonif,
+eInforma, libreBORME — with the role as published; the audit found no name
+taken from LinkedIn, Facebook, a review site or a news article, and the merge
+step drops any that is. The basis is legitimate interest for B2B contact, and
+anyone who objects is marked Lost and never contacted again.
+
+**S130c · Two method errors, both found by measuring rather than assuming.**
+Querying field by field exhausted a worker's 200-search budget on nine firms and
+left its remaining eight with nothing; one well-formed query returns CIF,
+address, administrator, CNAE, employees and activity together, and the rewritten
+instruction did 23 firms in 46 searches. And the merge keyed on NIF, so a firm
+whose NIF the second pass discovered arrived as two rows — 138 rows for 128
+firms. It keys on the normalised legal name now and combines both passes field
+by field, since each found things the other missed.
+
+**S130d · A duplicate column key wrote the administrator into the wrong cell.**
+The researched owner column and the sales-rep owner column shared the key
+`owner`, so the name was written to the tracking column and then blanked, while
+the role — whose key was unique — appeared normally. A column that is present,
+headed correctly and silently empty is the failure this repository keeps
+meeting. Duplicate keys in `COLS` now abort the build.
+
+**S131 · The missing telephones are a network setting, not a research failure.**
+73 firms have no telephone and 103 no email, and the reason was worth
+establishing rather than assuming: this session cannot open a web page.
+`WebFetch`, `curl`, Node's `fetch` and a real headless Chromium were all tried
+against eInforma, Google and a firm's own site; every one is refused by the
+egress proxy with `x-deny-reason: host_not_allowed` and the instruction _"Add
+this host to your network egress settings to allow access."_ Only web search
+gets out, which is exactly why the activity code and the address filled well —
+a directory snippet carries them — and the telephone and the email did not.
+They live on a contact page behind a link nobody could follow.
+
+Three doors exist and they stack, documented for the operator in
+`docs/market/barcelona/ENRICHMENT-OPTIONS.md`: the environment's own **Network
+access** level (Trusted today; **Full** costs nothing and takes two minutes),
+an **MCP connector** whose traffic goes through Anthropic's servers rather than
+the session's network and so is not subject to the allowlist at all
+(**Parallel Search** is authless and free), and **Google Places**, which is the
+canonical source for a local business's telephone and is inside its free
+monthly tier at 128 firms. `scripts/market-enrich.mjs` implements all three as
+interchangeable sources, probes which are open, and **refuses to run on
+snippets alone** — snippets are what left the cells empty.
+
+**S131a · The probe reported the door open while every page was refused.** Its
+first version accepted "any status below 500" as success, and the proxy answers
+a blocked host with a real HTTP 403. So it cheerfully said `direct: OPEN` and
+would have sent somebody to spend an afternoon on an enrichment that could not
+fetch anything. Blocked is now identified by the proxy's own `x-deny-reason`
+header, and open additionally requires a body large enough to be a page. This
+is the same class as every gate in this repository that had to be taught to
+fail: a check that cannot tell open from shut is worse than no check.
+
+**S131b · Google Places would also catch the dissolved firms automatically.**
+Its `businessStatus` field says whether a business is still trading, and the
+pipeline folds a non-`OPERATIONAL` answer straight into the workbook's DO NOT
+CALL column. The audit found three such firms by hand — one of them Tier B, on
+next week's call list. That should not depend on an auditor noticing.
+
+## S132 · Three email designs, and the product shipped the worst one (2026-09-14)
+
+Asked to make the ERP's emails look like they came from a world-leading company
+— the wording and the Canei identity, not only the text — and told a footer with
+the logo was missing. The finding was not that nobody had designed this.
+
+**The repository held three email designs.** `apps/web/lib/invite-mail.ts` had a
+genuinely premium six-band table layout, reachable only by the two account
+emails. `site/documentos/01-cliente/17–20-email-*.html` held four approved
+mockups with a lockup, a summary table, a payment box and a complete legal foot
+— drawings, rendered by nothing. And `CaneiEml.bodyHtml`, twelve lines of
+markup, was what **every customer** received: a mark, a name, the paragraphs,
+and one rule over two lines of contact detail. The weakest of the three was the
+one wired to the send path, which is the only reason it was the one that
+shipped.
+
+**So the design moved into `site/erp-eml.js`, beside the envelope**, in the file
+both runtimes already load, and a message that does not go through it does not
+get sent. Blocks — masthead, prose, facts, payment, note, attachment,
+credentials, steps, button, sign-off, legal foot — each optional, each stating
+its own background so a force-inverting dark-mode client cannot turn a band's
+text the colour of the paper behind it. Tables and inline styles only, because
+Outlook on Windows lays out with Word's engine.
+
+**Three envelope defects, fixed on the way past.** `build()` wrote `Subject:`
+raw with no RFC 2047, and three of the six standard subjects carry «—» or «¿» —
+so every draft this browser had ever built went out with an 8-bit header. No
+`Date:` was written. `esc()` did not escape an apostrophe. The server-side
+composer had done all three correctly for a year; nothing had ever compared the
+two, which is the same shape of fault as the `{{token}}` gap and the command
+arity gap before it.
+
+**The logo, against a documented decision.** `invite-mail.ts` opened with «NO
+IMAGES, ANYWHERE», and its reasons were right: a remote logo is blocked by
+default in Outlook and Gmail, an inline `<svg>` is stripped by Gmail. A `cid:`
+part is neither — it travels inside the message and both clients draw it. So the
+mark is attached (1.5 kB green, 1.3 kB white, `scripts/email-logo.mjs`
+regenerates both from the house outline), it carries alt text, and the wordmark
+beside it is live text. The worst case is exactly the identity that shipped
+before. The note was replaced with this reasoning rather than deleted, and the
+test that asserted «loads no images at all» was rewritten to assert what now
+matters: every image is a `cid:` reference with alt text, and nothing is
+fetched.
+
+**Content, not only styling.** A three-line email in a beautiful frame is still
+a three-line email. `STANDARD_COMMS_TEMPLATES` was rewritten around the pieces
+the design lays out — greeting, prose, steps, note, closing — in **three
+languages**, following `party.docLanguage` exactly as the documents already do.
+The FIGURES are deliberately not in the templates: reference, date, amount, due
+date, days overdue and the payment account come from the event, because a
+template author retyping a total is a total that can be wrong.
+`composeCommsMessage()` puts the two together once, and the HTML part, the plain
+part and the WhatsApp text all render from it — so they cannot disagree.
+
+**Two emails the catalogue promised and the product could not send.** The
+catalogue has drawn an acceptance confirmation and an invoice covering email
+since the document set was designed, and there was no template behind either:
+a customer accepted a quote and heard nothing until the contract arrived, and
+the library had a REMINDER for an invoice nobody had ever emailed. `quote-accepted`
+and `invoice-send` now exist, raised by `quote-accepted` and `invoice-issued`
+events built from data the system already held. The four catalogue pages are
+generated from the message library by `scripts/email-docs.mjs`; a client
+reviewing the catalogue is now reviewing the product.
+
+**The gate grew to match.** `tests/comms-tokens/run.mjs` asserted one thing; it
+now asserts twenty, per template per language, on the RENDERED message: no
+token in any part, a greeting, a sign-off, a preheader, a subject under 60
+characters, figures or steps, the reference in the plain part, an account
+offered whenever the event carries one, no flexbox, no `<style>` block, no
+remote image, every image a `cid:` with alt text, no cell painting text on a
+ground it does not state, a plain part that is prose rather than stripped
+markup, and the six identity facts LSSI-CE art. 10 asks for plus the
+confidentiality and GDPR notices. 678 checks. The floor is asserted too, so a
+sweep that finds nothing fails.
+
+**What the gate caught that a person would not have.** Letter-spacing of .18em
+on the uppercase eyebrow labels made a PDF extractor read «DATOS PARA EL PAGO»
+as «D AT O S PA R A E L PA G O» — the label stopped being findable, in exactly
+the way `tests/doc-print/searchable.mjs` was written to catch after the last
+time. Tracking is now .06em; it still reads as an eyebrow. And the preheader
+carried the raw `*emphasis*` markers to the lock screen, which is precisely what
+a machine-written message looks like.
+
+**What was decided without asking** (autonomy contract): one builder rather than
+a second premium renderer per side; the `cid:` mark with a live-text fallback,
+reversing the no-images note; content restructured rather than restyled; all
+three languages, because the product already chooses a document language per
+party and an email in the wrong one undoes the effect; the two missing templates
+added rather than left as drawings.
+
+## S133 · The App Store route, and two blockers that are not code (2026-09-14)
+
+Asked to put the app live on the App Store, "only for company internal use",
+first time right, with as little operator work as possible.
+
+**The route was already right and is now confirmed against Apple's current
+rules.** A single-company ERP wrapped in a WKWebView fails the public App Store
+twice: guideline 4.2, which rejects "a repackaged website… not particularly
+useful, unique, or app-like", and 3.2, which rejects an app "designed for a
+specific organisation… rather than a general audience". Apple's own answer for
+this is a **Custom App** through Business Manager — same binary, same review,
+private distribution. A previous session chose it and built the repository
+around it; nothing needed changing.
+
+**Two things block it, neither of them in this repository.**
+
+1 · **Canei is not enrolled in Apple Business Manager.** A Custom App is
+distributed to an organisation identified by its Organization ID. Without one,
+App Store Connect cannot be set to custom distribution and a submission goes in
+PUBLIC — into the rejection above. Enrolment needs a D-U-N-S number and a
+verification call from Apple: days. So "available immediately on the App Store"
+was not achievable on any route, and saying so was the useful answer. TestFlight
+is the channel that IS immediate, takes 100 internal testers and is not reviewed
+at all.
+
+2 · **The signing certificate cap refilled and run #26 hit it**, thirteen
+seconds in: _"Your account has reached the maximum number of certificates."_
+Exactly as INTEGRATIONS_PENDING predicted — cloud-managed signing asks Apple for
+a new certificate every run. Two minutes to clear, and it now matters more than
+it did, because the build sitting in TestFlight is 1.1 (14) from 8 September and
+predates the privacy manifest.
+
+**The gap that would have cost a review cycle.** `ios/` had **no
+`PrivacyInfo.xcprivacy`**, which Apple has required since May 2024 and which is
+the most-cited privacy rejection for any app touching `UserDefaults` — and this
+one does, for the Face ID arm flag, the role and the interface language. The
+uploads had gone through because at upload it is a warning; at submission it is
+not. Added, declaring what is true: no tracking, no collected data types, and
+`NSPrivacyAccessedAPICategoryUserDefaults` with reason `CA92.1`. The Xcode
+project uses a synchronised root group, so dropping the file into
+`CaneiSubirats/Resources/` was the whole change — no project surgery.
+
+**`tests/app-store/run.mjs` — the submission checked before Apple checks it.**
+Field limits per locale, locale parity, https URLs, real category keys,
+screenshots measured from their PNG headers rather than trusted from filenames,
+the privacy manifest cross-checked against whether the Swift actually uses
+`UserDefaults`, and review notes that name the privacy URL, the language switch
+and the custom-app framing. 76 checks. Proven red on an over-long subtitle and on
+an 800×600 screenshot before being trusted green.
+
+It has **two verdicts on purpose**. CI asserts what the repository owns and stays
+green while the operator-only values are blank, because blocking every commit on
+a value nobody here can supply only teaches people to ignore a red gate. The
+release workflow runs the same script with `--ready`, where a blank the reviewer
+needs is a failure — that is the moment it stops being pending and starts being
+a rejection.
+
+**Written down rather than automated:** the App Privacy questionnaire, export
+compliance and the age rating are screens in App Store Connect that nothing can
+send. `docs/RELEASE-IOS.md` now answers all three field by field, each answer
+checked against the code, so they are a copy rather than a judgement. A gate that
+pretended to cover them would be worse than one that says it does not.
+
+## S134 · One certificate, reused — and a branch that is a store, not a trunk (2026-09-15)
+
+Run #26 failed on Apple's certificate cap, as S133 recorded. The operator asked
+which certificates were safe to delete, and — having been told the cap would
+refill in three builds — asked for it fixed permanently.
+
+**Why it kept happening.** The `beta` lane signed with
+`-allowProvisioningUpdates`, which tells `xcodebuild` to ask Apple for a NEW
+distribution certificate whenever it cannot find one locally. A runner is a
+fresh machine every time, so it never found one. Every build minted another;
+Apple caps a standard account at three. fastlane's own documentation names this
+exact failure and names `match` as the answer.
+
+**What was actually safe to revoke, and why.** Three `Distribution` and one
+`iOS Distribution`, all created by the CI API key. Each private key existed only
+on the runner that made it and died with that machine, so none of them can sign
+anything anywhere — including on the operator's own Mac. Kept: the
+`Distribution Managed` certificate (Apple holds its key) and the operator's own
+development certificate. The ten `Created via API` development entries are
+clutter, not cause: development certificates have no cap.
+
+**THE STORE IS A BRANCH OF THIS REPOSITORY, AND THAT IS A DELIBERATE EXCEPTION.**
+`CLAUDE.md` says `main` is the only long-lived branch, and mandate §3 forbids
+deleting branches — so a permanent `certificates` branch is furniture that can
+never be removed. It was still the right call, and the alternative is why:
+
+- a separate private repository cannot be reached by `GITHUB_TOKEN`, so it needs
+  a personal access token, base64-encoded with a prefix, pasted into a second
+  secret — and the operator does this from a phone;
+- the GitHub App in this session **cannot create a repository** either (403), so
+  that path starts with manual work as well;
+- `GITHUB_TOKEN` reaches this repository for free, and the basic-auth value can
+  be assembled inside the workflow, so the whole thing costs **one secret**.
+
+The rule it bends exists to stop a second branch carrying CODE that deploys and
+drifts from `main` — two dev branches, one wired to a preview, work landing where
+the tooling was not looking. The `certificates` branch carries no code, nothing
+deploys from it, nothing merges into or out of it, and no gate reads it. It is a
+store that happens to speak git. Written down here so the next person reads a
+decision rather than finding an unexplained branch.
+
+**Read-only is the property that matters.** The build lanes call
+`match(readonly: true)` and sign manually. A build can use what exists and can
+create nothing, so however often it runs it cannot put the account back at the
+cap. Leaving `-allowProvisioningUpdates` in place alongside `match` would have
+made the failure rarer rather than impossible, which is not a fix.
+
+**The demo account.** The operator chose to give App Review their own
+Administrador login and supplied the password in chat. The address went into
+`demo_user.txt`, which is what Apple needs and is not a secret. The password was
+written nowhere: it belongs in `ASC_DEMO_PASSWORD`, and the release lane puts it
+in the metadata for the length of a run only. Recorded with the recommendation
+made once and not repeated: a disposable `revisor` account would be better, since
+App Review shares credentials internally and the account stays live afterwards.
+
+## S135 · A second system on the same machine, and the guards that make it safe (2026-09-15)
+
+**What was asked.** A development system mirroring production, on the same
+server, with the app unchanged and TestFlight remaining its staging path. Later
+simplified twice by the operator: no second machine, and **invented data rather
+than an anonymised copy of the real register**.
+
+**The shape.** Environments, not branches. `CLAUDE.md` forbids reintroducing a
+dev branch and gives the reason — two once existed, only one was wired to the
+preview, and `/preview` served nine-session-old content while nothing went red.
+So the build already publishes `:sha`, gates it in `smoke`, and moves `:main` in
+`promote`; dev simply follows a `:dev` tag published in the same `images` job,
+ungated. Same digest, roughly eight minutes and one gate earlier. Dev is never a
+different build, only an earlier one. A manual dispatch can publish `:dev` from
+any ref, which is the look-before-live path — and no branch name is written into
+any workflow, because the ref is whatever the person pressing the button chose.
+
+**The data decision, and why it is the cheap one.** The first plan was an
+anonymised copy of production. Research changed it: the AEPD names using real
+data in test environments as one of the infractions it most often finds, and
+names two acceptable alternatives — synthetic data, or anonymisation performed
+**before the copy leaves production**. Under the EDPB's three cumulative tests
+(singling out, linkability, inference) what we could realistically have built
+would have been pseudonymisation, not anonymisation, because the amounts, dates
+and invoice sequence numbers that make the data worth testing against are also
+what single a customer out. That would have left dev holding personal data and
+needing a `LEGAL_REVIEW.md` entry, a necessity analysis and equivalent controls.
+The operator chose invented data instead. `site/erp-seed.js` already builds a
+company of real shape — 26 counterparties, 19 quotes, 26 invoices, 14 projects,
+~1150 audit entries across 2024–2028 — so the realistic option cost nothing and
+**there is no personal data on the development system at all**. No LEGAL_REVIEW
+entry is needed and none was written; inventing one would have been noise.
+
+**`reformas-demo`, not `diorka`.** Tenant specs are baked into the image and
+`diorka` is the real company's — its name, address, tax id and bank details.
+Running the invented spec means nothing about Canei Subirats appears on dev even
+before the band loads, which removes the confusion risk by construction instead
+of by warning. The cost is that dev exercises a different tenant configuration;
+when a production-config change needs rehearsing, `diorka` is also in the image
+and can be seeded there with invented data for that session.
+
+**Three guards, because the machine is shared.** Each replaces a property a
+separate server would have had for free. See `OBJECTIONS.md` #7.
+
+- **The project name.** `docker-compose.prod.yml` carries `name: canei-erp`.
+  Brought up without an override the dev stack would land inside the production
+  project — same container names, same volumes — and `up -d --remove-orphans`
+  would delete the production containers it did not recognise. Verified rather
+  than assumed: compose resolves the name from `-p`, then
+  `COMPOSE_PROJECT_NAME`, then the file's `name:` key, and the `.env` beside the
+  compose file wins — read from the **compose file's** directory, not the working
+  directory, so an operator in the wrong folder still gets the right project.
+  Checked in three places: the generated `.env`, an `ExecStartPre` on the deploy
+  unit, and `dev-up.sh` refusing to start a stack that resolves to anything else.
+- **The disk.** One 80 GB disk, and dev exists to be broken. Dev's database sits
+  on a 12 GB loopback ext4 image with a `nofail` fstab entry. Rejected:
+  `storage_opt` (wrong storage driver), XFS project quotas (the filesystem is
+  ext4), a second Hetzner volume (costs money, which is what one box was for).
+- **TLS.** Two things cannot both bind 443, so production's Caddy grows a second
+  site block rather than dev getting its own ingress. Caddy will not start on a
+  config it cannot parse, so an empty `{$DEV_HOSTNAME}` would expand to an empty
+  site address and take the **real** ERP off the internet as a side effect of a
+  development feature. Hence the `{$DEV_HOSTNAME:dev.invalid}` default —
+  `.invalid` is reserved by RFC 2606 and can never resolve — and a
+  `caddy validate` before every reload, in both `sync-server.sh` and `dev-up.sh`.
+
+**The band fails open, and that direction is the decision.** Only an explicit
+marker makes a system show "ENTORNO DE PRUEBAS"; unset, empty or misspelt reads
+as production and shows nothing. The two failures are not symmetrical: a missing
+band on dev costs a moment's confusion between systems that already differ by
+address and by password, while a band wrongly drawn over a real company's
+invoices tells them their own books are invented. The workspace is a static file
+baked into the image and cannot read a server variable, so it asks `/api/health`
+at boot — in its own try/catch, last, unable to stop the page loading.
+
+**Separate ops actions rather than a prod/dev target selector.** The plan said a
+`target` input. Building it, a selector turned out to mean guarding _every_
+existing step, and a step whose guard was forgotten is a dev request that runs
+against the real system. `dev-up` and `dev-reset` are their own actions and no
+production step was modified, so there is nothing to forget.
+
+**Two pre-existing breaks fixed in passing.** `vars.APP_URL` was never set, so
+`deploy.yml`'s `verify` job has never once passed. And `ERP_PUBLIC_URL` is read
+by `apps/web/lib/public-origin.ts` but was not in the compose file's environment
+at all, so generated links have been falling back to the forwarded host.
+
+**Postscript — the band's first attempt put a 404 in every console.** It fetched
+`/api/health` unconditionally. The browser suite serves `site/` as static files
+over plain HTTP with no API behind it, so every page load logged a failed request
+and thirty-five "no console errors" assertions went red; the published
+demonstration copy on Pages would have done the same. The defect was not the
+band. It was inventing a second answer to a question the codebase had already
+answered: `recheckBuild` in `site/erp.html` was ALREADY fetching `/api/health` to
+notice new builds, already guarded by `ErpStore.isRemote()`, and already parsing
+the reply. The band now reads `environment` off that same response — one request
+instead of two, the existing server-detection instead of a new one, and nothing
+asks anything when there is no server to ask. Same shape as the compose project
+name above, and as the `PK-L` gate that pinned a number instead of a rule: the
+repository usually already knows, and the bug is in not looking.
+
+## S136 · A third level in the budget that is a word, not an identity (2026-09-16)
+
+**The ask.** Título above Partida and Subpartida, "just a visual thing, and
+just for some clients", with the same Partida reachable from two Títulos.
+
+**What the impact study found, and it decided the design.** Two things in this
+system address a partida, and both address it by its NUMBER. `markProgress`
+finds one chapter by num (`erp-engine.js`), and every cost bucket is a plain
+object keyed by num and read back first-match. Let one budget hold the same
+partida twice and the foreman marks half a partida done while the other half
+stays open, and the margin table sums to double the real cost — both silently,
+except on the Economía screen, whose reconciliation guard would turn red. The
+operator, shown this, withdrew the in-budget half of the requirement: the data
+stays at two levels and the título is a label.
+
+**So: the catalogue is many-to-many, the budget is not.** `lists.itemTitles`
+plus an `itemTitleLinks` edge table let fontanería belong to a bathroom and a
+kitchen at once, and that is free because nothing joins the price book to a
+budget's chapters — the only connections are a dropdown offering a chapter's
+Spanish NAME as free text and `chapterCatalogueCode` guessing the code back by
+accent-folded containment. Inside a budget, `chapter.title` is one optional
+string that nothing finds, buckets or sums by.
+
+**The título is the WORDS, not a code.** A sent presupuesto is a document
+somebody holds; if the chapter stored a code and the paper resolved it at print
+time, renaming a título in master data would rewrite a quote the customer had
+already accepted. The catalogue keeps codes because it is live; the document
+keeps words because it is frozen. Consequence, stated rather than discovered
+later: a título does not translate, exactly as a chapter's name does not.
+
+**A título is one band, so assigning one MOVES the partida** to the end of its
+run, within its own `section`. Safe only because `_editableVersion` refuses a
+sent or accepted version, and every stored `chapterNum` belongs to a project,
+which exists only downstream of acceptance.
+
+**The list ships EMPTY, and that is the whole of "only for some clients".** No
+flag, no per-tenant switch — a company with no títulos sees the screens and the
+documents exactly as they were. It also keeps the level out of
+`tests/i18n/coverage.mjs`, which demands EN and CA for every SHIPPED Spanish
+value; a título the owner types is their data, in their words.
+
+**English calls it "Section".** Never "Chapter": S23 renamed capítulo→Partida in
+all three languages and the coverage gate fails any EN value that brings the old
+word back.
+
+**Two holes closed on the way.** `\bpartida` never matched the "partida" inside
+"subpartida" — no word boundary falls between `sub` and `partida` — so a
+capability could have shipped the sector's own word for a budget line and passed
+`pnpm boundaries` in silence. The pattern lost its leading boundary, `título`
+joined it, and `check.test.ts` now pins the whole vocabulary word by word,
+including the near-misses that must NOT be swept up (partial, title, titular).
+
+**Not done, and deliberately.** The project baseline
+(`project.baseline.chapters`) does not carry the título: the heading is for the
+budget and its paper, by instruction, so nothing on the obra, the avance
+económico or the certification reads it. Giving it the field would be inventing
+a use for it.
+
+**Operator data, not a repo fix.** The `jor` unit in the live workspace reads
+"day rate" in the Spanish column where _jornada_ belongs. It is an entry the
+owner added; the shipped units list has no `jor` at all.
+
+## S137 · Releasing becomes a decision instead of a side effect (2026-09-16)
+
+**What it was.** Every push to `main` moved the `:main` tag and the client's
+server pulled it within 60 seconds. From commit to the client's screen was about
+four minutes, with nobody required to look. That was true on the day the company
+was handed a freshly blanked document to start working in.
+
+**What changed.** `promote` now needs `inputs.release`, which only a
+`workflow_dispatch` can set. A push to `main` still builds, publishes `:sha` and
+`:dev`, and runs `smoke` — so the development system is current and the artifact
+is tested. The only thing that waits is production.
+
+**Why this is not the dev branch CLAUDE.md forbids.** No branch name is written
+into any workflow. The thing that gates production is a tick box on a run of
+`main`; the thing that feeds dev is the ordinary build. `promote` keeps its ref
+guard, so dispatching from a `claude/**` branch builds it, smokes it and puts it
+on dev while `:main` stays where it is — which is the look-before-live path the
+governance file asks for, without a second source of truth.
+
+**What it does NOT change.** Rollback: re-tag `:main` onto an older `:sha`, as
+before, with `DEPLOY_PINNED` declaring the freeze. The bytes released are still
+the bytes `smoke` tested — `imagetools create` retags inside the registry and
+rebuilds nothing.
+
+**The cost, stated plainly.** A fix now needs two acts instead of one, and a
+release that nobody presses is a fix the client does not have. The gate makes
+forgetting possible where before it was impossible. That is the trade the
+operator asked for, and the reason `:dev` is ungated is that forgetting to look
+must not also mean forgetting to build.
+
+**Verify is still red until `APP_URL` is set.** It reads `/api/health` and
+compares the revision, and the variable has never been set, so it has never
+passed. It runs after `promote` and cannot block a release — but it is the only
+thing that would notice a server that has stopped following `:main`, and
+production once spent 25 hours on an image 19 commits behind while six
+consecutive deploys passed. Setting the variable is one line in repository
+settings and turns a permanently red job into a real check.
+
+## S138 · The company's address served the test system (2026-09-16)
+
+**The symptom.** `https://178-105-10-156.sslip.io/api/health` — the client's own
+address — answered `"environment": "dev"` and `"revision": "b09e248"`, a commit
+that was built but deliberately never released. Production was running
+`095aadd`. The operator could not reach the dev address at all.
+
+**The cause, in one line.** Compose gives every service the alias of its SERVICE
+NAME on every network it joins, on top of any explicit `aliases`. The dev
+overlay reuses `docker-compose.prod.yml`, so the dev app is also called `app`,
+and it joins `edge` — where it therefore answers to `app` as well as to
+`app-dev`. Caddy sits on BOTH networks, and its production block said
+`reverse_proxy app:3000`. Two possible answers; Docker returned both; Caddy
+picked one. It picked dev.
+
+**Why `app-dev` could never have prevented it.** The alias was added so the dev
+hostname could be proxied, and that works. What it cannot do is remove the
+implicit name: adding a second alias to the dev side leaves `app` meaning two
+things. The disambiguation has to happen on the PRODUCTION side, which is where
+it now is — `app-prod`, an explicit alias on the production network, on a
+service that is not on `edge` at all, so the name has exactly one answer from
+anywhere.
+
+**What was NOT harmed.** The two stacks have separate databases and the dev app
+only ever talked to the dev one, so the company's register was never written to
+by this. What it cost is worse than nothing and less than data loss: for a day,
+the address the client was told to use showed them a fabricated company.
+
+**The guard that was supposed to catch this, and why it did not.** The
+ENTORNO DE PRUEBAS band is explicitly documented as the third line of defence,
+after the hostname and the password. Both of those failed at once here — the
+hostname pointed at the wrong stack — so the band was all that was left, and it
+did work: it is what told the operator something was wrong. A third line of
+defence holding is not a system working.
+
+**Not fixed here, and named so it is not forgotten.** `ops/status.sh` compares
+the running revision against the newest commit on `main` and calls the
+difference "behind". Since S137 that is wrong by construction: merging is not
+releasing, so an unreleased commit now reads as a fault. It reported
+"10 commit(s) behind" during this incident, which is noise exactly when noise
+is most expensive.
+
+## S139 — a check that demanded a word production could not say
+
+`ops/dev-down.sh` restored production correctly on its first real use, and then
+reported `✗ the app still reports something other than production — do not hand
+this to the client yet` over a box that was fine.
+
+The script asked the container for `/api/health` and insisted on seeing
+`"environment":"production"`. That field arrived WITH the development stack
+(9c07ce8); production is serving an image built before it, so its health
+document has no `environment` key at all. The catch-all arm treated "the field
+is absent" the same as "the field says dev".
+
+Fixed by inverting the rule: fail on an explicit contradiction, not on a missing
+confirmation. An absent field cannot mean dev — dev only ever runs `:dev`, which
+is by construction newer than the commit that added the field — so absence is
+production, and is now reported in those words rather than folded silently into
+the happy path. A body that is neither still fails.
+
+The reason this matters beyond one red tick: the operator had been told, in
+writing, "if it still says dev, stop and tell me — don't hand the address to the
+client." The check that was supposed to answer that question answered it wrongly
+in the direction of alarm, at the end of the incident it existed to close. A
+false alarm on a recovery step is not a cosmetic defect; it is the step not
+working.
+
+Exercised against seven bodies — the real one, dev, explicit production, empty,
+a 502 page, key order reversed, and a docker error string — before pushing.
+
+## S140 · Configuración → Notas, the test phase's intake (2026-09-16)
+
+**S140j · It lives under Configuración, not Datos maestros.** Built under
+Maestros and moved on the operator's word, and the word was right: Datos
+maestros holds the COMPANY's records — clientes, proveedores, personal — and a
+note is about the software. Its neighbours under Configuración are Usuarios,
+Alertas and Idioma, which are the other screens about the application rather
+than about the business. `DMC-10`, appended last so the section's tab — named by
+its FIRST sub-route, `company`/ORG-01 — is untouched and all four `nav.json`
+copies stay byte-identical. The route key never changed, so the view, the
+drawers, the `#notas` alias, the badge, the CSS and every dictionary entry moved
+with it for free; what had to change was the two places that had written the old
+section's name down.
 
 The operator is testing the ERP against the live workspace on a phone, and the
 feedback was arriving as screenshots in a chat — not counted, not prioritised,
@@ -8618,7 +11072,7 @@ never visibly closed. The recorrido package was reconstructed from two
 photographs and four defects nobody had written down. This is the screen that
 stops that happening again.
 
-**S78a · «Where» is a route key, never a label.** The dropdown is built from
+**S140a · «Where» is a route key, never a label.** The dropdown is built from
 `SECTIONS`, so a screen added tomorrow is on the list tomorrow with no second
 copy of the menu to keep in step, and what the record stores is the route KEY.
 A label is a translation and cannot be an address: a note filed on an English
@@ -8626,7 +11080,7 @@ phone has to read in Spanish on the next one, and the `↗` has to open the scre
 either way. «Otro» plus a free-text detail covers what is not a screen — a PDF,
 an e-mail, the whole app.
 
-**S78b · Two questions, two marks.** The STATUS is the pill (Abierta gold · En
+**S140b · Two questions, two marks.** The STATUS is the pill (Abierta gold · En
 curso slate · Hecha green · No se hará plain grey) and the PRIORITY is a 3 px
 rule down the row's left edge, `cfg.rowClass`'s second use after CHG-04. Both
 lessons from that precedent were copied rather than rediscovered: the selector
@@ -8638,7 +11092,7 @@ rule: leaving one would mean the colour marked how loudly something was once
 filed rather than what is left to do. «No se hará» is the grey pill for the
 same reason — a decision not to act should be quiet, not red.
 
-**S78c · «Urgente / Normal / Menor», not «Alta / Media / Baja».** This
+**S140c · «Urgente / Normal / Menor», not «Alta / Media / Baja».** This
 dictionary already spends «Alta» on a registration — its English is
 "Registered", as in alta en la Seguridad Social — and «Baja» is the other half
 of that pair. A priority column reading "Registered" would be «Pendiente» →
@@ -8646,41 +11100,41 @@ of that pair. A priority column reading "Registered" would be «Pendiente» →
 surprise, it is a pattern: **before naming a status, look the word up.** Three
 words this register owns outright cost nothing and cannot collide.
 
-**S78d · Outstanding first, not newest first.** The first ordering put the two
+**S140d · Outstanding first, not newest first.** The first ordering put the two
 already-decided notes at the top and the urgent open one at the bottom, which
 is backwards for the only job this screen has. It is open-before-decided, then
 urgent-before-minor, then newest — the three questions a person triaging asks,
 in that order. Found by looking at the screenshot, not by a test.
 
-**S78e · No migration, against the ladder's habit.** Every other new collection
+**S140e · No migration, against the ladder's habit.** Every other new collection
 got a rung. `ERP.from()` already backfills any array the constructor declares
 (`erp-engine.js:925`), verified on a blob with the key deleted, so a rung would
 buy nothing — and `CURRENT_VERSION` 21 → 22 would make a blob written here
 unreadable by an older cached build, because `migrate()` throws when the blob is
 newer than the code. Declared in the constructor, not migrated.
 
-**S78f · The state blob, not `meta`.** A note is about the software rather than
+**S140f · The state blob, not `meta`.** A note is about the software rather than
 about the business, which argues for keeping it out of the tenant's records —
 but `meta` is per-device UI preference storage by its own docstring, and a note
 has to reach the people who can fix it. What reaches us goes through the blob's
 persistence, sync and export. `state.feedback` is the existing precedent for a
 small non-core collection.
 
-**S78g · No `erp-ownership.json` entry.** That file is one entry per **spec
+**S140g · No `erp-ownership.json` entry.** That file is one entry per **spec
 domain area** and its guard requires a non-empty `specSection`. A QA-intake
 screen has no section in the requirements document, and inventing one to satisfy
 a schema would make the file lie about what the product owes the spec. The guard
 passes at 27 areas unchanged.
 
-**S78h · `.field textarea` had no typeface.** Not part of the ask, found while
+**S140h · `.field textarea` had no typeface.** Not part of the ask, found while
 driving the form: the rule at `erp.html:4166` styles `input, select` and the
 `max-width` rule beside it already lists `textarea` — so the intent was there
 and the font half was never written, and all five drawers with a free-text box
 rendered their longest field in the browser's monospace. Fixed for all five.
 
-**S78i · The suite's `shape.subs` pin went 31 → 32.** Deliberately pinned so a
+**S140i · The suite's `shape.subs` pin went 31 → 32.** Deliberately pinned so a
 thirty-second sub arrives on purpose rather than by drift; this is that purpose.
 And one bug in the new suite itself, worth writing down because it is the shape
 of a whole class: it edited the first ROW and asserted on `notes.slice(-1)`,
-which were the same record until S78d's sort arrived and then silently were not.
+which were the same record until S140d's sort arrived and then silently were not.
 Addressed by the row's own `data-id` now.

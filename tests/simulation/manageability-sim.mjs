@@ -5248,10 +5248,27 @@ assert(
   });
   e.issueVersion(vb.id, {}, "bo");
   const v1 = e.budget(vb.id).versions[e.budget(vb.id).versions.length - 1];
+  const endBeforeAccept = prj.dates.targetEnd;
   e.acceptVersion(vb.id, v1.id, {}, "bo");
+  /* TWO EVENTS, NOT ONE. A customer accepting a price and an annex to a signed
+     contract existing are different facts, and PK12-S13 stopped them being the
+     same step. Between them lives the state that did not exist before — agreed
+     commercially, not yet part of the job — which is most of the life of a real
+     adicional. Asserted first, because a test that only checked the second half
+     would pass against the one-step behaviour this gate was built to remove. */
+  assert(
+    prj.dates.targetEnd === endBeforeAccept,
+    "S11: accepting a variation budget agrees the price and moves the job not at all",
+  );
+  e.signContractAnnex(
+    con.id,
+    (con.annexes || []).find((a) => a.budgetId === vb.id).number,
+    { method: "verbal", by: "Ignacio" },
+    "bo",
+  );
   assert(
     prj.dates.targetEnd === "2026-07-17",
-    "S11: accepting a variation budget extends the date by ITS days too",
+    "S11: …and signing its annex is what extends the date by ITS days",
   );
   assert(
     (con.annexes || []).length === annexesBefore + 2 &&
@@ -5284,6 +5301,16 @@ assert(
   e.issueVersion(vb2.id, {}, "bo");
   const v2 = e.budget(vb2.id).versions[e.budget(vb2.id).versions.length - 1];
   e.acceptVersion(vb2.id, v2.id, {}, "bo");
+  assert(
+    JSON.stringify(con.installments.map((i) => i.amountCents)) === JSON.stringify(instBefore),
+    "S12: an accepted adicional is not billed until its annex is signed",
+  );
+  e.signContractAnnex(
+    con.id,
+    (con.annexes || []).find((a) => a.budgetId === vb2.id).number,
+    { method: "verbal", by: "Ignacio" },
+    "bo",
+  );
   const instAfter = con.installments.map((i) => i.amountCents);
   assert(
     JSON.stringify(instAfter.slice(0, instBefore.length)) === JSON.stringify(instBefore),
@@ -5423,9 +5450,25 @@ assert(
     e.budgetStage(b) === "accepted",
     "S13: …and goes back to accepted once the adicional is answered",
   );
+  /* AGREED, AND STILL OUTSIDE THE JOB. The same gate as S11: acceptance writes
+     the annex and stops. Until it is signed the baseline has not moved, the
+     version it replaces is not superseded, and the days have not been counted.
+     Pinned before the signature so that this test cannot pass against an engine
+     that applies everything in one step. */
+  assert(
+    e.project(prj.id).acceptedVersionId === v0.id,
+    "S13: accepting the adicional does not move the baseline on its own",
+  );
+  assert(!e.version(prj.budgetId, v0.id).superseded, "S13: …nor supersede the version it replaces");
+  e.signContractAnnex(
+    con.id,
+    (con.annexes || []).find((a) => a.versionId === v1.id).number,
+    { method: "verbal", by: "Ignacio" },
+    "bo",
+  );
   assert(
     e.project(prj.id).acceptedVersionId === v1.id && b.acceptedVersionId === v1.id,
-    "S13: accepting it moves the baseline for progress and economics",
+    "S13: signing its annex moves the baseline for progress and economics",
   );
   assert(
     e.version(prj.budgetId, v0.id).frozen && e.version(prj.budgetId, v0.id).superseded,

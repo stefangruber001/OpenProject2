@@ -95,9 +95,17 @@
   .toc a span{color:var(--muted)}
   svg{display:block;max-width:100%}
 </style>
-<script src="i18n-dict.js"></script>
-<script src="i18n-dict-ca.js"></script>
-<script src="i18n.js"></script>
+<!-- NO i18n LAYER HERE, DELIBERATELY.
+     This document is written in English on purpose — the operator's decision,
+     2026-08-17, and the reason `tests/i18n/audit.mjs` lists it under
+     ENGLISH_BY_DESIGN. It used to load the dictionaries anyway, and the runtime
+     did what it is built to do: with the stored language Spanish and the page
+     declared `lang="en"`, it translated back through the reverse map and hit the
+     handful of phrases that happen to have a Spanish form. The result was an
+     English guide with Spanish patches — "Reformas, sencillamente complejas." on
+     the cover, "DOCUMENTO" in the meta strip, a contents line reading "7 · Horas:
+     site to payroll". Worse than either language on its own, and invisible until
+     the page was printed. A document with one language needs no translator. -->
 </head>
 <body>
 
@@ -115,17 +123,17 @@
       <div class="nm">Canei Subirats<small>Renovations, simply complex.</small></div>
     </div>
     <div style="margin:auto 0">
-      <div class="pill">ERP · Operations &amp; setup guide</div>
-      <h1>Bringing your ERP into operation</h1>
-      <div class="sub">Infrastructure, the day-to-day process, who does what (RACI), and a step-by-step
-      setup you can follow even with no technical background — from empty account to running the whole
-      job from lead to paid invoice and a five-star review.</div>
+      <div class="pill">ERP · Operations guide</div>
+      <h1>Running the company on it</h1>
+      <div class="sub">What the system is made of, the thirteen steps every job goes through, who does
+      what, how hours travel from the site to the payroll, and the rhythm of a week once you are live —
+      from the first enquiry to a paid invoice and a five-star review.</div>
     </div>
     <div class="meta">
       <div><span>Prepared for</span><b>Canei Subirats, S.L.</b></div>
       <div><span>Sant Just Desvern</span><b>Barcelona · Catalonia</b></div>
-      <div><span>Document</span><b>Go-live runbook v1</b></div>
-      <div><span>Read time</span><b>~20 minutes</b></div>
+      <div><span>Document</span><b>Operations guide v2</b></div>
+      <div><span>Read time</span><b>~25 minutes</b></div>
     </div>
   </div>
 </section>
@@ -134,32 +142,41 @@
 <section class="page">
   <div class="kicker">Contents</div>
   <h2 class="sec">What's in this guide</h2>
-  <p class="lead">Read it top to bottom the first time. When you set the system up, keep section 6 open —
-  it is the numbered checklist. Anything marked <span class="chip">later</span> is not needed on day one.</p>
+  <p class="lead">Read it top to bottom the first time. Sections 4, 7 and 8 are the ones you will come
+  back to — the process, the hours cycle and the weekly rhythm. Anything marked
+  <span class="chip">later</span> is not needed on day one.</p>
   <div class="toc">
     <a href="#s1"><b>1 · The system at a glance</b><span>p.3</span></a>
     <a href="#s2"><b>2 · Infrastructure (the moving parts)</b><span>p.4</span></a>
     <a href="#s3"><b>3 · How it's built (architecture)</b><span>p.5</span></a>
     <a href="#s4"><b>4 · The operating process</b><span>p.6</span></a>
-    <a href="#s5"><b>5 · Roles &amp; RACI matrix</b><span>p.7</span></a>
-    <a href="#s6"><b>6 · Go-live: step-by-step setup</b><span>p.8</span></a>
-    <a href="#s7"><b>7 · Daily operation runbook</b><span>p.11</span></a>
-    <a href="#s8"><b>8 · Backups, security &amp; data protection</b><span>p.12</span></a>
-    <a href="#s9"><b>9 · Next steps &amp; roadmap</b><span>p.13</span></a>
-    <a href="#gl"><b>Glossary of terms</b><span>p.14</span></a>
+    <a href="#s5"><b>5 · Roles, permissions &amp; RACI</b><span>p.7</span></a>
+    <a href="#s6"><b>6 · Go-live: who does what</b><span>p.8</span></a>
+    <a href="#s7"><b>7 · Hours: site to payroll</b><span>p.10</span></a>
+    <a href="#s8"><b>8 · Daily operation runbook</b><span>p.12</span></a>
+    <a href="#s9"><b>9 · Backups, security &amp; data protection</b><span>p.13</span></a>
+    <a href="#s10"><b>10 · Next steps &amp; roadmap</b><span>p.14</span></a>
+    <a href="#gl"><b>Glossary of terms</b><span>p.15</span></a>
   </div>
 
   <div class="callout"><b>The one-sentence version.</b> Your ERP is a website (an application) that your team
-  opens in a browser on the office PC or a phone on site. It stores everything in a secure database, and it
-  turns one data entry — the customer and the quote — into the quote PDF, the project, the purchase orders,
-  the invoice, the reminders and the review request, automatically.</div>
+  opens in a browser on the office PC or in the app on a phone on site. It stores everything in a secure
+  database, and it turns one data entry — the customer and the quote — into the quote PDF, the project,
+  the purchase orders, the invoice, the reminders and the review request, automatically.</div>
+
+  <div class="callout warn"><b>Read the other guide first if the system is new.</b> Filling in your
+  company — identity, tax defaults, catalogue, people, bank, mailbox — is a separate, one-off job with
+  its own document: <b>🏁 Guía de puesta en marcha / Initial Company Setup</b>, in the same profile menu.
+  This guide assumes that work is done.</div>
 
   <h3>How to use the workspace alongside this guide</h3>
   <p>Everything described here can be done today, with no installation, in your workspace:</p>
   <ul>
-    <li><b>End-to-End Journey</b> — enter your own project and run all 13 steps; photos and documents are
-      filed into a downloadable project folder.</li>
+    <li><b>El recorrido del cliente</b> — a screen of the workspace (Proyectos → Recorrido), not a demo:
+      enter your own project and follow all 13 phases over the same records every other screen uses.</li>
     <li><b>Control Tower</b> — the owner's dashboard (pipeline, money, alerts).</li>
+    <li><b>Horas</b> — the site's day sheet, the office's review, and the month's reconciliation
+      (section 7).</li>
     <li><b>Master Data</b> and <b>Financial Data</b> — every record the company runs on, and the live P&amp;L / balance sheet / cash-flow / KPIs.</li>
     <li><b>Quote builder</b> — the catalogue-first presupuesto screen.</li>
   </ul>
@@ -197,10 +214,11 @@
     <li><b>Documents carry your identity.</b> Quotes, invoices and emails all wear the Canei logo and colours.</li>
   </ul>
 
-  <div class="callout warn"><b>Honest limits on day one.</b> A few connections need your credentials before
-  they are switched on: real email sending, Verifactu/AEAT (legally required from 2027, not before), bank
-  statement import, and card payments. Until then the software produces the document or draft and logs it —
-  it never sends or files anything on its own. These are listed in section 9.</div>
+  <div class="callout warn"><b>Honest limits, stated once.</b> The system <b>never sends email and never
+  files anything with anybody</b>. It composes the message, attaches the document and puts it in your
+  mailbox's Drafts folder; a person opens it and presses send. Verifactu/AEAT (legally required from 2027,
+  not before), bank statement import and card payments are separate switch-ons and are listed in
+  section 10.</div>
 </section>
 
 <!-- ============ 2 · INFRASTRUCTURE ============ -->
@@ -231,19 +249,19 @@
     <!-- app -->
     <rect class="bx g" x="300" y="72" width="180" height="80" rx="12"/>
     <text class="lb" x="318" y="100">Canei ERP app</text>
-    <text class="sm" x="318" y="118">Next.js · runs on a</text><text class="sm" x="318" y="132">host (e.g. Vercel)</text>
+    <text class="sm" x="318" y="118">Next.js in a container</text><text class="sm" x="318" y="132">on one rented server</text>
 
     <!-- database -->
     <rect class="bx" x="560" y="72" width="180" height="80" rx="12"/>
     <text class="lb" x="578" y="100">🗄️  Database</text>
-    <text class="sm" x="578" y="118">PostgreSQL + row-level</text><text class="sm" x="578" y="132">security · daily backup</text>
+    <text class="sm" x="578" y="118">PostgreSQL 17 + row-level</text><text class="sm" x="578" y="132">security · daily backup</text>
 
     <!-- internet label -->
     <text class="sm" x="210" y="60" style="font-style:italic">internet (HTTPS)</text>
 
     <!-- integrations row -->
     <text class="lb" x="300" y="205" style="fill:#31532a">Connections (switched on with your credentials)</text>
-    <rect class="bx" x="300" y="220" width="132" height="58" rx="10"/><text class="lb" x="314" y="245">✉️ Email</text><text class="sm" x="314" y="263">Outlook / SMTP</text>
+    <rect class="bx" x="300" y="220" width="132" height="58" rx="10"/><text class="lb" x="314" y="245">✉️ Mailbox</text><text class="sm" x="314" y="263">IMAP · Drafts folder</text>
     <rect class="bx" x="446" y="220" width="132" height="58" rx="10"/><text class="lb" x="460" y="245">🏛️ Verifactu</text><text class="sm" x="460" y="263">AEAT (2027)</text>
     <rect class="bx" x="592" y="220" width="148" height="58" rx="10"/><text class="lb" x="606" y="245">🏦 Bank / 💳 Stripe</text><text class="sm" x="606" y="263">statements · payments</text>
     <rect class="bx" x="300" y="292" width="132" height="52" rx="10"/><text class="lb" x="314" y="316">🗂️ File storage</text><text class="sm" x="314" y="332">photos · PDFs</text>
@@ -261,18 +279,38 @@
   </svg>
 
   <table class="avoid">
-    <thead><tr><th style="width:26%">Part</th><th style="width:30%">What to rent (recommended)</th><th>Why · rough cost</th></tr></thead>
+    <thead><tr><th style="width:26%">Part</th><th style="width:30%">What is running today</th><th>Why · rough cost</th></tr></thead>
     <tbody>
-      <tr><td><b>The application host</b></td><td>Vercel (free/Pro) — or any Node host</td><td>Runs the website; deploys automatically from the code. ~€0–20/mo.</td></tr>
-      <tr><td><b>The database</b></td><td>Neon or Supabase (managed PostgreSQL)</td><td>Stores all data with backups &amp; isolation. ~€0–25/mo.</td></tr>
-      <tr><td><b>The code</b></td><td>GitHub (private repository)</td><td>Where the software lives; already set up. Free.</td></tr>
+      <tr><td><b>The server</b></td><td>One rented Linux machine (Hetzner), running the app and the
+        database as containers</td><td>Everything in one place, in the EU, under your own account.
+        ~€5–20/mo.</td></tr>
+      <tr><td><b>The database</b></td><td>PostgreSQL 17 on the same machine, with row-level
+        security</td><td>Stores all data; isolated per company; backed up nightly. Included.</td></tr>
+      <tr><td><b>HTTPS</b></td><td>Caddy, with certificates renewed automatically</td><td>The padlock in
+        the browser. Nothing to renew by hand. Free.</td></tr>
+      <tr><td><b>The code &amp; the build</b></td><td>GitHub, private, with GitHub Actions</td><td>Every
+        change is tested and packaged automatically before it can reach the server. Free.</td></tr>
+      <tr><td><b>The phone app</b></td><td>TestFlight while in beta, App Store afterwards</td><td>A native
+        shell around the same workspace. ~€99/yr Apple developer account.</td></tr>
       <tr><td><b>Domain</b> <span class="chip">optional</span></td><td>Any registrar (e.g. erp.caneisubirats.com)</td><td>A friendly web address. ~€12/yr.</td></tr>
-      <tr><td><b>Email</b> <span class="chip">later</span></td><td>Microsoft 365 (Outlook) or SMTP</td><td>To send emails &amp; save drafts to Outlook. You likely have this.</td></tr>
-      <tr><td><b>Payments</b> <span class="chip">later</span></td><td>Stripe</td><td>Card / online payment links on invoices. Pay per transaction.</td></tr>
+      <tr><td><b>Card payments</b> <span class="chip">later</span></td><td>Stripe</td><td>Pay-online links on invoices. Pay per transaction.</td></tr>
     </tbody>
   </table>
-  <div class="callout"><b>Plain-English takeaway.</b> You are not buying servers. You create a few online
-  accounts, paste some settings, and press deploy. Total starting cost can be under €30/month.</div>
+
+  <h3>How a change reaches you</h3>
+  <p>Worth knowing, because it explains why nothing breaks quietly:</p>
+  <ol style="font-size:12.5px">
+    <li>A change is made and every automated check runs against it — tests, layer rules, the whole
+      browser suite.</li>
+    <li>If they pass, two container images are built and published.</li>
+    <li>A <b>smoke test</b> then starts those exact images against a real database and runs the ERP end to
+      end inside them. Only if that passes is the version marked good.</li>
+    <li>The server checks for a good version <b>every minute</b> and pulls it. Nothing is pushed to the
+      server, so there is no key to the machine sitting in a build system.</li>
+  </ol>
+  <div class="callout"><b>Plain-English takeaway.</b> You are renting one small machine, not a rack. The
+  system updates itself only with versions that have already been proved to start, connect and invoice —
+  and the previous version is one command away if it is ever needed.</div>
 </section>
 
 <!-- ============ 3 · ARCHITECTURE ============ -->
@@ -328,11 +366,11 @@
   <div class="chips" style="gap:7px;line-height:1.9">
     <span class="chip">1 · Lead</span><span class="chip">2 · Site visit 📷</span><span class="chip">3 · Estimate</span>
     <span class="chip">4 · Quotation ⚙️</span><span class="chip">5 · Acceptance ⚙️✉️</span><span class="chip">6 · Project ⚙️</span>
-    <span class="chip">7 · Purchasing</span><span class="chip">8 · Execution</span><span class="chip">9 · Invoicing ⚙️✉️</span>
+    <span class="chip">7 · Purchasing</span><span class="chip">8 · Execution ⏱📷</span><span class="chip">9 · Invoicing ⚙️✉️</span>
     <span class="chip">10 · Collections ✉️</span><span class="chip">11 · Supplier payments</span><span class="chip">12 · Close ⚙️</span>
     <span class="chip">13 · Review request ✉️</span>
   </div>
-  <p style="font-size:11px;color:var(--muted)">⚙️ = document generated automatically · ✉️ = email drafted for you · 📷 = photos captured on site</p>
+  <p style="font-size:11px;color:var(--muted)">⚙️ = document generated automatically · ✉️ = email drafted for you · 📷 = photos captured on site · ⏱ = hours booked on the phone</p>
 
   <table class="avoid">
     <thead><tr><th style="width:22%">Step</th><th style="width:40%">What the operator does</th><th>What the system does automatically</th></tr></thead>
@@ -344,7 +382,9 @@
       <tr><td><b>5 Acceptance</b></td><td>Mark accepted (tick any optionals taken).</td><td>Freezes the version; drafts the <b>acceptance email</b> + PDF.</td></tr>
       <tr><td><b>6 Project</b></td><td>—</td><td>Turns the quote into a project with a frozen baseline.</td></tr>
       <tr><td><b>7 Purchasing</b></td><td>Raise purchase orders to chosen suppliers.</td><td>Commits cost against each line item; flags over-budget.</td></tr>
-      <tr><td><b>8 Execution</b></td><td>Book supplier bills as they arrive.</td><td>Tracks actual vs budget per line item (margin warning).</td></tr>
+      <tr><td><b>8 Execution</b></td><td>Book supplier bills as they arrive; the crew books its hours on
+        the phone (section 7).</td><td>Values each hour at that worker's cost and charges it to the line
+        item; tracks actual vs budget (margin warning).</td></tr>
       <tr><td><b>9 Invoicing</b></td><td>Confirm the invoice.</td><td>Applies the VAT rule, seals &amp; numbers it, makes PDF + <b>email</b>.</td></tr>
       <tr><td><b>10 Collections</b></td><td>Record the receipt when paid.</td><td>Allocates it; drafts a <b>reminder</b> if overdue.</td></tr>
       <tr><td><b>11 Supplier payments</b></td><td>Pay bills on due dates.</td><td>Shows cash out vs cash in.</td></tr>
@@ -354,20 +394,38 @@
   </table>
   <div class="callout"><b>Lean by design.</b> Of the 13 steps, six need only a click; the rest are short data
   entries. Everything the operator types is reused downstream — nothing is entered twice.</div>
+
+  <div class="callout warn"><b>The two costs that decide the margin arrive from different places.</b>
+  Materials and subcontractors come in as documents you book (steps 7–8). <b>Labour</b> arrives as hours
+  typed on a phone, by the person who worked them, on the day they worked — which is why it has a
+  section of its own and a review step before it counts.</div>
 </section>
 
 <!-- ============ 5 · RACI ============ -->
 <section class="page avoid" id="s5">
   <div class="kicker">Section 5</div>
-  <h2 class="sec">Roles &amp; responsibilities (RACI)</h2>
-  <p class="lead"><b>R</b> = does the work · <b>A</b> = accountable / signs off · <b>C</b> = consulted ·
-  <b>I</b> = kept informed. Roles map to the permissions already built into the system
-  (Owner, Administration, Operations), plus your external gestor and IT partner.</p>
+  <h2 class="sec">Roles, permissions &amp; RACI</h2>
+  <p class="lead">The system has exactly four permission levels. Everything below maps to them, plus your
+  external gestor and IT partner. <b>R</b> = does the work · <b>A</b> = accountable / signs off ·
+  <b>C</b> = consulted · <b>I</b> = kept informed.</p>
+
+  <table class="avoid">
+    <thead><tr><th style="width:24%">Permission</th><th>What it can reach</th></tr></thead>
+    <tbody>
+      <tr><td><b>Administrador</b></td><td>Everything, including user accounts. The owner, and one other
+        person so you are never locked out</td></tr>
+      <tr><td><b>Oficina</b></td><td>Quotes, invoices, collections and payments. Does not manage
+        users</td></tr>
+      <tr><td><b>Trabajador de obra</b></td><td>Books their own hours and sees only their own. No amounts,
+        no customers, no rest of the ERP — enforced by the server, not merely hidden</td></tr>
+      <tr><td><b>Gestoría</b></td><td>Read and export only. Never sees margins or selling prices</td></tr>
+    </tbody>
+  </table>
 
   <table class="raci avoid">
     <thead><tr>
       <th style="width:28%">Activity</th>
-      <th class="c">Owner</th><th class="c">Admin.</th><th class="c">Operations</th><th class="c">Gestor</th><th class="c">IT&nbsp;partner</th>
+      <th class="c">Owner<br><span style="font-weight:400">(Admin.)</span></th><th class="c">Oficina</th><th class="c">Obra</th><th class="c">Gestoría</th><th class="c">IT&nbsp;partner</th>
     </tr></thead>
     <tbody>
       <tr><td>Lead capture &amp; qualify</td><td class="c I">I</td><td class="c R">R</td><td class="c A">A</td><td class="c">·</td><td class="c">·</td></tr>
@@ -376,6 +434,8 @@
       <tr><td>Acceptance &amp; project open</td><td class="c A">A</td><td class="c R">R</td><td class="c I">I</td><td class="c">·</td><td class="c">·</td></tr>
       <tr><td>Purchasing / POs</td><td class="c I">I</td><td class="c C">C</td><td class="c A">A/R</td><td class="c">·</td><td class="c">·</td></tr>
       <tr><td>Execution &amp; supplier bills</td><td class="c I">I</td><td class="c R">R</td><td class="c A">A</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Booking hours worked</td><td class="c I">I</td><td class="c C">C</td><td class="c R">R</td><td class="c">·</td><td class="c">·</td></tr>
+      <tr><td>Reviewing &amp; approving the week's hours</td><td class="c A">A</td><td class="c R">A/R</td><td class="c I">I</td><td class="c">·</td><td class="c">·</td></tr>
       <tr><td>Invoicing</td><td class="c A">A</td><td class="c R">R</td><td class="c">·</td><td class="c C">C</td><td class="c">·</td></tr>
       <tr><td>Collections &amp; reminders</td><td class="c I">I</td><td class="c A">A/R</td><td class="c">·</td><td class="c">·</td><td class="c">·</td></tr>
       <tr><td>Supplier payments</td><td class="c A">A</td><td class="c R">R</td><td class="c I">I</td><td class="c C">C</td><td class="c">·</td></tr>
@@ -392,87 +452,173 @@
 
 <!-- ============ 6 · GO-LIVE SETUP ============ -->
 <section class="page" id="s6">
-  <div class="kicker">Section 6 · the checklist</div>
-  <h2 class="sec">Go-live: step-by-step setup</h2>
-  <p class="lead">Follow these in order. Each step says <b>what to do</b> and <b>why</b>. Where you must copy a
-  setting, it looks like <code>THIS</code>. You do <b>not</b> need to understand the code — you are creating
-  accounts and pasting values. Budget about half a day. If a step feels technical, your IT partner can do
-  Part A once in ~1 hour.</p>
+  <div class="kicker">Section 6</div>
+  <h2 class="sec">Go-live: who does what</h2>
+  <p class="lead">Three parts, and only the middle one is yours. Part A is done once by whoever installs
+  the system; Part B is the company setup, which has its own guide; Part C is switched on when it starts
+  to pay off.</p>
 
-  <h3>Part A — Stand up the system (one-time, technical)</h3>
-  <div class="step"><div class="no">1</div><div class="bd"><b>Create the accounts</b>
-    <div class="why">Go to each site and sign up (email + password): <b>GitHub</b> (github.com — you already have
-    the code here), <b>Vercel</b> (vercel.com, “Continue with GitHub”), and a database at <b>Neon</b>
-    (neon.tech) or <b>Supabase</b> (supabase.com). All have free tiers.</div></div></div>
-  <div class="step"><div class="no">2</div><div class="bd"><b>Create the database &amp; copy its address</b>
-    <div class="why">In Neon/Supabase click <i>New project</i>. When it finishes, copy the <b>connection string</b>
-    (starts with <code>postgres://…</code>). Keep it private — it is like a key to your data.</div></div></div>
-  <div class="step"><div class="no">3</div><div class="bd"><b>Connect the app to GitHub in Vercel</b>
-    <div class="why">In Vercel: <i>Add New → Project</i>, choose the <code>OpenProject2</code> repository, framework
-    “Next.js”. Don't deploy yet — first add the settings in step 4.</div></div></div>
-  <div class="step"><div class="no">4</div><div class="bd"><b>Paste the settings (environment variables)</b>
-    <div class="why">In Vercel → Project → <i>Settings → Environment Variables</i>, add:
-    <code>DATABASE_URL</code> = the address from step 2; <code>UI_LANG</code> = <code>es</code> (or <code>ca</code>
-    for Catalan, <code>en</code> for English). These tell the app where the data is and which language to show.</div></div></div>
-  <div class="step"><div class="no">5</div><div class="bd"><b>Create the tables (migrate)</b>
-    <div class="why">Once, run the database setup: <code>pnpm install</code> then <code>pnpm db:migrate</code>
-    (your IT partner runs this from the code, with the same <code>DATABASE_URL</code>). This builds the empty
-    tables. Nothing to decide — just run it.</div></div></div>
-  <div class="step"><div class="no">6</div><div class="bd"><b>Deploy</b>
-    <div class="why">Press <b>Deploy</b> in Vercel. In ~2 minutes you get a web address like
-    <code>canei-erp.vercel.app</code>. Open it — the app is live. (Optional: point
-    <code>erp.caneisubirats.com</code> to it under Vercel → Domains.)</div></div></div>
-  <div class="step"><div class="no">7</div><div class="bd"><b>Prove it works</b>
-    <div class="why">Open the workspace and run one project end to end — build a quote, accept it, issue the
-    invoice and close it. If the documents and totals come out right, you're ready to go live.</div></div></div>
+  <h3>Part A — Stand up the system (one-time, technical) <span class="chip">IT partner</span></h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>Rent the machine and point a name at it</b>
+    <div class="why">One small Linux server in the EU, and a DNS record. The full procedure is written down
+    in the project's own operations handover — your IT partner works from that, not from this page.</div></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>Bring up the containers</b>
+    <div class="why">The application, PostgreSQL 17 and Caddy come up together from one compose file. The
+    database tables are created by a migration container that runs before the app, so there is no manual
+    setup step and no order to remember.</div></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Set the public address</b>
+    <div class="why">The one setting worth naming here: the server has to be told the address the outside
+    world reaches it on. Activation links and invitation emails are built from it — get it wrong and the
+    links point at the inside of the container, which nobody can open.</div></div></div>
+  <div class="step"><div class="no">4</div><div class="bd"><b>Enable automatic updates and backups</b>
+    <div class="why">A timer pulls each proven version within a minute of it being published; a nightly
+    job takes an encrypted, off-site copy of the database. Both are switched on once and then left
+    alone.</div></div></div>
+  <div class="step"><div class="no">5</div><div class="bd"><b>Create the first administrator</b>
+    <div class="why">One account, for the owner. Everybody else is invited from inside the system
+    afterwards — see the setup guide.</div></div></div>
 
-  <h3>Part B — Make it yours (configuration, no coding)</h3>
-  <div class="step"><div class="no">8</div><div class="bd"><b>Confirm the company details</b>
-    <div class="why">Open <b>Master Data → Company / Legal entity</b> and confirm: legal name, CIF, address,
-    logo colours, invoice numbering, IVA/IRPF profile and IBAN. These are pre-filled for Canei Subirats —
-    replace the placeholder CIF (B-00000000) and IBAN with the real values once your gestor confirms them,
-    <b>before issuing any invoice</b>.</div></div></div>
-  <div class="step"><div class="no">9</div><div class="bd"><b>Load your catalogue &amp; suppliers</b>
-    <div class="why">Enter your usual line items/sub-line items and prices, and your suppliers with their prices. This is
-    what makes quoting “pick, don't type”. Start with your 20 most common items; add more over time.</div></div></div>
-  <div class="step"><div class="no">10</div><div class="bd"><b>Create the user accounts &amp; roles</b>
-    <div class="why">Add each team member and give them a role: <b>Owner</b>, <b>Administration</b> or
-    <b>Operations</b> (permissions are already defined). The owner can do everything; operations can capture
-    visits and purchasing but not, say, change tax settings.</div></div></div>
+  <h3>Part B — Make it yours (configuration, no coding) <span class="chip">owner / office</span></h3>
+  <div class="callout"><b>This part has its own document.</b> Company identity, tax defaults, the company
+  mailbox, bank accounts, the catalogue of chapters and sub-chapters, your workers and their hourly cost,
+  and who can log in — all of it, in order, with a printable checklist, is in
+  <b>🏁 Guía de puesta en marcha / Initial Company Setup</b>, in the profile menu next to this guide.
+  Budget about an hour.</div>
+  <p>Do not issue anything real until its checklist is finished. The system will refuse to issue an
+  invoice while the legally required company fields are empty, which is the behaviour you want — but the
+  catalogue and the workers' costs are not enforced, and a job quoted without them reports a margin that
+  means nothing.</p>
 
   <h3>Part C — Optional connections (turn on when ready) <span class="chip">later</span></h3>
-  <div class="step"><div class="no">11</div><div class="bd"><b>Email &amp; Outlook drafts</b>
-    <div class="why">Provide your Microsoft 365 / SMTP details so emails can be sent and saved to the Outlook
-    Drafts folder. Until then the app still produces the branded email and a downloadable Outlook draft.</div></div></div>
-  <div class="step"><div class="no">12</div><div class="bd"><b>Payments, bank &amp; tax</b>
-    <div class="why">Add <b>Stripe</b> for pay-online links; connect the bank for statement import; and, ahead
-    of 2027, complete the <b>Verifactu/AEAT</b> certification with your gestor. Each is a self-contained
-    switch-on and is not needed to start operating.</div></div></div>
+  <div class="step"><div class="no">6</div><div class="bd"><b>Bank statement import</b>
+    <div class="why">The cheapest win in cash visibility: upload the statement and match movements against
+    invoices and bills. Nothing to contract — it reads the file your bank already gives you.</div></div></div>
+  <div class="step"><div class="no">7</div><div class="bd"><b>Card payments</b>
+    <div class="why">Add <b>Stripe</b> for pay-online links on invoices. Pay-per-use, and not needed to
+    start operating.</div></div></div>
+  <div class="step"><div class="no">8</div><div class="bd"><b>Verifactu / AEAT</b>
+    <div class="why">Legally required from 2027. Plan the certification with your gestoría in good time;
+    the invoices the system produces are already sealed and gap-free in the way the regime
+    expects.</div></div></div>
 </section>
 
-<!-- ============ 7 · DAILY OPERATION ============ -->
-<section class="page avoid" id="s7">
+<!-- ============ 7 · HOURS ============ -->
+<section class="page" id="s7">
   <div class="kicker">Section 7</div>
+  <h2 class="sec">Hours: from the site to the payroll</h2>
+  <p class="lead">Labour is usually the largest cost on a renovation and the one nobody has a document
+  for. So the ERP collects it where it happens — on a phone, by the person who worked it — and puts a
+  review step between the crew's typing and the company's numbers.</p>
+
+  <h3>Three screens, in the order the work happens</h3>
+  <div class="chips" style="gap:7px;line-height:1.9">
+    <span class="chip">Parte diario — the crew types</span>
+    <span class="chip">Revisión — the office corrects &amp; approves</span>
+    <span class="chip">Resumen — the owner reads</span>
+  </div>
+
+  <table class="avoid">
+    <thead><tr><th style="width:20%">Screen</th><th style="width:20%">Who uses it</th><th>What it is for</th></tr></thead>
+    <tbody>
+      <tr><td><b>Parte diario</b></td><td>Foreman, on site</td><td>One day, one tile per worker, showing
+        what has been booked: job, chapter, sub-chapter, kind of hour, hours. <b>It displays; it does not
+        edit.</b> Adding is «Añadir línea»; changing anything is done in Revisión</td></tr>
+      <tr><td><b>Revisión</b></td><td>Office / owner</td><td>The week's entries as a list, filtered by
+        still open / approved / all. Here an entry can be corrected — hours, job, chapter, sub-chapter,
+        date — or deleted, and the week approved</td></tr>
+      <tr><td><b>Resumen</b></td><td>Owner</td><td>Day, week, month or year, for all projects or one:
+        who worked, what it cost, overtime, and the month's reconciliation including wages paid in
+        cash</td></tr>
+      <tr><td><b>Mis horas</b></td><td>Site worker</td><td>The same booking screen, and only their own
+        hours. No amounts, no colleagues, no rest of the ERP</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><b>Why the day sheet cannot be edited.</b> A screen that both shows the day and
+  changes it makes an accidental edit indistinguishable from a booking — and the person holding the phone
+  on a scaffold is not the person accountable for the numbers. Booking is one deliberate action
+  («Añadir línea»); correction is somebody else's screen, and it leaves the entry marked as reviewed.</div>
+
+  <h3>What an entry carries</h3>
+  <p>Four things, and each earns its place:</p>
+  <ul>
+    <li><b>Obra</b> — which job the hours belong to. Without it the hour has no cost centre.</li>
+    <li><b>Partida</b> and <b>Subpartida</b> — which chapter and, optionally, which line. This is what
+      makes «the tiling ran 40 % over» a sentence you can say.</li>
+    <li><b>Tipo de hora</b> — normal, overtime, and so on. Overtime is valued at the worker's overtime
+      rate, not the normal one.</li>
+    <li><b>Horas</b> — in hours and minutes.</li>
+  </ul>
+  <div class="brandfoot">Canei Subirats · Operations guide</div><div class="pagenum">10</div>
+</section>
+
+<!-- ============ 7b · HOURS, THE WEEK ============ -->
+<section class="page avoid">
+  <div class="kicker">Section 7 · continued</div>
+  <h2 class="sec">The week, and what the numbers are worth</h2>
+
+  <h3>The weekly rhythm</h3>
+  <div class="step"><div class="no">1</div><div class="bd"><b>Every day, on site</b>
+    <div class="why">Each worker — or the foreman for the crew — books the day's hours against the job and
+    the chapter. Two minutes. The tile shows what is already there, so a repeat entry is visible rather
+    than duplicated.</div></div></div>
+  <div class="step"><div class="no">2</div><div class="bd"><b>Once a week, in the office</b>
+    <div class="why">Open <b>Revisión</b>, filter to <i>still open</i>, and work down. Fix what is wrong —
+    the wrong job, a chapter nobody chose, eleven hours that were nine — then approve. The yellow
+    <b>«Revisar y aprobar N h»</b> button on the summary is the count of what is still waiting.</div></div></div>
+  <div class="step"><div class="no">3</div><div class="bd"><b>Once a month, with the payroll</b>
+    <div class="why">The reconciliation block compares what the hours say against what left the company,
+    including <b>wages paid in cash</b>. A difference here is either an unbooked day or a payment nobody
+    recorded — both worth finding on the last day of the month rather than in March.</div></div></div>
+
+  <h3>Reading the summary</h3>
+  <p>Two controls sit above everything and filter everything below them:</p>
+  <ul>
+    <li><b>The project</b> — <i>all projects</i> by default, which is the company view. Choose one and
+      every figure underneath narrows to it. The ★ beside it shows only your favourite jobs in the
+      list.</li>
+    <li><b>The period</b> — day, week, month or year. Click the date itself to choose which one.</li>
+  </ul>
+  <p>Underneath: hours and cost for the period, who worked (hours, overtime and cost, per person), where
+  the hours went by job and chapter, and the month's reconciliation.</p>
+
+  <div class="callout"><b>Take it to Excel.</b> The <b>Excel</b> button produces a full report, not a dump:
+  your identity and logo, the period and the scope it was taken under, a block of headline figures, then
+  the hours by job, by job and chapter, by worker, the month's reconciliation, and every individual entry
+  behind them. It is the document to send to the gestoría or to keep with the payroll.</div>
+
+  <div class="callout warn"><b>Approved is not the same as paid.</b> Approval says the hours are correct.
+  Paying them is payroll, and cash paid on site is recorded where the cash is — the reconciliation is what
+  brings the two together.</div>
+  <div class="brandfoot">Canei Subirats · Operations guide</div><div class="pagenum">11</div>
+</section>
+
+<!-- ============ 8 · DAILY OPERATION ============ -->
+<section class="page avoid" id="s8">
+  <div class="kicker">Section 8</div>
   <h2 class="sec">Daily operation runbook</h2>
   <p class="lead">The rhythm once you are live.</p>
   <div class="grid2">
     <div class="box"><h4>Every day</h4><ul style="margin:0;padding-left:18px;font-size:12px">
       <li>Capture new leads and book visits.</li>
       <li>On site: photos + notes on the phone.</li>
+      <li>On site: <b>book the day's hours</b> before leaving.</li>
       <li>Turn accepted quotes into projects (one click).</li>
       <li>Book supplier bills as they arrive.</li>
       <li>Send drafted invoices &amp; reminders after a glance.</li>
     </ul></div>
     <div class="box"><h4>Every week</h4><ul style="margin:0;padding-left:18px;font-size:12px">
+      <li><b>Review and approve the week's hours</b> (section 7).</li>
       <li>Review the Control Tower: pipeline, margins, overdue.</li>
       <li>Chase overdue invoices (reminders are pre-drafted).</li>
       <li>Pay supplier bills due this week.</li>
       <li>Send review requests for finished jobs.</li>
     </ul></div>
     <div class="box"><h4>Every month</h4><ul style="margin:0;padding-left:18px;font-size:12px">
-      <li>Export the ledger for your gestor (CSV).</li>
+      <li>Reconcile hours against the payroll and the cash paid on site.</li>
+      <li>Export the ledger and the hours report for your gestoría.</li>
       <li>Check margin-by-line-item for lessons on pricing.</li>
-      <li>Confirm the backup ran (section 8).</li>
+      <li>Confirm the backup ran (section 9).</li>
     </ul></div>
     <div class="box"><h4>If something looks wrong</h4><ul style="margin:0;padding-left:18px;font-size:12px">
       <li>Nothing is deleted — invoices are immutable; use a <i>rectificativa</i>.</li>
@@ -484,22 +630,25 @@
   it forward. If you find yourself re-typing, there is probably a button that already has it.</div>
 </section>
 
-<!-- ============ 8 · SECURITY ============ -->
-<section class="page avoid" id="s8">
-  <div class="kicker">Section 8</div>
+<!-- ============ 9 · SECURITY ============ -->
+<section class="page avoid" id="s9">
+  <div class="kicker">Section 9</div>
   <h2 class="sec">Backups, security &amp; data protection</h2>
   <div class="grid2">
     <div class="box"><h4>Backups</h4><ul style="margin:0;padding-left:18px;font-size:12px">
-      <li>Managed Postgres (Neon/Supabase) takes <b>automatic daily backups</b>; keep 7–30 days.</li>
-      <li>Once a month, export a full copy (the app supports JSON/CSV export) and store it off-site
-        (e.g. company OneDrive/Drive).</li>
-      <li>Twice a year, do a <b>restore drill</b>: confirm a backup actually opens.</li>
+      <li>A nightly job takes an <b>encrypted copy</b> of the database and stores it off the machine.</li>
+      <li>Once a month, take your own copy too — <b>⤓ Exportar datos</b> in the profile menu — and keep it
+        somewhere the company controls.</li>
+      <li>Twice a year, do a <b>restore drill</b>: confirm a backup actually opens. A backup nobody has
+        restored is a hope, not a backup.</li>
     </ul></div>
     <div class="box"><h4>Access &amp; security</h4><ul style="margin:0;padding-left:18px;font-size:12px">
-      <li>Each person has their own login; roles limit what they can do.</li>
+      <li>Each person has their own login; the four permission levels limit what they can do.</li>
+      <li>A site worker's limits are enforced by the <b>server</b>, not by hiding buttons.</li>
       <li>The database has <b>row-level security</b> — data is isolated per company.</li>
-      <li>Never share the <code>DATABASE_URL</code> or passwords; store them in the host's secret settings, not in email.</li>
-      <li>Turn on 2-factor login on GitHub, Vercel and the database.</li>
+      <li>Never share the database address or passwords; they belong in the server's own settings, never
+        in email.</li>
+      <li>Turn on 2-factor login on GitHub and on the server provider.</li>
     </ul></div>
     <div class="box"><h4>Data protection (GDPR / LOPD)</h4><ul style="margin:0;padding-left:18px;font-size:12px">
       <li>You hold customer names, addresses, photos — treat them as personal data.</li>
@@ -515,53 +664,60 @@
   </div>
 </section>
 
-<!-- ============ 9 · NEXT STEPS ============ -->
-<section class="page avoid" id="s9">
-  <div class="kicker">Section 9</div>
+<!-- ============ 10 · NEXT STEPS ============ -->
+<section class="page avoid" id="s10">
+  <div class="kicker">Section 10</div>
   <h2 class="sec">Next steps &amp; roadmap</h2>
   <p class="lead">What to do right after go-live, and what is queued.</p>
 
   <h4>Do first (week 1–2)</h4>
   <ol style="font-size:12.5px">
-    <li>Complete Part A &amp; B of section 6; run one real job end-to-end with a friendly customer.</li>
+    <li>Finish the Initial Company Setup checklist, then run one real job end-to-end with a friendly
+      customer.</li>
     <li>Load your top catalogue items and suppliers so quoting is fast.</li>
-    <li>Confirm CIF, bank and invoice-numbering with your gestor; update the company file.</li>
-    <li>Turn on email so invoices and reminders can actually go out (or keep using Outlook drafts).</li>
+    <li>Confirm CIF, bank and invoice numbering with your gestoría; update the company record.</li>
+    <li>Get the crew booking hours daily for two weeks before you rely on a margin figure.</li>
   </ol>
 
   <h4>Queued integrations (turn on when it pays off)</h4>
   <table class="avoid">
     <thead><tr><th style="width:34%">Capability</th><th>Status &amp; what it needs</th></tr></thead>
     <tbody>
-      <tr><td>Real email / Outlook drafts</td><td>Needs Microsoft 365 or SMTP credentials. Today: branded draft + downloadable .eml.</td></tr>
-      <tr><td>Verifactu / AEAT filing</td><td>Legally required 2027; needs certificate + gestor sign-off.</td></tr>
-      <tr><td>Bank statement import (N43)</td><td>Cheapest cash-visibility win; upload file or connect aggregator.</td></tr>
+      <tr><td>Company mailbox (drafts)</td><td><b>Working.</b> Connect the mailbox on the Empresa screen;
+        every generated email is filed in its Drafts folder. Sending stays a person's decision, by
+        design.</td></tr>
+      <tr><td>Phone app</td><td><b>Working</b>, in TestFlight. Same workspace, native shell, camera wired
+        in. Public App Store release is a listing and a review, not new software.</td></tr>
+      <tr><td>Verifactu / AEAT filing</td><td>Legally required 2027; needs certificate + gestoría
+        sign-off.</td></tr>
+      <tr><td>Bank statement import</td><td><b>Working</b> for uploaded statements; an automatic
+        connection to the bank is the next step.</td></tr>
       <tr><td>Card / online payments (Stripe)</td><td>Adds “pay online” to invoices; pay-per-use.</td></tr>
-      <tr><td>Gestor export (A3 / Holded / Sage)</td><td>Confirm your gestor's preferred format; then one-click export.</td></tr>
-      <tr><td>Mobile app shell (offline site visits)</td><td>PWA packaging for weak-signal sites; the web app already works on phones.</td></tr>
+      <tr><td>Gestoría export</td><td><b>Working</b> as a downloadable package. Confirm your gestoría's
+        preferred format if they want something more specific.</td></tr>
+      <tr><td>Offline site visits</td><td>For weak-signal sites. The app needs a connection today.</td></tr>
       <tr><td>Owner consolidated view (multi-company)</td><td>When a second company is added — configuration only.</td></tr>
     </tbody>
   </table>
 
-  <h4>Process logic to add for full practice (step-by-step input → output)</h4>
-  <p style="font-size:12.5px">An audit of what each step needs to be fully production-ready. The documents now carry all
-  the legal essentials (parties + NIF/CIF, dates, line items, VAT breakdown, IBAN, terms, legal notes); the
-  items below deepen day-to-day practice.</p>
-  <table class="avoid">
-    <thead><tr><th style="width:20%">Step</th><th style="width:40%">Extra input to capture</th><th>Output it unlocks</th></tr></thead>
-    <tbody>
-      <tr><td>Quotation</td><td>Quantity × unit price per line (not only a line-item lump sum); measurement (medición)</td><td>Itemised quote &amp; certifiable progress billing</td></tr>
-      <tr><td>Acceptance</td><td>Acceptance date &amp; method (signature / email); deposit % agreed</td><td>Deposit invoice + audit trail</td></tr>
-      <tr><td>Invoicing</td><td>Deposit / milestone (<i>certificación</i>) invoices; IRPF retention line for B2B; series per year</td><td>Partial invoices &amp; correct withholding</td></tr>
-      <tr><td>Project</td><td>Planned start / end dates; assigned team</td><td>Scheduling &amp; overdue alerts</td></tr>
-      <tr><td>Purchasing</td><td>Supplier, PO number, expected delivery date</td><td>Delivery tracking &amp; supplier ledger</td></tr>
-      <tr><td>Execution</td><td>Supplier bill number &amp; date; change orders</td><td>Duplicate detection &amp; baseline-preserving changes</td></tr>
-      <tr><td>Collections / Payments</td><td>Payment date &amp; method (transfer / card / cash)</td><td>Exact cash-flow timing &amp; bank reconciliation</td></tr>
-    </tbody>
-  </table>
-  <div class="callout"><b>Already engineered underneath.</b> Most of these (change orders, certificaciones,
-  IRPF profiles, scheduling, supplier ledger) exist as capabilities in the platform; closing the gap is
-  surfacing their input fields in the screens — configuration and UI, not new architecture.</div>
+  <h4>What has closed since version 1 of this guide</h4>
+  <p style="font-size:12.5px">Version 1 carried an audit of what each step still needed. Those inputs are
+  in the screens now, which is why this guide no longer lists them as gaps:</p>
+  <ul style="font-size:12.5px">
+    <li><b>Itemised quotes</b> — quantity × unit price per line, with measurements, from the catalogue.</li>
+    <li><b>Progress valuation and deposits</b> — partial invoicing against the contract, with withholding
+      where it applies.</li>
+    <li><b>Projects with dates</b> — planned start and end, and the alerts that fire when they slip.</li>
+    <li><b>Purchasing and the supplier ledger</b> — orders, bills with their number and date, duplicate
+      detection, and cost committed against each chapter.</li>
+    <li><b>Hours</b> — booked on site, reviewed in the office, valued at each worker's cost and charged to
+      the chapter (section 7).</li>
+    <li><b>Payments</b> — date and method, cash included, reconciled against the bank.</li>
+    <li><b>Documents in three languages</b> — the customer's own, whatever language the office works in.</li>
+  </ul>
+  <div class="callout"><b>What remains</b> is the table above: connections to other people's systems —
+  the tax authority, the bank, the card processor — each of which needs a credential or a certificate
+  from outside the company, not new software.</div>
 
   <div class="callout"><b>Adding a second company</b> is configuration, not a rebuild: a new company file plus its
   catalogue, ready in well under an hour. That is the whole point of the “factory”.</div>
@@ -573,16 +729,17 @@
   <h2 class="sec">Glossary</h2>
   <div class="grid2">
     <div>
-      <h4>Application (app)</h4><p style="font-size:12px">The website your team logs into to run the business.</p>
-      <h4>Host / Vercel</h4><p style="font-size:12px">The service that runs the app on the internet.</p>
+      <h4>Application (app)</h4><p style="font-size:12px">The website your team logs into to run the business — in a browser, or in the phone app.</p>
+      <h4>Container</h4><p style="font-size:12px">A packaged copy of the app, identical everywhere it runs. What gets tested is what gets deployed.</p>
       <h4>Database / PostgreSQL</h4><p style="font-size:12px">Where all data is stored, safely and with backups.</p>
-      <h4>Environment variable</h4><p style="font-size:12px">A private setting (like <code>DATABASE_URL</code>) pasted into the host, not into the code.</p>
-      <h4>Deploy</h4><p style="font-size:12px">Publishing a new version of the app — one button; reversible.</p>
-      <h4>Migration</h4><p style="font-size:12px">Creating/updating the database tables. Run once at setup.</p>
+      <h4>Deploy</h4><p style="font-size:12px">Publishing a new version — automatic, and only after it has passed every check. Reversible.</p>
+      <h4>Migration</h4><p style="font-size:12px">Creating or updating the database tables. Runs by itself before each new version starts.</p>
+      <h4>Draft</h4><p style="font-size:12px">A finished email waiting in your mailbox for a person to press send. The system never sends.</p>
     </div>
     <div>
       <h4>Tenant / configuration</h4><p style="font-size:12px">Your company set up as data (name, logo, tax profile) — no coding.</p>
       <h4>Baseline</h4><p style="font-size:12px">The frozen budget copied from the accepted quote; everything is measured against it.</p>
+      <h4>Partida / subpartida</h4><p style="font-size:12px">Chapter and line of work. Costs — materials, subcontractors and hours — are charged to them.</p>
       <h4>Committed vs actual</h4><p style="font-size:12px">Committed = ordered (POs); actual = billed by suppliers.</p>
       <h4>Rectificativa</h4><p style="font-size:12px">A correcting invoice — invoices are never edited or deleted.</p>
       <h4>Verifactu</h4><p style="font-size:12px">Spain's anti-fraud invoicing regime, mandatory from 2027.</p>
@@ -591,10 +748,11 @@
   </div>
   <div class="callout" style="margin-top:20px"><b>Questions?</b> Keep this guide with your company file. The
   workspace mirrors every step described here, so you can rehearse the whole process before go-live —
-  and after, it is the fastest way to train a new team member.</div>
+  and after, it is the fastest way to train a new team member. Setting the company up in the first place
+  is the companion document, <b>🏁 Initial Company Setup</b>.</div>
   <p style="margin-top:22px;font-size:11px;color:var(--muted)">Canei Subirats, S.L. · Sant Just Desvern ·
-  Operations &amp; setup guide v1 · Generated by the Canei ERP factory. Emails and filings are never sent
-  automatically without your credentials.</p>
+  Operations guide v2 · Generated by the Canei ERP factory. Emails are composed and filed as drafts;
+  nothing is ever sent or filed with anybody automatically.</p>
 </section>
 
 <div class="noprint" style="position:fixed;right:18px;bottom:18px;z-index:50">

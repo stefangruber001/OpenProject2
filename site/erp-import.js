@@ -181,12 +181,19 @@
   }
 
   /** The whole file → the first worksheet's rows of strings. */
-  async function parseXlsxRows(arrayBuffer) {
+  /**
+   * The rows of one worksheet. `sheetIndex` is 1-based and defaults to the
+   * first, which is every caller that reads a bank statement — a workbook of
+   * several tabs is a thing this reader can now be pointed at, and a caller
+   * that does not point stays where it always was.
+   */
+  async function parseXlsxRows(arrayBuffer, sheetIndex) {
     const bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer);
     const entries = centralDirectory(bytes);
+    const wanted = "xl/worksheets/sheet" + (sheetIndex || 1) + ".xml";
     const sheetName =
-      entries["xl/worksheets/sheet1.xml"] != null
-        ? "xl/worksheets/sheet1.xml"
+      entries[wanted] != null
+        ? wanted
         : Object.keys(entries)
             .filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))
             .sort()[0];

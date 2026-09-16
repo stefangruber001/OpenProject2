@@ -196,6 +196,44 @@ async function main() {
     check("its scripts are served too", engine.ok, `erp-engine.js HTTP ${engine.status}`);
   }
 
+  // --- NOTHING PER-ACCOUNT MAY BE STORED BY A BROWSER ----------------------
+  //
+  // Every answer here is shaped by who asked: the session route says who you
+  // are, the state route is redacted per role. Served with no `Cache-Control`,
+  // no `Expires` and no validator — which is what a `force-dynamic` route
+  // handler emits, measured, nothing but a content-type — a browser may store
+  // the response and hand it back on the same device to whoever signs in next.
+  //
+  // That is not a theory. An administrator signed out on a phone, a site worker
+  // signed in, and the workspace painted the administrator's name and
+  // ADMINISTRATOR permission while every write was correctly refused: the
+  // client reading a stored `/api/~/session` while the server knew perfectly
+  // well who was holding the phone. The label was the visible half; the same
+  // silence covers `/erp/state`, where the stale copy is the invoice register.
+  //
+  // Checked on the wire rather than by reading the source, because the header
+  // has to survive the route, the framework and the proxy in front of it.
+  {
+    for (const path of [
+      `/api/${TENANT}/session`,
+      `/api/${TENANT}/erp/state`,
+      `/api/${TENANT}/erp/version`,
+      `/api/${TENANT}/control-tower`,
+    ]) {
+      const res = await api(path);
+      const cc = (res.headers.get("cache-control") ?? "").toLowerCase();
+      check(`${path} tells the browser not to store it`, cc.includes("no-store"), cc || "(none)");
+    }
+    // The two that carry the cookie itself. One replayed from a cache without
+    // its Set-Cookie is a sign-in that appears to work and leaves you signed
+    // out — or a sign-out that appears to work and leaves you signed in.
+    for (const path of ["/api/auth/login", "/api/auth/logout"]) {
+      const res = await fetch(`${BASE}${path}`, { method: "POST", redirect: "manual" });
+      const cc = (res.headers.get("cache-control") ?? "").toLowerCase();
+      check(`${path} is never stored`, cc.includes("no-store"), `HTTP ${res.status} · ${cc}`);
+    }
+  }
+
   // --- reading state ------------------------------------------------------
   let version;
   {
@@ -476,6 +514,29 @@ async function siteWorkerBoundary() {
     const link = body?.invitation?.link ?? "";
     const token = link ? new URL(link).searchParams.get("token") : null;
     check("the invitation carries a token", Boolean(token), link.slice(0, 80));
+
+    /* THE TEMPORARY PASSWORD, PROVED AGAINST A REAL DATABASE. This is the only
+       place it can be: the password is written to the account row at invitation
+       time, so a unit test can assert the string is generated but not that it
+       opens the door. What the operator asked for was "copy it, paste it, be
+       in" — so that is what is checked, before the link is used at all. */
+    const tempPw = body?.invitation?.tempPassword ?? "";
+    check(
+      "the invitation carries a temporary password",
+      typeof tempPw === "string" && tempPw.length >= 12,
+      JSON.stringify(tempPw).slice(0, 40),
+    );
+    const loginUrl = body?.invitation?.loginUrl ?? "";
+    check("…and the address of the page to type it on", /\/login$/.test(loginUrl), loginUrl);
+    if (tempPw) {
+      const tempCookie = await signIn(email, tempPw);
+      check(
+        "and it signs in on its own, without following any link",
+        Boolean(tempCookie),
+        tempCookie ? "cookie issued" : "no cookie",
+      );
+    }
+
     if (!token) return;
 
     const act = await fetch(`${BASE}/api/auth/activate`, {
@@ -501,6 +562,7 @@ async function siteWorkerBoundary() {
   // site account is about to be refused.
   let workerId = null;
   let otherWorkerId = null;
+  let assignedProjectId = null;
   {
     const st = await json(await api(`/api/${TENANT}/erp/state`));
     const state = st.state ?? {};
@@ -510,6 +572,21 @@ async function siteWorkerBoundary() {
       ...(state.workers ?? []),
       { id: workerId, name: `E2E Site ${RUN}`, email, active: true },
     ];
+    /* AND ASSIGNED TO A REAL JOB. Until now this suite created the worker and
+       stopped, so `assignments` was empty, the scoped read carried NO projects,
+       and every check below about what a project may contain ran over an empty
+       list. "Not one amount in cents" passed for a year without once being
+       handed a project — while a real assigned worker was being sent the job's
+       revenue, cost and margin and every chapter's sale and cost price.
+
+       A fixture that cannot fail is not a test. This one now has something to
+       redact. */
+    assignedProjectId = (state.projects ?? []).find((p) => !p.closed)?.id ?? null;
+    if (assignedProjectId)
+      state.assignments = [
+        ...(state.assignments ?? []),
+        { workerId, projectId: assignedProjectId, from: null, to: null },
+      ];
     const res = await api(`/api/${TENANT}/erp/state`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
@@ -525,6 +602,69 @@ async function siteWorkerBoundary() {
     siteCookie ? "cookie issued" : "no cookie",
   );
   if (!siteCookie) return;
+
+  // --- and can sign out again ---------------------------------------------
+  // The menu's sign-out is a plain form post, so this is byte for byte what the
+  // browser sends when somebody taps it. Three things have to hold or the
+  // button lies about what it did:
+  //
+  //   · the answer sends the browser to the login page, which is the only
+  //     reason the person sees a login screen at all;
+  //   · the cookie it sets is an empty one that expires immediately;
+  //   · and a request carrying no cookie no longer reaches the workspace.
+  //
+  // The third is the one worth having. Clearing a cookie and still being able
+  // to open the application is the shape this fails in, and it would look
+  // completely correct from the outside — right redirect, right header.
+  //
+  // What is NOT claimed: that the token is dead. There is no session store to
+  // delete it from (see lib/session-token.ts), so signing out ends the session
+  // ON THIS DEVICE, which is what the word means to the person pressing it.
+  //
+  // Done with the site worker's cookie, not the suite's own: signing out is a
+  // client-side act, so it takes nothing away from the admin session the rest
+  // of this file runs on — but using a throwaway account means that stays true
+  // even if the route ever grows a real revocation.
+  {
+    const res = await fetch(`${BASE}/api/auth/logout`, {
+      method: "POST",
+      headers: { cookie: siteCookie },
+      redirect: "manual",
+    });
+    check("signing out answers with a redirect", res.status === 303, `HTTP ${res.status}`);
+    check(
+      "…and sends the browser to the login page",
+      res.headers.get("location") === "/login",
+      res.headers.get("location") ?? "(no Location)",
+    );
+    const raw = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+    const set = (raw.length ? raw : [res.headers.get("set-cookie") ?? ""]).filter(Boolean);
+    const cleared = set.find((c) => /^[^=]+=;/.test(c) && /Max-Age=0/i.test(c)) ?? "";
+    check(
+      "…clearing the session cookie",
+      Boolean(cleared),
+      cleared || set.join(" | ") || "(no Set-Cookie)",
+    );
+
+    // A GET must not do this. Without that, any page on the internet can sign
+    // one of the crew out with an image tag pointing here — annoying rather
+    // than dangerous, but it is one line of the route and it is worth keeping.
+    const viaGet = await fetch(`${BASE}/api/auth/logout`, { redirect: "manual" });
+    check(
+      "a GET cannot sign somebody out",
+      viaGet.status === 405 || viaGet.status === 404,
+      `HTTP ${viaGet.status}`,
+    );
+
+    // And the cookie really is spent: no cookie, no workspace.
+    const after = await fetch(`${BASE}/workspace/erp.html`, { redirect: "manual" });
+    const landed = after.headers.get("location") ?? "";
+    check(
+      "and afterwards the workspace sends you to the login page",
+      after.status >= 300 && after.status < 400 && landed.includes("/login"),
+      `HTTP ${after.status} → ${landed || "(no Location)"}`,
+    );
+  }
 
   await as(siteCookie, async () => {
     const st = await json(await api(`/api/${TENANT}/erp/state`));
@@ -546,10 +686,53 @@ async function siteWorkerBoundary() {
       (s.workers ?? []).every((w) => w.id === workerId),
       `workers=${(s.workers ?? []).map((w) => w.id).join(",") || "(none)"}`,
     );
+    /* THE ASSIGNED JOB IS ACTUALLY THERE, checked before the money is, because
+       everything below is vacuous without it — which is exactly how the cents
+       assertion passed while a leak was live. */
+    check(
+      "the job he is assigned to is in his document",
+      !assignedProjectId || (s.projects ?? []).some((p) => p.id === assignedProjectId),
+      `assigned=${assignedProjectId ?? "(none open)"} got=${(s.projects ?? []).length}`,
+    );
+    /* AND IT CARRIES WHAT THE ENTRY SCREEN NEEDS. Hours are booked against a
+       chapter and a line; the line list lives in the budget, and the budget is
+       not sent. Without these fields lifted onto the chapter, «Subpartida» is
+       empty for ever and the hours lose their attribution. */
+    const scopedProject = (s.projects ?? []).find((p) => p.id === assignedProjectId);
+    const chapters = scopedProject?.baseline?.chapters ?? [];
+    check(
+      "with its chapters named",
+      !assignedProjectId || chapters.some((c) => c.num && c.name),
+      `chapters=${chapters.length}`,
+    );
+    check(
+      "and their line items, so a sub-chapter can be chosen",
+      !assignedProjectId || chapters.some((c) => (c.lines ?? []).some((l) => l.id)),
+      `lines=${chapters.reduce((n, c) => n + (c.lines ?? []).length, 0)}`,
+    );
+
     const money = JSON.stringify(s).match(/"[a-zA-Z]*Cents"/g) ?? [];
     check("and not one amount in cents", money.length === 0, money.slice(0, 6).join(" "));
+    /* Belt and braces on the one that got through: the baseline's own three
+       totals, named, because those are what a project carried in whole. */
+    const baselineMoney = ["revenueCents", "costCents", "marginCents", "saleCents"].filter((k) =>
+      JSON.stringify(s.projects ?? []).includes(`"${k}"`),
+    );
+    check(
+      "and no job revenue, cost or margin",
+      baselineMoney.length === 0,
+      baselineMoney.join(" ") || "clean",
+    );
 
     // --- the other door is shut ------------------------------------------
+    //
+    // 403 AND NOT 401, and the difference is the whole reason this reads the
+    // status rather than merely "not ok". These refusals used to answer 401,
+    // which the workspace reads as an expired session: a site worker was shown
+    // «your session has expired, your latest changes are NOT saved» on a
+    // perfectly valid session, on every save, with signing in again as the only
+    // cure offered — and signing in again did it all over. The boundary was
+    // right; the word it used for itself was wrong.
     {
       const res = await api(`/api/${TENANT}/erp/state`, {
         method: "PUT",
@@ -558,8 +741,14 @@ async function siteWorkerBoundary() {
       });
       check(
         "a site worker may not save the whole document",
-        res.status === 401,
+        res.status === 403,
         `HTTP ${res.status}`,
+      );
+      const body = await json(res);
+      check(
+        "…and says so as FORBIDDEN, not as «who are you»",
+        body.error === "FORBIDDEN",
+        `${body.error} · ${String(body.message).slice(0, 60)}`,
       );
     }
 
@@ -570,7 +759,7 @@ async function siteWorkerBoundary() {
         args: [workerId, "2026-09-07"],
         expectedVersion: st.version,
       });
-      check("a site worker may not approve a week", res.status === 401, `HTTP ${res.status}`);
+      check("a site worker may not approve a week", res.status === 403, `HTTP ${res.status}`);
     }
 
     // --- hours for somebody else ------------------------------------------
@@ -582,7 +771,7 @@ async function siteWorkerBoundary() {
       });
       check(
         "a site worker may not record another person's hours",
-        res.status === 401,
+        res.status === 403,
         `HTTP ${res.status}`,
       );
     }
@@ -604,8 +793,81 @@ async function siteWorkerBoundary() {
       });
       check(
         "nor his own hours on a site he is not assigned to",
-        res.status === 401,
+        res.status === 403,
         `HTTP ${res.status}`,
+      );
+    }
+
+    // --- AND THE DOOR HE IS MEANT TO WALK THROUGH ACTUALLY OPENS ----------
+    //
+    // Four refusals above and not one admission, which is the shape of a suite
+    // that passes just as well against an endpoint refusing a site worker
+    // everything — and that is precisely what shipped. The permission was
+    // granted, the rule was right, the endpoint answered; no client ever called
+    // it. A crew member's hours were held in memory, drawn on screen, announced
+    // as saved, and gone on the next reload.
+    //
+    // A boundary is two statements. This is the second one.
+    const chapter = chapters.find((c) => (c.lines ?? []).some((l) => l.id));
+    const line = (chapter?.lines ?? []).find((l) => l.id);
+    /* Guarded on the LINE and not merely on the project, because a budgeted job
+       whose partida names no subpartida is refused by the engine — and this
+       block would then be reporting the wrong thing about the endpoint. The two
+       reads above already assert that the chapters and their lines arrive; if
+       they do not, the failure belongs to them. */
+    if (assignedProjectId && chapter && line) {
+      const res = await command(
+        {
+          command: "recordHours",
+          args: [
+            {
+              workerId,
+              projectId: assignedProjectId,
+              chapterNum: chapter.num,
+              lineId: line.id,
+              date: "2026-09-07",
+              hoursMilli: 8000,
+              kind: "normal",
+            },
+          ],
+          expectedVersion: st.version,
+        },
+        "?include=state",
+      );
+      const body = await json(res);
+      check(
+        "but he MAY record his own hours on the site he is assigned to",
+        res.status === 200,
+        `HTTP ${res.status} ${JSON.stringify(body).slice(0, 200)}`,
+      );
+
+      /* AND THE RECEIPT IS SCOPED LIKE EVERY OTHER READ. `?include=state` is
+         what an interactive client asks for — it renders from the document, so
+         this response is the widest thing a site account is ever handed. It
+         used to be the company file entire: every invoice, every bank line and
+         everybody's pay, returned as the answer to saving one's own timesheet.
+         Unreachable only for as long as no client existed, and the client that
+         makes the endpoint useful is the same change that would have made the
+         leak live. */
+      check(
+        "and the state that comes back with it is scoped",
+        body.scoped === true,
+        `scoped=${body.scoped}`,
+      );
+      const back = body.state ?? {};
+      const backMoney = JSON.stringify(back).match(/"[a-zA-Z]*Cents"/g) ?? [];
+      check("carrying no amount in cents", backMoney.length === 0, backMoney.slice(0, 6).join(" "));
+      check(
+        "nor anybody else's worker record",
+        (back.workers ?? []).every((w) => w.id === workerId),
+        `workers=${(back.workers ?? []).map((w) => w.id).join(",") || "(none)"}`,
+      );
+      check(
+        "and the hours he just recorded are in it",
+        (back.labour ?? []).some(
+          (l) => l.workerId === workerId && l.projectId === assignedProjectId,
+        ),
+        `labour=${(back.labour ?? []).length}`,
       );
     }
   });

@@ -283,6 +283,14 @@
             );
           } else if (res.status === 401) {
             notify("Your session has expired.", "Please sign in again.");
+          } else if (res.status === 403) {
+            // Signed in, not allowed. The opposite recovery from a 401, and
+            // telling somebody to sign in again when they already are sends
+            // them round a loop that cannot end.
+            notify(
+              "This account may not save this.",
+              (res.body && res.body.message) || "Ask an administrator.",
+            );
           } else {
             notify("Could not save to the server.", (res.body && res.body.message) || "");
           }

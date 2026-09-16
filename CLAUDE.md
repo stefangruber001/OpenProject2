@@ -45,7 +45,9 @@ for packs, `site/`, and tenant config, where they belong:
 
 | Say this (generic) | Not this (jurisdiction/sector) |
 | ------------------ | ------------------------------ |
+| section            | título                         |
 | line item          | partida                        |
+| sub-line item      | subpartida                     |
 | measurement        | medición                       |
 | progress valuation | certificación                  |
 | tax                | IVA                            |
@@ -108,6 +110,13 @@ this way before it was written down. Wait, then commit.
   `claude/**` branch if you want one — CI runs on those too — and merge it into
   `main` the same day. Push to `main` directly when the gates are green; that is
   the instruction, not a shortcut.
+  - **Merging is not releasing.** A push to `main` builds, publishes `:sha` and
+    `:dev`, and runs `smoke` — so the development system has it within minutes
+    and the artifact is tested. `:main` moves only on **Actions → Deploy → Run
+    workflow, from `main`, with `release` ticked**. Until somebody ticks it the
+    client's server keeps serving what it was serving, which is the point: the
+    same digest is already on dev, eight minutes and one gate earlier, and
+    there was never a reason the release could not wait for a person to look.
   - There is no dev branch and no `/preview` any more. There were two named dev
     branches and only one was wired to the preview, so work landed where the
     tooling was not looking, and the preview once served nine-session-old

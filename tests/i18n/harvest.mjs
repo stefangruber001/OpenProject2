@@ -45,17 +45,31 @@ const HARVEST = `() => {
   const skip = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 1 };
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let n;
+  // A language switcher names each language in its own language, so Català
+  // renders identically in all three passes BY DESIGN — counting it would be
+  // counting the ruler as part of what it measures. The same is true of the
+  // ES/CA/EN codes on its buttons.
+  //
+  // This used to be pinned to the id of the floating switcher, which no longer
+  // exists; when the choice moved into the profile menu the exemption stayed
+  // behind on a dead id and the audit went red on the three language names. So
+  // it reads the translate="no" attribute instead — the standard HTML opt-out,
+  // which site/i18n.js ALREADY honours for exactly this purpose. One attribute,
+  // and the measurement and the runtime cannot disagree about what is
+  // translatable.
+  //
+  // NO BACKTICKS IN THIS COMMENT. It lives inside the template literal that
+  // carries this function to the browser, so one would end the string early and
+  // turn the whole file into a syntax error.
+  const optedOut = (el) => !!(el && el.closest && el.closest('[translate="no"]'));
   while ((n = walker.nextNode())) {
     const p = n.parentElement;
     if (!p || skip[p.nodeName]) continue;
-    if (p.closest('#canei-lang-pill')) continue;
+    if (optedOut(p)) continue;
     push(n.nodeValue);
   }
   for (const el of document.querySelectorAll('[placeholder],[title],[aria-label],input[type=button],input[type=submit],option')) {
-    // The switcher names each language in its own language, so "Català" is
-    // identical in all three renders by design. Counting it would be counting
-    // the ruler as part of what it measures.
-    if (el.closest('#canei-lang-pill')) continue;
+    if (optedOut(el)) continue;
     push(el.getAttribute('placeholder'));
     push(el.getAttribute('title'));
     push(el.getAttribute('aria-label'));

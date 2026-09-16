@@ -31,9 +31,14 @@
 {$PUBLIC_HOSTNAME} {
 	encode zstd gzip
 
-	# The application. `app` resolves on the compose network; nothing about this
-	# service is published directly, so the proxy is the only way in.
-	reverse_proxy app:3000 {
+	# `app-prod`, NOT `app`. Caddy sits on two networks, and the dev stack reuses
+	# the production compose file — so its app is also called `app` and answers
+	# to that name on the shared `edge` network. `reverse_proxy app:3000` had two
+	# possible answers and picked the wrong one: on 16/09 the company's own
+	# address served the development system's invented data. `app-prod` is an
+	# explicit alias on the production network only (docker-compose.prod.yml),
+	# and this service is not on `edge`, so the name has exactly one answer.
+	reverse_proxy app-prod:3000 {
 		# The application needs to know the browser used HTTPS even though this
 		# hop is plain HTTP — otherwise the session cookie is issued without the
 		# Secure flag and sign-in silently fails to stick.
@@ -61,6 +66,57 @@
 		# The login form posts a password. Caddy does not log bodies, but the
 		# query string can carry a `next` path, and access logs are the one place
 		# people paste into a chat window without thinking.
+		format json
+	}
+}
+
+# =============================================================================
+# THE DEVELOPMENT STACK, served by the SAME Caddy.
+#
+# Two things cannot both bind 80 and 443, so the second stack does not get its
+# own ingress — this one grows a second address. The dev application runs in a
+# separate compose project with a separate database, reachable here only because
+# both this container and that one sit on the shared `canei-edge` network. Note
+# what is NOT on that network: either stack's `db`, and production's `app`. The
+# door opens one way.
+#
+# THE DEFAULT IS NOT COSMETIC. `{$DEV_HOSTNAME}` with nothing behind it expands
+# to an empty site address, which is a parse error, which means this container
+# does not start, which means PRODUCTION LOSES TLS — a dev feature taking the
+# real system down on a variable nobody set. `dev.invalid` is a reserved name
+# under RFC 2606 that can never resolve and can never be issued a certificate, so
+# an unconfigured server quietly serves nothing here instead of failing to serve
+# anything anywhere.
+#
+# Always `caddy validate` before bringing this file up. ops/dev-up.sh does.
+# =============================================================================
+{$DEV_HOSTNAME:dev.invalid} {
+	encode zstd gzip
+
+	# `app-dev` is the alias the dev stack's app takes on the shared network;
+	# see docker-compose.dev.yml. Until that stack exists this is a 502, which is
+	# the correct order of events — the address answers before the thing behind
+	# it is built, not the other way round.
+	reverse_proxy app-dev:3000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	# A separate file, so "what happened on dev" and "what happened to the
+	# company's invoices" are never the same question.
+	log {
+		output file /var/log/caddy/access-dev.log {
+			roll_size 20mb
+			roll_keep 5
+		}
 		format json
 	}
 }

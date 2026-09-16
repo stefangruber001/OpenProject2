@@ -88,10 +88,45 @@
     ];
   }
 
-  /** Chapters as the writer's table groups. */
+  /**
+   * Chapters as the writer's table groups.
+   *
+   * THE CONTRACT DOES NOT GAIN A TIER. A group is still one chapter with its
+   * own rows and its own subtotal, and `baseOf` below is still the sum over
+   * chapters — so the título cannot move a cent however the writers draw it.
+   * What a group gains is two optional hints: `bandOpen`, the heading to rule
+   * above this group, set on the FIRST group of a run; and `bandTotal`, the
+   * run's subtotal, set on the LAST. A writer that ignores both prints exactly
+   * what it printed before, which is what every writer does for the documents
+   * that carry no títulos at all.
+   *
+   * A run, not a group-by: the chapters arrive in the order the estimator
+   * arranged and the paper prints, and a band that reordered them to be tidy
+   * would be describing a different document from the one below it.
+   */
   function chapterGroups(f) {
-    return f.chapters.map((c) => ({
+    const titles = f.chapters.map((c) => c.title || "");
+    const runEnd = titles.map((t, i) => !!t && titles[i + 1] !== t);
+    const runStart = titles.map((t, i) => !!t && titles[i - 1] !== t);
+    const runSum = (i) => {
+      let total = 0;
+      for (let j = i; j < titles.length && titles[j] === titles[i]; j++)
+        total += f.chapters[j].rows.reduce((s, r) => s + r.amount, 0);
+      return total;
+    };
+    const startAt = (i) => {
+      let j = i;
+      while (j > 0 && titles[j - 1] === titles[i]) j--;
+      return j;
+    };
+    return f.chapters.map((c, i) => ({
       chapter: c.code + " · " + c.name,
+      // The título this group belongs to, on EVERY group of the run — so the
+      // writer closing a band can name it without looking back at the one that
+      // opened it.
+      band: titles[i],
+      bandOpen: runStart[i] ? titles[i] : "",
+      bandTotal: runEnd[i] ? eur(runSum(startAt(i))) : "",
       rows: c.rows.map((r) => ({
         item: r.item,
         // Carried through so the writer can draw the line's plate and print

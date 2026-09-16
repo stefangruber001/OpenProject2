@@ -48,6 +48,14 @@
     return d.toISOString().slice(0, 10);
   };
   const daysBetween = (a, b) => Math.round((new Date(a) - new Date(b)) / 86400000);
+  /** An ISO date as dd/mm/yyyy, for the one place the engine produces a date a
+   *  CUSTOMER reads: the `{{fecha}}` token of a message template. Everything
+   *  else the engine stores and passes stays ISO, and erp-facts.js formats the
+   *  dates that go on documents. */
+  const dmy = (isoDate) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate || ""));
+    return m ? m[3] + "/" + m[2] + "/" + m[1] : String(isoDate || "");
+  };
   // Monday of the ISO week containing dateIso (§4.6's weekly grid, LAB-01).
   const weekStartOf = (dateIso) => {
     const d = new Date(dateIso + "T00:00:00Z");
@@ -388,6 +396,22 @@
       { code: "noResponse", es: "Sin respuesta", ca: "Sense resposta" },
       { code: "withdrew", es: "Desistió", ca: "Va desistir" },
     ],
+    /* The grouping ABOVE the catalogue's chapter tree, and the only list that
+       ships EMPTY on purpose.
+
+       A título is a heading a company puts over a run of partidas — "Reforma
+       de baño", "Instalaciones" — and which partidas belong under which is a
+       statement about how that company sells, not a fact about the trade. A
+       seeded taxonomy would arrive in a price book somebody is already using
+       and would have to be argued with before it could be deleted; an empty
+       list is invisible until the first título is typed, which is also what
+       makes the whole feature opt-in per company with no flag to maintain.
+
+       Empty also keeps it out of tests/i18n/coverage.mjs, which requires EN and
+       CA for every SHIPPED Spanish value. A título the owner types is their
+       data, in their words, and is not translated — the same status as a
+       chapter name they add themselves. */
+    itemTitles: [],
     // DMC-01. The catalogue's chapter tree, and the reason it is a LIST and
     // not a derived set of the distinct values on items: a tree the owner can
     // drag into order needs somewhere to keep that order, and a chapter with
@@ -544,6 +568,19 @@
   };
   /** The four kinds DMC-03/04/05 maintain, in the order those screens show them. */
   const LIST_KINDS = Object.keys(LIST_DEFAULTS);
+  /*
+   * Lists that are allowed to hold nothing.
+   *
+   * Every other list answers a question the system must always be able to ask
+   * — what unit, what payment method, what accounting account — so emptying
+   * one would leave a form with no valid answer, and `setListEntryActive`
+   * refuses it. `itemTitles` answers a question nobody has to ask: a company
+   * with no títulos prints its partidas exactly as it did before the level
+   * existed. Without this the list would ship empty and then be impossible to
+   * return to empty after the first título, which is a door that only opens
+   * one way.
+   */
+  const OPTIONAL_LISTS = new Set(["itemTitles"]);
   /** A fresh copy — callers mutate what they get back, seeds must not drift. */
   function seedLists() {
     const out = {};
@@ -707,6 +744,7 @@
       legalName: "", // denominación social, as registered
       tradeName: "", // what it trades as, when that differs
       taxId: "",
+      tagline: "", // the line under the wordmark in a message masthead
       logo: null, // an uploaded file {storageKey,name,type,size}
       logoRef: "canei-logo", // the named pictogram, for the vector document stack
 
@@ -803,54 +841,531 @@
      Wording, not law: every one of these is editable on the Comunicaciones
      screen, and editing makes a new version rather than overwriting, so a
      message already sent stays reproducible.
+
+     WHY EACH ENTRY IS THREE ENTRIES. The product already chooses a document
+     language per customer — a quote, a contract and an invoice all come out in
+     the language on the party record. The covering email did not: every one of
+     these was Spanish, so a Catalan customer got a Catalan invoice under a
+     Spanish sentence, and an English one got an English contract the same way.
+     The three languages sit side by side here rather than in three files
+     because that is what keeps them saying the same thing.
+
+     WHY THE PROSE IS SPLIT INTO PARTS. `greeting`, `body`, `closing`, `steps`
+     and `note` are separate because the message is assembled into the house
+     design (see CaneiEml.bodyHtml) and also sent down channels that have no
+     design at all — the plain-text part of the mail, and the WhatsApp deep
+     link on the quote screen. One blob of prose can be shown; it cannot be
+     laid out. The FIGURES are deliberately NOT here: reference, date, amount,
+     due date and the payment details come from the event that raises the
+     message, because a template author retyping a total is a total that can be
+     wrong.
+
+     `*emphasis*` is the only markup allowed — it becomes bold in the HTML part
+     and plain text everywhere else.
      ========================================================================== */
   const STANDARD_COMMS_TEMPLATES = [
     {
       key: "quote-send",
-      label: "Envío de presupuesto",
       family: "comercial",
-      subject: "Su presupuesto {{number}}",
-      body: "Hola {{cliente}},\n\nAdjuntamos el presupuesto {{number}}. Quedamos a su disposición para cualquier duda.\n\nUn saludo,",
       attach: "budget",
+      /* A quote has no public URL — there is no customer portal — so the
+         action is the reply, and the button is a mailto: that really works
+         rather than a link to a page that does not exist. */
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Envío de presupuesto",
+          subject: "Su presupuesto {{number}}",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Adjuntamos el presupuesto *{{number}}* con el detalle de partidas, mediciones y plazos.",
+            "Los precios incluyen mano de obra, materiales y retirada de residuos, y se mantienen durante {{validez}} días.",
+          ],
+          steps: [
+            "Revise el detalle: cada partida indica material, medición y precio.",
+            "Respóndanos a este correo para aceptarlo o pedir un cambio.",
+            "Al aceptarlo le enviamos el contrato de obra y fijamos fecha de inicio.",
+          ],
+          note: "Si alguna partida no encaja con lo que tenía en mente, díganoslo: ajustar el presupuesto antes de empezar sale mucho más barato que ajustar la obra después.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder al presupuesto",
+        },
+        ca: {
+          label: "Enviament de pressupost",
+          subject: "El seu pressupost {{number}}",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us adjuntem el pressupost *{{number}}* amb el detall de partides, amidaments i terminis.",
+            "Els preus inclouen mà d'obra, materials i retirada de residus, i es mantenen durant {{validez}} dies.",
+          ],
+          steps: [
+            "Reviseu el detall: cada partida indica material, amidament i preu.",
+            "Respongueu a aquest correu per acceptar-lo o demanar-hi un canvi.",
+            "En acceptar-lo us enviem el contracte d'obra i fixem la data d'inici.",
+          ],
+          note: "Si alguna partida no encaixa amb el que teníeu al cap, digueu-nos-ho: ajustar el pressupost abans de començar surt molt més barat que ajustar l'obra després.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre al pressupost",
+        },
+        en: {
+          label: "Quote sent",
+          subject: "Your quote {{number}}",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "Please find attached quote *{{number}}*, with the line items, measurements and timings in full.",
+            "Prices include labour, materials and waste removal, and hold for {{validez}} days.",
+          ],
+          steps: [
+            "Read the detail: every line item names its material, its measurement and its price.",
+            "Reply to this email to accept it or to ask for a change.",
+            "On acceptance we send the works contract and agree a start date.",
+          ],
+          note: "If a line item is not what you had in mind, tell us. Adjusting a quote before we start is far cheaper than adjusting the building work afterwards.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about this quote",
+        },
+      },
+    },
+    {
+      /* THE MESSAGE THE CATALOGUE PROMISED AND THE PRODUCT COULD NOT SEND.
+         `site/documentos/01-cliente/17-email-aceptacion.html` has drawn this
+         email since the document set was designed, and there was no template
+         behind it: a customer accepted a quote and got nothing at all until
+         the contract turned up. Same for the invoice below. Both are raised by
+         an event that already existed in the data and by no rule — the person
+         who took the acceptance presses send, as they do on the quote. */
+      key: "quote-accepted",
+      family: "comercial",
+      attach: "budget",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Confirmación de aceptación",
+          subject: "Presupuesto {{number}} aceptado",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Le confirmamos que hemos recibido su aceptación del presupuesto *{{number}}*. Gracias por su confianza.",
+            "Adjuntamos la versión aceptada y congelada del presupuesto: es la que rige la obra, y cualquier cambio posterior se documenta como orden de cambio con su propio precio.",
+          ],
+          steps: [
+            "Le enviamos el contrato de obra para su firma.",
+            "Al firmarlo fijamos la fecha de inicio y le avisamos.",
+            "A partir de ahí recibirá el avance cada semana.",
+          ],
+          note: "Guarde este correo con el presupuesto adjunto: es el alcance acordado, y es a lo que nos comprometemos.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder sobre la obra",
+        },
+        ca: {
+          label: "Confirmació d'acceptació",
+          subject: "Pressupost {{number}} acceptat",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us confirmem que hem rebut la vostra acceptació del pressupost *{{number}}*. Gràcies per la confiança.",
+            "Us adjuntem la versió acceptada i congelada del pressupost: és la que regeix l'obra, i qualsevol canvi posterior es documenta com a ordre de canvi amb el seu preu.",
+          ],
+          steps: [
+            "Us enviem el contracte d'obra per signar.",
+            "En signar-lo fixem la data d'inici i us avisem.",
+            "A partir d'aquí rebreu l'avenç cada setmana.",
+          ],
+          note: "Deseu aquest correu amb el pressupost adjunt: és l'abast acordat, i és allò a què ens comprometem.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre sobre l'obra",
+        },
+        en: {
+          label: "Acceptance confirmed",
+          subject: "Quote {{number}} accepted",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "We confirm that we have your acceptance of quote *{{number}}*. Thank you.",
+            "Attached is the accepted, frozen version of the quote. That is the version the work is run against, and any later change is documented as a change order with a price of its own.",
+          ],
+          steps: [
+            "We send you the works contract to sign.",
+            "Once signed, we set the start date and tell you.",
+            "From then on you get the weekly progress report.",
+          ],
+          note: "Keep this email and the attached quote: it is the scope we agreed, and it is what we are committing to.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about the works",
+        },
+      },
     },
     {
       key: "quote-followup",
-      label: "Seguimiento de presupuesto",
       family: "comercial",
-      subject: "Su presupuesto {{number}}",
-      body: "Hola {{cliente}},\n\n¿Ha podido revisar el presupuesto {{number}}? Quedamos a su disposición para cualquier ajuste.\n\nUn saludo,",
       attach: "budget",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Seguimiento de presupuesto",
+          subject: "¿Alguna duda con el presupuesto {{number}}?",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Le escribimos para saber si ha podido revisar el presupuesto *{{number}}*, que le enviamos hace unos días.",
+            "Si necesita ajustar el alcance, cambiar materiales o escalonar los trabajos, preparamos una alternativa sin compromiso.",
+          ],
+          steps: [
+            "Díganos qué le encaja y qué no; lo revisamos con usted.",
+            "Si prefiere hablarlo, llámenos al teléfono del pie de este correo.",
+          ],
+          note: "Y si ha decidido no seguir adelante, díganoslo también: nos ayuda a mejorar y dejamos de escribirle.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder al presupuesto",
+        },
+        ca: {
+          label: "Seguiment de pressupost",
+          subject: "Algun dubte amb el pressupost {{number}}?",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us escrivim per saber si heu pogut revisar el pressupost *{{number}}*, que us vam enviar fa uns dies.",
+            "Si cal ajustar l'abast, canviar materials o esglaonar els treballs, us preparem una alternativa sense compromís.",
+          ],
+          steps: [
+            "Digueu-nos què us encaixa i què no; ho revisem amb vosaltres.",
+            "Si ho preferiu parlar, truqueu-nos al telèfon del peu d'aquest correu.",
+          ],
+          note: "I si heu decidit no tirar-ho endavant, digueu-nos-ho també: ens ajuda a millorar i deixem d'escriure-us.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre al pressupost",
+        },
+        en: {
+          label: "Quote follow-up",
+          subject: "Any questions about quote {{number}}?",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "We are writing to ask whether you have had a chance to look at quote *{{number}}*, which we sent a few days ago.",
+            "If the scope needs adjusting, the materials changing, or the work splitting into stages, we will prepare an alternative with no obligation.",
+          ],
+          steps: [
+            "Tell us what works and what does not; we will go through it with you.",
+            "If you would rather talk it over, call the number in the footer.",
+          ],
+          note: "And if you have decided not to go ahead, tell us that too — it helps us improve, and we stop writing.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about this quote",
+        },
+      },
     },
     {
       key: "invoice-reminder",
-      label: "Recordatorio de factura vencida",
       family: "cobros",
-      subject: "Factura {{number}} pendiente",
-      body: "Hola {{cliente}},\n\nLa factura {{number}}, por importe de {{importe}} €, figura pendiente en nuestros registros. Si ya la ha abonado, indíquenoslo y la conciliamos.\n\nGracias,",
       attach: "invoice",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Recordatorio de factura vencida",
+          subject: "Factura {{number}} pendiente",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Le recordamos que la factura *{{number}}*, por importe de *{{importe}} €*, venció el {{vencimiento}} y figura pendiente en nuestros registros.",
+          ],
+          steps: [],
+          note: "Si ya ha realizado la transferencia en los últimos días, ignore este mensaje: es posible que se hayan cruzado. Si nos indica la fecha y la referencia, lo conciliamos el mismo día.",
+          closing: "Gracias por su colaboración. Un cordial saludo,",
+          ctaLabel: "Responder sobre el pago",
+        },
+        ca: {
+          label: "Recordatori de factura vençuda",
+          subject: "Factura {{number}} pendent",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Us recordem que la factura *{{number}}*, per import de *{{importe}} €*, va vèncer el {{vencimiento}} i consta pendent als nostres registres.",
+          ],
+          steps: [],
+          note: "Si ja heu fet la transferència aquests dies, ignoreu aquest missatge: és possible que s'hagin creuat. Si ens indiqueu la data i la referència, ho conciliem el mateix dia.",
+          closing: "Gràcies per la vostra col·laboració. Ben cordialment,",
+          ctaLabel: "Respondre sobre el pagament",
+        },
+        en: {
+          label: "Overdue invoice reminder",
+          subject: "Invoice {{number}} outstanding",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "This is a reminder that invoice *{{number}}*, for *{{importe}} €*, fell due on {{vencimiento}} and is recorded as outstanding.",
+          ],
+          steps: [],
+          note: "If you have paid in the last few days, please ignore this — the two may simply have crossed. Send us the date and the reference and we will reconcile it the same day.",
+          closing: "Thank you. Kind regards,",
+          ctaLabel: "Reply about this payment",
+        },
+      },
+    },
+    {
+      /* The other one the catalogue drew and nothing sent: the invoice itself.
+         The library had a REMINDER for an invoice nobody had emailed. */
+      key: "invoice-send",
+      family: "cobros",
+      attach: "invoice",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Envío de factura",
+          subject: "Factura {{number}}",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Adjuntamos la factura *{{number}}* correspondiente a los trabajos de *{{obra}}*.",
+          ],
+          steps: [],
+          note: "Si detecta cualquier discrepancia, respóndanos a este correo y lo revisamos el mismo día — antes de que venza es mucho más fácil de corregir.",
+          closing: "Gracias, y un cordial saludo,",
+          ctaLabel: "Responder sobre la factura",
+        },
+        ca: {
+          label: "Enviament de factura",
+          subject: "Factura {{number}}",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: ["Us adjuntem la factura *{{number}}* corresponent als treballs de *{{obra}}*."],
+          steps: [],
+          note: "Si hi detecteu qualsevol discrepància, respongueu a aquest correu i ho revisem el mateix dia — abans del venciment és molt més fàcil de corregir.",
+          closing: "Gràcies, i ben cordialment,",
+          ctaLabel: "Respondre sobre la factura",
+        },
+        en: {
+          label: "Invoice sent",
+          subject: "Invoice {{number}}",
+          greeting: "Dear {{cliente}},",
+          body: ["Attached is invoice *{{number}}* for the work at *{{obra}}*."],
+          steps: [],
+          note: "If anything does not match, reply to this email and we will look at it the same day — before the due date it is far easier to correct.",
+          closing: "Thank you, and kind regards,",
+          ctaLabel: "Reply about this invoice",
+        },
+      },
     },
     {
       key: "works-start",
-      label: "Aviso de inicio de obra",
       family: "obra",
-      subject: "Comenzamos su obra el {{fecha}}",
-      body: "Hola {{cliente}},\n\nConfirmamos el inicio de los trabajos. El equipo llegará a primera hora y le informaremos del avance semanalmente.\n\nUn saludo,",
+      attach: "",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Aviso de inicio de obra",
+          subject: "Comenzamos su obra el {{fecha}}",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Confirmamos el inicio de los trabajos de *{{obra}}* el *{{fecha}}*.",
+            "El primer día protegemos accesos, suelos y mobiliario antes de tocar nada.",
+          ],
+          steps: [
+            "El equipo llega a primera hora de la mañana.",
+            "Le informamos del avance cada semana, con fotografías.",
+            "Cualquier incidencia, respóndanos a este correo o llame al teléfono del pie.",
+          ],
+          note: "Necesitamos acceso a la vivienda desde primera hora y un punto de agua y de luz disponibles durante los trabajos.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Responder sobre la obra",
+        },
+        ca: {
+          label: "Avís d'inici d'obra",
+          subject: "Comencem la seva obra el {{fecha}}",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Confirmem l'inici dels treballs de *{{obra}}* el *{{fecha}}*.",
+            "El primer dia protegim accessos, terres i mobiliari abans de tocar res.",
+          ],
+          steps: [
+            "L'equip arriba a primera hora del matí.",
+            "Us informem de l'avenç cada setmana, amb fotografies.",
+            "Qualsevol incidència, respongueu a aquest correu o truqueu al telèfon del peu.",
+          ],
+          note: "Necessitem accés a l'habitatge des de primera hora i un punt d'aigua i de llum disponibles durant els treballs.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Respondre sobre l'obra",
+        },
+        en: {
+          label: "Works starting",
+          subject: "Your works start on {{fecha}}",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "We confirm that work on *{{obra}}* starts on *{{fecha}}*.",
+            "On the first day we protect the entrance, the floors and the furniture before touching anything else.",
+          ],
+          steps: [
+            "The team arrives first thing in the morning.",
+            "We report progress every week, with photographs.",
+            "Anything at all, reply to this email or call the number in the footer.",
+          ],
+          note: "We need access to the property from first thing, and water and power available while the work is under way.",
+          closing: "Kind regards,",
+          ctaLabel: "Reply about the works",
+        },
+      },
     },
     {
       key: "docs-expired",
-      label: "Documentación caducada",
       family: "proveedores",
-      subject: "Documentación pendiente — {{number}}",
-      body: "Buenos días,\n\nLa documentación asociada a {{number}} ({{oficio}}) figura caducada. Sin ella no es posible el acceso a obra.\n\nGracias,",
+      attach: "",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Documentación caducada",
+          subject: "Documentación caducada — {{number}}",
+          greeting: "Buenos días,",
+          body: [
+            "La documentación asociada a *{{number}}* ({{oficio}}) figura caducada en nuestro registro.",
+          ],
+          steps: [
+            "Envíenos el certificado actualizado respondiendo a este correo.",
+            "Lo registramos el mismo día y le confirmamos.",
+            "El acceso a obra queda restablecido en cuanto conste en vigor.",
+          ],
+          note: "Sin la documentación en vigor no es posible el acceso a obra. Es una obligación de coordinación de actividades empresariales, no una decisión nuestra.",
+          noteKind: "warn",
+          closing: "Gracias,",
+          ctaLabel: "Enviar la documentación",
+        },
+        ca: {
+          label: "Documentació caducada",
+          subject: "Documentació caducada — {{number}}",
+          greeting: "Bon dia,",
+          body: [
+            "La documentació associada a *{{number}}* ({{oficio}}) consta caducada al nostre registre.",
+          ],
+          steps: [
+            "Envieu-nos el certificat actualitzat responent a aquest correu.",
+            "El registrem el mateix dia i us ho confirmem.",
+            "L'accés a obra queda restablert tan bon punt consti vigent.",
+          ],
+          note: "Sense la documentació vigent no és possible l'accés a obra. És una obligació de coordinació d'activitats empresarials, no una decisió nostra.",
+          noteKind: "warn",
+          closing: "Gràcies,",
+          ctaLabel: "Enviar la documentació",
+        },
+        en: {
+          label: "Expired documentation",
+          subject: "Expired documentation — {{number}}",
+          greeting: "Good morning,",
+          body: ["The documentation attached to *{{number}}* ({{oficio}}) is recorded as expired."],
+          steps: [
+            "Send us the current certificate by replying to this email.",
+            "We register it the same day and confirm back to you.",
+            "Site access is restored as soon as it is on file and in date.",
+          ],
+          note: "Without current documentation there is no site access. That is a legal coordination obligation, not a decision of ours.",
+          noteKind: "warn",
+          closing: "Thank you,",
+          ctaLabel: "Send the documentation",
+        },
+      },
     },
     {
       key: "warranty-followup",
-      label: "Seguimiento posventa",
       family: "posventa",
-      subject: "¿Todo correcto tras la obra?",
-      body: "Hola {{cliente}},\n\nHa pasado un tiempo desde que terminamos. ¿Está todo a su gusto? Cualquier detalle en garantía lo revisamos sin coste.\n\nUn saludo,",
+      attach: "",
+      cta: "reply",
+      langs: {
+        es: {
+          label: "Seguimiento posventa",
+          subject: "¿Todo correcto tras la obra?",
+          greeting: "Estimado/a {{cliente}},",
+          body: [
+            "Ha pasado un tiempo desde que terminamos *{{obra}}* y queríamos saber si todo sigue a su gusto.",
+          ],
+          steps: [
+            "Cuéntenos cualquier detalle respondiendo a este correo.",
+            "Si ha quedado satisfecho, una reseña nos ayuda muchísimo: la mayoría de nuestros clientes nos encuentran gracias a lo que otros han escrito.",
+          ],
+          note: "La obra está en garantía: cualquier detalle que dependa de nosotros lo revisamos sin coste. Guarde este correo, lleva nuestros datos de contacto.",
+          closing: "Un cordial saludo,",
+          ctaLabel: "Contarnos cómo ha ido",
+        },
+        ca: {
+          label: "Seguiment postvenda",
+          subject: "Tot correcte després de l'obra?",
+          greeting: "Benvolgut/uda {{cliente}},",
+          body: [
+            "Ha passat un temps des que vam acabar *{{obra}}* i volíem saber si tot continua al vostre gust.",
+          ],
+          steps: [
+            "Expliqueu-nos qualsevol detall responent a aquest correu.",
+            "Si n'heu quedat satisfets, una ressenya ens ajuda moltíssim: la majoria dels nostres clients ens troben gràcies al que altres han escrit.",
+          ],
+          note: "L'obra està en garantia: qualsevol detall que depengui de nosaltres el revisem sense cost. Deseu aquest correu, porta les nostres dades de contacte.",
+          closing: "Ben cordialment,",
+          ctaLabel: "Explicar-nos com ha anat",
+        },
+        en: {
+          label: "Aftercare follow-up",
+          subject: "Everything in order since the work?",
+          greeting: "Dear {{cliente}},",
+          body: [
+            "Some time has passed since we finished *{{obra}}*, and we wanted to know whether everything is still as it should be.",
+          ],
+          steps: [
+            "Tell us about anything at all by replying to this email.",
+            "If you were happy with the result, a review helps us enormously — most of our customers find us through what others have written.",
+          ],
+          note: "The work is under warranty: anything that is down to us, we put right at no cost. Keep this email — it carries our contact details.",
+          closing: "Kind regards,",
+          ctaLabel: "Tell us how it went",
+        },
+      },
     },
   ];
+
+  /** The languages the standard library ships in. */
+  const COMMS_LANGS = ["es", "ca", "en"];
+
+  /** Who signs which family of message, when nobody named a person. */
+  const DEPARTMENT = {
+    es: {
+      comercial: "Equipo comercial",
+      cobros: "Administración",
+      obra: "Jefatura de obra",
+      proveedores: "Compras y contratación",
+      posventa: "Atención al cliente",
+      contractual: "Administración",
+    },
+    ca: {
+      comercial: "Equip comercial",
+      cobros: "Administració",
+      obra: "Direcció d'obra",
+      proveedores: "Compres i contractació",
+      posventa: "Atenció al client",
+      contractual: "Administració",
+    },
+    en: {
+      comercial: "Sales team",
+      cobros: "Accounts",
+      obra: "Site management",
+      proveedores: "Procurement",
+      posventa: "Customer care",
+      contractual: "Accounts",
+    },
+  };
+
+  /** One flat template record per key and language, as the store holds them. */
+  function standardCommsRecords() {
+    const out = [];
+    for (const t of STANDARD_COMMS_TEMPLATES)
+      for (const lang of COMMS_LANGS) {
+        const l = t.langs[lang];
+        if (!l) continue;
+        out.push({
+          key: t.key,
+          family: t.family,
+          attach: t.attach,
+          cta: t.cta,
+          lang,
+          label: l.label,
+          subject: l.subject,
+          greeting: l.greeting,
+          /* `body` stays a single string on the record, because that is what
+             the Comunicaciones screen edits and what every existing caller
+             renders. The parts are joined by blank lines and split back the
+             same way. */
+          body: l.body.join("\n\n"),
+          steps: l.steps || [],
+          note: l.note || "",
+          noteKind: l.noteKind || "",
+          closing: l.closing,
+          ctaLabel: l.ctaLabel || "",
+        });
+      }
+    return out;
+  }
 
   /* =============================================================================
      ERP — the aggregate. `state` is plain JSON (persist/restore friendly).
@@ -866,6 +1381,21 @@
         opportunities: [],
         visits: [],
         catalogue: [],
+        /* Which partidas sit under which título, one row per membership:
+           {titleCode, chapterCode, order}. A separate collection rather than an
+           array hung on the `itemTitles` entry, because `addListEntry` builds a
+           literal {code, es, ca, active} and `updateListEntry` patches only
+           es/ca — anything else on a list entry is dropped the first time it
+           passes through either, silently. `accounts` already lives with that
+           trap for its `cost`/`overhead` keys; a membership table that lost its
+           rows on a rename would be worse.
+
+           Many-to-many by construction: one partida may appear under several
+           títulos, which is the point — fontanería belongs to a bathroom and to
+           a kitchen alike. That is safe here and nowhere else: nothing joins
+           this to a budget's chapters, so a membership can never reach a total,
+           a progress mark or a printed number. */
+        itemTitleLinks: [],
         packages: [],
         prices: [],
         budgets: [], // {id,number,partyId,propertyId,activityLine, versions:[], currentVersionId, acceptedVersionId, status}
@@ -1046,7 +1576,12 @@
     setListEntryActive(kind, code, active, user) {
       const hit = this.listAll(kind).find((e) => e.code === code);
       if (!hit) throw new Error("No such entry in " + kind + ": " + code);
-      if (!active && this.listActive(kind).length <= 1 && hit.active !== false)
+      if (
+        !active &&
+        !OPTIONAL_LISTS.has(kind) &&
+        this.listActive(kind).length <= 1 &&
+        hit.active !== false
+      )
         throw new Error("A list cannot be left with no active entries");
       hit.active = !!active;
       this._log(user, active ? "activateListEntry" : "deactivateListEntry", kind + "/" + code);
@@ -1066,6 +1601,131 @@
       rows.splice(to, 0, rows.splice(from, 1)[0]);
       this._log(user, "moveListEntry", kind + "/" + code + "→" + to);
       return rows;
+    }
+
+    /* =========================================================================
+       TÍTULOS — the grouping above the catalogue's partidas.
+
+       Everything a título needs in order to BE a list is already above:
+       `addListEntry("itemTitles", …)` creates one, `updateListEntry` renames
+       it, `moveListEntry` orders it. What follows is only what a título has
+       that the other lists do not — a membership, and a real delete.
+
+       WHY A REAL DELETE, against the system-wide "retire, never remove" rule.
+       That rule exists because a retired code is still written on records that
+       must keep rendering: `listLabel` resolves it for ever. Nothing carries a
+       título's CODE. A budget chapter stores the título's WORDS (schema v22),
+       so a deleted título cannot orphan a presupuesto, a contract or a printed
+       page — the document keeps reading exactly as it was sent. The only rows
+       pointing at the code are the memberships, and they go with it. A heading
+       somebody typed by mistake should be removable, not permanently greyed.
+       ====================================================================== */
+
+    /** The membership rows, created on first use like every other collection. */
+    titleLinks() {
+      if (!Array.isArray(this.state.itemTitleLinks)) this.state.itemTitleLinks = [];
+      return this.state.itemTitleLinks;
+    }
+    /** The partidas filed under a título, in the order the owner put them. */
+    titlePartidas(titleCode) {
+      return this.titleLinks()
+        .filter((l) => l.titleCode === titleCode)
+        .slice()
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map((l) => l.chapterCode);
+    }
+    /** The títulos a partida appears under. More than one is the normal case. */
+    partidaTitles(chapterCode) {
+      return this.titleLinks()
+        .filter((l) => l.chapterCode === chapterCode)
+        .map((l) => l.titleCode);
+    }
+    /** Codes that exist in a list, retired ones included — a membership may name either. */
+    _knownCode(kind, code) {
+      return this.listAll(kind).some((e) => e.code === code);
+    }
+    /**
+     * Replace which partidas sit under one título.
+     *
+     * Stated as the whole set rather than add/remove one at a time, because
+     * that is how the screen asks it: a person ticks boxes and presses save,
+     * and a half-applied set is not a state the list should be able to reach.
+     */
+    setTitlePartidas(titleCode, chapterCodes, user) {
+      if (!this._knownCode("itemTitles", titleCode))
+        throw new Error("No such título: " + titleCode);
+      const wanted = [];
+      for (const raw of chapterCodes || []) {
+        const code = String(raw || "").trim();
+        if (!code || wanted.includes(code)) continue;
+        if (!this._knownCode("itemChapters", code)) throw new Error("No such partida: " + code);
+        wanted.push(code);
+      }
+      const links = this.titleLinks();
+      const kept = links.filter((l) => l.titleCode !== titleCode);
+      this.state.itemTitleLinks = kept.concat(
+        wanted.map((chapterCode, order) => ({ titleCode, chapterCode, order })),
+      );
+      this._log(user, "setTitlePartidas", titleCode + " ×" + wanted.length);
+      return this.titlePartidas(titleCode);
+    }
+    /**
+     * The same membership from the partida's side — "assign it to a título or
+     * several", which is the operator's own wording for the Modify Partida
+     * panel. A partida joins each título at the end of its run, so ticking a
+     * box never silently reorders a título somebody else arranged.
+     */
+    setPartidaTitles(chapterCode, titleCodes, user) {
+      if (!this._knownCode("itemChapters", chapterCode))
+        throw new Error("No such partida: " + chapterCode);
+      const wanted = [];
+      for (const raw of titleCodes || []) {
+        const code = String(raw || "").trim();
+        if (!code || wanted.includes(code)) continue;
+        if (!this._knownCode("itemTitles", code)) throw new Error("No such título: " + code);
+        wanted.push(code);
+      }
+      const links = this.titleLinks();
+      const others = links.filter((l) => l.chapterCode !== chapterCode);
+      const mine = links.filter((l) => l.chapterCode === chapterCode);
+      // A membership this partida already had is kept as the row it is, so its
+      // position inside that título survives a save that only ticked a
+      // different box. A new one joins at the end of that título's run.
+      const rows = wanted.map(
+        (titleCode) =>
+          mine.find((l) => l.titleCode === titleCode) || {
+            titleCode,
+            chapterCode,
+            order: others.filter((l) => l.titleCode === titleCode).length,
+          },
+      );
+      this.state.itemTitleLinks = others.concat(rows);
+      this._log(user, "setPartidaTitles", chapterCode + " ×" + wanted.length);
+      return this.partidaTitles(chapterCode);
+    }
+    /** Delete a título and every membership that named it. See the block above. */
+    removeTitle(code, user) {
+      const rows = this.listAll("itemTitles");
+      const at = rows.findIndex((e) => e.code === code);
+      if (at < 0) throw new Error("No such título: " + code);
+      const gone = rows[at];
+      const dropped = this.titlePartidas(code).length;
+      rows.splice(at, 1);
+      this.state.itemTitleLinks = this.titleLinks().filter((l) => l.titleCode !== code);
+      this._log(user, "removeTitle", code + " · " + gone.es + " (" + dropped + " partidas)");
+      return gone;
+    }
+    /**
+     * Drop a partida's memberships. Called when a partida is retired, so the
+     * títulos stop offering a trade the company no longer works in — the entry
+     * itself is retired, not deleted, exactly as before.
+     */
+    clearPartidaTitles(chapterCode, user) {
+      const before = this.titleLinks().length;
+      this.state.itemTitleLinks = this.titleLinks().filter((l) => l.chapterCode !== chapterCode);
+      const removed = before - this.state.itemTitleLinks.length;
+      if (removed) this._log(user, "clearPartidaTitles", chapterCode + " ×" + removed);
+      return removed;
     }
     /** How many stored records still carry this code — shown before retiring one. */
     listEntryUsage(kind, code) {
@@ -1243,6 +1903,7 @@
         phone: c.phone,
         email: c.email,
         web: c.web,
+        tagline: c.tagline,
         iban: c.iban,
         bic: c.bic,
         bankName: c.bankName,
@@ -2208,11 +2869,18 @@
       const applied = Math.max(0, Math.round(v.scheduleAppliedDays || 0));
       v.scheduleImpactDays = want;
       const delta = want - applied;
-      /* Only once accepted, for `setVariationScheduleDays`'s reason: a
-         proposal must not move a date the customer has not agreed to. */
-      if (delta !== 0 && b.acceptedVersionId === v.id) {
-        const prj = this.state.projects.find((x) => x.budgetId === budgetId);
-        if (prj && this.extendProjectDeadline(prj.id, delta, v.adiNumber, user))
+      /* Only once the annex is AGREED, for `setVariationScheduleDays`'s reason
+         and with PK13-S15's correction to it: a proposal must not move a date
+         the customer has not agreed to, and after the gate an adicional whose
+         price is accepted but whose annex is unsigned is still a proposal as
+         far as the job is concerned. */
+      const prj = this.state.projects.find((x) => x.budgetId === budgetId);
+      const live =
+        b.acceptedVersionId === v.id &&
+        prj &&
+        this._annexApplied(this._annexForBudget(prj.id, budgetId, v.id));
+      if (delta !== 0 && live) {
+        if (this.extendProjectDeadline(prj.id, delta, v.adiNumber, user))
           v.scheduleAppliedDays = want;
       }
       this._log(user, "setAdditionalScheduleDays", v.adiNumber + " +" + want + "d");
@@ -2250,6 +2918,12 @@
           num: String(v.chapters.length + 1),
           manualNum: false, // COM-03 free numbering — see _renumber
           name: "",
+          /* The heading this partida prints under, as words rather than a
+             code — schema v22 says why. Empty is the normal value: a company
+             with no títulos never sees it, and the document is byte-identical
+             to one written before the field existed. Never a key: nothing
+             finds, buckets or sums by it. */
+          title: "",
           section: "base",
           order: v.chapters.length,
           progress: "notStarted",
@@ -2464,6 +3138,85 @@
     }
 
     /**
+     * Put a partida under a título, or take it out of one.
+     *
+     * The título is the WORDS, not a code — schema v22 says why: a presupuesto
+     * that has been sent is a document somebody holds, and renaming a título in
+     * master data must not rewrite it. Nothing here is a key: no `find` reads
+     * it, no bucket is keyed on it, no total is grouped by it. It prints, and
+     * that is all it does.
+     *
+     * A TÍTULO IS ONE BAND, WHICH IS WHY THIS MOVES THE PARTIDA. A heading that
+     * appeared twice on a page — «Baño», three partidas, «Cocina», then «Baño»
+     * again — would read as a mistake in the document, and the subtotal under
+     * each half would be a number the customer cannot reconcile with anything.
+     * So a partida joins the END of its título's existing run. Only within its
+     * own `section`: base, optional and out-of-scope are separate parts of the
+     * customer's document, and a título must not drag a partida across that
+     * line. With no run to join, the partida stays exactly where it is and
+     * starts one.
+     *
+     * Safe to renumber here, and only here, because `_editableVersion` refuses
+     * a version that has been sent or accepted. Every stored `chapterNum` —
+     * on a change, a purchase, a subcontract, an hour, a cost allocation —
+     * belongs to a project, and a project only exists downstream of acceptance.
+     * So there is no live reference to a number this can move.
+     */
+    setChapterTitle(budgetId, chapterId, title, user) {
+      const v = this._editableVersion(budgetId);
+      const c = v.chapters.find((x) => x.id === chapterId);
+      if (!c) throw new Error("Chapter not found");
+      const want = String(title == null ? "" : title).trim();
+      const had = c.title || "";
+      c.title = want;
+      if (want) {
+        const peers = v.chapters.filter(
+          (x) => x.id !== c.id && (x.title || "") === want && x.section === c.section,
+        );
+        if (peers.length) {
+          const last = peers[peers.length - 1];
+          v.chapters.splice(v.chapters.indexOf(c), 1);
+          v.chapters.splice(v.chapters.indexOf(last) + 1, 0, c);
+        }
+      }
+      this._renumber(v);
+      this._log(
+        user,
+        "setChapterTitle",
+        `${this.budget(budgetId).number} ${c.num}. ${c.name} · ${had || "—"} → ${want || "—"}`,
+      );
+      return c;
+    }
+
+    /**
+     * The chapters of a version as the bands a document draws, in order.
+     *
+     * A band is a RUN of consecutive chapters carrying the same título — run
+     * length, not a group-by, and deliberately: the array order is what the
+     * estimator arranged and what the paper prints, so a band that reordered it
+     * to be tidy would be showing something other than the document. Chapters
+     * with no título come back as a band whose `title` is "", which every
+     * writer draws as no band at all.
+     *
+     * `saleCents` is the sum of the band's own chapters and nothing else. It is
+     * a presentation subtotal: no cost, no margin, no progress. The budget's
+     * base is still the sum over CHAPTERS (`baseOf`), untouched, so a band can
+     * never disagree with the total under it.
+     */
+    chapterBands(budgetId, versionId) {
+      const t = this.budgetTotals(budgetId, versionId);
+      const bands = [];
+      for (const c of t.chapters) {
+        const title = c.title || "";
+        const last = bands[bands.length - 1];
+        if (last && last.title === title && title) last.chapters.push(c);
+        else bands.push({ title, chapters: [c], saleCents: 0 });
+      }
+      for (const b of bands) b.saleCents = b.chapters.reduce((s, c) => s + c.saleCents, 0);
+      return bands;
+    }
+
+    /**
      * Move a line within its chapter, or into another one.
      *
      * Moving BETWEEN chapters is the point: a line put under the wrong partida
@@ -2665,6 +3418,9 @@
           id: c.id,
           num: c.num,
           name: c.name,
+          // Carried, never summed by: `chapterBands` bands on it and the
+          // writers print it. Every total below is still per CHAPTER.
+          title: c.title || "",
           section: c.section,
           saleCents,
           costCents,
@@ -2893,6 +3649,11 @@
         chapters: v.chapters.map((c) => ({
           num: c.num,
           name: c.name,
+          /* The heading this partida prints under. Carried as WORDS, which is
+             the only identity the document layer has ever had for a chapter —
+             and here that is a feature rather than a limitation: a título is
+             words by design, so nothing downstream has to resolve anything. */
+          title: c.title || "",
           section: c.section,
           lines: c.lines
             .filter((l) => !l.pending)
@@ -3068,9 +3829,170 @@
       this._log(user, "createVariationBudget", p.code + " ← " + rec.number);
       return rec;
     }
-    /** The project's ACCEPTED variations, oldest first. */
+    /**
+     * An adicional, created against the CONTRACT it amends.
+     *
+     * The operator's own words for the door: «whenever you click on ＋
+     * Adicional, it requires you to select from an Active Contract (Adicional
+     * de una obra en marcha), and then it gives you the Budgeting tool with no
+     * lines to start from scratch».
+     *
+     * A CONTRACT, not a job, and that is the substance rather than the wording:
+     * an adicional becomes an annex to a signed document, so naming the
+     * document it amends at the moment it is created is what stops the two
+     * drifting apart. The job is reached through the contract, never chosen
+     * separately.
+     *
+     * EMPTY, and it already was: `createVariationBudget` makes a fresh budget
+     * with one blank version, which is exactly the "no lines to start from
+     * scratch" this asks for. The route that CLONED the accepted scope is the
+     * adicional VERSION (PK12-S13), and this replaces it — see ASSUMPTIONS S95
+     * for the trade that makes: an adicional can add, and a reduction is an
+     * explicit negative line rather than an edit of something already agreed.
+     *
+     * It carries an ADI number of its own for the customer's document. A
+     * budget handed over as «PRE-2026-0014» reads as a re-quote of the whole
+     * job; the paper the customer should receive says «ADI-2026-0002» and
+     * prices only the extra — the same reasoning the version route was given,
+     * and it survives the move because it was always about the paper.
+     */
+    createAdicionalBudget(contractId, { reason, scheduleImpactDays } = {}, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      if (["completed", "cancelled"].includes(c.status))
+        throw new Error("Un contrato finalizado o anulado no admite adicionales");
+      const p = this.state.projects.find((x) => x.contractId === c.id);
+      if (!p) throw new Error("Ese contrato todavía no tiene obra");
+      if (p.closed) throw new Error("Una obra cerrada no admite adicionales");
+      const rec = this.createVariationBudget(p.id, { reason, scheduleImpactDays }, user);
+      rec.adicionalOfContract = c.id;
+      rec.adiNumber = this.nextNumber("additional");
+      this._log(user, "createAdicionalBudget", c.number + " ← " + rec.adiNumber);
+      return rec;
+    }
+    /**
+     * The partidas an annex's days can be spread over, and the days on each.
+     *
+     * Whichever route the adicional came by: the chapters of the adicional
+     * VERSION, or of the variation BUDGET's accepted version. The screen asking
+     * for the breakdown should not have to know which shape it is looking at —
+     * that is the knowledge the two-register split exists to stop leaking into
+     * every caller.
+     */
+    annexScheduleChapters(contractId, annexNumber) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      const a = c && (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a || !a.budgetId) return { days: {}, totalDays: 0, chapters: [] };
+      const b = this.state.budgets.find((x) => x.id === a.budgetId);
+      if (!b) return { days: {}, totalDays: 0, chapters: [] };
+      const v = a.versionId
+        ? (b.versions || []).find((x) => x.id === a.versionId)
+        : (b.versions || []).find((x) => x.id === b.acceptedVersionId);
+      if (!v) return { days: {}, totalDays: 0, chapters: [] };
+      /* Only a real adicional carries days. An annex can name a version that is
+         not one — the legacy change register writes annexes with no budget at
+         all, and a row can point at a base version — and offering a delivery
+         impact for scope nobody added would ask a question with no answer. */
+      const isAdicional = a.versionId ? !!v.additional : !!b.variationOf;
+      if (!isAdicional) return { days: {}, totalDays: 0, chapters: [] };
+      const owner = a.versionId ? v : b;
+      return {
+        days: owner.scheduleDaysByChapter || {},
+        totalDays: Math.max(0, Math.round(owner.scheduleImpactDays || 0)),
+        chapters: (v.chapters || [])
+          .filter((ch) => ch.section === "base")
+          .map((ch) => ({ num: String(ch.num), name: ch.name })),
+      };
+    }
+    /**
+     * Set an annex's days — per partida and in total — by whichever route the
+     * adicional came.
+     *
+     * The days moved with the gate. They used to be typed on the «Formalizar un
+     * adicional» panel in Contratos, which was also where the customer's answer
+     * was recorded, because acceptance was the moment everything happened.
+     * PK13-S15 split those two moments apart, and the days belong to the second
+     * one: they are applied when the annex joins the job, so they are asked for
+     * where that is decided. The operator asked for exactly this — the impact
+     * on delivery time chosen as part of signing the annex.
+     *
+     * Recording is not applying. Both underlying verbs write the figure and
+     * only move a date once the annex is agreed, so typing days into an
+     * unsigned annex changes no plan.
+     */
+    setAnnexScheduleDays(contractId, annexNumber, byChapter, totalDays, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      if (!a.budgetId) return null;
+      if (a.versionId) {
+        const vb = this.state.budgets.find((x) => x.id === a.budgetId);
+        const vv = vb && (vb.versions || []).find((x) => x.id === a.versionId);
+        /* Nothing to attribute days to, and that is not an error worth
+           refusing a SIGNATURE over: this runs on the way to signing, so
+           throwing here would block agreeing an annex because of a field it
+           should never have been offered. */
+        if (!vv || !vv.additional) return null;
+        return this.setAdditionalScheduleDays(a.budgetId, a.versionId, byChapter, totalDays, user);
+      }
+      const b = this.budget(a.budgetId);
+      if (!b.variationOf) return null;
+      const clean = {};
+      for (const k of Object.keys(byChapter || {})) {
+        const n = Math.round(Number(byChapter[k]) || 0);
+        if (n) clean[String(k)] = n;
+      }
+      /* The breakdown is stored even on the budget route, which had only ever
+         carried a total. It is what the schedule consumes — one delay per
+         partida through `applyChapterDelay` — and an adicional that can move a
+         completion date but not the bars underneath it is half a plan. */
+      b.scheduleDaysByChapter = clean;
+      const summed = Object.values(clean).reduce((x, n) => x + n, 0);
+      return this.setVariationScheduleDays(
+        a.budgetId,
+        totalDays == null ? summed : totalDays,
+        user,
+      );
+    }
+    /** The annex an adicional budget wrote, so a register can say where it waits. */
+    annexOfAdicional(budgetId) {
+      const b = this.state.budgets.find((x) => x.id === budgetId);
+      if (!b || !b.variationOf) return null;
+      return this._annexForBudget(b.variationOf, b.id);
+    }
+    /** The contracts an adicional can be raised against: live, and with a job. */
+    adicionalTargets() {
+      return this.state.contracts
+        .filter((c) => !["completed", "cancelled"].includes(c.status))
+        .map((c) => ({
+          contract: c,
+          project: this.state.projects.find((x) => x.contractId === c.id) || null,
+        }))
+        .filter((x) => x.project && !x.project.closed);
+    }
+    /**
+     * The project's variations that are actually IN the job, oldest first.
+     *
+     * Accepted is no longer enough. The operator's rule: «Acceptance coming
+     * from Budget tool do nothing until we accept it on Contracts/Annex.» So
+     * an adicional the customer has agreed a price for sits in Contratos →
+     * Anexos, priced and visible, and its partidas are not in the scope, its
+     * money is not in the milestones and its days are not in the completion
+     * date until somebody signs the annex.
+     *
+     * This is the single walk everything chapter-addressed goes through —
+     * Alcance, both progress readers, cost allocation, certification — so this
+     * one predicate is the whole gate. A job with no contract has no annex to
+     * sign, and `_annexApplied` says yes to what it cannot find.
+     */
     projectVariations(projectId) {
-      return this.state.budgets.filter((b) => b.variationOf === projectId && b.acceptedVersionId);
+      return this.state.budgets.filter(
+        (b) =>
+          b.variationOf === projectId &&
+          b.acceptedVersionId &&
+          this._annexApplied(this._annexForBudget(projectId, b.id)),
+      );
     }
     /**
      * Every accepted (budget, version) pair a project's figures come from:
@@ -3182,12 +4104,14 @@
          The superseded one stays in `b.versions`, frozen, and the version
          navigator still opens it: nothing is lost, it stops being current. */
       if (v.additional) {
-        const from = this.version(budgetId, v.additionalOf);
         const delta =
           this.budgetTotals(budgetId, v.id).baseCents -
           this.budgetTotals(budgetId, v.additionalOf).baseCents;
-        from.superseded = true;
-        from.frozen = true;
+        /* THE VERSION IT REVISES IS STILL THE LIVE SCOPE. Superseding it here
+           is what used to make acceptance apply the adicional; that moved to
+           `_applyContractAnnex`, which runs when the annex is agreed on the
+           contract. Until then the job reports against what the customer
+           actually signed. */
         /* EVERY OTHER ADICIONAL STILL WAITING IS SUPERSEDED BY THIS ONE.
            They were each cloned from the version this one just replaced, so
            accepting any of them now would apply a revision of a scope that no
@@ -3216,35 +4140,47 @@
         b.acceptedVersionId = v.id;
         const prj = this.state.projects.find((x) => x.budgetId === budgetId);
         if (prj) {
-          prj.acceptedVersionId = v.id;
-          /* Marked applied only when it actually moved something.
-             `extendProjectDeadline` returns null on a job with no completion
-             date — it refuses to invent one — and recording the days as
-             applied anyway meant that if a date were set later, the delta
-             logic would believe they had already been counted and skip them.
-             The operator hit exactly this: a job with «Fin previsto» empty,
-             five days recorded, and nothing to show for them. */
-          if (this.extendProjectDeadline(prj.id, v.scheduleImpactDays, v.adiNumber, user))
-            v.scheduleAppliedDays = Math.max(0, Math.round(v.scheduleImpactDays || 0));
           /* The annex carries the DELTA, not the new total: `contractValue` is
              original + annexes, so handing it the whole revised scope would
              count the base twice. A reduction gives a negative annex, which is
-             the honest representation of scope removed. */
+             the honest representation of scope removed.
+
+             And this is now ALL that acceptance does to the job: it puts the
+             extra in front of the contract, where somebody agrees it. The
+             scope, the milestone and the days arrive with that agreement. */
           this.writeContractAnnex(
             prj.id,
             { valueCents: delta, budgetId, versionId: v.id, ref: v.adiNumber },
             user,
           );
+          /* A JOB WITH NO CONTRACT HAS NOTHING TO GATE ON. `writeContractAnnex`
+             returns null there — an extra agreed before the contract exists is
+             ordinary, and refusing it would block work over a document still
+             being drafted — so the adicional applies as it always did rather
+             than waiting for a signature that has nowhere to be given. */
+          if (!prj.contractId) {
+            const from = this.version(budgetId, v.additionalOf);
+            if (from) {
+              from.superseded = true;
+              from.frozen = true;
+            }
+            prj.acceptedVersionId = v.id;
+            if (this.extendProjectDeadline(prj.id, v.scheduleImpactDays, v.adiNumber, user))
+              v.scheduleAppliedDays = Math.max(0, Math.round(v.scheduleImpactDays || 0));
+          }
         }
       }
       if (b.variationOf) {
-        this.extendProjectDeadline(b.variationOf, b.scheduleImpactDays, b.number, user);
-        b.scheduleAppliedDays = Math.max(0, Math.round(b.scheduleImpactDays || 0));
-        this.writeContractAnnex(
+        const written = this.writeContractAnnex(
           b.variationOf,
           { valueCents: this.budgetTotals(b.id, v.id).baseCents || 0, budgetId: b.id },
           user,
         );
+        if (!written) {
+          // Same reason as above: no contract, nothing to sign, so it applies.
+          if (this.extendProjectDeadline(b.variationOf, b.scheduleImpactDays, b.number, user))
+            b.scheduleAppliedDays = Math.max(0, Math.round(b.scheduleImpactDays || 0));
+        }
       }
       this._log(user, "acceptVersion", b.number + " v" + v.vNumber);
       return v;
@@ -3848,7 +4784,18 @@
     contractValue(contractId) {
       const c = this.state.contracts.find((x) => x.id === contractId);
       if (!c) throw new Error("Contract not found");
-      const annexCents = sum(c.annexes || [], (a) => a.valueCents);
+      /* ONLY THE ANNEXES THAT HAVE BEEN AGREED. «Importe vigente» is what the
+         contract is worth today, and an adicional the customer has priced but
+         nobody has signed is not part of it. Counting it would put money in
+         the contract total that nobody has agreed to — the same error, at the
+         other end, as leaving an agreed extra out.
+         The pending figure is returned beside it rather than dropped: an
+         operator who can see only one of the two numbers asks where the other
+         went, and «vigente» alone cannot answer it. */
+      const applied = (c.annexes || []).filter((a) => a.applied !== false);
+      const pending = (c.annexes || []).filter((a) => a.applied === false);
+      const annexCents = sum(applied, (a) => a.valueCents);
+      const pendingAnnexCents = sum(pending, (a) => a.valueCents);
       const currentCents = c.valueCents + annexCents;
       return {
         originalCents: c.valueCents,
@@ -3864,7 +4811,9 @@
         vatBp: c.vatBp,
         originalTotalCents: c.totalCents,
         totalCents: currentCents + pctOf(currentCents, c.vatBp || 0),
-        annexes: (c.annexes || []).length,
+        annexes: applied.length,
+        pendingAnnexCents,
+        pendingAnnexes: pending.length,
         differs: annexCents !== 0,
       };
     }
@@ -4382,7 +5331,18 @@
         { valueCents: c.priceCents, changeId: c.id },
         user,
       );
-      if (annex) c.annexNumber = annex.number;
+      if (annex) {
+        c.annexNumber = annex.number;
+        /* THE LEGACY REGISTER KEEPS ITS OLD BEHAVIOUR, on purpose. `state.changes`
+           is the route PK12-S13 replaced and the menu already hides; the gate the
+           operator asked for governs the ADICIONAL routes they are redesigning.
+           Half-gating this one — an annex with no milestone, but its days applied
+           two lines below — would be the "half the consequence missing" bug this
+           very method was written to fix. Approving a change applies it, as it
+           always has, in one step. */
+        const con = this.state.contracts.find((x) => x.annexes && x.annexes.includes(annex));
+        if (con) this._applyContractAnnex(con, annex, user);
+      }
       /* …and the days it recorded finally reach the job. `priceChange` has
          taken `scheduleImpactDays` since CHG-02 and the screen has asked for
          it just as long; approving the change moved the Gantt bars and left
@@ -4414,6 +5374,27 @@
         user,
         "variationExtendsDeadline",
         pj.code + " +" + n + "d → " + pj.dates.targetEnd + (ref ? " · " + ref : ""),
+      );
+      return pj.dates.targetEnd;
+    }
+    /**
+     * Give back days a variation added. Not `extendProjectDeadline` with a
+     * negative: that one refuses anything at or below zero, on purpose — it is
+     * the verb for "this extra takes longer", and a caller handing it a
+     * negative is confused about which direction it works in. Withdrawing an
+     * annex is the one legitimate way a completion date moves BACK, and it
+     * moves back by exactly what that annex moved it forward, never further.
+     */
+    _giveBackDeadlineDays(projectId, days, ref, user) {
+      const n = Math.round(days || 0);
+      if (n <= 0) return null;
+      const pj = this.state.projects.find((x) => x.id === projectId);
+      if (!pj || !pj.dates || !pj.dates.targetEnd) return null;
+      pj.dates.targetEnd = addDays(pj.dates.targetEnd, -n);
+      this._log(
+        user,
+        "annexReturnsDeadline",
+        pj.code + " −" + n + "d → " + pj.dates.targetEnd + (ref ? " · " + ref : ""),
       );
       return pj.dates.targetEnd;
     }
@@ -4454,8 +5435,70 @@
         ref: ref || null,
         valueCents: valueCents || 0,
         date: this.state.today,
+        /* EXPLICITLY false, and that word carries the migration. `_annexApplied`
+           reads an ABSENT flag as applied, because every annex written before
+           this gate existed was applied the moment it was created. Only rows
+           created from here start unapplied, which is the only population the
+           gate can safely govern. */
+        applied: false,
+        appliedAt: null,
       };
       con.annexes.push(rec);
+      this._log(user, "writeContractAnnex", rec.number + " · pendiente de firma");
+      return rec;
+    }
+    /**
+     * Has this annex been agreed, and therefore actually joined the job?
+     *
+     * `applied === undefined` is TRUE, and that is the whole migration. Every
+     * annex written before the gate existed was applied the moment it was
+     * created — its scope, its milestone and its days are already in a running
+     * job — so a workspace saved yesterday and loaded today keeps every one of
+     * them. Only annexes written from here on start `false`, which is the only
+     * population the gate can safely govern. A stamping migration would have
+     * done the same thing and could have missed a row; an absent field cannot
+     * be missed.
+     */
+    _annexApplied(a) {
+      return !a || a.applied !== false;
+    }
+    /**
+     * The annex an adicional produced on its project's contract, if any.
+     * With a `versionId` it looks for the annex of that adicional VERSION;
+     * without one, for the annex of the variation BUDGET itself — the two
+     * routes write different rows and matching on the budget alone would let
+     * a version's annex answer for its budget.
+     */
+    _annexForBudget(projectId, budgetId, versionId) {
+      const p = this.state.projects.find((x) => x.id === projectId);
+      if (!p || !p.contractId) return null;
+      const c = this.state.contracts.find((x) => x.id === p.contractId);
+      if (!c) return null;
+      return (
+        (c.annexes || []).find((a) =>
+          versionId ? a.versionId === versionId : a.budgetId === budgetId && !a.versionId,
+        ) || null
+      );
+    }
+    /**
+     * The annex JOINS THE JOB — and until this runs, accepting an adicional
+     * has changed nothing about the work.
+     *
+     * The operator's rule, in their words: «Acceptance coming from Budget tool
+     * do nothing until we accept it on Contracts/Annex. This is key.» A
+     * customer agreeing a price is not the same event as an annex to a signed
+     * contract, and the product used to treat them as one: acceptance moved
+     * the scope, the completion date and the money in a single step, so there
+     * was no state in which an extra was agreed commercially and not yet part
+     * of the job. That state is most of the life of a real adicional.
+     *
+     * Everything that used to happen on acceptance happens here instead, and
+     * `applied` makes it idempotent — signing twice, or changing a signature
+     * from verbal to a document, must not append a second milestone.
+     */
+    _applyContractAnnex(con, a, user) {
+      if (this._annexApplied(a)) return null;
+      const prj = this.state.projects.find((p) => p.contractId === con.id);
       /* THE MONEY GETS A COLLECTION DATE, appended as its own milestone.
          The operator chose this over redistributing across the unbilled ones,
          and it is what `contractValue` already assumed: "annexes bill
@@ -4467,18 +5510,242 @@
          Gross, because milestones are priced on the gross (`_finishContract`
          splits `rec.totalCents`) while an annex value is a base. Adding a base
          to a list of grosses would understate every adicional by its tax. */
-      const grossCents = (rec.valueCents || 0) + pctOf(rec.valueCents || 0, con.vatBp || 0);
+      const grossCents = (a.valueCents || 0) + pctOf(a.valueCents || 0, con.vatBp || 0);
       con.installments = con.installments || [];
       con.installments.push({
         idx: con.installments.length,
-        annexNumber: rec.number,
+        annexNumber: a.number,
         amountCents: grossCents,
         trigger: "onAnnex",
         expectedDate: this.state.today,
         status: "planned",
       });
-      this._log(user, "writeContractAnnex", rec.number + " · " + grossCents + "c");
-      return rec;
+      const b = a.budgetId ? this.state.budgets.find((x) => x.id === a.budgetId) : null;
+      const v = b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
+      if (v && v.additionalOf) {
+        /* AN ADICIONAL VERSION BECOMES THE BASELINE — here, not on acceptance.
+           Everything downstream reads the project's accepted version through
+           one walk, so moving that pointer is the whole of the operator's "the
+           base of the progress changes to this new version". The superseded
+           one stays in `b.versions`, frozen, and the version navigator still
+           opens it: nothing is lost, it stops being current. */
+        const from = (b.versions || []).find((x) => x.id === v.additionalOf);
+        if (from) {
+          from.superseded = true;
+          from.frozen = true;
+        }
+        if (prj) prj.acceptedVersionId = v.id;
+        /* Marked applied only when it actually moved something.
+           `extendProjectDeadline` returns null on a job with no completion
+           date — it refuses to invent one — and recording the days as applied
+           anyway meant that if a date were set later, the delta logic would
+           believe they had already been counted and skip them. */
+        if (prj && this.extendProjectDeadline(prj.id, v.scheduleImpactDays, a.number, user))
+          v.scheduleAppliedDays = Math.max(0, Math.round(v.scheduleImpactDays || 0));
+      } else if (b && b.variationOf) {
+        /* A variation BUDGET needs no pointer moved: `projectVariations` asks
+           whether its annex is applied, so this flag IS its entry into the
+           scope. Only the days are its own to apply. */
+        if (this.extendProjectDeadline(b.variationOf, b.scheduleImpactDays, a.number, user))
+          b.scheduleAppliedDays = Math.max(0, Math.round(b.scheduleImpactDays || 0));
+      }
+      a.applied = true;
+      a.appliedAt = this.state.today;
+      this._log(user, "applyContractAnnex", a.number + " · " + grossCents + "c");
+      return a;
+    }
+    /**
+     * The annex leaves the job again — everything `_applyContractAnnex` put
+     * in, and nothing else. Shared by withdrawing a signature and removing the
+     * annex outright, because a half-undo is the same bug either way.
+     *
+     * REFUSES rather than half-does, and each refusal names a fact somebody
+     * else already relied on: an invoiced milestone, because the invoice points
+     * at an installment and deleting it would leave sealed paper describing a
+     * document that is no longer there; and progress marked on the scope it
+     * brought, because that is somebody's record of work done on site.
+     */
+    _unapplyContractAnnex(con, a, user) {
+      const undone = { annex: a.number, installments: 0, days: 0, scope: false };
+      if (!this._annexApplied(a)) return undone;
+      const inst = (con.installments || []).filter((x) => x.annexNumber === a.number);
+      if (inst.find((x) => x.invoiceId || x.status === "invoiced"))
+        throw new Error(
+          "El hito de este anexo ya se ha facturado. Rectifica la factura antes de quitarlo.",
+        );
+      const b = a.budgetId ? this.state.budgets.find((x) => x.id === a.budgetId) : null;
+      const v = b && a.versionId ? (b.versions || []).find((x) => x.id === a.versionId) : null;
+      const linesOf = (ver) => (ver ? (ver.chapters || []).flatMap((ch) => ch.lines || []) : []);
+      /* ONLY THE LINES THIS ANNEX ACTUALLY BROUGHT. An adicional version is a
+         CLONE of the version it revises, ids preserved, progress and all — so
+         reading its whole chapter list finds every line of the base scope and
+         refuses on work that has nothing to do with this annex. A variation
+         BUDGET is a different record entirely, so all of it is its own. */
+      let broughtLines = [];
+      if (v && v.additionalOf) {
+        const from = (b.versions || []).find((x) => x.id === v.additionalOf);
+        const had = new Set(linesOf(from).map((l) => l.id));
+        broughtLines = linesOf(v).filter((l) => !had.has(l.id));
+      } else if (b && b.variationOf) {
+        broughtLines = linesOf((b.versions || []).find((x) => x.id === b.acceptedVersionId));
+      }
+      if (broughtLines.find((l) => (l.progressPct || 0) > 0 || l.progress === "done"))
+        throw new Error(
+          "Hay avance marcado sobre las partidas de este anexo. Ponlo a cero antes de quitarlo.",
+        );
+      undone.installments = inst.length;
+      con.installments = (con.installments || []).filter((x) => x.annexNumber !== a.number);
+      // The index is positional and several screens read it, so it is re-seated.
+      con.installments.forEach((x, i) => {
+        x.idx = i;
+      });
+      const prj = this.state.projects.find((p) => p.contractId === con.id);
+      if (v && v.additionalOf) {
+        const back = (b.versions || []).find((x) => x.id === v.additionalOf);
+        if (back) {
+          /* The version it superseded becomes the live scope again. It stays
+             frozen: it was frozen when the customer accepted it, and a
+             withdrawn adicional does not un-agree what came before. */
+          back.superseded = false;
+          if (prj) prj.acceptedVersionId = back.id;
+          undone.scope = true;
+        }
+        undone.days = Math.max(0, Math.round(v.scheduleAppliedDays || 0));
+        if (prj) this._giveBackDeadlineDays(prj.id, undone.days, a.number, user);
+        v.scheduleAppliedDays = 0;
+      } else if (b && b.variationOf) {
+        undone.scope = true;
+        undone.days = Math.max(0, Math.round(b.scheduleAppliedDays || 0));
+        this._giveBackDeadlineDays(b.variationOf, undone.days, a.number, user);
+        b.scheduleAppliedDays = 0;
+      }
+      a.applied = false;
+      a.appliedAt = null;
+      this._log(user, "unapplyContractAnnex", a.number);
+      return undone;
+    }
+    /**
+     * The annex's own signature, and it is deliberately NOT the contract's.
+     *
+     * `signContract` refuses without a document — CON-11, and rightly, because
+     * the first invoice of a job opens on the strength of it. An annex agreed
+     * on site does not work that way. The operator's own account of it is two
+     * options, and the second has no paper: «aprobado verbalmente» and «anexo
+     * firmado». Refusing the verbal one would not produce more signed paper; it
+     * would produce a blank page scanned to get past the gate, which is worse
+     * than the truth because it LOOKS like evidence.
+     *
+     * So both are accepted and the record says WHICH. A verbal annex is a fact
+     * about a conversation and is held as one — who agreed it, when, and that
+     * there is no document — and every screen that prints it prints that too.
+     * The signed one carries the file, openable, because a document nobody can
+     * reopen proves nothing (the same rule the evidence field was built on).
+     *
+     * Inert for now, on purpose: it records the fact and moves nothing. What
+     * an annex adds to the scope, the plan and the money still arrives on
+     * acceptance, exactly as it does today. Moving that gate is its own change
+     * with its own migration, and shipping the field first means the operator
+     * can attach the paper they already have while the rest is built.
+     */
+    signContractAnnex(contractId, annexNumber, { method, document, by, date } = {}, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      const how = method === "verbal" ? "verbal" : "document";
+      const when = date || this.state.today;
+      if (when > this.state.today) throw new Error("A signature cannot be dated in the future");
+      const doc = document || null;
+      if (how === "document" && !(doc && (doc.storageKey || doc.ref || doc.name)))
+        throw new Error("Un anexo firmado necesita el documento firmado");
+      /* A verbal agreement names the person who gave it. «Somebody said yes»
+         is not a record anybody can stand behind six months later, and this is
+         the only field standing in for a signature. */
+      if (how === "verbal" && !(by && String(by).trim()))
+        throw new Error("Di quién lo aprobó verbalmente");
+      a.signature = {
+        signedAt: when,
+        method: how,
+        document: how === "document" ? doc : null,
+        by: (by && String(by).trim()) || null,
+      };
+      this._log(user, "signContractAnnex", annexNumber + " · " + how);
+      /* AND ONLY NOW DOES IT JOIN THE JOB. Idempotent, so re-signing — verbal
+         corrected to a document, a date fixed — does not append a second
+         milestone or move the date twice. */
+      this._applyContractAnnex(c, a, user);
+      return a;
+    }
+    /** Untie an annex signature. The annex goes back to unsigned; nothing else moves. */
+    clearContractAnnexSignature(contractId, annexNumber, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      if (!a.signature) throw new Error("That annex is not signed");
+      /* Unapplied FIRST, and it may refuse. A signature that could be withdrawn
+         while its scope, milestone and days stayed in the job would be a gate
+         that only closes one way — sign, apply, unsign, keep everything. */
+      const undone = this._unapplyContractAnnex(c, a, user);
+      delete a.signature;
+      this._log(user, "clearContractAnnexSignature", annexNumber);
+      return { annex: a, undone };
+    }
+    /**
+     * Take an annex back OUT of the job — all of it, or refuse.
+     *
+     * Annexes were write-only. `writeContractAnnex` is the only thing that
+     * ever touched `con.annexes`, so an adicional accepted by mistake stayed
+     * in the contract, in the milestones and in the delivery date for good,
+     * and the only way out was editing the document by hand. This repo has
+     * met that shape before and named it: a thing that can be granted and not
+     * withdrawn is half a feature (`undoImport`, `clearCashReturn`).
+     *
+     * WHAT COMES OUT IS EVERYTHING IT PUT IN, because a half-undo is worse
+     * than none: the annex row, the milestone it appended, the days it added
+     * to the completion date, and — for an adicional VERSION — the accepted
+     * pointer it moved, which is what puts its partidas in the scope. Remove
+     * only the row and the job keeps the scope and the date of something the
+     * contract no longer mentions.
+     *
+     * REFUSES rather than half-does, and each refusal names a fact somebody
+     * else already relied on:
+     *   · an invoiced milestone — the invoice points at an installment, and
+     *     deleting it would leave sealed paper describing a document that is
+     *     no longer there;
+     *   · progress marked on the scope it brought, because that is somebody's
+     *     record of work actually done on site.
+     * Both are answerable by the operator (credit the invoice, clear the
+     * progress) and neither is answerable by this method.
+     */
+    removeContractAnnex(contractId, annexNumber, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const a = (c.annexes || []).find((x) => x.number === annexNumber);
+      if (!a) throw new Error("Annex not found: " + annexNumber);
+      /* Everything it put in comes out first, with its refusals; an annex
+         still waiting for a signature has put nothing in, so this is a no-op
+         and removing it costs the job nothing. */
+      const undone = this._unapplyContractAnnex(c, a, user);
+      c.annexes = (c.annexes || []).filter((x) => x.number !== annexNumber);
+      this._log(
+        user,
+        "removeContractAnnex",
+        annexNumber + " · " + undone.installments + " hito(s) · " + undone.days + "d",
+      );
+      return undone;
+    }
+    /** Every annex of a contract, taken back in one pass. Stops at the first refusal. */
+    removeAllContractAnnexes(contractId, user) {
+      const c = this.state.contracts.find((x) => x.id === contractId);
+      if (!c) throw new Error("Contract not found");
+      const out = [];
+      /* Newest first. An adicional's accepted pointer walks BACK one step at a
+         time (`additionalOf`), so unwinding the oldest first would restore a
+         version that a later adicional had already superseded. */
+      for (const n of (c.annexes || []).map((x) => x.number).reverse())
+        out.push(this.removeContractAnnex(contractId, n, user));
+      return out;
     }
     /**
      * Set (or change) the days an adicional adds, applying only the DIFFERENCE.
@@ -4496,7 +5763,14 @@
       const applied = Math.max(0, Math.round(b.scheduleAppliedDays || 0));
       b.scheduleImpactDays = want;
       const delta = want - applied;
-      if (delta !== 0 && b.acceptedVersionId) {
+      /* Only once the annex is AGREED. Before that the adicional is a proposal,
+         and a proposal must not move a date the customer has not agreed to —
+         which after PK13-S15 includes one they have accepted a price for but
+         nobody has signed the annex of. The number is still recorded; it is
+         applied when the annex joins the job. */
+      const live =
+        b.acceptedVersionId && this._annexApplied(this._annexForBudget(b.variationOf, b.id));
+      if (delta !== 0 && live) {
         /* Only once accepted. Before that the adicional is a proposal, and a
            proposal must not move a date the customer has not agreed to. */
         this.extendProjectDeadline(b.variationOf, delta, b.number, user);
@@ -5693,9 +6967,11 @@
           invs.filter((i) => i.kind !== "creditNote"),
           (i) => i.baseCents,
         ) -
+        // Magnitude, for `invoiceOutstandingCents`'s reason: an abono entered
+        // negative made this subtraction ADD, overstating what had been billed.
         sum(
           invs.filter((i) => i.kind === "creditNote"),
-          (i) => i.baseCents,
+          (i) => Math.abs(cents(i.baseCents)),
         );
       const prog = this.chapterProgress(p.id);
       const chapters = (p.baseline.chapters || [])
@@ -6103,9 +7379,20 @@
           (a) => a.amountCents,
         ),
       );
+      /* BY MAGNITUDE, never by the stored sign. A credit note REDUCES what is
+         owed, and this line used to subtract the stored total: an abono issued
+         with negative amounts — which is how a rectificativa reads, and what
+         the operator typed — made `- credited` into `- (-220)` and ADDED the
+         money back. Reported from the live workspace as an invoice of 1.628 €
+         showing 2.068 € outstanding, its two abonos each counted the wrong way.
+
+         `Math.abs` rather than flipping the sign, because both conventions
+         exist in the data: nothing ever forced one, so a workspace can hold
+         abonos entered positive and abonos entered negative, and only the
+         magnitude is meaningful in both. */
       const credited = sum(
         this.state.invoices.filter((i) => i.rectifies === invId),
-        (i) => i.totalCents,
+        (i) => Math.abs(cents(i.totalCents)),
       );
       if (inv.kind === "creditNote") return 0;
       return inv.totalCents - collected - credited - sum(inv.writeOffs || [], (w) => w.amountCents);
@@ -6122,22 +7409,28 @@
      */
     invoiceRegister() {
       const t = this.state.today;
-      return this.state.invoices
-        .filter((i) => i.kind !== "creditNote")
-        .map((i) => {
-          const out = this.invoiceOutstandingCents(i.id);
-          return {
-            number: i.number,
-            partyId: i.partyId,
-            party: this.party(i.partyId).name,
-            contact: this.party(i.partyId).mobile || this.party(i.partyId).email,
-            projectId: i.projectId,
-            totalCents: i.totalCents,
-            outstandingCents: out,
-            dueDate: i.dueDate,
-            daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
-          };
-        });
+      /* ABONOS ARE IN THE REGISTER. They were filtered out, so a rectificativa
+         — a fiscal document, numbered without gaps, immutable once issued —
+         was issued and then appeared on no screen that lists issued documents.
+         The operator raised one to correct an invoice and could not find it.
+
+         Its own outstanding is zero (an abono is not owed), so it changes no
+         chase list; what it changes is `emitido`, which now nets the way the
+         register reads. */
+      return this.state.invoices.map((i) => {
+        const out = this.invoiceOutstandingCents(i.id);
+        return {
+          number: i.number,
+          partyId: i.partyId,
+          party: this.party(i.partyId).name,
+          contact: this.party(i.partyId).mobile || this.party(i.partyId).email,
+          projectId: i.projectId,
+          totalCents: i.totalCents,
+          outstandingCents: out,
+          dueDate: i.dueDate,
+          daysOverdue: out > 0 ? Math.max(0, daysBetween(t, i.dueDate)) : 0,
+        };
+      });
     }
     /**
      * ADM-01's four counters: emitido · cobrado · pendiente · vencido.
@@ -6812,6 +8105,30 @@
       return this.state.movements
         .filter((m) => m.cashWithdrawal && quarterOf(m.accountingDate) === quarter)
         .map((m) => ({ ...m, cash: this.cashWithdrawalState(m.id) }));
+    }
+    /**
+     * Every withdrawal that still owes an explanation, newest first.
+     *
+     * NOT filtered by period, deliberately. Cash in somebody's pocket does not
+     * respect a quarter boundary — money taken out in March is spent in April
+     * and the receipts arrive in May — so a list scoped to the period on screen
+     * would hide exactly the withdrawals that have been open longest, which are
+     * the ones worth chasing. The account filter stays, because the queue beside
+     * it is worked one account at a time.
+     *
+     * This exists because the withdrawal LEAVES the reconciliation queue the
+     * moment it is declared: `markCashWithdrawal` classifies it, `classifyMovement`
+     * marks it allocated and out of the profit and loss, and `unreconciledMovements`
+     * wants neither. That is right — a declared withdrawal is not an unexplained
+     * line — but it left the only list that could open the panel where its
+     * receipts are attached, so the receipts could never be attached at all.
+     */
+    openCashWithdrawals(accountId) {
+      return this.state.movements
+        .filter((m) => m.cashWithdrawal && (!accountId || m.accountId === accountId))
+        .map((m) => ({ ...m, cash: this.cashWithdrawalState(m.id) }))
+        .filter((m) => m.cash.outstandingCents > 0)
+        .sort((a, b) => String(b.accountingDate).localeCompare(String(a.accountingDate)));
     }
 
     /* ============ PK7-D — a transfer is a PAIR, and the product must hold it ==
@@ -7739,6 +9056,14 @@
         );
         m.class = "customerReceipt";
       }
+      /* A DECLARED WITHDRAWAL KEEPS ITS CLASS. The two branches above set the
+         class to what the match means — a project cost, a customer receipt — and
+         for a cash withdrawal both are wrong: the receipts it paid for are the
+         cost, and the line itself is the company moving its own money into a
+         pocket. `excludedFromPL` already survives this call, so nothing was ever
+         counted twice, but the class and the flag disagreed and a report keyed on
+         either would have told a different story. */
+      if (m.cashWithdrawal) m.class = "internalTransfer";
       // What it settled, all of it — not the last one considered.
       m.matched = { documents: list.map((s) => ({ ...s })) };
       m.status = "matched";
@@ -9733,6 +11058,10 @@
           partyCode: this.party(i.partyId).code,
           accountingCode: this.party(i.partyId).accountingCode,
           partyName: this.party(i.partyId).name,
+          // Symmetric with `txFromBill`: the four fields the accountant works
+          // from are the number, the date, the counterparty and its tax id, and
+          // the sales half of this dictionary carried three of the four.
+          partyTaxId: this.party(i.partyId).taxId || "",
           direction: "sale",
           category: "obra",
           invoiceExists: true,
@@ -9833,7 +11162,18 @@
           family: "comercial", // comercial|contractual|obra|cobros|proveedores|posventa
           lang: "es",
           subject: "",
+          /* The prose, in the pieces the house design lays out. `body` is the
+             one the operator edits on the Comunicaciones screen; the rest give
+             the message its shape and are optional, so a template written by
+             hand with nothing but a body still renders. */
+          greeting: "",
           body: "",
+          closing: "",
+          steps: [],
+          note: "",
+          noteKind: "",
+          cta: "", // "reply" — the only action a message can offer today
+          ctaLabel: "",
           attach: "", // which document rides along: budget|invoice|contract|""
           version: 1,
           active: true,
@@ -9854,7 +11194,21 @@
     updateCommsTemplate(id, patch, user) {
       const cur = this.state.commsTemplates.find((x) => x.id === id);
       if (!cur) throw new Error("Template not found");
-      const allowed = ["label", "family", "lang", "subject", "body", "attach"];
+      const allowed = [
+        "label",
+        "family",
+        "lang",
+        "subject",
+        "greeting",
+        "body",
+        "closing",
+        "steps",
+        "note",
+        "noteKind",
+        "cta",
+        "ctaLabel",
+        "attach",
+      ];
       const next = Object.assign({}, cur, { id: this._id("tpl"), version: cur.version + 1 });
       for (const k of Object.keys(patch)) if (allowed.includes(k)) next[k] = patch[k];
       cur.active = false;
@@ -9879,10 +11233,17 @@
      * Same shape as ensureAlertRules(): missing ones are created, existing
      * ones are never touched, so an operator's own edits and their retired
      * versions survive untouched.
+     *
+     * KEYED ON KEY **AND** LANGUAGE. It used to test the key alone, which was
+     * right while the library was Spanish-only and silently wrong the moment
+     * it was not: the first record of each key installed and the Catalan and
+     * English ones were skipped as duplicates, so a customer whose documents
+     * come out in Catalan would have gone on getting a Spanish email with no
+     * error anywhere.
      */
     ensureCommsTemplates(user) {
-      for (const t of STANDARD_COMMS_TEMPLATES) {
-        if (this.state.commsTemplates.some((x) => x.key === t.key)) continue;
+      for (const t of standardCommsRecords()) {
+        if (this.state.commsTemplates.some((x) => x.key === t.key && x.lang === t.lang)) continue;
         this.addCommsTemplate(Object.assign({}, t), user || "system");
       }
       return this.state.commsTemplates;
@@ -9900,7 +11261,121 @@
         this.ensureCommsTemplates("system");
         all = pick();
       }
+      /* A language nobody has written a template in falls back rather than
+         answering null. The caller's only reaction to null is to send nothing,
+         and a message in the wrong language beats no message — the customer
+         reads it either way, and the alternative is silence nobody notices. */
+      if (!all.length && lang) {
+        all = this.state.commsTemplates.filter((t) => t.key === key && t.active && t.lang === "es");
+      }
       return all[all.length - 1] || null;
+    }
+
+    /**
+     * A QUEUED MESSAGE, AS THE THING THAT GETS SENT.
+     *
+     * The template holds the wording and the event holds the figures, and
+     * until now nothing put the two together beyond `render(subject)` and
+     * `render(body)` — which is why every email that left this system was
+     * three lines of prose with no reference, no amount, no due date and no
+     * way to pay.
+     *
+     * Returns the structured message CaneiEml.bodyHtml and CaneiEml.textPart
+     * both render, so the HTML part, the plain part and the WhatsApp text
+     * cannot disagree about what the message says.
+     *
+     * The FIGURES come from `vars`, never from the template: a template author
+     * retyping a total is a total that can be wrong.
+     */
+    composeCommsMessage(tpl, vars, opts) {
+      const o = opts || {};
+      const v = vars || {};
+      const t = typeof tpl === "string" ? this.commsTemplate(tpl, o.lang) : tpl;
+      if (!t) return null;
+      const lang = t.lang || o.lang || "es";
+      const fill = (s) =>
+        String(s == null ? "" : s).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) =>
+          v[k] === undefined || v[k] === null || v[k] === "" ? m : String(v[k]),
+        );
+      const iss = o.issuer || this._issuerBlock();
+      const L = {
+        es: { ref: "Referencia", date: "Fecha", valid: "Validez", due: "Vencimiento" },
+        ca: { ref: "Referència", date: "Data", valid: "Validesa", due: "Venciment" },
+        en: { ref: "Reference", date: "Date", valid: "Valid for", due: "Due" },
+      };
+      const l = L[lang] || L.es;
+      const amountLabel = { es: "Importe", ca: "Import", en: "Amount" }[lang] || "Importe";
+      const overdueLabel = { es: "Días vencida", ca: "Dies vençuda", en: "Days overdue" }[lang];
+
+      /* Which figures this message is about. Only the ones the event actually
+         carries appear — a row reading «Vencimiento —» is worse than no row. */
+      const facts = [
+        { k: l.ref, v: v.number },
+        { k: l.date, v: v.fecha_doc },
+        { k: l.valid, v: v.validez ? v.validez + (lang === "en" ? " days" : " días") : "" },
+        { k: l.due, v: v.vencimiento },
+        { k: overdueLabel, v: v.dias },
+        { k: amountLabel, v: v.importe ? v.importe + " €" : "", hero: true },
+      ].filter((f) => f.k && f.v !== undefined && f.v !== null && f.v !== "");
+
+      const paras = String(t.body || "")
+        .split(/\n{2,}/)
+        .map((p) => fill(p).trim())
+        .filter(Boolean);
+
+      const replyTo = iss.email || "";
+      const cta =
+        t.cta === "reply" && replyTo
+          ? {
+              label: fill(t.ctaLabel) || (lang === "en" ? "Reply" : "Responder"),
+              href:
+                "mailto:" +
+                replyTo +
+                (v.number ? "?subject=" + encodeURIComponent("Re: " + v.number) : ""),
+            }
+          : null;
+
+      return {
+        lang,
+        subject: fill(t.subject),
+        ref: v.number || "",
+        greeting: fill(t.greeting),
+        /* The first paragraph is the message. It gets the lede's weight
+           because a reader who stops after one line should still know why
+           this arrived. */
+        lede: paras[0] || "",
+        paras: paras.slice(1),
+        facts,
+        payment: v.iban
+          ? {
+              /* Grouped in fours, the way an IBAN is printed on every bank
+                 statement and typed into every transfer form. Stored without
+                 spaces, read with them. */
+              iban: String(v.iban)
+                .replace(/\s+/g, "")
+                .replace(/(.{4})/g, "$1 ")
+                .trim(),
+              holder: iss.legalName,
+              concept: v.concepto || "",
+            }
+          : null,
+        note: t.note ? { text: fill(t.note), kind: t.noteKind || "" } : null,
+        steps: (t.steps || []).map(fill).filter(Boolean),
+        cta,
+        attachment: o.attachment || null,
+        closing: fill(t.closing),
+        /* Somebody signs it. The queue does not know which person pressed the
+           button, so the fallback is the department that owns the message —
+           «Administración» under a payment reminder reads as a company, while
+           an unsigned message reads as a notification. A caller that does know
+           the person passes one and wins. */
+        signoff: o.signoff || {
+          who: DEPARTMENT[lang] && DEPARTMENT[lang][t.family] ? DEPARTMENT[lang][t.family] : "",
+          role: "",
+          company: iss.legalName || iss.tradeName || "",
+          phone: iss.phone || "",
+        },
+      };
     }
     addCommsRule(r, user) {
       const rec = Object.assign(
@@ -9952,50 +11427,180 @@
      */
     commsEvents() {
       const t = this.state.today;
+      const cfg = this._configForRead();
       const ev = [];
       const addr = (partyId) => {
         const p = this.party(partyId);
         return { customer: p.email || "", supplier: p.email || "" };
       };
+      /* Which language this customer reads. The same rule the documents use —
+         a customer whose invoice comes out in Catalan gets a Catalan covering
+         email, which is the whole point of having chosen a language for them. */
+      const langOf = (partyId, projectId) => this._docLanguageFor("", projectId || null, partyId);
+      /* Money as a person reads it, in the language the message is written in.
+         Written out rather than left to Intl so the same figure comes out the
+         same on a phone, in a browser and in the sample generator. */
+      const money = (c, lang) => {
+        const n = Math.round(Math.abs(c)) / 100;
+        const [i, d] = n.toFixed(2).split(".");
+        const g = i.replace(/\B(?=(\d{3})+(?!\d))/g, lang === "en" ? "," : ".");
+        return (c < 0 ? "-" : "") + g + (lang === "en" ? "." : ",") + d;
+      };
+      /* The site, as the customer calls it: the street of the property the job
+         is on, and the job's own code when there is no property. «su obra»
+         with no name is a sentence about nothing. */
+      const siteLabel = (projectId) => {
+        const p = projectId ? this.state.projects.find((x) => x.id === projectId) : null;
+        if (!p) return "";
+        const prop = p.propertyId ? this.state.properties.find((x) => x.id === p.propertyId) : null;
+        const street = prop ? [prop.street, prop.city].filter(Boolean).join(", ") : "";
+        return street || p.code;
+      };
       for (const b of this.state.budgets) {
         const v = b.versions.find((x) => x.id === b.currentVersionId);
-        if (v && v.sent && !b.acceptedVersionId)
+        if (v && v.sent && !b.acceptedVersionId) {
+          const lang = b.language || langOf(b.partyId);
           ev.push({
             event: "quote-sent",
             subjectRef: b.number,
             date: v.sent.date,
+            lang,
             recipients: addr(b.partyId),
-            vars: { number: b.number, cliente: this.party(b.partyId).name },
+            vars: {
+              number: b.number,
+              cliente: this.party(b.partyId).name,
+              fecha_doc: dmy(v.sent.date),
+              validez: cfg.quoteValidityDays,
+            },
           });
+        }
+      }
+      /* THE TWO EVENTS THE CATALOGUE'S OWN DRAWINGS ASSUMED. An accepted quote
+         and an issued invoice are both facts this system already holds; what
+         it had no way to do was write to the customer about either. */
+      for (const b of this.state.budgets) {
+        const v = b.acceptedVersionId ? b.versions.find((x) => x.id === b.acceptedVersionId) : null;
+        const when = v && v.customerResponse && v.customerResponse.date;
+        if (!when) continue;
+        const lang = b.language || langOf(b.partyId);
+        const tot = this.budgetTotals(b.id, b.acceptedVersionId);
+        ev.push({
+          event: "quote-accepted",
+          subjectRef: b.number,
+          date: when,
+          lang,
+          recipients: addr(b.partyId),
+          vars: {
+            number: b.number,
+            cliente: this.party(b.partyId).name,
+            fecha_doc: dmy(when),
+            importe: money(tot.grandCents, lang),
+          },
+        });
+      }
+      for (const i of this.state.invoices) {
+        if (i.kind === "creditNote") continue;
+        const lang = i.language || langOf(i.partyId, i.projectId);
+        ev.push({
+          event: "invoice-issued",
+          subjectRef: i.number,
+          date: i.date,
+          lang,
+          recipients: addr(i.partyId),
+          vars: {
+            number: i.number,
+            cliente: this.party(i.partyId).name,
+            obra: siteLabel(i.projectId) || i.worksAddress || i.number,
+            fecha_doc: dmy(i.date),
+            vencimiento: dmy(i.dueDate),
+            importe: money(i.totalCents, lang),
+            iban: i.iban || cfg.iban || "",
+            concepto: i.number,
+          },
+        });
       }
       for (const r of this.receivables()) {
-        if (r.outstandingCents > 0 && r.daysOverdue > 0)
+        if (r.outstandingCents > 0 && r.daysOverdue > 0) {
+          const inv = this.state.invoices.find((i) => i.number === r.number);
+          const lang = (inv && inv.language) || langOf(r.partyId, r.projectId);
           ev.push({
             event: "invoice-overdue",
             subjectRef: r.number,
             date: r.dueDate,
+            lang,
             recipients: addr(r.partyId),
-            vars: { number: r.number, importe: r.outstandingCents / 100, cliente: r.party },
+            vars: {
+              number: r.number,
+              /* The amount as it is read, not as it is stored. It used to be
+                 `outstandingCents / 100`, which reaches a customer as
+                 «2136.97 €» — a number in a language nobody writing to a
+                 Spanish customer would use. */
+              importe: money(r.outstandingCents, lang),
+              cliente: r.party,
+              fecha_doc: inv && inv.date ? dmy(inv.date) : "",
+              vencimiento: dmy(r.dueDate),
+              dias: r.daysOverdue,
+              /* How to pay it. The one thing a reminder exists to make easy,
+                 and the one thing it did not say. */
+              /* The invoice's own account when it names one — a job billed
+                 through a different account is billed through it on the
+                 reminder too — else the company's. */
+              iban: (inv && inv.iban) || cfg.iban || "",
+              concepto: r.number,
+            },
             flags: { unpaid: true },
           });
+        }
       }
+      /* EVERY TOKEN ITS TEMPLATES USE, OR THE CUSTOMER READS THE TOKEN.
+         `renderTemplate` leaves an unsupplied `{{token}}` visible — the right
+         choice, because a silently blank sentence is worse than an obvious
+         gap — but it means an event that under-reports its variables sends the
+         gap to the customer. These two did: `works-start` is raised by
+         contract-signed and greets «Hola {{cliente}},» under the subject
+         «Comenzamos su obra el {{fecha}}», and `warranty-followup` is raised by
+         works-finished and greets the same way. Both were shipping the braces.
+         Found by generating the sample pack, which is the first thing that ever
+         read these messages as a customer would. */
       for (const c of this.state.contracts)
-        if (c.signature && c.signature.customerSignedAt)
+        if (c.signature && c.signature.customerSignedAt) {
+          // The start date the works-start message announces: the job's own,
+          // when there is a job, and the signature date when there is not yet.
+          const job = this.state.projects.find((p) => p.contractId === c.id);
           ev.push({
             event: "contract-signed",
             subjectRef: c.number,
             date: c.signature.customerSignedAt,
+            lang: c.language || langOf(c.partyId, job ? job.id : null),
             recipients: addr(c.partyId),
-            vars: { number: c.number },
+            vars: {
+              number: c.number,
+              cliente: this.party(c.partyId).name,
+              /* dd/mm/yyyy, not ISO: this lands in a subject line a customer
+                 reads. `{{fecha}}` is the only date token any template uses,
+                 so it is formatted where it is produced. */
+              fecha: dmy((job && job.dates && job.dates.start) || c.signature.customerSignedAt),
+              obra: siteLabel(job ? job.id : null) || c.number,
+            },
           });
+        }
       for (const p of this.state.projects)
         if (p.closed && p.dates.actualEnd)
           ev.push({
             event: "works-finished",
             subjectRef: p.code,
             date: p.dates.actualEnd,
+            lang: langOf(p.partyId, p.id),
             recipients: addr(p.partyId),
-            vars: { number: p.code },
+            vars: {
+              number: p.code,
+              cliente: this.party(p.partyId).name,
+              /* dd/mm/yyyy here too. It was ISO, which nothing rendered — so
+                 the two events disagreed about what a date looks like and the
+                 disagreement was invisible until a message printed this one. */
+              fecha: dmy(p.dates.actualEnd),
+              obra: siteLabel(p.id),
+            },
           });
       for (const s of this.state.subcontracts || []) {
         const ds = this.subcontractDocStatus(s);
@@ -10004,6 +11609,7 @@
             event: "subcontractor-docs-expired",
             subjectRef: s.number,
             date: t,
+            lang: langOf(s.supplierId),
             recipients: addr(s.supplierId),
             vars: { number: s.number, oficio: s.trade },
           });
@@ -10015,7 +11621,12 @@
      * means it does not need a person to approve it before its due date.
      */
     queueCommunication(planned, user) {
-      const tpl = this.commsTemplate(planned.template);
+      /* The language the RECIPIENT reads, carried on the row so the message is
+         rendered the same way whenever it is re-filed — a template edited or a
+         company default changed months later must not silently switch the
+         language of a message already queued for somebody. */
+      const lang = planned.lang || (planned.vars && planned.vars.lang) || "";
+      const tpl = this.commsTemplate(planned.template, lang);
       const rec = {
         id: this._id("cq"),
         key: planned.ruleId + "|" + planned.subjectRef,
@@ -10024,6 +11635,7 @@
         subjectRef: planned.subjectRef,
         templateKey: planned.template,
         templateId: tpl ? tpl.id : null,
+        lang: tpl ? tpl.lang : lang || "es",
         to: planned.to,
         channel: planned.channel,
         dueDate: planned.dueDate,
@@ -11245,6 +12857,25 @@
       );
       this.state.assignments.push(rec);
       this._log(user, "assignResource", projectId);
+      return rec;
+    }
+    /**
+     * Take somebody off a job.
+     *
+     * The other half of PLN-02, and it was missing. An assignment is not a note:
+     * it is what decides which jobs a site account is SENT — the scoped read
+     * carries the jobs a worker is assigned to and nothing else — so an
+     * assignment made by mistake is a person holding a job's chapters until
+     * somebody edits the document by hand. A thing that can be granted through
+     * a screen has to be removable through the same screen.
+     */
+    unassignResource(id, user) {
+      const A = this.state.assignments || [];
+      const i = A.findIndex((x) => x.id === id);
+      if (i < 0) throw new Error("Asignación no encontrada");
+      const rec = A[i];
+      A.splice(i, 1);
+      this._log(user, "unassignResource", rec.projectId);
       return rec;
     }
     resourceConflicts() {

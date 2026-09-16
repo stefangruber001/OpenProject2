@@ -13,7 +13,15 @@ name: iOS · TestFlight
 #   ASC_KEY_P8          the BASE64 of the AuthKey_XXXX.p8 file
 #                       (create it with:  base64 -i AuthKey_XXXX.p8 | pbcopy)
 #   DEVELOPER_TEAM_ID   your Apple Developer team id (10 chars)
+#   MATCH_PASSWORD      the passphrase the signing store is encrypted with
 # See the Beta Onboarding PDF for exactly where each value comes from.
+#
+# SIGNING. This build does not create a certificate; it downloads the one
+# "iOS · Signing setup" put on the `certificates` branch. That is deliberate:
+# the lane used to sign with -allowProvisioningUpdates, which asks Apple for a
+# NEW certificate whenever it cannot find one locally, and a runner is a fresh
+# machine every time — so every build minted another and the account kept
+# hitting Apple's cap of three.
 
 on:
   workflow_dispatch:
@@ -21,6 +29,10 @@ on:
 concurrency:
   group: ios-testflight
   cancel-in-progress: false
+
+permissions:
+  # match only READS the store here; it never writes from a build.
+  contents: read
 
 jobs:
   testflight:
@@ -50,8 +62,17 @@ jobs:
           bundler-cache: true
           working-directory: ios
 
+      # Assembled rather than stored: match reaches the `certificates` branch
+      # with this workflow's own token, so there is no second secret to create,
+      # rotate or leak.
+      - name: Authorise match against this repository
+        run: |
+          echo "MATCH_GIT_BASIC_AUTHORIZATION=$(printf 'x-access-token:%s' \
+            "${{ secrets.GITHUB_TOKEN }}" | base64 | tr -d '\n')" >> "$GITHUB_ENV"
+
       - name: Upload to TestFlight
         env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}

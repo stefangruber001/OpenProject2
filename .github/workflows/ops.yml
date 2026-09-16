@@ -30,10 +30,20 @@ on:
         options:
           - status
           - deploy-now
+          - set-ghcr-token
           - sync-server
           - backup-now
           - set-email
           - list-ssh-allowed
+          # The development stack. SEPARATE ACTIONS rather than a prod/dev
+          # target selector on the ones above, deliberately: a selector would
+          # mean every existing step needed a guard, and a step whose guard was
+          # forgotten is a dev request that runs against the real system. There
+          # is nothing to forget if the production steps are never reachable
+          # from a dev action at all.
+          - dev-up
+          - dev-down
+          - dev-reset
 
 concurrency:
   # Two runs mutating the same firewall would race: the first one's cleanup
@@ -154,6 +164,40 @@ jobs:
           bash ops/sync-server.sh
           bash ops/set-email.sh "${{ vars.ERP_MAIL_ADDRESS || 'if@2iberia.com' }}"
 
+      # THE ONE THAT COULD NOT BE FIXED FROM A PHONE, UNTIL IT HAD TO BE.
+      #
+      # This was deliberately left off the button, for the reason given above:
+      # a token travelling through a workflow INPUT persists in the run log for
+      # anyone with read access. That objection is about inputs, and it still
+      # stands. A repository SECRET is the other thing — masked in logs, never
+      # in a box on a page — which is precisely the distinction `set-email`
+      # already draws for the mailbox password.
+      #
+      # What changed the balance: an expired registry token is the failure that
+      # STRANDS you. The pipeline stays green, the image is published, the timer
+      # runs every minute — and the machine serves the old version for as long
+      # as nobody notices. It cost this project 25 commits and two days, and the
+      # only remedy needed a laptop nobody had. A recovery path that requires
+      # the thing the incident takes away is not a recovery path.
+      - name: set-ghcr-token
+        if: inputs.action == 'set-ghcr-token'
+        env:
+          GHCR_TOKEN_NEW: ${{ secrets.GHCR_TOKEN }}
+        run: |
+          if [ -z "$GHCR_TOKEN_NEW" ]; then
+            echo "::error::Repository secret GHCR_TOKEN is not set."
+            echo "::error::Make one at github.com -> Settings -> Developer settings ->"
+            echo "::error::Personal access tokens -> Tokens (classic) -> Generate new token,"
+            echo "::error::ticking ONLY read:packages. Then add it under Settings ->"
+            echo "::error::Secrets and variables -> Actions as GHCR_TOKEN and run this again."
+            exit 1
+          fi
+          # The script stores it AND proves it by logging in and pulling. A
+          # stored token that cannot pull is indistinguishable from a working
+          # one until a release silently fails to arrive — which is the whole
+          # shape of this incident.
+          bash ops/set-ghcr-token.sh
+
       - name: backup-now
         if: inputs.action == 'backup-now'
         run: |
@@ -166,6 +210,68 @@ jobs:
           $SSH "systemctl start canei-backup.service" </dev/null
           echo "Backup service started. Most recent dumps on the machine:"
           $SSH "ls -lt /opt/canei-erp/backups/*.age 2>/dev/null | head -5 || echo '(none yet)'" </dev/null
+
+      # ── THE DEVELOPMENT STACK ────────────────────────────────────────────
+      #
+      # Brings up (or repairs) a second, complete copy of the ERP on the same
+      # machine, at its own address, holding invented data. Idempotent: run it
+      # again after any change to the compose file or the Caddyfile.
+      #
+      # sync-server runs first and is not optional. The compose file and the
+      # Caddyfile live on the SERVER, not in the image, and the dev stack needs
+      # the current ones — the shared network the compose file now declares, and
+      # the second site block. sync-server is also where the Caddyfile is
+      # validated before anything that reads it is restarted.
+      - name: dev-up
+        if: inputs.action == 'dev-up'
+        run: |
+          bash ops/sync-server.sh
+          IP="$(curl -sS -H "Authorization: Bearer ${{ secrets.HCLOUD_TOKEN }}" \
+                 "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME:-canei-erp-prod}" \
+               | jq -r '.servers[0].public_net.ipv4.ip')"
+          SSH="ssh -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ops/.provisioned/id_ed25519 root@${IP}"
+          # </dev/null on every remote command — see backup-now for why.
+          $SSH "bash /opt/canei-erp/ops/dev-up.sh" </dev/null
+
+      # Stops the dev stack and hands production's address back. The one to
+      # reach for when the company's own URL is answering with invented data —
+      # see ASSUMPTIONS S138. Not destructive: the dev database and its disk
+      # stay, and `dev-up` brings the containers back.
+      - name: dev-down
+        if: inputs.action == 'dev-down'
+        run: |
+          IP="$(curl -sS -H "Authorization: Bearer ${{ secrets.HCLOUD_TOKEN }}" \
+                 "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME:-canei-erp-prod}" \
+               | jq -r '.servers[0].public_net.ipv4.ip')"
+          SSHOPTS="-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ops/.provisioned/id_ed25519"
+          # Copied every time rather than assumed present: this button has to
+          # work on a server that has never seen it, which is exactly the server
+          # you are on when you need it.
+          scp $SSHOPTS -q ops/dev-down.sh "root@${IP}:/opt/canei-erp/ops/"
+          # shellcheck disable=SC2086
+          ssh $SSHOPTS "root@${IP}" \
+            "chmod +x /opt/canei-erp/ops/dev-down.sh && bash /opt/canei-erp/ops/dev-down.sh" </dev/null
+
+      # Wipes the dev database and reloads the invented company. The seed is
+      # built HERE, on the runner, because it comes from site/erp-seed.js in this
+      # checkout — the server has the image but not the repository.
+      #
+      # The destructive half runs on the server and refuses to act on anything
+      # whose compose project, ERP_ENVIRONMENT and database name do not all three
+      # say development. See ops/dev-reset.sh.
+      - name: dev-reset
+        if: inputs.action == 'dev-reset'
+        run: |
+          node ops/dev-seed.mjs > /tmp/dev-seed.json
+          IP="$(curl -sS -H "Authorization: Bearer ${{ secrets.HCLOUD_TOKEN }}" \
+                 "https://api.hetzner.cloud/v1/servers?name=${SERVER_NAME:-canei-erp-prod}" \
+               | jq -r '.servers[0].public_net.ipv4.ip')"
+          SSHOPTS="-o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new -i ops/.provisioned/id_ed25519"
+          scp $SSHOPTS -q /tmp/dev-seed.json "root@${IP}:/tmp/dev-seed.json"
+          scp $SSHOPTS -q ops/dev-reset.sh ops/import-erp-state.sh "root@${IP}:/opt/canei-erp-dev/ops/"
+          # shellcheck disable=SC2086
+          ssh $SSHOPTS "root@${IP}" \
+            "chmod +x /opt/canei-erp-dev/ops/*.sh && bash /opt/canei-erp-dev/ops/dev-reset.sh /tmp/dev-seed.json" </dev/null
 
       - name: Take this runner back out of the firewall
         # always(), because a failed run that leaves its address allowed is how
