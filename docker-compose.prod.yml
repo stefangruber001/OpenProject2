@@ -153,6 +153,27 @@ services:
     # used, so an .env that has never heard of this variable is unaffected.
     ports:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
+    # A name only THIS stack's app can answer to, and the reason it has to exist.
+    #
+    # Compose gives every service the alias of its SERVICE NAME on every network
+    # it joins, on top of any explicit `aliases`. The dev overlay reuses this
+    # file, so its app is also called `app` — and it joins `edge`, where it
+    # therefore answers to `app` as well as to `app-dev`. Caddy sits on BOTH
+    # networks, so `reverse_proxy app:3000` had two possible answers: this app
+    # over `default`, and the DEV app over `edge`. Docker returned both and Caddy
+    # picked one. On 16/09 it picked dev, and the company's own address served
+    # invented data — `/api/health` on the production hostname answered
+    # `"environment": "dev"`.
+    #
+    # `app-dev` was added to make dev reachable; what was missed is that the
+    # implicit alias cannot be removed, so adding a second name to the dev side
+    # could never disambiguate the first. The fix has to be on THIS side: a name
+    # that exists only here. `app-prod` is never on `edge` — this service is not
+    # on `edge` at all — so it has exactly one answer from anywhere.
+    networks:
+      default:
+        aliases:
+          - app-prod
     depends_on:
       db:
         condition: service_healthy

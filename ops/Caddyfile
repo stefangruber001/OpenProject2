@@ -31,9 +31,14 @@
 {$PUBLIC_HOSTNAME} {
 	encode zstd gzip
 
-	# The application. `app` resolves on the compose network; nothing about this
-	# service is published directly, so the proxy is the only way in.
-	reverse_proxy app:3000 {
+	# `app-prod`, NOT `app`. Caddy sits on two networks, and the dev stack reuses
+	# the production compose file — so its app is also called `app` and answers
+	# to that name on the shared `edge` network. `reverse_proxy app:3000` had two
+	# possible answers and picked the wrong one: on 16/09 the company's own
+	# address served the development system's invented data. `app-prod` is an
+	# explicit alias on the production network only (docker-compose.prod.yml),
+	# and this service is not on `edge`, so the name has exactly one answer.
+	reverse_proxy app-prod:3000 {
 		# The application needs to know the browser used HTTPS even though this
 		# hop is plain HTTP — otherwise the session cookie is issued without the
 		# Secure flag and sign-in silently fails to stick.

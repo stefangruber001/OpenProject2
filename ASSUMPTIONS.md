@@ -10981,3 +10981,45 @@ thing that would notice a server that has stopped following `:main`, and
 production once spent 25 hours on an image 19 commits behind while six
 consecutive deploys passed. Setting the variable is one line in repository
 settings and turns a permanently red job into a real check.
+
+## S138 · The company's address served the test system (2026-09-16)
+
+**The symptom.** `https://178-105-10-156.sslip.io/api/health` — the client's own
+address — answered `"environment": "dev"` and `"revision": "b09e248"`, a commit
+that was built but deliberately never released. Production was running
+`095aadd`. The operator could not reach the dev address at all.
+
+**The cause, in one line.** Compose gives every service the alias of its SERVICE
+NAME on every network it joins, on top of any explicit `aliases`. The dev
+overlay reuses `docker-compose.prod.yml`, so the dev app is also called `app`,
+and it joins `edge` — where it therefore answers to `app` as well as to
+`app-dev`. Caddy sits on BOTH networks, and its production block said
+`reverse_proxy app:3000`. Two possible answers; Docker returned both; Caddy
+picked one. It picked dev.
+
+**Why `app-dev` could never have prevented it.** The alias was added so the dev
+hostname could be proxied, and that works. What it cannot do is remove the
+implicit name: adding a second alias to the dev side leaves `app` meaning two
+things. The disambiguation has to happen on the PRODUCTION side, which is where
+it now is — `app-prod`, an explicit alias on the production network, on a
+service that is not on `edge` at all, so the name has exactly one answer from
+anywhere.
+
+**What was NOT harmed.** The two stacks have separate databases and the dev app
+only ever talked to the dev one, so the company's register was never written to
+by this. What it cost is worse than nothing and less than data loss: for a day,
+the address the client was told to use showed them a fabricated company.
+
+**The guard that was supposed to catch this, and why it did not.** The
+ENTORNO DE PRUEBAS band is explicitly documented as the third line of defence,
+after the hostname and the password. Both of those failed at once here — the
+hostname pointed at the wrong stack — so the band was all that was left, and it
+did work: it is what told the operator something was wrong. A third line of
+defence holding is not a system working.
+
+**Not fixed here, and named so it is not forgotten.** `ops/status.sh` compares
+the running revision against the newest commit on `main` and calls the
+difference "behind". Since S137 that is wrong by construction: merging is not
+releasing, so an unreleased commit now reads as a fault. It reported
+"10 commit(s) behind" during this incident, which is noise exactly when noise
+is most expensive.
