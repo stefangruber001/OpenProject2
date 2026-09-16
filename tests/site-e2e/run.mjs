@@ -2887,11 +2887,15 @@ async function testShell(browser, base) {
       // they were two screens over the same `parties` collection separated by a
       // role, and the operator read them as one thing. The role survives on the
       // record and in the creation door; only the duplicate register went.
-      shape.subs === 30 &&
+      // 31 since PK14 added Configuración > Títulos, the grouping above the
+      // partidas. A separate screen and not a tab on the one below it, because
+      // the two ask different questions: which partidas make up a título, and
+      // which subpartidas make up a partida.
+      shape.subs === 31 &&
       shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
-      ok("shell: 6 secciones × 30 declared subs, 5 hidden by name");
-    else bad("shell: 6x30 (5 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 31 declared subs, 5 hidden by name");
+    else bad("shell: 6x31 (5 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
