@@ -11023,3 +11023,31 @@ difference "behind". Since S137 that is wrong by construction: merging is not
 releasing, so an unreleased commit now reads as a fault. It reported
 "10 commit(s) behind" during this incident, which is noise exactly when noise
 is most expensive.
+
+## S139 — a check that demanded a word production could not say
+
+`ops/dev-down.sh` restored production correctly on its first real use, and then
+reported `✗ the app still reports something other than production — do not hand
+this to the client yet` over a box that was fine.
+
+The script asked the container for `/api/health` and insisted on seeing
+`"environment":"production"`. That field arrived WITH the development stack
+(9c07ce8); production is serving an image built before it, so its health
+document has no `environment` key at all. The catch-all arm treated "the field
+is absent" the same as "the field says dev".
+
+Fixed by inverting the rule: fail on an explicit contradiction, not on a missing
+confirmation. An absent field cannot mean dev — dev only ever runs `:dev`, which
+is by construction newer than the commit that added the field — so absence is
+production, and is now reported in those words rather than folded silently into
+the happy path. A body that is neither still fails.
+
+The reason this matters beyond one red tick: the operator had been told, in
+writing, "if it still says dev, stop and tell me — don't hand the address to the
+client." The check that was supposed to answer that question answered it wrongly
+in the direction of alarm, at the end of the incident it existed to close. A
+false alarm on a recovery step is not a cosmetic defect; it is the step not
+working.
+
+Exercised against seven bodies — the real one, dev, explicit production, empty,
+a 502 page, key order reversed, and a docker error string — before pushing.

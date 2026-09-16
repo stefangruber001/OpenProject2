@@ -64,6 +64,18 @@ BODY="$(docker compose -f docker-compose.prod.yml exec -T app \
   node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>r.text()).then(console.log)" 2>/dev/null || true)"
 printf '  %s\n' "${BODY:-(the app did not answer)}"
 
+# Fail on an explicit CONTRADICTION, rather than passing only on an explicit
+# confirmation — and the difference cost a red run the first time this was used
+# in anger. `environment` arrived with the development stack itself (9c07ce8),
+# and production is serving an image built before that, so it answers without
+# the field at all. Demanding to SEE the word "production" therefore failed on a
+# box that had just been restored correctly, and printed "do not hand this to
+# the client yet" over a perfectly good production system.
+#
+# An absent field cannot mean dev: dev only ever runs the :dev tag, which is by
+# construction newer than the commit that added the field. So absence is
+# production — but it is reported in its own words, not folded into the happy
+# path, because a check that passes without saying why stops being read.
 case "$BODY" in
   *'"environment":"production"'* | *'"environment": "production"'*)
     info "the application reports production"
@@ -71,8 +83,14 @@ case "$BODY" in
   "")
     warn "no answer from the app container — check: docker compose -f docker-compose.prod.yml ps"
     ;;
-  *)
+  *'"environment"'*)
     die "the app still reports something other than production — do not hand this to the client yet"
+    ;;
+  *'"status"'*'"revision"'* | *'"revision"'*'"status"'*)
+    info "the app answered production (an image older than the environment field)"
+    ;;
+  *)
+    die "that is not the health document — do not hand this to the client yet"
     ;;
 esac
 
