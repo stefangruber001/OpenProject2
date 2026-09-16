@@ -15858,6 +15858,50 @@ async function testTitles(browser, base) {
       ok("títulos: deleting one removes its memberships and leaves every partida standing");
     else bad("títulos: delete is clean", JSON.stringify(gone));
 
+    // ---- the band in the presupuestador -----------------------------------
+    const bid = await pg.evaluate(() => {
+      const b =
+        erp.state.budgets.find((x) => erp.budgetStage(x) === "draft") || erp.state.budgets[0];
+      go("quotes", b.id);
+      return b.id;
+    });
+    await pg.waitForTimeout(900);
+    const baseBefore = await pg.evaluate((q) => erp.budgetTotals(q).baseCents, bid);
+    const chapIds = await pg.evaluate(() =>
+      [...document.querySelectorAll("#bRows tr.chaprow")].map((r) => r.dataset.chaprow),
+    );
+    if (chapIds.length >= 2) {
+      await pg.selectOption(`[data-chaptitle="${chapIds[0]}"]`, "E2E Baño");
+      await pg.waitForTimeout(800);
+      await pg.selectOption(`[data-chaptitle="${chapIds[1]}"]`, "E2E Baño");
+      await pg.waitForTimeout(800);
+      const band = await pg.evaluate((q) => {
+        const rows = [...document.querySelectorAll("#bRows tr")];
+        const bands = erp.chapterBands(q);
+        const mine = bands.find((x) => x.title === "E2E Baño");
+        return {
+          headers: rows.filter((r) => r.classList.contains("bandrow")).length,
+          sums: rows.filter((r) => r.classList.contains("bandsum")).length,
+          saidTitle: rows.some(
+            (r) => r.classList.contains("bandrow") && r.textContent.includes("E2E Baño"),
+          ),
+          chapters: mine ? mine.chapters.length : 0,
+          saleCents: mine ? mine.saleCents : -1,
+          ofItsOwn: mine ? mine.chapters.reduce((s, c) => s + c.saleCents, 0) : -2,
+          baseNow: erp.budgetTotals(q).baseCents,
+        };
+      }, bid);
+      if (band.headers === 1 && band.sums === 1 && band.saidTitle && band.chapters === 2)
+        ok("presupuestador: two partidas under one título draw ONE band, with one subtotal");
+      else bad("presupuestador: one band per título", JSON.stringify(band));
+      if (band.saleCents === band.ofItsOwn && band.saleCents > 0)
+        ok("presupuestador: the band's subtotal is the sum of its own partidas and nothing else");
+      else bad("presupuestador: band subtotal", JSON.stringify(band));
+      if (band.baseNow === baseBefore)
+        ok("presupuestador: grouping partidas under a título leaves the base untouched");
+      else bad("presupuestador: base unchanged", `${baseBefore} → ${band.baseNow}`);
+    } else bad("presupuestador: a draft with two partidas to band", JSON.stringify(chapIds));
+
     if (!errs.length) ok("títulos: no console errors on the screen");
     else bad("títulos: console clean", errs.slice(0, 3).join(" | "));
   } finally {

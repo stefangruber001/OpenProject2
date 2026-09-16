@@ -2301,6 +2301,37 @@
         font: 600 12px var(--sans);
         color: var(--greenDeep);
       }
+      /* The título band: one rule above its run of partidas and one subtotal
+     under it. Deliberately quieter than a chapter row and louder than a line —
+     it groups, it does not price. A company with no títulos never sees either. */
+      .bgrid tr.bandrow td {
+        background: transparent;
+        border-bottom: 2px solid var(--greenDeep);
+        font: 700 13px var(--serif);
+        color: var(--greenDeep);
+        letter-spacing: 0.02em;
+        padding-top: 14px;
+      }
+      .bgrid tr.bandsum td {
+        background: transparent;
+        border-top: 1px solid var(--line);
+        font: 600 12px var(--sans);
+        color: var(--muted);
+      }
+      .bgrid tr.bandsum .bandsumin {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+      }
+      .bgrid tr.bandsum b {
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+        color: var(--ink);
+      }
+      .bgrid select.chaptitle {
+        font: 600 11px var(--sans);
+        max-width: 190px;
+      }
       .bgrid .out {
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
@@ -17334,11 +17365,63 @@
                  where typing already re-renders. */
         const chapCat = {};
         for (const c of V.chapters) chapCat[c.id] = chapterCatalogueCode(id, vsel, c.id);
+        /* THE TÍTULO BAND, and the one rule that keeps it honest: it is drawn
+           from runs of the SAME array this grid renders, so what is banded on
+           screen is what the paper will band. `saleCents` is the band's own
+           partidas and nothing else; the base underneath is still the sum over
+           partidas, so a band can never disagree with the total below it.
+
+           Every fragment is built out here rather than inside the template: a
+           literal sitting between a greater-than and a less-than is what the
+           source audit reads as an untranslated sentence, and this file has a
+           recorded history of exactly that. */
+        const titleRows = erp.listActive("itemTitles");
+        const bandOf = {};
+        if (titleRows.length || V.chapters.some((c) => c.title))
+          for (const bd of erp.chapterBands(id, vsel)) {
+            if (!bd.title) continue;
+            const first = bd.chapters[0].id;
+            const last = bd.chapters[bd.chapters.length - 1].id;
+            bandOf[first] = Object.assign(bandOf[first] || {}, { open: bd.title });
+            bandOf[last] = Object.assign(bandOf[last] || {}, { close: bd });
+          }
+        const bandOpen = (c) => {
+          const b = bandOf[c.id];
+          if (!b || !b.open) return "";
+          return `<tr class="bandrow"><td colspan="${cols}">${esc(b.open)}</td></tr>`;
+        };
+        const bandClose = (c) => {
+          const b = bandOf[c.id];
+          if (!b || !b.close) return "";
+          const n = b.close.chapters.length;
+          const label = `${b.close.title} · ${n} ${n === 1 ? "partida" : "partidas"}`;
+          const money = eur(b.close.saleCents);
+          return `<tr class="bandsum"><td colspan="${cols}"><span class="bandsumin">${esc(label)}<b translate="no">${money}</b></span></td></tr>`;
+        };
+        /* Only offered once the company has títulos. A price book with none
+           shows the grid exactly as it looked before this level existed, which
+           is what "only for some clients" has to mean in practice. A título
+           already written on a partida is offered even if it was since retired
+           or renamed, so opening the grid can never silently re-file it. */
+        const titlePicker = (c) => {
+          if (locked || !titleRows.length) return "";
+          const cur = c.title || "";
+          const stray =
+            cur && !titleRows.some((t) => t.es === cur)
+              ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>`
+              : "";
+          const opts = titleRows
+            .map((t) => `<option value="${esc(t.es)}"${t.es === cur ? " selected" : ""}>${esc(t.es)}</option>`)
+            .join("");
+          const none = `<option value=""${cur ? "" : " selected"}>— sin título —</option>`;
+          return `<select class="chaptitle" data-chaptitle="${c.id}" title="Título bajo el que se agrupa esta partida">${none}${stray}${opts}</select>`;
+        };
         $("#bRows").innerHTML =
           chapters
             .map(
-              (c) => `
+              (c) => `${bandOpen(c)}
           <tr class="chaprow" data-chaprow="${c.id}"><td colspan="${cols}"><div class="chaprowin"><span class="chapttl">${esc(c.num)}. ${esc(c.name)} · ${SECL[c.section] || c.section}</span>
+            ${titlePicker(c)}
             ${
               locked
                 ? ""
@@ -17370,11 +17453,26 @@
             ${locked ? "" : `<td class="pbdel c-del" data-th=""><button class="btn sm danger" data-delline="${l.id}" title="Eliminar esta subpartida"><span class="delx">✕</span><span class="dellbl">Eliminar subpartida</span></button></td>`}
           </tr>`;
             })
-            .join("")}`,
+            .join("")}
+          ${bandClose(c)}`,
             )
             .join("") ||
           `<tr><td colspan="${cols}"><div class="empty">Sin partidas todavía.</div></td></tr>`;
 
+        /* Assigning a título re-renders, because it can MOVE the partida — a
+           título is one band, so a partida joins the end of its run. Nothing
+           else on this screen reorders on a change, which is exactly why it
+           has to be a visible jump rather than a silent one. */
+        $("#bRows")
+          .querySelectorAll("[data-chaptitle]")
+          .forEach(
+            (sel) =>
+              (sel.onchange = () =>
+                mutate(
+                  () => erp.setChapterTitle(id, sel.dataset.chaptitle, sel.value, "backoffice"),
+                  sel.value ? "Partida agrupada" : "Partida sin título",
+                )),
+          );
         $("#bRows")
           .querySelectorAll("[data-gal]")
           .forEach((btn) => (btn.onclick = () => lineImagesDrawer(id, btn.dataset.gal)));
