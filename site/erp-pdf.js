@@ -514,6 +514,19 @@
     this.tableHead();
 
     for (const g of d.groups) {
+      /* The título band. A heading with its first partida stranded on the next
+         page is worse than a chapter heading alone, so it reserves room for
+         both — the band, the chapter under it, and a line of the table. Empty
+         on every document that carries no títulos, which is nearly all of
+         them, and then this costs one comparison per chapter. */
+      if (g.bandOpen) {
+        if (this.need(72)) this.tableHead();
+        this.y -= 6;
+        this.text(X0, this.y - 11, 12, FONT.serifB, C.ink, g.bandOpen);
+        this.y -= 17;
+        this.rule(X0, this.y + 2, CONTENT_W, C.green, 1.6);
+        this.y -= 6;
+      }
       // A chapter heading must never be the last thing on a page.
       if (this.need(40)) this.tableHead();
       this.text(X0, this.y - 9, 9.5, FONT.serifB, C.green, g.chapter);
@@ -565,6 +578,17 @@
       this.textRight(c.price, this.y - 10, 8, FONT.sans, C.muted, "Subtotal " + g.chapter);
       this.textRight(c.amt, this.y - 10, 9, FONT.sansB, C.ink, g.subtotal);
       this.y -= 22;
+
+      /* The band's own total, under the last partida of its run. Quieter than
+         the document's base and louder than a chapter subtotal, because that
+         is exactly what it is: a reading aid between the two. */
+      if (g.bandTotal) {
+        if (this.need(24)) this.tableHead();
+        this.rule(X0, this.y + 4, CONTENT_W, C.green, 0.8);
+        this.textRight(c.price, this.y - 8, 8.5, FONT.sansB, C.muted, "Total " + g.band);
+        this.textRight(c.amt, this.y - 8, 10, FONT.sansB, C.ink, g.bandTotal);
+        this.y -= 22;
+      }
     }
   };
 

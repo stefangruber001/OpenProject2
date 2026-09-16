@@ -3643,6 +3643,11 @@
         chapters: v.chapters.map((c) => ({
           num: c.num,
           name: c.name,
+          /* The heading this partida prints under. Carried as WORDS, which is
+             the only identity the document layer has ever had for a chapter —
+             and here that is a feature rather than a limitation: a título is
+             words by design, so nothing downstream has to resolve anything. */
+          title: c.title || "",
           section: c.section,
           lines: c.lines
             .filter((l) => !l.pending)

@@ -386,6 +386,22 @@
       Math.round(CONTENT_W * 0.16),
     ];
     for (const g of groups) {
+      /* The título band, above the first partida of its run. Word has no page
+         model this writer controls, so there is nothing to reserve — the band
+         is a heavier paragraph with a rule under it, and a document with no
+         títulos never emits one. */
+      if (g.bandOpen)
+        this.push(
+          p(this.t(g.bandOpen), {
+            font: SERIF,
+            size: 13,
+            bold: true,
+            color: C.ink,
+            rule: true,
+            before: 160,
+            after: 40,
+          }),
+        );
       if (g.chapter)
         this.push(
           p(this.t(g.chapter), {
@@ -477,6 +493,21 @@
           },
         ]);
       this.push(table(rows));
+      /* The band's total, under the last partida of its run. Named, because a
+         bare figure between two chapter subtotals is a number the reader
+         cannot attribute to anything. */
+      if (g.bandTotal)
+        this.push(
+          p(this.t("Total " + g.band) + "   " + g.bandTotal, {
+            font: SERIF,
+            size: 10.5,
+            bold: true,
+            color: C.ink,
+            align: "right",
+            rule: true,
+            after: 120,
+          }),
+        );
       this.push(p("", { size: 2, after: 60 }));
     }
   };

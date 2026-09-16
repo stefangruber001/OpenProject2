@@ -29132,7 +29132,22 @@
         const doc = erp.renderBudgetDoc(id, versionId);
         const money = (c) => eur(c).replace(/ ?€/, "").trim();
         const rows = [["Nº", "Código", "Descripción", "Ud.", "Cantidad", "Precio ud.", "Importe"]];
-        for (const c of doc.chapters) {
+        /* The título bands, run by run, so the spreadsheet reads in the same
+           groups as the paper. Summed from the lines that reach the FILE — the
+           same rule the chapter subtotal below already follows, because
+           renderBudgetDoc drops pending lines and a band that counted them
+           would not match the rows above it. */
+        const titles = doc.chapters.map((c) => c.title || "");
+        const bandCents = doc.chapters.map((c) =>
+          c.lines.reduce((s, l) => s + l.totalCents, 0),
+        );
+        const runTotal = (i) => {
+          let total = 0;
+          for (let j = i; j < titles.length && titles[j] === titles[i]; j++) total += bandCents[j];
+          return total;
+        };
+        doc.chapters.forEach((c, i) => {
+          if (titles[i] && titles[i - 1] !== titles[i]) rows.push(["", "", titles[i], "", "", "", ""]);
           // The chapter as its own banner row, so the file reads in the same
           // order and the same groups as the paper does.
           rows.push([c.num, "", c.name, "", "", "", ""]);
@@ -29153,7 +29168,12 @@
           // the chapter: renderBudgetDoc drops pending lines, and a subtotal
           // that counted them would not match the column above it.
           rows.push(["", "", "Subtotal " + c.name, "", "", "", money(sub)]);
-        }
+          if (titles[i] && titles[i + 1] !== titles[i]) {
+            let from = i;
+            while (from > 0 && titles[from - 1] === titles[i]) from--;
+            rows.push(["", "", "Total " + titles[i], "", "", "", money(runTotal(from))]);
+          }
+        });
         rows.push([]);
         rows.push(["", "", "Base imponible", "", "", "", money(doc.totals.taxableCents)]);
         rows.push([

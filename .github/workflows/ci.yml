@@ -99,6 +99,14 @@ jobs:
         if: always()
         run: pnpm test:docs
 
+      # The título band: a heading over a run of partidas, with the run's own
+      # subtotal. It is allowed to exist only because it groups and never
+      # computes, so this asserts both halves — the band totals its own
+      # partidas, and the document's base is still the sum over partidas.
+      - name: Título band on the paper
+        if: always()
+        run: pnpm test:band
+
       # The runner's Chromium places glyphs differently from any machine this is
       # developed on, and its build cannot be downloaded here — so its PDFs are
       # the only evidence that exists for the heading-splitting question. Kept

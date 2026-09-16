@@ -159,6 +159,10 @@
       .map((c) => ({
         code: String(c.num),
         name: c.name,
+        // The heading this partida prints under, or "" for the great majority
+        // of documents, which carry none. `chapterGroups` turns a run of equal
+        // titles into one band; nothing here sums or groups by it.
+        title: c.title || "",
         rows: c.lines.map((l) => ({
           chapter: (l.code || "").split("-")[0] || String(c.num),
           code: l.code || "",
