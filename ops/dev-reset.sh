@@ -85,7 +85,11 @@ info "answering again"
 
 # ── Fill it ──────────────────────────────────────────────────────────────────
 say "Loading the invented company into '${TENANT}'"
-OVERWRITE=1 ERP_BASE_URL="http://127.0.0.1:${PORT}" \
+# The dev stack has a shared password, so every API call needs a session. The
+# import signs in with this the way a browser would; without it the server
+# answers 401 and the script blames the SSH tunnel.
+DEV_PW="$(sed -n 's/^ERP_ACCESS_PASSWORD=//p' .env | tr -d '"' | head -1)"
+OVERWRITE=1 ERP_BASE_URL="http://127.0.0.1:${PORT}" ERP_ACCESS_PASSWORD="$DEV_PW" \
   bash "${DEV_DIR}/ops/import-erp-state.sh" "$SEED" "$TENANT"
 
 say "Production, untouched — confirming"
