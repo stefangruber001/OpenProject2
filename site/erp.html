@@ -11836,15 +11836,6 @@
          <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
          <div class="field"><label>Unidad</label><select id="ci_unit">${listOptionsUnits(it ? it.unit : "ud")}</select></div>
          <div class="field"><label>Calidad</label><input id="ci_qual" value="${val("quality", "")}" placeholder="estándar / alta"></div>
-         <!-- Marca y modelo eran de sólo lectura: el registro los enseña en dos
-              columnas, el libro de precios de arranque los trae rellenos y el
-              motor los guarda, pero no había dónde escribirlos — una subpartida
-              creada desde aquí nacía sin ellos para siempre. Y son justo lo que
-              decide un precio: el mismo punto de agua en dos calidades son dos
-              precios y una discusión en obra seis meses después, que se zanja
-              con lo que decía el presupuesto. -->
-         <div class="field"><label>Marca</label><input id="ci_brand" value="${val("brand", "")}" placeholder="Grohe"></div>
-         <div class="field"><label>Modelo</label><input id="ci_model" value="${val("model", "")}" placeholder="Grohtherm"></div>
          <div class="field"><label>Coste de referencia (€)</label><input id="ci_cost" type="number" min="0" step="0.01" value="${it ? it.defaultCostCents / 100 : ""}"></div>
          <div class="field"><label>Precio de referencia (€)</label><input id="ci_price" type="number" min="0" step="0.01" value="${it && it.defaultPriceCents ? it.defaultPriceCents / 100 : ""}"></div>
          <div class="field full" style="display:flex;align-items:center;gap:8px;margin-top:-2px">
@@ -11949,8 +11940,6 @@
                 chapter: $("#ci_chap").value,
                 unit: $("#ci_unit").value,
                 quality: $("#ci_qual").value.trim(),
-                brand: $("#ci_brand").value.trim(),
-                model: $("#ci_model").value.trim(),
                 defaultCostCents: money("#ci_cost"),
                 defaultPriceCents: money("#ci_price"),
               };
