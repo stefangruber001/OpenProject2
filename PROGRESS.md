@@ -3336,3 +3336,35 @@ signing setup, then TestFlight 1.1 (15).
 
 **Waiting on Apple:** the Business Manager verification call. No Organization ID
 means no custom distribution and no submission; everything else is ready.
+
+## Package 14 · Título, Partida, Subpartida — the third level (2026-09-16)
+
+Seven commits on `claude/package-13-progress-37g71k`, each green on its own.
+
+- **Schema v22** — `chapter.title`, `lists.itemTitles`, `itemTitleLinks`.
+  Additive and idempotent; the ladder still runs v1→v22 with 104/104.
+- **The engine** — membership in both directions, and a real delete for
+  títulos (safe because nothing stores a título's code). Fixed a latent trap on
+  the way: the "a list cannot be left with no active entries" guard would have
+  made it impossible to return to zero títulos after creating the first one.
+- **Configuración › Títulos** — títulos left with their counts, their partidas
+  right, four doors, drag to reorder, and a «sin título» branch for the
+  partidas nobody has filed yet.
+- **`setChapterTitle` + `chapterBands`** — the run-ordering rule, and the bands
+  a document draws.
+- **The presupuestador** — a band with a live subtotal, and a picker that only
+  appears once the company has títulos.
+- **The paper** — PDF, Word, the HTML sheet and the hand-rolled Excel, plus a
+  new gate (`pnpm test:band`) that reads the PDF back with pdftotext and
+  asserts that the band totals its own partidas while the base stays the sum
+  over partidas.
+- **Governance** — the glossary gained _section / título_ and _sub-line item /
+  subpartida_, and the forbidden-literal linter gained the compound it had
+  always missed.
+
+**Section 2 needed no work:** _Partidas y subpartidas_ was already two-pane
+with an editor carrying cost, price, live margin, description and images.
+
+**Not merged to `main`.** Everything is on the branch, so the client's system is
+untouched. Still open: the manual-release gate, so these do not auto-deploy on
+merge.

@@ -10781,3 +10781,65 @@ written nowhere: it belongs in `ASC_DEMO_PASSWORD`, and the release lane puts it
 in the metadata for the length of a run only. Recorded with the recommendation
 made once and not repeated: a disposable `revisor` account would be better, since
 App Review shares credentials internally and the account stays live afterwards.
+
+## S135 · A third level in the budget that is a word, not an identity (2026-09-16)
+
+**The ask.** Título above Partida and Subpartida, "just a visual thing, and
+just for some clients", with the same Partida reachable from two Títulos.
+
+**What the impact study found, and it decided the design.** Two things in this
+system address a partida, and both address it by its NUMBER. `markProgress`
+finds one chapter by num (`erp-engine.js`), and every cost bucket is a plain
+object keyed by num and read back first-match. Let one budget hold the same
+partida twice and the foreman marks half a partida done while the other half
+stays open, and the margin table sums to double the real cost — both silently,
+except on the Economía screen, whose reconciliation guard would turn red. The
+operator, shown this, withdrew the in-budget half of the requirement: the data
+stays at two levels and the título is a label.
+
+**So: the catalogue is many-to-many, the budget is not.** `lists.itemTitles`
+plus an `itemTitleLinks` edge table let fontanería belong to a bathroom and a
+kitchen at once, and that is free because nothing joins the price book to a
+budget's chapters — the only connections are a dropdown offering a chapter's
+Spanish NAME as free text and `chapterCatalogueCode` guessing the code back by
+accent-folded containment. Inside a budget, `chapter.title` is one optional
+string that nothing finds, buckets or sums by.
+
+**The título is the WORDS, not a code.** A sent presupuesto is a document
+somebody holds; if the chapter stored a code and the paper resolved it at print
+time, renaming a título in master data would rewrite a quote the customer had
+already accepted. The catalogue keeps codes because it is live; the document
+keeps words because it is frozen. Consequence, stated rather than discovered
+later: a título does not translate, exactly as a chapter's name does not.
+
+**A título is one band, so assigning one MOVES the partida** to the end of its
+run, within its own `section`. Safe only because `_editableVersion` refuses a
+sent or accepted version, and every stored `chapterNum` belongs to a project,
+which exists only downstream of acceptance.
+
+**The list ships EMPTY, and that is the whole of "only for some clients".** No
+flag, no per-tenant switch — a company with no títulos sees the screens and the
+documents exactly as they were. It also keeps the level out of
+`tests/i18n/coverage.mjs`, which demands EN and CA for every SHIPPED Spanish
+value; a título the owner types is their data, in their words.
+
+**English calls it "Section".** Never "Chapter": S23 renamed capítulo→Partida in
+all three languages and the coverage gate fails any EN value that brings the old
+word back.
+
+**Two holes closed on the way.** `\bpartida` never matched the "partida" inside
+"subpartida" — no word boundary falls between `sub` and `partida` — so a
+capability could have shipped the sector's own word for a budget line and passed
+`pnpm boundaries` in silence. The pattern lost its leading boundary, `título`
+joined it, and `check.test.ts` now pins the whole vocabulary word by word,
+including the near-misses that must NOT be swept up (partial, title, titular).
+
+**Not done, and deliberately.** The project baseline
+(`project.baseline.chapters`) does not carry the título: the heading is for the
+budget and its paper, by instruction, so nothing on the obra, the avance
+económico or the certification reads it. Giving it the field would be inventing
+a use for it.
+
+**Operator data, not a repo fix.** The `jor` unit in the live workspace reads
+"day rate" in the Spanish column where _jornada_ belongs. It is an entry the
+owner added; the shipped units list has no `jor` at all.

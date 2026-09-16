@@ -45,7 +45,9 @@ for packs, `site/`, and tenant config, where they belong:
 
 | Say this (generic) | Not this (jurisdiction/sector) |
 | ------------------ | ------------------------------ |
+| section            | título                         |
 | line item          | partida                        |
+| sub-line item      | subpartida                     |
 | measurement        | medición                       |
 | progress valuation | certificación                  |
 | tax                | IVA                            |
