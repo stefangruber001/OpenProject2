@@ -38,3 +38,21 @@ Per mandate §2: logged, reasoned, and then implemented your way.
    Recommendation stands that sending be left OFF until the ERP has run in anger
    for a few weeks, and then enabled first for the narrow case (payment reminders
    to existing customers) rather than the whole journey.
+7. **A development stack on the production machine.** Asked for a mirrored dev
+   system, I recommended a second €4.50/month server and was told to use the
+   existing one. Implemented as instructed, and the objection is narrow: nothing
+   about the design is unsound, but three properties that a separate machine
+   would have had **by construction** are now held by **guards that have to keep
+   working**. The disk is shared, so dev's database sits on a fixed-size loopback
+   filesystem — if that mount is ever lost, dev silently goes back to competing
+   for production's 80 GB. The compose project namespace is shared, so a dev
+   stack that came up without `COMPOSE_PROJECT_NAME` would adopt and then remove
+   production's containers — three separate checks refuse that, and all three are
+   code somebody could delete. TLS is shared, so a Caddyfile that does not parse
+   takes the real ERP off the internet — hence validating before every reload,
+   and a `{$DEV_HOSTNAME:dev.invalid}` default so an unset variable cannot do it.
+   Each guard is tested and each failure is loud. But the honest summary is that
+   we have traded four euros a month for three mechanisms that must not rot, and
+   the person who eventually removes one of them will not be told what it was
+   for unless they read this file. That is why it is written here rather than
+   only in a comment.

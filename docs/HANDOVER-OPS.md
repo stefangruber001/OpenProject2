@@ -285,3 +285,74 @@ repository, a shell history, or a chat. Verify with `pnpm test:mailbox`
 against the live IMAP if in doubt. Until the mailbox is connected the ERP
 degrades loudly: each message is recorded in the queue with «sin buzón —
 solo registrado» and the operator is told once per session.
+
+---
+
+## Two stacks on one machine
+
+There are two complete copies of the ERP on this server. They share a kernel, a
+disk, a Docker daemon and a web front door, and **nothing else** — separate
+databases, separate volumes, separate passwords, separate addresses.
+
+|                 | Production                        | Development                           |
+| --------------- | --------------------------------- | ------------------------------------- |
+| Address         | `https://178-105-10-156.sslip.io` | `https://dev-178-105-10-156.sslip.io` |
+| Directory       | `/opt/canei-erp`                  | `/opt/canei-erp-dev`                  |
+| Compose project | `canei-erp`                       | `canei-erp-dev`                       |
+| App port        | `127.0.0.1:3000`                  | `127.0.0.1:3001`                      |
+| Image tag       | `:main` (after the smoke gate)    | `:dev` (ungated, ~8 min earlier)      |
+| Database        | `canei_erp` on the shared disk    | `canei_erp_dev` on a capped 12 GB     |
+| Data            | the company's real register       | an invented company                   |
+| Sign-in         | named accounts                    | one shared password                   |
+| Mail            | configured                        | **off** — cannot reach anyone         |
+| Backups         | nightly to R2, drilled monthly    | **none**                              |
+| Deploy timer    | `canei-deploy.timer`              | `canei-deploy-dev.timer`              |
+
+**Telling them apart.** Different address, different password, and dev carries an
+orange `ENTORNO DE PRUEBAS` band across every screen. The band appears only where
+`ERP_ENVIRONMENT` is explicitly set, so it can never show up on production —
+which means its absence is not proof you are on production. **The address is.**
+
+### Everyday
+
+```
+Actions → Ops → dev-up      create or repair the whole dev stack (idempotent)
+Actions → Ops → dev-reset   wipe dev and reload the invented company (~1 min)
+```
+
+Both are safe to run repeatedly. `dev-up` never overwrites an existing `.env`, so
+it will not change a password somebody is using; it prints the current address
+and password whether it just made them or found them.
+
+### The three things that must not rot
+
+A separate machine would have given these for free. On one machine they are code.
+If you are changing any of it, read `OBJECTIONS.md` #7 first.
+
+1. **`COMPOSE_PROJECT_NAME=canei-erp-dev`** in `/opt/canei-erp-dev/.env`. Without
+   it the dev stack comes up _inside_ the production project and
+   `up -d --remove-orphans` deletes production's containers. Checked by the
+   `.env`, by an `ExecStartPre` on `canei-deploy-dev.service`, and by `dev-up.sh`.
+2. **The capped disk.** `/var/lib/canei-dev-db.img` is a 12 GB ext4 image mounted
+   at `/var/lib/canei-dev-db` and listed in `/etc/fstab`. Lose the mount and dev's
+   database silently goes back to competing for production's 80 GB.
+   Check with `df -h /var/lib/canei-dev-db` — it should say 12G, not 80G.
+3. **`caddy validate` before any reload.** One Caddy serves both addresses. A
+   Caddyfile that does not parse means the container does not start, which means
+   **production loses TLS**. `sync-server.sh` and `dev-up.sh` both validate first
+   and refuse rather than restart. Never bypass this.
+
+### When something is wrong
+
+| Symptom                                     | Cause                                                                              | Fix                                                                                                                |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ERR_SSL_PROTOCOL_ERROR` on the dev address | Caddy has no site block for it — `DEV_HOSTNAME` missing from `/opt/canei-erp/.env` | Ops → `dev-up`                                                                                                     |
+| Dev answers, production does not            | Caddy failed to start on a bad config                                              | `docker compose -f docker-compose.prod.yml --profile pilot logs web`; fix the Caddyfile, `caddy validate`, restart |
+| `502` on the dev address                    | the dev app is down or not on `canei-edge`                                         | Ops → `dev-up`                                                                                                     |
+| `up` fails: network `canei-edge` not found  | the shared network was removed                                                     | `docker network create canei-edge` — or just Ops → `dev-up`                                                        |
+| Dev's disk is full                          | working as designed                                                                | Ops → `dev-reset`                                                                                                  |
+
+**Production is checked last, every time.** Both `dev-up.sh` and `dev-reset.sh`
+finish by curling production's `/api/health` and saying so. If that line is ever
+missing or unhappy, stop and investigate before doing anything else — the whole
+risk of running two stacks on one machine is that one disturbs the other.

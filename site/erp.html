@@ -5175,6 +5175,18 @@
     <script src="i18n.js"></script>
   </head>
   <body>
+    <!-- WHICH SYSTEM IS THIS?
+         Empty here and filled in by `paintEnvBand`, because this page is a
+         STATIC file baked into the image and the same image runs the real system
+         and the test one. It cannot read a server variable, so it reads the
+         answer off the health check the workspace already makes — see
+         `recheckBuild`, and apps/web/lib/environment.ts for why the default is
+         silence.
+
+         It stays empty on production, and empty when there is no server at all:
+         no request failure, no race and no typo can put a "these figures are
+         invented" band in front of a company looking at its own invoices. -->
+    <div id="envBand" hidden></div>
     <div class="topbar">
       <!-- The logo is the way home, on every screen. It is a real <button> and
            not a div with a click handler: a control that a mouse can use and a
@@ -5863,6 +5875,40 @@
             a.isContentEditable)
         );
       }
+      /* WHICH SYSTEM IS THIS? There are two now — the real one and a test stack
+         on the same machine — and this page is a STATIC file baked into the
+         image, identical on both. It cannot read a server variable, so it takes
+         the answer from the health check `recheckBuild` is already making.
+
+         No second request, and no second way of deciding whether a server is
+         even there: `recheckBuild` is guarded by `ErpStore.isRemote()`, which is
+         what stops this asking at all when the workspace is opened from disk or
+         served as the static demonstration copy. Asking anyway was the first
+         attempt, and it put a 404 in the console of every page the browser suite
+         loads — the failure was not the band, it was inventing a second answer
+         to a question the store had already answered.
+
+         It paints only on an explicit `dev`. Production, an older build that
+         reports no environment at all, a failed request, an offline phone — all
+         leave the element hidden. That asymmetry is the point: a missing band on
+         the test system costs a moment's confusion between two systems that
+         already differ by address and by password, while a band wrongly drawn
+         over a real company's invoices tells them their own books are invented.
+
+         Styles inline, markup empty, so it cannot depend on anything else having
+         gone right. */
+      function paintEnvBand(environment) {
+        const el = $("#envBand");
+        if (!el || environment !== "dev" || !el.hidden) return;
+        el.textContent = "ENTORNO DE PRUEBAS · los datos aquí son inventados · TEST ENVIRONMENT";
+        el.setAttribute("role", "status");
+        el.setAttribute("data-environment", "dev");
+        el.style.cssText =
+          "background:#8a6d12;color:#fff;text-align:center;padding:6px 12px;" +
+          "font:600 12px/1.45 var(--sans);letter-spacing:.04em;position:relative;z-index:99";
+        el.hidden = false;
+      }
+
       /* `reload` is a parameter with the real thing as its default, exactly as
          `recheckIdentity` takes one: it is what lets the suite assert the
          DECISION without a page that reloads itself out from under it. */
@@ -5875,7 +5921,11 @@
             credentials: "same-origin",
           });
           if (!res.ok) return;
-          const rev = String(((await res.json()) || {}).revision || "");
+          const health = (await res.json()) || {};
+          /* Before the revision logic, which has several early returns of its
+             own — the band must not depend on where those happen to land. */
+          paintEnvBand(health.environment);
+          const rev = String(health.revision || "");
           if (!rev || rev === "unknown") return;
           if (!buildRev) {
             buildRev = rev;

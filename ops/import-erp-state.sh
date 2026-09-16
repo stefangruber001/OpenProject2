@@ -38,10 +38,41 @@ jq -e '(.data // .) | (.parties | type == "array") and (.seq | type == "object")
   exit 1
 }
 
+# ── Sign in, when the server expects it ─────────────────────────────────────
+# This script predates the ERP having any login: it was written when the only
+# way in was an SSH tunnel to a server that asked nobody for anything. A server
+# with ERP_ACCESS_PASSWORD set answers 401 to every one of the calls below, and
+# the message it produced — "is the SSH tunnel open?" — sends you looking in
+# precisely the wrong place.
+#
+# Set ERP_ACCESS_PASSWORD and it signs in first, the same way a browser does:
+# a form post with NO address, which is what selects the shared-password path in
+# app/api/auth/login. The cookie lives in a jar that is deleted on the way out,
+# whatever happens.
+JAR=""
+if [ -n "${ERP_ACCESS_PASSWORD:-}" ]; then
+  JAR="$(mktemp)"
+  trap 'rm -f "$JAR"' EXIT
+  echo "▸ Signing in with the shared password"
+  curl -fsS -o /dev/null -c "$JAR" \
+    --data-urlencode "email=" \
+    --data-urlencode "password=${ERP_ACCESS_PASSWORD}" \
+    "$BASE/api/auth/login" 2>/dev/null || true
+  grep -q 'canei_session' "$JAR" 2>/dev/null || {
+    echo "✗ Sign-in did not return a session cookie." >&2
+    echo "  Check ERP_ACCESS_PASSWORD matches the one in the server's .env." >&2
+    exit 1
+  }
+  echo "  signed in"
+fi
+CURL=(curl -fsS)
+[ -n "$JAR" ] && CURL+=(-b "$JAR")
+
 echo "▸ Reading current state of \"$TENANT\" at $BASE"
-current="$(curl -fsS "$BASE/api/$TENANT/erp/state" | jq -r '.version')" || {
+current="$("${CURL[@]}" "$BASE/api/$TENANT/erp/state" | jq -r '.version')" || {
   echo "✗ Could not reach $BASE/api/$TENANT/erp/state" >&2
-  echo "  Is the SSH tunnel open, and is the tenant name right?" >&2
+  echo "  Reachable at all? A 401 here means the server wants a password:" >&2
+  echo "  set ERP_ACCESS_PASSWORD (or ERP_USERS credentials) and run again." >&2
   exit 1
 }
 echo "  version $current"
@@ -68,10 +99,11 @@ EOF
 fi
 
 echo "▸ Uploading $(wc -c < "$FILE" | tr -d ' ') bytes"
-out="$(curl -fsS -X POST "$BASE/api/$TENANT/erp/import$QUERY" \
+out="$("${CURL[@]}" -X POST "$BASE/api/$TENANT/erp/import$QUERY" \
   -H 'content-type: application/json' --data-binary "@$FILE")" || {
   echo "✗ Import rejected. The server's reason:" >&2
-  curl -sS -X POST "$BASE/api/$TENANT/erp/import$QUERY" \
+  # Without -f, so the body of the refusal is printed rather than swallowed.
+  curl -sS ${JAR:+-b "$JAR"} -X POST "$BASE/api/$TENANT/erp/import$QUERY" \
     -H 'content-type: application/json' --data-binary "@$FILE" | jq . >&2 || true
   exit 1
 }

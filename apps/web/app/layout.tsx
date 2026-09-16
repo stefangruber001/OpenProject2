@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
 import "./globals.css";
+import { ENVIRONMENT_BAND, isDevEnvironment } from "@/lib/environment";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -94,7 +95,31 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        {/* Server-rendered, so it is present in the FIRST byte of HTML rather
+            than appearing after a script runs. On production `isDevEnvironment()`
+            is false and nothing below is emitted at all — no element, no
+            stylesheet, nothing to go wrong. Inline styles for the same reason:
+            a band that depends on a stylesheet loading is a band that can fail
+            to be a band. */}
+        {isDevEnvironment() ? (
+          <div
+            role="status"
+            data-environment="dev"
+            style={{
+              background: "#8a6d12",
+              color: "#fff",
+              font: "600 12px/1.45 system-ui, -apple-system, Segoe UI, Arial, sans-serif",
+              letterSpacing: ".04em",
+              textAlign: "center",
+              padding: "6px 12px",
+            }}
+          >
+            {ENVIRONMENT_BAND.es} · {ENVIRONMENT_BAND.en}
+          </div>
+        ) : null}
+        {children}
+      </body>
     </html>
   );
 }

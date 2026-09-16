@@ -134,9 +134,25 @@ services:
       # with no thumbnail — which looks like the image is missing rather than
       # like a variable is.
       PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-}
+      # The absolute address this instance answers on, used when a generated
+      # document or draft needs a link somebody else can open. public-origin.ts
+      # falls back to the forwarded Host when this is empty, which is right on a
+      # single server and wrong the moment there are two — a link copied out of
+      # one environment must never resolve to the other.
+      ERP_PUBLIC_URL: ${ERP_PUBLIC_URL:-}
+      # Which environment this is. Empty means production: the band that says
+      # "these figures are not real" appears only where this is set, and the
+      # DEFAULT has to be the silent one — a band wrongly on production would
+      # alarm the customer, which is worse than a missing band on a test system
+      # whose address and password already differ.
+      ERP_ENVIRONMENT: ${ERP_ENVIRONMENT:-}
     # Loopback only. See the note at the top of this file before touching it.
+    #
+    # APP_PORT exists so a SECOND stack can run beside this one on the same host
+    # (see docker-compose.dev.yml). The default is what production has always
+    # used, so an .env that has never heard of this variable is unaffected.
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     depends_on:
       db:
         condition: service_healthy
@@ -163,6 +179,21 @@ services:
     environment:
       PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME}
       ACME_EMAIL: ${ACME_EMAIL}
+      # The development stack's address, when there is one.
+      #
+      # THE DEFAULT MUST NOT BE EMPTY, and that is not a style preference. The
+      # Caddyfile writes this as `{$DEV_HOSTNAME:dev.invalid}`, and Caddy applies
+      # a placeholder default only when the variable is UNSET — not when it is
+      # set to an empty string, which is exactly what `${DEV_HOSTNAME:-}` would
+      # hand it. The result is a site block with no address, which Caddy reads as
+      # a misplaced global options block and refuses to load, which stops this
+      # container starting, which takes the REAL system's TLS down.
+      #
+      # That is not hypothetical: it is what the first attempt did, caught by the
+      # `caddy validate` in ops/sync-server.sh before anything was restarted.
+      # `.invalid` is reserved by RFC 2606, so it can never resolve and can never
+      # be issued a certificate — the block exists and serves nobody.
+      DEV_HOSTNAME: ${DEV_HOSTNAME:-dev.invalid}
     ports:
       # 80 is not optional: it is how the certificate is issued and renewed.
       - "80:80"
@@ -174,6 +205,14 @@ services:
       - caddy-data:/data
       - caddy-config:/config
       - caddy-logs:/var/log/caddy
+    # Caddy is the ONLY service that sits on both networks, and that is the whole
+    # design: it reaches this stack's app over the project's own network, and the
+    # second stack's app over the shared one. Nothing else crosses. In particular
+    # `app` and `db` stay off `edge`, so the two stacks can never reach each
+    # other's database — the second stack can only be proxied to, not talked to.
+    networks:
+      default: {}
+      edge: {}
     depends_on:
       - app
 
@@ -202,3 +241,18 @@ volumes:
   caddy-data:
   caddy-config:
   caddy-logs:
+
+# The one network both stacks share, so the ingress of one can reach the app of
+# the other. It is EXTERNAL — created once by ops/dev-up.sh and by an
+# ExecStartPre on the deploy units — because a network owned by one compose
+# project disappears when that project is torn down, which would take the other
+# stack's ingress with it.
+#
+# A missing external network makes `docker compose up` fail outright, and this
+# file IS production. That is why creation is idempotent and lives in three
+# places rather than in a runbook step somebody has to remember.
+networks:
+  default: {}
+  edge:
+    name: canei-edge
+    external: true
