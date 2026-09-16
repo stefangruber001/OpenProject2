@@ -3132,6 +3132,85 @@
     }
 
     /**
+     * Put a partida under a título, or take it out of one.
+     *
+     * The título is the WORDS, not a code — schema v22 says why: a presupuesto
+     * that has been sent is a document somebody holds, and renaming a título in
+     * master data must not rewrite it. Nothing here is a key: no `find` reads
+     * it, no bucket is keyed on it, no total is grouped by it. It prints, and
+     * that is all it does.
+     *
+     * A TÍTULO IS ONE BAND, WHICH IS WHY THIS MOVES THE PARTIDA. A heading that
+     * appeared twice on a page — «Baño», three partidas, «Cocina», then «Baño»
+     * again — would read as a mistake in the document, and the subtotal under
+     * each half would be a number the customer cannot reconcile with anything.
+     * So a partida joins the END of its título's existing run. Only within its
+     * own `section`: base, optional and out-of-scope are separate parts of the
+     * customer's document, and a título must not drag a partida across that
+     * line. With no run to join, the partida stays exactly where it is and
+     * starts one.
+     *
+     * Safe to renumber here, and only here, because `_editableVersion` refuses
+     * a version that has been sent or accepted. Every stored `chapterNum` —
+     * on a change, a purchase, a subcontract, an hour, a cost allocation —
+     * belongs to a project, and a project only exists downstream of acceptance.
+     * So there is no live reference to a number this can move.
+     */
+    setChapterTitle(budgetId, chapterId, title, user) {
+      const v = this._editableVersion(budgetId);
+      const c = v.chapters.find((x) => x.id === chapterId);
+      if (!c) throw new Error("Chapter not found");
+      const want = String(title == null ? "" : title).trim();
+      const had = c.title || "";
+      c.title = want;
+      if (want) {
+        const peers = v.chapters.filter(
+          (x) => x.id !== c.id && (x.title || "") === want && x.section === c.section,
+        );
+        if (peers.length) {
+          const last = peers[peers.length - 1];
+          v.chapters.splice(v.chapters.indexOf(c), 1);
+          v.chapters.splice(v.chapters.indexOf(last) + 1, 0, c);
+        }
+      }
+      this._renumber(v);
+      this._log(
+        user,
+        "setChapterTitle",
+        `${this.budget(budgetId).number} ${c.num}. ${c.name} · ${had || "—"} → ${want || "—"}`,
+      );
+      return c;
+    }
+
+    /**
+     * The chapters of a version as the bands a document draws, in order.
+     *
+     * A band is a RUN of consecutive chapters carrying the same título — run
+     * length, not a group-by, and deliberately: the array order is what the
+     * estimator arranged and what the paper prints, so a band that reordered it
+     * to be tidy would be showing something other than the document. Chapters
+     * with no título come back as a band whose `title` is "", which every
+     * writer draws as no band at all.
+     *
+     * `saleCents` is the sum of the band's own chapters and nothing else. It is
+     * a presentation subtotal: no cost, no margin, no progress. The budget's
+     * base is still the sum over CHAPTERS (`baseOf`), untouched, so a band can
+     * never disagree with the total under it.
+     */
+    chapterBands(budgetId, versionId) {
+      const t = this.budgetTotals(budgetId, versionId);
+      const bands = [];
+      for (const c of t.chapters) {
+        const title = c.title || "";
+        const last = bands[bands.length - 1];
+        if (last && last.title === title && title) last.chapters.push(c);
+        else bands.push({ title, chapters: [c], saleCents: 0 });
+      }
+      for (const b of bands) b.saleCents = b.chapters.reduce((s, c) => s + c.saleCents, 0);
+      return bands;
+    }
+
+    /**
      * Move a line within its chapter, or into another one.
      *
      * Moving BETWEEN chapters is the point: a line put under the wrong partida
@@ -3333,6 +3412,9 @@
           id: c.id,
           num: c.num,
           name: c.name,
+          // Carried, never summed by: `chapterBands` bands on it and the
+          // writers print it. Every total below is still per CHAPTER.
+          title: c.title || "",
           section: c.section,
           saleCents,
           costCents,
