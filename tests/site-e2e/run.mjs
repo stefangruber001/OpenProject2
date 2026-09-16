@@ -104,6 +104,7 @@ async function main() {
     testAdmin,
     testControlTowerAndDay,
     testVisitCapture,
+    testTitles,
     testConfigurableLists,
     testInlineCustomer,
     testPresupuestadorRework,
@@ -15737,6 +15738,133 @@ async function testSendAndVersions(browser, base) {
    never rolled into anything a person could act on or compare. Both are now
    owner-maintained lists (DMC-04, DMC-05) with a "＋ Nueva…" entry that adds
    to the list inline, without leaving the screen that needed it. */
+/*
+ * DMC-01 · Títulos — the grouping above the partidas.
+ *
+ * The claim this screen rests on is that a título is a heading and nothing
+ * else: it can be created, it can hold the SAME partida as another título, and
+ * none of that moves a single cent. So the suite measures a budget's total
+ * before and after building a taxonomy over the price book, and the numbers
+ * have to be identical. That check is the reason the feature was allowed to be
+ * called cosmetic; without it "cosmetic" is an opinion.
+ */
+async function testTitles(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
+  const errs = [];
+  attachConsole(pg, errs);
+  await autoAnswerModals(pg, {});
+  try {
+    await pg.goto(`${base}/erp.html#titles`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(700);
+
+    // What every company sees before it creates one: no branches, an
+    // explanation, and every partida listed on the right.
+    const start = await pg.evaluate(() => ({
+      // "" is «todas las partidas» and "~" is «sin título» — both are always
+      // there. A named branch is what a company has not created yet.
+      named: document.querySelectorAll(
+        '.cattree .catbr[data-title]:not([data-title=""]):not([data-title="~"])',
+      ).length,
+      unfiled: !!document.querySelector('.cattree .catbr[data-title="~"]'),
+      explains: !!document.querySelector(".cattree .empty"),
+      rows: document.querySelectorAll("#tiList tbody tr.click").length,
+      chapters: erp.listAll("itemChapters").length,
+    }));
+    if (start.named === 0 && start.explains && start.unfiled)
+      ok("títulos: a company with none sees an empty tree, and every partida under «sin título»");
+    else bad("títulos: empty state", JSON.stringify(start));
+    if (start.rows > 0 && start.rows <= start.chapters)
+      ok(`títulos: every partida is listed with no título selected (${start.rows} shown)`);
+    else bad("títulos: partidas listed", JSON.stringify(start));
+
+    // The number that must not move. Taken before anything is created.
+    const before = await pg.evaluate(() => {
+      const b = erp.state.budgets[0];
+      const v = b.versions[b.versions.length - 1];
+      return { id: b.id, total: JSON.stringify(erp.budgetTotals(b.id, v.id)) };
+    });
+
+    // ---- create one through the drawer, with two partidas ----------------
+    await pg.click("#tiNew");
+    await pg.waitForTimeout(400);
+    await pg.fill("#ti_code", "E2EBANO");
+    await pg.fill("#ti_es", "E2E Baño");
+    await pg.fill("#ti_ca", "E2E Bany");
+    const picked = await pg.evaluate(() => {
+      const bs = [...document.querySelectorAll("#ti_chaps input[type=checkbox]")];
+      bs[0].checked = true;
+      bs[1].checked = true;
+      return [bs[0].value, bs[1].value];
+    });
+    await pg.click("#ti_save");
+    await pg.waitForTimeout(700);
+    const made = await pg.evaluate(() => ({
+      partidas: erp.titlePartidas("E2EBANO"),
+      branch: [...document.querySelectorAll(".cattree .catbr")].some((b) =>
+        (b.textContent || "").includes("E2E Baño"),
+      ),
+    }));
+    if (made.partidas.length === 2 && made.branch)
+      ok("títulos: a título created from the drawer appears in the tree with its partidas");
+    else bad("títulos: created with partidas", JSON.stringify(made));
+
+    // ---- the same partida under a second título --------------------------
+    await pg.click("#tiNew");
+    await pg.waitForTimeout(400);
+    await pg.fill("#ti_code", "E2ECOCINA");
+    await pg.fill("#ti_es", "E2E Cocina");
+    await pg.evaluate((want) => {
+      const bs = [...document.querySelectorAll("#ti_chaps input[type=checkbox]")];
+      const hit = bs.find((b) => b.value === want);
+      if (hit) hit.checked = true;
+    }, picked[0]);
+    await pg.click("#ti_save");
+    await pg.waitForTimeout(700);
+    const shared = await pg.evaluate((code) => erp.partidaTitles(code), picked[0]);
+    if (shared.length === 2)
+      ok("títulos: one partida sits under two títulos — the many-to-many the operator asked for");
+    else bad("títulos: partida under two títulos", JSON.stringify(shared));
+
+    // ---- and not one cent moved ------------------------------------------
+    const after = await pg.evaluate((id) => {
+      const b = erp.budget(id);
+      const v = b.versions[b.versions.length - 1];
+      return JSON.stringify(erp.budgetTotals(id, v.id));
+    }, before.id);
+    if (after === before.total)
+      ok("títulos: building a taxonomy leaves every budget total byte-identical");
+    else bad("títulos: budget totals unchanged", `${before.total} → ${after}`);
+
+    // ---- deleting one takes its memberships and leaves the partidas -------
+    await pg.evaluate(() => {
+      titleSel = "E2ECOCINA";
+      render();
+    });
+    await pg.waitForTimeout(400);
+    await pg.click("#tiEdit");
+    await pg.waitForTimeout(400);
+    await pg.click("#ti_del");
+    await pg.waitForTimeout(900);
+    const gone = await pg.evaluate(
+      (code) => ({
+        titles: erp.listAll("itemTitles").map((t) => t.code),
+        links: erp.titleLinks().filter((l) => l.titleCode === "E2ECOCINA").length,
+        partida: erp.listAll("itemChapters").some((c) => c.code === code),
+      }),
+      picked[0],
+    );
+    if (!gone.titles.includes("E2ECOCINA") && gone.links === 0 && gone.partida)
+      ok("títulos: deleting one removes its memberships and leaves every partida standing");
+    else bad("títulos: delete is clean", JSON.stringify(gone));
+
+    if (!errs.length) ok("títulos: no console errors on the screen");
+    else bad("títulos: console clean", errs.slice(0, 3).join(" | "));
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testConfigurableLists(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 950 } });
   const errs = [];

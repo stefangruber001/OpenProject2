@@ -6187,6 +6187,7 @@
           short: "Config.",
           subs: [
             { k: "company", lab: "Empresa", code: "ORG-01" },
+            { k: "titles", lab: "Títulos", code: "DMC-01" },
             { k: "items", lab: "Partidas y subpartidas", code: "DMC-01" },
             { k: "price-list", lab: "Lista de precios", code: "DMC-02" },
             { k: "units", lab: "Unidades de medida", code: "DMC-03" },
@@ -11566,6 +11567,160 @@
           if (!taken.has(candidate)) return candidate;
         }
         return "";
+      }
+
+      /* A checkbox per code, for the two membership panels below. Built by a
+         helper rather than inline in each template because the list sits
+         between a greater-than and a less-than, and the source audit reads a
+         literal beside one of those as a sentence nobody translated. */
+      function codeChecks(entries, chosen) {
+        return entries
+          .map((e) => {
+            const on = chosen.includes(e.code) ? " checked" : "";
+            const off = e.active === false ? " · retirada" : "";
+            return (
+              '<label style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:13px">' +
+              `<input type="checkbox" value="${esc(e.code)}"${on}>` +
+              esc(e.es + off) +
+              "</label>"
+            );
+          })
+          .join("");
+      }
+      const checksOf = (el) =>
+        Array.from(el.querySelectorAll("input[type=checkbox]"))
+          .filter((b) => b.checked)
+          .map((b) => b.value);
+
+      /**
+       * A título: the heading a run of partidas prints under.
+       *
+       * Delete is a real delete, and it is safe for a reason worth repeating
+       * where somebody will read it before pressing the button: a budget
+       * chapter stores the título's WORDS, never its code (schema v22). So
+       * removing one cannot orphan a presupuesto, a contract or a page already
+       * sent — those documents keep reading exactly as they were written. What
+       * goes with it is the membership, and nothing else.
+       */
+      function titleDrawer(code) {
+        const t = code ? erp.listAll("itemTitles").find((x) => x.code === code) : null;
+        const db = openDrawer(t ? t.es : "Nuevo título");
+        const mine = t ? erp.titlePartidas(t.code) : [];
+        const codeField = t
+          ? `<div class="field"><label>Código</label><input value="${esc(t.code)}" disabled title="Las pertenencias guardan el código; no se cambia."></div>`
+          : `<div class="field"><label>Código *</label><input id="ti_code" placeholder="BANO"></div>`;
+        const delBtn = t ? '<button class="btn" id="ti_del">Eliminar título</button>' : "";
+        const boxes = codeChecks(erp.listAll("itemChapters"), mine);
+        db.innerHTML = `<div class="fgrid">
+         ${codeField}
+         <div class="field"><label>Nombre (ES) *</label><input id="ti_es" value="${esc(t ? t.es : "")}"></div>
+         <div class="field"><label>Nom (CA)</label><input id="ti_ca" value="${esc(t ? t.ca || "" : "")}"></div>
+         <div class="field full"><label>Partidas de este título</label>
+           <div id="ti_chaps" style="max-height:38vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${boxes}</div></div>
+         <div class="field full" style="display:flex;gap:8px;align-items:center;margin-top:4px">
+           <button class="btn primary" id="ti_save">Guardar</button><span style="flex:1"></span>${delBtn}</div>
+        </div>`;
+        $("#ti_save").onclick = () => {
+          const es = $("#ti_es").value.trim();
+          const ca = $("#ti_ca").value.trim();
+          const picked = checksOf($("#ti_chaps"));
+          const key = t ? t.code : $("#ti_code").value.trim();
+          try {
+            if (t) erp.updateListEntry("itemTitles", t.code, { es, ca }, "backoffice");
+            else erp.addListEntry("itemTitles", { code: key, es, ca }, "backoffice");
+            erp.setTitlePartidas(key, picked, "backoffice");
+            titleSel = key;
+            persist();
+            closeDrawer();
+            render();
+            toast(t ? "Título actualizado" : "Título creado");
+          } catch (e) {
+            toast("⚠ " + e.message);
+          }
+        };
+        const del = $("#ti_del");
+        if (del)
+          del.onclick = async () => {
+            const n = erp.titlePartidas(t.code).length;
+            const body = n
+              ? `Agrupa ${n} partida${n === 1 ? "" : "s"}. Las partidas y sus subpartidas no se tocan: sólo deja de existir la agrupación. Los presupuestos ya escritos conservan el rótulo impreso.`
+              : "No agrupa ninguna partida todavía.";
+            if (!(await askConfirm(`Eliminar «${t.es}»`, { body, okLabel: "Eliminar" }))) return;
+            if (titleSel === t.code) titleSel = "";
+            mutate(() => erp.removeTitle(t.code, "backoffice"), "Título eliminado");
+            closeDrawer();
+          };
+      }
+
+      /**
+       * A partida — an entry in the catalogue's chapter list, plus the títulos
+       * it appears under. Retired rather than deleted, unlike a título: budget
+       * lines and catalogue items both store this code, so it has to keep
+       * resolving through `listLabel` for ever.
+       */
+      function chapterEntryDrawer(code) {
+        const c = code ? erp.listAll("itemChapters").find((x) => x.code === code) : null;
+        const db = openDrawer(c ? `${c.code} · ${c.es}` : "Nueva partida");
+        const mine = c ? erp.partidaTitles(c.code) : [];
+        const titles = erp.listAll("itemTitles");
+        const codeField = c
+          ? `<div class="field"><label>Código</label><input value="${esc(c.code)}" disabled title="Las subpartidas y las líneas de presupuesto guardan el código; no se cambia."></div>`
+          : `<div class="field"><label>Código *</label><input id="pa_code" placeholder="FON"></div>`;
+        const off = c && c.active === false;
+        const offBtn = c
+          ? `<button class="btn" id="pa_off">${off ? "Reactivar" : "Retirar del catálogo"}</button>`
+          : "";
+        const NO_TITLES =
+          '<div style="font-size:12.5px;color:var(--muted);padding:4px 0">Todavía no hay títulos. Créalos con «＋ Nuevo título».</div>';
+        const boxes = titles.length ? codeChecks(titles, mine) : NO_TITLES;
+        db.innerHTML = `<div class="fgrid">
+         ${codeField}
+         <div class="field"><label>Nombre (ES) *</label><input id="pa_es" value="${esc(c ? c.es : "")}"></div>
+         <div class="field"><label>Nom (CA)</label><input id="pa_ca" value="${esc(c ? c.ca || "" : "")}"></div>
+         <div class="field full"><label>Títulos en los que aparece</label>
+           <div id="pa_titles" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${boxes}</div></div>
+         <div class="field full" style="display:flex;gap:8px;align-items:center;margin-top:4px">
+           <button class="btn primary" id="pa_save">Guardar</button><span style="flex:1"></span>${offBtn}</div>
+        </div>`;
+        $("#pa_save").onclick = () => {
+          const es = $("#pa_es").value.trim();
+          const ca = $("#pa_ca").value.trim();
+          const picked = checksOf($("#pa_titles"));
+          const key = c ? c.code : $("#pa_code").value.trim();
+          try {
+            if (c) erp.updateListEntry("itemChapters", c.code, { es, ca }, "backoffice");
+            else erp.addListEntry("itemChapters", { code: key, es, ca }, "backoffice");
+            erp.setPartidaTitles(key, picked, "backoffice");
+            persist();
+            closeDrawer();
+            render();
+            toast(c ? "Partida actualizada" : "Partida creada");
+          } catch (e) {
+            toast("⚠ " + e.message);
+          }
+        };
+        const offB = $("#pa_off");
+        if (offB)
+          offB.onclick = async () => {
+            if (off) {
+              mutate(
+                () => erp.setListEntryActive("itemChapters", c.code, true, "backoffice"),
+                "Partida reactivada",
+              );
+              closeDrawer();
+              return;
+            }
+            const used = erp.state.catalogue.filter(
+              (i) => i.active !== false && i.chapter === c.code,
+            ).length;
+            const body = `Retirarla la quita de los desplegables; las ${used} subpartida${used === 1 ? "" : "s"} que la llevan la conservan y se siguen viendo con su nombre. Deja de ofrecerse en los títulos.`;
+            if (!(await askConfirm(`Retirar «${c.es}»`, { body, okLabel: "Retirar" }))) return;
+            mutate(() => {
+              erp.setListEntryActive("itemChapters", c.code, false, "backoffice");
+              erp.clearPartidaTitles(c.code, "backoffice");
+            }, "Partida retirada");
+            closeDrawer();
+          };
       }
 
       function catalogueItemDrawer(id, opts) {
@@ -20046,6 +20201,10 @@
         catTreeQ = "",
         catQ = "",
         catDrag = null;
+      /** The same three, for the título screen one level up. "~" = filed nowhere. */
+      let titleSel = "",
+        titleTreeQ = "",
+        titleDrag = null;
 
       /**
        * A picker over one of the owner-maintained lists.
@@ -22348,6 +22507,193 @@
         _reconciled: conciliados,
         "cash-flow": flujoCaja,
         messaging: comunicaciones,
+
+        /* ---------- Títulos (DMC-01) ----------
+          One level above the screen below it, and the same two zones: the
+          títulos on the left with a count per branch, the partidas of the
+          selected one on the right.
+
+          A partida can sit under SEVERAL títulos — fontanería belongs to a
+          bathroom and to a kitchen alike — which is the one place in this
+          system where that is both wanted and safe. Nothing joins this to a
+          budget's chapters, so a membership can never reach a total, a
+          progress mark or a printed page; what the budget keeps is the
+          título's words on the chapter, decided when the estimator groups it.
+
+          "Sin título" is the branch that earns this screen its keep: it is
+          where the partidas nobody has filed yet show up, and it empties as
+          the taxonomy gets built. */
+        titles(v) {
+          $("#sub").textContent =
+            "Los títulos agrupan partidas para que un presupuesto se lea por estancias o por gremios. Una misma partida puede estar en varios títulos. Mientras no crees ninguno, los presupuestos salen exactamente como hasta ahora.";
+          const all = erp.listAll("itemTitles");
+          const chapters = erp.listAll("itemChapters");
+          if (titleSel && titleSel !== "~" && !all.some((t) => t.code === titleSel)) titleSel = "";
+          const tq = titleTreeQ.trim().toLowerCase();
+          const shown = tq
+            ? all.filter(
+                (t) => t.es.toLowerCase().includes(tq) || t.code.toLowerCase().includes(tq),
+              )
+            : all;
+          const unfiled = chapters.filter((c) => erp.partidaTitles(c.code).length === 0);
+          const byCode = (code) => chapters.find((c) => c.code === code);
+          const picked =
+            titleSel === "~"
+              ? unfiled
+              : titleSel
+                ? erp.titlePartidas(titleSel).map(byCode).filter(Boolean)
+                : chapters;
+          // renderMasterList keys its rows on `id`; a list entry's identity is
+          // its code, so it travels as both rather than growing a second field
+          // that could disagree with it.
+          const rows = picked.map((c) => Object.assign({ id: c.code }, c));
+          const subCount = (code) =>
+            erp.state.catalogue.filter((i) => i.active !== false && i.chapter === code).length;
+
+          /* Every fragment built before the template, never inside it: a
+             literal sitting between a greater-than and a less-than is what the
+             source audit reads as an untranslated sentence, and this file has
+             a recorded history of exactly that. */
+          const RETIRED = '<span class="pill y">retirada</span>';
+          const EMPTY_TREE =
+            '<div class="empty" style="padding:14px;font-size:12.5px">Todavía no hay títulos. Crea el primero y arrastra las partidas que lo forman.</div>';
+          const editBtn =
+            titleSel && titleSel !== "~"
+              ? '<button class="btn sm" id="tiEdit">✎ Modificar título</button>'
+              : "";
+          const unfiledRow = unfiled.length
+            ? `<div class="catbr${titleSel === "~" ? " on" : ""}" data-title="~"><span class="grip" style="visibility:hidden">⠿</span>
+             <span class="nm" style="color:var(--muted)">Sin título</span><span class="ct">${unfiled.length}</span></div>`
+            : "";
+          const branches = shown
+            .map((t) => {
+              const on = titleSel === t.code ? " on" : "";
+              const retired = t.active === false ? " retired" : "";
+              const label = esc(t.es + (t.active === false ? " · retirado" : ""));
+              return `<div class="catbr${on}${retired}" data-title="${esc(t.code)}" draggable="true">
+              <span class="grip" title="Arrastra para reordenar">⠿</span>
+              <span class="nm">${label}</span><span class="ct">${erp.titlePartidas(t.code).length}</span></div>`;
+            })
+            .join("");
+
+          v.innerHTML = `<div class="catwrap">
+         <div class="cattree">
+           <div class="tsearch" style="display:flex;gap:6px">
+             <button class="btn sm primary" id="tiNew">＋ Nuevo título</button>${editBtn}</div>
+           <div class="tsearch"><input id="tiTreeQ" placeholder="Buscar título…" value="${esc(titleTreeQ)}"></div>
+           <div class="catbr${titleSel === "" ? " on" : ""}" data-title=""><span class="grip" style="visibility:hidden">⠿</span>
+             <span class="nm">Todas las partidas</span><span class="ct">${chapters.length}</span></div>
+           ${all.length ? branches : EMPTY_TREE}
+           ${unfiledRow}
+         </div>
+         <div>
+          <div id="tiList"></div>
+         </div></div>`;
+
+          const q = $("#tiTreeQ");
+          q.oninput = () => {
+            titleTreeQ = q.value;
+            const at = q.selectionStart;
+            render();
+            const n = $("#tiTreeQ");
+            if (n) {
+              n.focus();
+              n.setSelectionRange(at, at);
+            }
+          };
+          $("#tiNew").onclick = () => titleDrawer(null);
+          const ed = $("#tiEdit");
+          if (ed) ed.onclick = () => titleDrawer(titleSel);
+
+          v.querySelectorAll(".catbr").forEach((b) => {
+            b.onclick = () => {
+              titleSel = b.dataset.title;
+              render();
+            };
+            if (b.getAttribute("draggable") !== "true") return;
+            b.ondragstart = (e) => {
+              titleDrag = b.dataset.title;
+              b.classList.add("dragging");
+              try {
+                e.dataTransfer.setData("text/plain", titleDrag);
+                e.dataTransfer.effectAllowed = "move";
+              } catch (err) {}
+            };
+            b.ondragend = () => {
+              titleDrag = null;
+              v.querySelectorAll(".catbr").forEach((x) =>
+                x.classList.remove("dragging", "dropbefore", "dropafter"),
+              );
+            };
+            b.ondragover = (e) => {
+              if (!titleDrag || b.dataset.title === titleDrag) return;
+              e.preventDefault();
+              const r = b.getBoundingClientRect(),
+                after = e.clientY > r.top + r.height / 2;
+              b.classList.toggle("dropbefore", !after);
+              b.classList.toggle("dropafter", after);
+            };
+            b.ondragleave = () => b.classList.remove("dropbefore", "dropafter");
+            b.ondrop = (e) => {
+              e.preventDefault();
+              const over = b.dataset.title;
+              if (!titleDrag || over === titleDrag) return;
+              const r = b.getBoundingClientRect(),
+                after = e.clientY > r.top + r.height / 2;
+              let to = all.findIndex((t) => t.code === over);
+              const from = all.findIndex((t) => t.code === titleDrag);
+              if (after && to < from) to += 1;
+              else if (!after && to > from) to -= 1;
+              const moved = titleDrag;
+              titleDrag = null;
+              mutate(
+                () => erp.moveListEntry("itemTitles", moved, to, "backoffice"),
+                "Orden de títulos actualizado",
+              );
+            };
+          });
+
+          renderMasterList($("#tiList"), {
+            id: "titles-" + (titleSel || "all"),
+            defSize: 25,
+            ids: {
+              q: "tiQ",
+              size: "tiSize",
+              prev: "tiPrev",
+              next: "tiNext",
+              newBtn: "tiNewChap",
+              exp: "tiExp",
+              expMenu: "tiExpMenu",
+              expXlsx: "tiExpXlsx",
+              expCsv: "tiExpCsv",
+            },
+            newLabel: "＋ Nueva partida",
+            onNew: () => chapterEntryDrawer(null),
+            searchPlaceholder: "Buscar por código o nombre",
+            nounSingular: "partida",
+            nounPlural: "partidas",
+            baseRows: rows,
+            matches: (c, s) =>
+              c.code.toLowerCase().includes(s) || c.es.toLowerCase().includes(s),
+            columns: [
+              { label: "Código", primary: true, get: (c) => c.code },
+              { label: "Nombre", primary: true, get: (c) => c.es },
+              { label: "Nom (CA)", get: (c) => c.ca || "", html: (c) => esc(c.ca || "—") },
+              { label: "Subpartidas", num: true, get: (c) => subCount(c.code) },
+              {
+                label: "Títulos",
+                num: true,
+                get: (c) => erp.partidaTitles(c.code).length,
+              },
+              {
+                label: "Estado",
+                get: (c) => (c.active === false ? "Retirada" : "Activa"),
+                html: (c) => (c.active === false ? RETIRED : "—"),
+              },
+            ],
+            onRowClick: (code) => chapterEntryDrawer(code),
+          });
+        },
 
         /* ---------- Partidas y subpartidas (DMC-01, spec §DMC-01) ----------
           The catalogue finally gets a screen inside the shell. It lived in
