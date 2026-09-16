@@ -186,8 +186,22 @@ else
 fi
 
 say "Restarting"
+# `up -d` recreates a service whose COMPOSE definition changed. Caddy's never
+# does — the Caddyfile is a bind mount, so editing it changes the file on disk
+# and nothing compose can see. The container keeps serving the config it parsed
+# at startup, and the sync reports success having changed nothing that matters.
+# That is how a routing fix sits on a server for hours while the old route is
+# still live (S138 is the version of this that reached a client), so the front
+# door is recreated explicitly, every time, whenever it is running at all.
 ssh "${SSH_OPTS[@]}" "root@${IP}" \
-  "cd /opt/canei-erp && docker compose -f docker-compose.prod.yml ${PROFILE} up -d && docker compose -f docker-compose.prod.yml ${PROFILE} ps" </dev/null
+  "cd /opt/canei-erp && docker compose -f docker-compose.prod.yml ${PROFILE} up -d" </dev/null
+if [ -n "$PROFILE" ]; then
+  ssh "${SSH_OPTS[@]}" "root@${IP}" \
+    "cd /opt/canei-erp && docker compose -f docker-compose.prod.yml ${PROFILE} up -d --force-recreate web" </dev/null
+  info "front door recreated, so the Caddyfile just copied is the one being served"
+fi
+ssh "${SSH_OPTS[@]}" "root@${IP}" \
+  "cd /opt/canei-erp && docker compose -f docker-compose.prod.yml ${PROFILE} ps" </dev/null
 
 cat <<EOF
 

@@ -347,7 +347,10 @@ if docker run --rm \
   -e DEV_HOSTNAME="${DEV_HOSTNAME:-dev.invalid}" \
   -v "$PROD_DIR/ops/Caddyfile:/etc/caddy/Caddyfile:ro" \
   caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
-  docker compose -f docker-compose.prod.yml --profile pilot up -d web
+  # --force-recreate, because `up -d web` alone recreates nothing: the Caddyfile
+  # is a bind mount, so its contents changing is invisible to compose. This step
+  # exists precisely to make the front door re-read that file.
+  docker compose -f docker-compose.prod.yml --profile pilot up -d --force-recreate web
   info "Caddy recreated; https://${DEV_HOST} should answer within a few seconds"
   info "(first request takes longer — that is Let's Encrypt issuing the certificate)"
 else
