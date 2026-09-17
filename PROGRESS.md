@@ -3556,3 +3556,39 @@ the list … or it picks it automatically.» None of the three did that.
 
 Gates: site E2E 831/831 · boundaries · lint · check-types · test · test:codes
 38 · test:links 26 · test:shell 20 · source literals 158/158.
+
+## S31 · The preview measured the window, not the drawer it fits in (2026-09-17)
+
+**Done, on dev — not released.** «In the preview, we can't see the Partida and
+Título Subtotal.» Both were being rendered all along; what was impossible was
+seeing them at the same time as the figures.
+
+- **A 794px page in a 444px cage.** «Vista previa» is a 480px drawer. The
+  sheet's fluid layout was keyed on `@media (max-width:700px)` — which asks the
+  WINDOW, and the window was 1878px. The amounts sit at the right edge of that
+  page and the band heading and its «Total …» caption at the left, so scrolling
+  to the figures took both captions off screen. `Subtotal 1 · Fontanería`
+  survived only because that caption is right-aligned, beside its amount.
+- **Ask the cage instead.** `.cnsheet` declares `container-type` and
+  `scopedCss` re-emits the narrow layout as an `@container` query beside the
+  `@media` one. The standalone document is untouched — there the window IS the
+  box — and the container rule is screen-only, because `container-type` brings
+  `contain:layout` with it and a layout-contained box is monolithic: on paper it
+  would force a multi-page document onto one sheet.
+- **The regression it exposed, caught by the full run and not by me.** The
+  contract's document column is a centring flex container whose child sized
+  itself by its own content. That worked by accident — the sheet offered 794px
+  and the item took it, hanging 34px out of a 760px column — and stopped working
+  the moment the sheet stopped offering a width, which is what containment does.
+  The item collapsed to 420px and reformatted a contract nobody had touched. A
+  column tells its child how wide it is; the rule existed for phones since
+  PK6-A and only there. Measured on the same page: 794/794 before, 420/420 with
+  the container and no column fix, 728/794 now.
+- **The gate opens the real preview** on an 1878px window and requires the sheet
+  to fit its cage with the band, the partida subtotal and the título total
+  inside it. Backed out, it fails with `{"cageW":444,"sheetW":794,…}` — the
+  operator's report, in one line.
+
+Gates: site E2E 832/832 · boundaries · lint · check-types · test · test:sync 20
+· test:band · test:docs · test:pdf 44 · test:docx 124 · test:codes 38 ·
+test:links 26 · test:shell 20.
