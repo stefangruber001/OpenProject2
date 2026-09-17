@@ -111,6 +111,74 @@ console.log("\n\x1b[1mA subpartida in two partidas\x1b[0m\n");
   );
 }
 
+/* ── 2b · the budget's own grouping is what a project inherits ────────────── */
+{
+  /* THE OTHER HALF OF v24, and the half that ADDS. The operator's words: the
+     relation "is just for that specific budget, which afterwards will be
+     inherited to the contract, the physical control, the economical control and
+     also to assign expenses and hours of the workers".
+
+     `project.baseline.chapters` copied {num, name, sale, cost, billTo} and left
+     the título behind, so every hour and every euro booked against a chapter
+     knew which partida it belonged to and not which part of the job. Backfilled
+     from the version the customer ACCEPTED — not the latest draft, which would
+     retitle a frozen record from a document nobody agreed to. */
+  const { state: s } = MIG.migrate({
+    schemaVersion: 23,
+    itemTitleLinks: [{ titleCode: "BAN", chapterCode: "FON", order: 0 }],
+    budgets: [
+      {
+        id: "b1",
+        versions: [
+          {
+            id: "v1",
+            chapters: [
+              { num: "1", name: "Fontanería", title: "Reforma de baño" },
+              { num: "2", name: "Pintura", title: "" },
+            ],
+          },
+          // A later draft that retitles everything, and must not be read.
+          {
+            id: "v2",
+            chapters: [{ num: "1", name: "Fontanería", title: "Otra cosa" }],
+          },
+        ],
+      },
+    ],
+    projects: [
+      {
+        id: "p1",
+        budgetId: "b1",
+        acceptedVersionId: "v1",
+        baseline: {
+          chapters: [
+            { num: "1", name: "Fontanería" },
+            { num: "2", name: "Pintura" },
+          ],
+        },
+      },
+    ],
+  });
+  /* v24 takes the título memberships away entirely. Migration 23 still READS
+     them — a ladder step has to mean the same thing for ever, so it goes on
+     consulting the table that existed when it was written — and 24 then drops
+     it. Asserted as an absence, because what regresses silently is a table
+     quietly coming back. */
+  ok("v24 drops the título memberships", s.itemTitleLinks, undefined);
+  ok(
+    "a project inherits the título it was sold under",
+    s.projects[0].baseline.chapters.map((c) => c.title),
+    ["Reforma de baño", ""],
+  );
+  // Idempotent, and it reads the accepted version both times.
+  const again = MIG.migrate(s).state;
+  ok(
+    "and re-running the ladder does not retitle it",
+    again.projects[0].baseline.chapters.map((c) => c.title),
+    ["Reforma de baño", ""],
+  );
+}
+
 /* ── 3 · the price-book pack files what it loads ─────────────────────────── */
 {
   /* `applyCataloguePack` is step 11's `up` AND an exported entry point the app

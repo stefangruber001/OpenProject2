@@ -16024,7 +16024,14 @@ async function testTitles(browser, base) {
       return { id: b.id, total: JSON.stringify(erp.budgetTotals(b.id, v.id)) };
     });
 
-    // ---- create one through the drawer, with two partidas ----------------
+    /* ---- a título is a NAME, and the register holds nothing else ---------
+       The drawer used to carry a «Partidas de este título» pane and the
+       register a count beside it. Both went at v24, on the operator's
+       instruction: a título groups partidas inside ONE budget, so the price
+       book has no stable answer to store and this drawer had no business
+       asking for one. Asserted as an absence, because an absence is what
+       regresses silently — a pane restored by a careless merge would put the
+       question back on screen without failing anything else here. */
     await pg.evaluate(async () => {
       biSection = "tit";
       render();
@@ -16037,44 +16044,44 @@ async function testTitles(browser, base) {
     await pg.fill("#ti_ca", "E2E Bany");
     await pg.waitForTimeout(200);
     const titleCode = await pg.evaluate(() => document.querySelector("#ti_code").value);
-    const picked = await pg.evaluate(() => {
-      const bs = [...document.querySelectorAll("#ti_chaps input[type=checkbox]")];
-      bs[0].checked = true;
-      bs[1].checked = true;
-      return [bs[0].value, bs[1].value];
-    });
+    const flat = await pg.evaluate(() => ({
+      pane: !!document.querySelector("#ti_chaps"),
+      fields: [...document.querySelectorAll(".drawer .field label")].map((l) => l.textContent),
+    }));
     await pg.click("#ti_save");
     await pg.waitForTimeout(700);
     const made = await pg.evaluate(
-      (code) => ({
-        partidas: erp.titlePartidas(code),
+      () => ({
+        noLinks: !erp.state.itemTitleLinks,
         listed: [...document.querySelectorAll("#biList tbody tr.click")].some((r) =>
           (r.textContent || "").includes("E2E Baño"),
+        ),
+        columns: [...document.querySelectorAll("#biList thead th")].map((t) =>
+          t.textContent.trim(),
         ),
       }),
       titleCode,
     );
-    if (made.partidas.length === 2 && made.listed)
-      ok("títulos: a título created from the drawer is in the register with its partidas");
-    else bad("títulos: created with partidas", JSON.stringify(made));
+    if (!flat.pane && made.listed && made.noLinks && !made.columns.includes("Partidas"))
+      ok("títulos: the register holds names — no membership pane, no count, no link table");
+    else bad("títulos: the título register is flat", JSON.stringify({ flat, made }));
 
-    // ---- the same partida under a second título --------------------------
-    await pg.click("#biTitNew");
-    await pg.waitForTimeout(400);
-    await pg.fill("#ti_es", "E2E Cocina");
-    await pg.waitForTimeout(200);
-    const cocinaCode = await pg.evaluate(() => document.querySelector("#ti_code").value);
-    await pg.evaluate((want) => {
-      const bs = [...document.querySelectorAll("#ti_chaps input[type=checkbox]")];
-      const hit = bs.find((b) => b.value === want);
-      if (hit) hit.checked = true;
-    }, picked[0]);
-    await pg.click("#ti_save");
-    await pg.waitForTimeout(700);
-    const shared = await pg.evaluate((code) => erp.partidaTitles(code), picked[0]);
-    if (shared.length === 2)
-      ok("títulos: one partida sits under two títulos — the many-to-many the operator asked for");
-    else bad("títulos: partida under two títulos", JSON.stringify(shared));
+    // A partida's drawer lost the same pane, from the other side.
+    const parFlat = await pg.evaluate(async () => {
+      const c = erp.listActive("itemChapters")[0];
+      chapterEntryDrawer(c.code);
+      await new Promise((r) => setTimeout(r, 400));
+      const out = {
+        titlesPane: !!document.querySelector("#pa_titles"),
+        itemsPane: !!document.querySelector("#pa_items"),
+      };
+      closeDrawer();
+      return out;
+    });
+    // …and kept the one that earns its keep: the subpartidas it gathers.
+    if (!parFlat.titlesPane && parFlat.itemsPane)
+      ok("partidas: the drawer keeps its subpartidas and has no títulos pane");
+    else bad("partidas: drawer panes", JSON.stringify(parFlat));
 
     // ---- and not one cent moved ------------------------------------------
     const after = await pg.evaluate((id) => {
@@ -16086,23 +16093,33 @@ async function testTitles(browser, base) {
       ok("títulos: building a taxonomy leaves every budget total byte-identical");
     else bad("títulos: budget totals unchanged", `${before.total} → ${after}`);
 
-    // ---- deleting one takes its memberships and leaves the partidas -------
-    // Opened from the row, which is how the register works now: there is no
-    // separate "✎ Modificar" button because there is no selected branch.
+    // ---- deleting one leaves every partida standing ----------------------
+    // A second título, made only to be deleted: «E2E Baño» has to survive for
+    // the band assertions below, which are about the budget and not the
+    // register. Opened from the row, which is how the register works now —
+    // there is no "✎ Modificar" button because there is no selected branch.
+    await pg.click("#biTitNew");
+    await pg.waitForTimeout(400);
+    await pg.fill("#ti_es", "E2E Cocina");
+    await pg.waitForTimeout(200);
+    const cocinaCode = await pg.evaluate(() => document.querySelector("#ti_code").value);
+    await pg.click("#ti_save");
+    await pg.waitForTimeout(700);
+    const partidasBefore = await pg.evaluate(() => erp.listAll("itemChapters").map((c) => c.code));
     await pg.evaluate((code) => titleDrawer(code), cocinaCode);
     await pg.waitForTimeout(400);
     await pg.click("#ti_del");
     await pg.waitForTimeout(900);
     const gone = await pg.evaluate(
-      ([code, gonecode]) => ({
+      ([code, was]) => ({
         titles: erp.listAll("itemTitles").map((t) => t.code),
-        links: erp.titleLinks().filter((l) => l.titleCode === gonecode).length,
-        partida: erp.listAll("itemChapters").some((c) => c.code === code),
+        same:
+          JSON.stringify(erp.listAll("itemChapters").map((c) => c.code)) === JSON.stringify(was),
       }),
-      [picked[0], cocinaCode],
+      [cocinaCode, partidasBefore],
     );
-    if (!gone.titles.includes(cocinaCode) && gone.links === 0 && gone.partida)
-      ok("títulos: deleting one removes its memberships and leaves every partida standing");
+    if (!gone.titles.includes(cocinaCode) && gone.same)
+      ok("títulos: deleting one touches no partida at all");
     else bad("títulos: delete is clean", JSON.stringify(gone));
 
     // ---- the band in the presupuestador -----------------------------------
@@ -16179,7 +16196,6 @@ async function testTitles(browser, base) {
         erp.state.lists.itemChapters = [];
         erp.state.lists.itemTitles = [];
         erp.state.itemPartidaLinks = [];
-        erp.state.itemTitleLinks = [];
         erp.state.catalogue = [];
         const party =
           erp.state.parties.find((p) => p.kind === "customer") ||
@@ -16301,19 +16317,20 @@ async function testTitles(browser, base) {
         );
       else bad("presupuestador: create a subpartida from the picker", JSON.stringify(born));
 
-      /* EACH LEVEL NARROWED BY THE ONE ABOVE — the operator's correction, and
-         the property the first version of «+ título» got wrong: it asked for a
-         título and then offered every partida in the book, which is not a
-         hierarchy but two unrelated questions in a row.
+      /* EVERY PARTIDA, WHATEVER TÍTULO IS IN HAND — and this assertion is the
+         exact inverse of the one it replaces, which is the point of keeping it
+         rather than deleting it.
 
-         Two títulos with different partidas, plus one partida filed under
-         neither: choosing a título must offer ITS partidas only, and «+ partida»
-         pressed on its own must still offer everything, because there is
-         nothing to narrow by. */
+         For one day «+ título» narrowed the partida list to the título's own
+         memberships. The operator took that apart, and was right: a título is
+         how ONE budget is divided, not a category the price book keeps, so
+         «Reforma de baño» cannot be said in advance to contain fontanería and
+         not electricidad. Two títulos and four partidas, none of them related
+         to anything: each título must offer all four, and so must «+ partida»
+         pressed on its own. */
       const narrowed = await flow.evaluate(async () => {
         erp.state.lists.itemTitles = [];
         erp.state.lists.itemChapters = [];
-        erp.state.itemTitleLinks = [];
         erp.state.itemPartidaLinks = [];
         erp.addListEntry("itemTitles", { code: "E2EB", es: "E2E Baño" }, "e2e");
         erp.addListEntry("itemTitles", { code: "E2EC", es: "E2E Cocina" }, "e2e");
@@ -16324,8 +16341,6 @@ async function testTitles(browser, base) {
           ["E2EP", "E2E Pintura"],
         ])
           erp.addListEntry("itemChapters", { code: c, es }, "e2e");
-        erp.setTitlePartidas("E2EB", ["E2EF", "E2EA"], "e2e");
-        erp.setTitlePartidas("E2EC", ["E2EE"], "e2e");
         const party =
           erp.state.parties.find((p) => p.kind === "customer") ||
           erp.addParty({ kind: "customer", name: "E2E filtro" }, "e2e");
@@ -16362,18 +16377,11 @@ async function testTitles(browser, base) {
           .click();
         return { bano, coci, all };
       });
-      const only = (got, want) =>
-        got &&
-        want.every((w) => got.includes(w)) &&
-        !got.some((g) => /^E2E /.test(g) && !want.includes(g));
-      if (
-        only(narrowed.bano, ["E2E Fontanería", "E2E Albañilería"]) &&
-        only(narrowed.coci, ["E2E Electricidad"]) &&
-        narrowed.all &&
-        narrowed.all.includes("E2E Pintura")
-      )
-        ok("presupuestador: a título offers only ITS partidas, and «+ partida» still offers all");
-      else bad("presupuestador: título narrows the partidas", JSON.stringify(narrowed));
+      const ALL = ["E2E Fontanería", "E2E Albañilería", "E2E Electricidad", "E2E Pintura"];
+      const everything = (got) => got && ALL.every((w) => got.includes(w));
+      if (everything(narrowed.bano) && everything(narrowed.coci) && everything(narrowed.all))
+        ok("presupuestador: every título offers every partida — the grouping is the budget's");
+      else bad("presupuestador: the título does not filter the partidas", JSON.stringify(narrowed));
     } finally {
       await flow.close();
     }
@@ -16454,6 +16462,74 @@ async function testTitles(browser, base) {
     } finally {
       await wide.close();
     }
+
+    /* ---- AND THE JOB INHERITS IT (v24) -----------------------------------
+       The operator's sentence, and the half of this change that adds rather
+       than removes: the grouping "is just for that specific budget, which
+       afterwards will be inherited to the contract, the physical control, the
+       economical control and also to assign expenses and hours of the workers".
+
+       `project.baseline.chapters` copied {num, name, sale, cost, billTo} and
+       dropped the título on the floor, so every hour and every euro booked
+       against a chapter knew its partida and not its section of the job. The
+       contract needed nothing — it reads the accepted version — so what is
+       measured here is the frozen baseline and the screen the job is actually
+       controlled from. */
+    const inherit = await pg.evaluate(async () => {
+      /* A customer the engine will let us issue TO. Issuing needs an email
+         (MDM-04) and acceptance needs a complete record, so this borrows the
+         payer of a job that already exists rather than inventing a half-filled
+         party the gates would rightly refuse. */
+      const partyId =
+        (erp.state.projects[0] || {}).partyId ||
+        (erp.state.parties.find((x) => x.kind === "customer" && x.email) || {}).id;
+      const b = erp.createBudget({ partyId }, "e2e");
+      const mk = (name, title) => {
+        const ch = erp.addChapter(b.id, { name });
+        erp.setChapterTitle(b.id, ch.id, title, "e2e");
+        erp.addLine(b.id, ch.id, {
+          desc: name,
+          unit: "ud",
+          qtyMilli: 1000,
+          priceCents: 10000,
+          costCents: 6000,
+        });
+        return ch;
+      };
+      mk("E2E Fontanería", "E2E Reforma de baño");
+      mk("E2E Alicatado", "E2E Reforma de baño");
+      mk("E2E Pintura", "E2E Salón");
+      erp.issueVersion(b.id, {}, "e2e");
+      erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "e2e" }, "e2e");
+      const prj = erp.createProjectFromAcceptance(b.id, "e2e");
+      // Straight to the full-screen «Avance económico» for that job, which is
+      // the table the operator named as the economic control.
+      gProject = prj.id;
+      ecoFull = true;
+      go("economics");
+      await new Promise((r) => setTimeout(r, 1200));
+      return {
+        baseline: prj.baseline.chapters.map((c) => c.title),
+        economics: erp.chapterEconomics(prj.id).map((c) => c.title),
+        needs: erp.purchaseNeeds(prj.id).map((c) => c.title),
+        // One band per RUN, so the two bathroom partidas share one and the
+        // salón opens its own — the same rule the paper follows.
+        bands: [...document.querySelectorAll("table.ecotree tr.ecoband td")].map((t) =>
+          t.textContent.trim(),
+        ),
+      };
+    });
+    const WANT = ["E2E Reforma de baño", "E2E Reforma de baño", "E2E Salón"];
+    if (
+      JSON.stringify(inherit.baseline) === JSON.stringify(WANT) &&
+      JSON.stringify(inherit.economics) === JSON.stringify(WANT) &&
+      JSON.stringify(inherit.needs) === JSON.stringify(WANT) &&
+      JSON.stringify(inherit.bands) === JSON.stringify(["E2E Reforma de baño", "E2E Salón"])
+    )
+      ok(
+        "proyecto: the budget's títulos are inherited by the baseline, the economics and the screen",
+      );
+    else bad("proyecto: título inheritance", JSON.stringify(inherit));
 
     if (!errs.length) ok("títulos: no console errors on the screen");
     else bad("títulos: console clean", errs.slice(0, 3).join(" | "));
