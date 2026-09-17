@@ -11784,7 +11784,8 @@
        * sent — those documents keep reading exactly as they were written. What
        * goes with it is the membership, and nothing else.
        */
-      function titleDrawer(code) {
+      /** `opts.onCreated(entry)` — see `chapterEntryDrawer`, same contract. */
+      function titleDrawer(code, opts) {
         const t = code ? erp.listAll("itemTitles").find((x) => x.code === code) : null;
         const db = openDrawer(t ? t.es : "Nuevo título");
         const mine = t ? erp.titlePartidas(t.code) : [];
@@ -11814,6 +11815,8 @@
             else erp.addListEntry("itemTitles", { code: key, es, ca }, "backoffice");
             erp.setTitlePartidas(key, picked, "backoffice");
             titleSel = key;
+            if (!t && opts && typeof opts.onCreated === "function")
+              opts.onCreated(erp.listAll("itemTitles").find((x) => x.code === key));
             persist();
             closeDrawer();
             render();
@@ -11842,7 +11845,18 @@
        * lines and catalogue items both store this code, so it has to keep
        * resolving through `listLabel` for ever.
        */
-      function chapterEntryDrawer(code) {
+      /**
+       * A partida — an entry in the catalogue's chapter list, plus the
+       * subpartidas it gathers and the títulos it appears under.
+       *
+       * `opts.onCreated(entry)` fires once, after a NEW partida is saved and
+       * its memberships are written, and before the drawer persists and
+       * repaints. That ordering is the point: the caller's own change rides the
+       * same save and the same render, so the operator sees one update rather
+       * than the screen moving twice. Used by the presupuestador, which needs
+       * the partida it just asked for.
+       */
+      function chapterEntryDrawer(code, opts) {
         const c = code ? erp.listAll("itemChapters").find((x) => x.code === code) : null;
         const db = openDrawer(c ? `${c.code} · ${c.es}` : "Nueva partida");
         const mine = c ? erp.partidaTitles(c.code) : [];
@@ -11929,6 +11943,8 @@
             else erp.addListEntry("itemChapters", { code: key, es, ca }, "backoffice");
             erp.setPartidaTitles(key, picked, "backoffice");
             erp.setPartidaItems(key, items, "backoffice");
+            if (!c && opts && typeof opts.onCreated === "function")
+              opts.onCreated(erp.listAll("itemChapters").find((x) => x.code === key));
             persist();
             closeDrawer();
             render();
@@ -12184,6 +12200,13 @@
                 target = erp.addCatalogueItem(Object.assign({ code }, patch), "backoffice");
               }
               erp.setItemPartidas(target.id, picked, "backoffice");
+              /* Hand the new subpartida back to whoever asked for it. The
+                 catalogue picker used to close, open this drawer and stop —
+                 so "create it" left you back where you started, with the thing
+                 created and the line still missing. (Operator, 17 Sep: "once
+                 created, it automatically goes back to the list … or it picks
+                 it automatically.") */
+              if (!it && opts && typeof opts.onCreated === "function") opts.onCreated(target);
               closeDrawer();
             },
             it ? "Subpartida actualizada" : "Subpartida creada",
@@ -12349,7 +12372,12 @@
         $("#cp_cancel").onclick = close;
         $("#cp_new").onclick = () => {
           close();
-          catalogueItemDrawer(null, { chapter });
+          catalogueItemDrawer(null, {
+            chapter,
+            // Straight onto the line, rather than leaving the operator to
+            // reopen the picker and find what they just made.
+            onCreated: (made) => onPick(multi ? [made] : made),
+          });
         };
         if (multi)
           $("#cp_add").onclick = () => {
@@ -17153,6 +17181,25 @@
                     : "sin subpartidas todavía",
                 };
               });
+            /* CREATE ONE FROM HERE, the way the subpartida picker has always
+               let you (Package 1, slide 9: "En caso de no estar creada, dar la
+               opción de crearla"). The partida level never got it, and on an
+               empty price book that left exactly one usable choice — «Otro
+               nombre…», a free-text chapter belonging to no catalogue entry.
+               Which is the opposite of what this chooser exists for: it is here
+               so a partida is spelled the same in every presupuesto, and with
+               nothing in the catalogue it was quietly teaching the opposite.
+
+               It opens the SAME drawer as Elementos de presupuesto → Partidas,
+               not a second form written for this popup that would drift out of
+               step with it — the same reason the subpartida picker reuses
+               `catalogueItemDrawer`. */
+            options.push({
+              value: "__create__",
+              label: "＋ Nueva partida",
+              group: "Crear",
+              hint: "se añade al catálogo",
+            });
             options.push({ value: "__free__", label: "Otro nombre…", group: "Fuera del catálogo" });
             const pick = await askChoice("Nueva partida", options, {
               body: "Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.",
@@ -17160,6 +17207,17 @@
               wide: true,
             });
             if (pick === null) return;
+            /* The drawer owns the save; this rides it. `onCreated` fires before
+               the drawer persists and repaints, so the new partida and the
+               chapter that uses it land in one write and one render. */
+            if (pick === "__create__") {
+              chapterEntryDrawer(null, {
+                onCreated: (entry) => {
+                  if (entry) bChapter = erp.addChapter(id, { name: entry.es }).id;
+                },
+              });
+              return;
+            }
             let name = pick;
             if (pick === "__free__") {
               name = await askText("Nueva partida", {
@@ -17836,13 +17894,20 @@
           const money = eur(b.close.saleCents);
           return `<tr class="bandsum"><td colspan="${cols}"><span class="bandsumin">${esc(label)}<b translate="no">${money}</b></span></td></tr>`;
         };
-        /* Only offered once the company has títulos. A price book with none
-           shows the grid exactly as it looked before this level existed, which
-           is what "only for some clients" has to mean in practice. A título
-           already written on a partida is offered even if it was since retired
-           or renamed, so opening the grid can never silently re-file it. */
+        /* ALWAYS OFFERED, since 17 September. It used to be hidden until the
+           company had títulos — "a price book with none shows the grid exactly
+           as it looked before this level existed" — and that was a mistake with
+           a clear symptom: the operator, whose price book was empty, reported
+           «I still can't add a title» and was right. There was no route in from
+           anywhere. A level you cannot reach until you already have one is a
+           level nobody ever gets.
+
+           So the dropdown is always there, and when the list is empty it holds
+           the one thing that is useful: create the first one. A título already
+           written on a partida is still offered even if it was since retired or
+           renamed, so opening the grid can never silently re-file it. */
         const titlePicker = (c) => {
-          if (locked || !titleRows.length) return "";
+          if (locked) return "";
           const cur = c.title || "";
           const stray =
             cur && !titleRows.some((t) => t.es === cur)
@@ -17855,7 +17920,8 @@
             )
             .join("");
           const none = `<option value=""${cur ? "" : " selected"}>— sin título —</option>`;
-          return `<select class="chaptitle" data-chaptitle="${c.id}" title="Título bajo el que se agrupa esta partida">${none}${stray}${opts}</select>`;
+          const create = `<option value="__create__">＋ Nuevo título…</option>`;
+          return `<select class="chaptitle" data-chaptitle="${c.id}" title="Título bajo el que se agrupa esta partida">${none}${stray}${opts}${create}</select>`;
         };
         $("#bRows").innerHTML =
           chapters
@@ -17908,11 +17974,26 @@
           .querySelectorAll("[data-chaptitle]")
           .forEach(
             (sel) =>
-              (sel.onchange = () =>
+              (sel.onchange = () => {
+                /* The same shape as «+ partida» and the catalogue picker: look
+                   in the list, and when it is not there, create it and come
+                   back with it chosen. `onCreated` fires before the drawer
+                   persists and repaints, so the new título and the partida now
+                   carrying it land in one write and one render. */
+                if (sel.value === "__create__") {
+                  const chapterId = sel.dataset.chaptitle;
+                  titleDrawer(null, {
+                    onCreated: (entry) => {
+                      if (entry) erp.setChapterTitle(id, chapterId, entry.es, "backoffice");
+                    },
+                  });
+                  return;
+                }
                 mutate(
                   () => erp.setChapterTitle(id, sel.dataset.chaptitle, sel.value, "backoffice"),
                   sel.value ? "Partida agrupada" : "Partida sin título",
-                )),
+                );
+              }),
           );
         $("#bRows")
           .querySelectorAll("[data-gal]")

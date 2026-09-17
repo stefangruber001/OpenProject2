@@ -16149,6 +16149,149 @@ async function testTitles(browser, base) {
       else bad("presupuestador: base unchanged", `${baseBefore} → ${band.baseNow}`);
     } else bad("presupuestador: a draft with two partidas to band", JSON.stringify(chapIds));
 
+    /* ALL THREE LEVELS, CREATED FROM THE BUDGET, on an empty price book.
+
+       The operator's wording: "+Item (whatever item), look up in the list for
+       the one you like, if there is none, click create one which redirects you
+       to the creation of the item. Once created, it automatically goes back to
+       the list … or it picks it automatically." None of the three did that —
+       partida had no create option at all, título had no control at all until
+       the company already had one, and the subpartida picker opened the drawer
+       and then left you where you started.
+
+       ON ITS OWN PAGE, deliberately. This suite installs `autoAnswerModals`,
+       which runs on a zero-delay interval: it sees a chooser, ticks a radio and
+       presses accept before any assertion can read the options. Fighting that
+       with timing would make the check flaky; not using it makes the check
+       drive the same modal a person does. */
+    const flow = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    try {
+      await flow.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+      await bootedShell(flow);
+      await flow.waitForTimeout(700);
+      const born = await flow.evaluate(async () => {
+        erp.state.lists.itemChapters = [];
+        erp.state.lists.itemTitles = [];
+        erp.state.itemPartidaLinks = [];
+        erp.state.itemTitleLinks = [];
+        erp.state.catalogue = [];
+        const party =
+          erp.state.parties.find((p) => p.kind === "customer") ||
+          erp.addParty({ kind: "customer", name: "E2E vacio" }, "e2e");
+        const b = erp.createBudget({ partyId: party.id }, "e2e");
+        go("quotes", b.id);
+        await new Promise((r) => setTimeout(r, 1300));
+        const out = {};
+
+        // ── PARTIDA ────────────────────────────────────────────────────────
+        document.querySelector("#bAddChap").click();
+        await new Promise((r) => setTimeout(r, 800));
+        out.chapOptions = [...document.querySelectorAll(".mopts input[type=radio]")].map(
+          (x) => x.value,
+        );
+        const create = document.querySelector('.mopts input[type=radio][value="__create__"]');
+        if (create) {
+          create.checked = true;
+          create.dispatchEvent(new Event("change", { bubbles: true }));
+          [...document.querySelectorAll("button")]
+            .find((x) => /Añadir/.test(x.textContent))
+            .click();
+          await new Promise((r) => setTimeout(r, 900));
+          out.chapDrawer = !!document.querySelector("#pa_es");
+          if (out.chapDrawer) {
+            const es = document.querySelector("#pa_es");
+            es.value = "E2E Fontanería";
+            es.dispatchEvent(new Event("input"));
+            await new Promise((r) => setTimeout(r, 200));
+            out.chapCode = document.querySelector("#pa_code").value;
+            document.querySelector("#pa_save").click();
+            await new Promise((r) => setTimeout(r, 1000));
+            const v = erp.budget(b.id).versions.slice(-1)[0];
+            // BOTH sides, which is the point: the catalogue gained it and the
+            // budget is using it. Either alone would be the wrong outcome.
+            out.chapInCatalogue = erp
+              .listAll("itemChapters")
+              .some((c) => c.es === "E2E Fontanería");
+            out.chapInBudget = v.chapters.some((c) => c.name === "E2E Fontanería");
+          }
+        }
+
+        // ── TÍTULO ─────────────────────────────────────────────────────────
+        const sel = document.querySelector("[data-chaptitle]");
+        out.titleOptions = sel ? [...sel.options].map((o) => o.value) : null;
+        if (sel) {
+          sel.value = "__create__";
+          sel.dispatchEvent(new Event("change", { bubbles: true }));
+          await new Promise((r) => setTimeout(r, 900));
+          out.titleDrawer = !!document.querySelector("#ti_es");
+          if (out.titleDrawer) {
+            const tes = document.querySelector("#ti_es");
+            tes.value = "E2E Reforma";
+            tes.dispatchEvent(new Event("input"));
+            await new Promise((r) => setTimeout(r, 200));
+            document.querySelector("#ti_save").click();
+            await new Promise((r) => setTimeout(r, 1000));
+            const v2 = erp.budget(b.id).versions.slice(-1)[0];
+            out.titleOnChapter = v2.chapters.some((c) => c.title === "E2E Reforma");
+          }
+        }
+
+        // ── SUBPARTIDA ─────────────────────────────────────────────────────
+        const addLine = document.querySelector("[data-addline]");
+        if (addLine) {
+          addLine.click();
+          await new Promise((r) => setTimeout(r, 1000));
+          const nw = document.querySelector("#cp_new");
+          if (nw) {
+            nw.click();
+            await new Promise((r) => setTimeout(r, 900));
+            const d = document.querySelector("#ci_desc");
+            out.subDrawer = !!d;
+            if (d) {
+              d.value = "E2E punto";
+              d.dispatchEvent(new Event("input"));
+              await new Promise((r) => setTimeout(r, 200));
+              out.subCode = document.querySelector("#ci_code").value;
+              document.querySelector("#ci_save").click();
+              await new Promise((r) => setTimeout(r, 1200));
+              const v3 = erp.budget(b.id).versions.slice(-1)[0];
+              out.subOnLine = v3.chapters.some((c) => c.lines.some((l) => l.code === out.subCode));
+            }
+          }
+        }
+        return out;
+      });
+
+      if (
+        born.chapOptions &&
+        born.chapOptions.includes("__create__") &&
+        born.chapDrawer &&
+        born.chapInCatalogue &&
+        born.chapInBudget
+      )
+        ok(
+          `presupuestador: «+ partida» creates one from an empty price book (${born.chapCode}), into the catalogue AND the budget`,
+        );
+      else bad("presupuestador: create a partida from the budget", JSON.stringify(born));
+
+      if (
+        born.titleOptions &&
+        born.titleOptions.includes("__create__") &&
+        born.titleDrawer &&
+        born.titleOnChapter
+      )
+        ok("presupuestador: a título can be created from the partida row, and lands on it");
+      else bad("presupuestador: create a título from the budget", JSON.stringify(born));
+
+      if (born.subDrawer && born.subOnLine)
+        ok(
+          `presupuestador: a subpartida created from the picker lands on the line (${born.subCode})`,
+        );
+      else bad("presupuestador: create a subpartida from the picker", JSON.stringify(born));
+    } finally {
+      await flow.close();
+    }
+
     if (!errs.length) ok("títulos: no console errors on the screen");
     else bad("títulos: console clean", errs.slice(0, 3).join(" | "));
   } finally {

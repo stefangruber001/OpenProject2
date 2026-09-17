@@ -71,6 +71,8 @@ window.CANEI_DICT = {
       "Sin un documento no se puede facturar ni contratar — la ficha se crea igual y se completa después",
       "Without a document you cannot invoice or contract — the record is still created and is completed later",
     ],
+    ["＋ Nuevo título…", "＋ New section…"],
+    ["se añade al catálogo", "added to the catalogue"],
     ["Elementos de presupuesto", "Budget items"],
     ["Partidas en las que aparece", "Line items it appears in"],
     ["Subpartidas de esta partida", "Sub-line items in this line item"],

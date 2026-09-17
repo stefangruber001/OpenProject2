@@ -274,6 +274,8 @@ window.CANEI_DICT.ca = {
     "Sense un document no es pot facturar ni contractar — la fitxa existeix igualment i es completa després",
   "Sin un documento no se puede facturar ni contratar — la ficha se crea igual y se completa después":
     "Sense un document no es pot facturar ni contractar — la fitxa es crea igualment i es completa després",
+  "＋ Nuevo título…": "＋ Nou títol…",
+  "se añade al catálogo": "s'afegeix al catàleg",
   "Elementos de presupuesto": "Elements de pressupost",
   "Partidas en las que aparece": "Partides en què apareix",
   "Subpartidas de esta partida": "Subpartides d'aquesta partida",
