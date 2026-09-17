@@ -17048,7 +17048,7 @@
                  left to add a chapter at all. Every add now sits in the one pane that
                  is always on screen. -->
             <div class="pbh"><button class="pbfold" id="pbFoldL" title="Mostrar u ocultar las partidas">⟨</button>
-             Subpartidas${locked ? "" : '<button class="btn sm" id="bAddChap" style="margin-left:8px">+ partida</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
+             Subpartidas${locked ? "" : '<button class="btn sm" id="bAddTitle" style="margin-left:8px">+ título</button><button class="btn sm" id="bAddChap" style="margin-left:6px">+ partida</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
              <button class="pbfold" id="pbFoldR" title="Mostrar u ocultar los totales">⟩</button></div>
             <!-- Column order and names come from Package 1 slide 9, and they are the
                  order the work is actually done in: say what it is, in what unit, what
@@ -17153,7 +17153,7 @@
           };
         });
         const addChap = $("#bAddChap");
-        if (addChap)
+        {
           /* Package 1, slide 8 (client's words, old vocabulary): "los Capítulos
              deberían ser un dropdown list de las Partidas" — a chapter is not a free-text heading, it is one of the
              catalogue's own chapters, and typing it fresh each time is how the same
@@ -17161,11 +17161,34 @@
              already-used ones are hidden, since a second "Albañilería" in the same
              budget is a mistake rather than a choice, and "Otro nombre…" keeps the
              door open for a one-off that does not belong in the catalogue. */
-          addChap.onclick = async () => {
+          /* ONE STEP, reusable, because «+ título» drives it too: pick or create
+             a partida, add it to the budget, and apply `title` to it when the
+             caller has one. Written as a function rather than duplicated into
+             the título flow — two copies of "add a chapter" is how the two
+             levels would drift apart again. */
+          /* `t` is the TÍTULO ENTRY {code, es} this step is running under, or
+             null when «+ partida» was pressed on its own.
+
+             It has to be the entry and not just the words: the words are what a
+             budget chapter stores (schema v22), but the CODE is what the
+             membership table is keyed on — so filtering the list, and filing a
+             newly created partida under the título, both need it. */
+          let addedChapterId = "";
+          const addChapterStep = async (t, thenSubpartidas) => {
+            addedChapterId = "";
+            const title = t ? t.es : "";
             const used = new Set(erp.version(id, vsel).chapters.map((c) => c.name));
+            /* NARROWED BY THE LEVEL ABOVE. Choosing «Reforma de baño» and then
+               being offered every partida in the book is not a hierarchy, it is
+               two unrelated questions in a row — which is what this was, and
+               what the operator sent it back for. With a título in hand the list
+               is its partidas and nothing else; «+ partida» on its own still
+               offers the whole catalogue, because there is nothing to narrow by. */
+            const inTitle = t ? new Set(erp.titlePartidas(t.code)) : null;
             const options = erp
               .listActive("itemChapters")
               .filter((c) => !used.has(c.es))
+              .filter((c) => !inTitle || inTitle.has(c.code))
               .map((c) => {
                 const n = erp
                   .partidaItems(c.code)
@@ -17175,7 +17198,7 @@
                 return {
                   value: c.es,
                   label: c.es,
-                  group: "Del catálogo",
+                  group: t ? "De este título" : "Del catálogo",
                   hint: n
                     ? n + (n === 1 ? " subpartida" : " subpartidas")
                     : "sin subpartidas todavía",
@@ -17202,7 +17225,9 @@
             });
             options.push({ value: "__free__", label: "Otro nombre…", group: "Fuera del catálogo" });
             const pick = await askChoice("Nueva partida", options, {
-              body: "Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.",
+              body: t
+                ? `Partidas de «${t.es}». Las de fuera de este título no se ofrecen aquí.`
+                : "Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.",
               okLabel: "Añadir",
               wide: true,
             });
@@ -17213,7 +17238,18 @@
             if (pick === "__create__") {
               chapterEntryDrawer(null, {
                 onCreated: (entry) => {
-                  if (entry) bChapter = erp.addChapter(id, { name: entry.es }).id;
+                  if (!entry) return;
+                  /* Filed under the título it was created from, or it would be
+                     missing from this same list the next time — created inside
+                     «Reforma de baño» and then not one of its partidas. */
+                  if (t) erp.setPartidaTitles(entry.code, [t.code], "backoffice");
+                  const ch = erp.addChapter(id, { name: entry.es });
+                  bChapter = ch.id;
+                  if (title) erp.setChapterTitle(id, ch.id, title, "backoffice");
+                  addedChapterId = ch.id;
+                  // After the drawer has closed and repainted, so the operator
+                  // is never looking at two overlays at once.
+                  if (thenSubpartidas) setTimeout(() => addSubpartidaStep(id, vsel, ch.id), 80);
                 },
               });
               return;
@@ -17229,9 +17265,70 @@
               if (name === null) return;
             }
             mutate(() => {
-              bChapter = erp.addChapter(id, { name }).id;
+              const ch = erp.addChapter(id, { name });
+              bChapter = ch.id;
+              if (title) erp.setChapterTitle(id, ch.id, title, "backoffice");
+              addedChapterId = ch.id;
             }, "Partida añadida");
+            if (thenSubpartidas && addedChapterId) {
+              const made = addedChapterId;
+              setTimeout(() => addSubpartidaStep(id, vsel, made), 80);
+            }
           };
+          if (addChap) addChap.onclick = () => addChapterStep(null);
+
+          /* «+ TÍTULO», and it is FIRST in the bar because that is the order the
+             operator reads the three levels in: título, partida, subpartida.
+             
+             It exists because the título control hangs on a partida ROW, and a
+             budget with no partidas has no rows — so on an empty price book
+             there was no route to a título from anywhere on this screen. The
+             operator hit exactly that, twice: "I have no way to create Titulo,
+             and Titulo should be the first."
+             
+             It does not make a título a thing the budget owns — it still is not
+             one; a título is words on a partida (schema v22) and nothing finds,
+             buckets or sums by it. What this does is run the two steps in the
+             order they think in: choose or create the título, then add the first
+             partida under it. */
+          const addTitle = $("#bAddTitle");
+          if (addTitle)
+            addTitle.onclick = async () => {
+              const rows = erp.listAll("itemTitles").filter((t) => t.active !== false);
+              const options = rows.map((t) => ({
+                value: t.es,
+                label: t.es,
+                group: "Del catálogo",
+                hint: `${erp.titlePartidas(t.code).length} partidas`,
+              }));
+              options.push({
+                value: "__create__",
+                label: "＋ Nuevo título",
+                group: "Crear",
+                hint: "se añade al catálogo",
+              });
+              const pick = await askChoice("Nuevo título", options, {
+                body: "Un título agrupa partidas en el presupuesto. Al elegirlo se añade la primera partida debajo.",
+                okLabel: "Continuar",
+                wide: true,
+              });
+              if (pick === null) return;
+              if (pick === "__create__") {
+                titleDrawer(null, {
+                  // The partida step is opened AFTER the drawer has closed and
+                  // repainted, so the operator is not looking at two overlays.
+                  onCreated: (entry) => {
+                    if (entry) setTimeout(() => addChapterStep(entry, true), 60);
+                  },
+                });
+                return;
+              }
+              await addChapterStep(
+                rows.find((t) => t.es === pick) || null,
+                true,
+              );
+            };
+        }
         $("#bPreview").onclick = () => budgetDrawer(id, vsel);
         // "Guardar" is in the bar because the specification's own layout puts it
         // there — but §3.1 is equally explicit that nothing waits for it, and this
@@ -17534,6 +17631,40 @@
             chapter: chapterId ? chapterCatalogueCode(budgetId, vsel, chapterId) : "",
             multi: true,
           },
+        );
+      }
+      /* THE THIRD STEP OF THE GUIDED FLOW, and the row's own «+ subpartida del
+         catálogo» button — one function, because they are one question.
+         Narrowed to the partida, which is what "the ones associated with that
+         specific Título and Partida" comes to in the data: a subpartida is
+         linked to partidas, and the partida was already chosen from the
+         título's set, so the título constraint arrives carried by the partida
+         rather than re-applied.
+
+         TOP LEVEL, deliberately, and this is the whole reason the check below
+         it exists. It lived inside `budgetBuilder` while its second caller is
+         in `builderRows` — a sibling function, not a nested one — so every
+         press of «+ subpartida del catálogo» threw `addSubpartidaStep is not
+         defined` into the console and did nothing visible. A parse check
+         cannot see that; only running the button can. */
+      function addSubpartidaStep(budgetId, vsel, chapId) {
+        return catalogueSearchModal(
+          (items) => {
+            mutate(
+              () => {
+                for (const it of items) {
+                  const line = erp.addLine(
+                    budgetId,
+                    chapId,
+                    Object.assign(lineFromCatalogueItem(it), { qtyMilli: 1000 }),
+                  );
+                  attachCatalogueImages(budgetId, line.id, it);
+                }
+              },
+              `${items.length} subpartida${items.length === 1 ? "" : "s"} del catálogo`,
+            );
+          },
+          { chapter: chapterCatalogueCode(budgetId, vsel, chapId), multi: true },
         );
       }
       function attachCatalogueImages(budgetId, lineId, it) {
@@ -18031,25 +18162,7 @@
                  The blank line survives as the SECOND button, because a subpartida
                  that is not in the price book yet is a normal thing to quote and
                  must not require a detour through Configuración first. */
-                const chapId = btn.dataset.addline;
-                catalogueSearchModal(
-                  (items) => {
-                    mutate(
-                      () => {
-                        for (const it of items) {
-                          const line = erp.addLine(
-                            id,
-                            chapId,
-                            Object.assign(lineFromCatalogueItem(it), { qtyMilli: 1000 }),
-                          );
-                          attachCatalogueImages(id, line.id, it);
-                        }
-                      },
-                      `${items.length} subpartida${items.length === 1 ? "" : "s"} del catálogo`,
-                    );
-                  },
-                  { chapter: chapterCatalogueCode(id, vsel, chapId), multi: true },
-                );
+                addSubpartidaStep(id, vsel, btn.dataset.addline);
               }),
           );
         /* Deleting a partida takes every subpartida under it with it, so it asks

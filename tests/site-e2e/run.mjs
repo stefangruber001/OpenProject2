@@ -16165,6 +16165,12 @@ async function testTitles(browser, base) {
        with timing would make the check flaky; not using it makes the check
        drive the same modal a person does. */
     const flow = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+    /* A handler that throws does NOTHING and says nothing: pressing
+       «+ subpartida del catálogo» raised `addSubpartidaStep is not defined`
+       into a console nobody was reading, and the only symptom above was an
+       assertion missing a key. Collect them, and fail on them by name. */
+    const flowErrors = [];
+    flow.on("pageerror", (e) => flowErrors.push(String(e).slice(0, 160)));
     try {
       await flow.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
       await bootedShell(flow);
@@ -16238,10 +16244,12 @@ async function testTitles(browser, base) {
 
         // ── SUBPARTIDA ─────────────────────────────────────────────────────
         const addLine = document.querySelector("[data-addline]");
+        out.addLine = !!addLine;
         if (addLine) {
           addLine.click();
           await new Promise((r) => setTimeout(r, 1000));
           const nw = document.querySelector("#cp_new");
+          out.picker = !!nw;
           if (nw) {
             nw.click();
             await new Promise((r) => setTimeout(r, 900));
@@ -16283,11 +16291,89 @@ async function testTitles(browser, base) {
         ok("presupuestador: a título can be created from the partida row, and lands on it");
       else bad("presupuestador: create a título from the budget", JSON.stringify(born));
 
+      if (!flowErrors.length)
+        ok("presupuestador: the guided three-level flow raises no page errors");
+      else bad("presupuestador: the guided flow threw", JSON.stringify(flowErrors));
+
       if (born.subDrawer && born.subOnLine)
         ok(
           `presupuestador: a subpartida created from the picker lands on the line (${born.subCode})`,
         );
       else bad("presupuestador: create a subpartida from the picker", JSON.stringify(born));
+
+      /* EACH LEVEL NARROWED BY THE ONE ABOVE — the operator's correction, and
+         the property the first version of «+ título» got wrong: it asked for a
+         título and then offered every partida in the book, which is not a
+         hierarchy but two unrelated questions in a row.
+
+         Two títulos with different partidas, plus one partida filed under
+         neither: choosing a título must offer ITS partidas only, and «+ partida»
+         pressed on its own must still offer everything, because there is
+         nothing to narrow by. */
+      const narrowed = await flow.evaluate(async () => {
+        erp.state.lists.itemTitles = [];
+        erp.state.lists.itemChapters = [];
+        erp.state.itemTitleLinks = [];
+        erp.state.itemPartidaLinks = [];
+        erp.addListEntry("itemTitles", { code: "E2EB", es: "E2E Baño" }, "e2e");
+        erp.addListEntry("itemTitles", { code: "E2EC", es: "E2E Cocina" }, "e2e");
+        for (const [c, es] of [
+          ["E2EF", "E2E Fontanería"],
+          ["E2EA", "E2E Albañilería"],
+          ["E2EE", "E2E Electricidad"],
+          ["E2EP", "E2E Pintura"],
+        ])
+          erp.addListEntry("itemChapters", { code: c, es }, "e2e");
+        erp.setTitlePartidas("E2EB", ["E2EF", "E2EA"], "e2e");
+        erp.setTitlePartidas("E2EC", ["E2EE"], "e2e");
+        const party =
+          erp.state.parties.find((p) => p.kind === "customer") ||
+          erp.addParty({ kind: "customer", name: "E2E filtro" }, "e2e");
+        const b2 = erp.createBudget({ partyId: party.id }, "e2e");
+        go("quotes", b2.id);
+        await new Promise((r) => setTimeout(r, 1200));
+        const read = async (titleValue) => {
+          document.querySelector("#bAddTitle").click();
+          await new Promise((r) => setTimeout(r, 700));
+          const r = document.querySelector(`.mopts input[type=radio][value="${titleValue}"]`);
+          if (!r) return null;
+          r.checked = true;
+          r.dispatchEvent(new Event("change", { bubbles: true }));
+          [...document.querySelectorAll("button")]
+            .find((x) => /Continuar/.test(x.textContent))
+            .click();
+          await new Promise((x) => setTimeout(x, 800));
+          const opts = [...document.querySelectorAll(".mopts input[type=radio]")].map(
+            (x) => x.value,
+          );
+          [...document.querySelectorAll("button")]
+            .find((x) => /Cancelar/.test(x.textContent))
+            .click();
+          await new Promise((x) => setTimeout(x, 400));
+          return opts;
+        };
+        const bano = await read("E2E Baño");
+        const coci = await read("E2E Cocina");
+        document.querySelector("#bAddChap").click();
+        await new Promise((r) => setTimeout(r, 700));
+        const all = [...document.querySelectorAll(".mopts input[type=radio]")].map((x) => x.value);
+        [...document.querySelectorAll("button")]
+          .find((x) => /Cancelar/.test(x.textContent))
+          .click();
+        return { bano, coci, all };
+      });
+      const only = (got, want) =>
+        got &&
+        want.every((w) => got.includes(w)) &&
+        !got.some((g) => /^E2E /.test(g) && !want.includes(g));
+      if (
+        only(narrowed.bano, ["E2E Fontanería", "E2E Albañilería"]) &&
+        only(narrowed.coci, ["E2E Electricidad"]) &&
+        narrowed.all &&
+        narrowed.all.includes("E2E Pintura")
+      )
+        ok("presupuestador: a título offers only ITS partidas, and «+ partida» still offers all");
+      else bad("presupuestador: título narrows the partidas", JSON.stringify(narrowed));
     } finally {
       await flow.close();
     }
