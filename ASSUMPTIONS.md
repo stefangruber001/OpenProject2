@@ -11312,3 +11312,50 @@ mandatory cases need a **VAT number**, which a passport is not, and
 the right kind for the operation. `LEGAL_REVIEW.md` §9 records that gap with
 `legally_verified: false`; it is not closed here because it was not what was
 asked and it needs the asesor's view on the reverse-charge cases.
+
+## S143 — «behind» meant two different things, and only one was a fault
+
+`ops/status.sh` compared the revision production is serving against the newest
+commit on `origin/main` and called any gap "N commit(s) behind", in red, with
+"The pipeline is green and the image is published; the box has not taken it"
+underneath. That was true until the release gate (S137). Since then `main` is
+what reaches DEV, and production moves only when a person ticks `release` — so
+the ordinary, correct, everyday state of this system, work merged and waiting
+for somebody to look at it, was reported as a problem.
+
+**What it cost.** It was red through all of 16/09 with nothing wrong. It was red
+again during the routing incident, in the middle of the output the operator was
+reading to find a real fault. And it is why `Ops → status` was a _failing
+workflow run_ rather than a report — which trains people to ignore the result,
+which is the opposite of what the script is for. Flagged in S138 as mine to fix
+and left unfixed for a day.
+
+**The fix separates the two questions the one line was conflating.**
+
+1. _Has the box taken the release?_ — asked of the two image IDs on the machine:
+   what the container is running, and what the released tag resolves to there
+   after the last pull. Different means the image arrived and the restart did
+   not, and that is a genuine fault every other line here stays green through.
+   It is also the only thing the old line ever half-caught, and it caught it by
+   accident: a commit gap is not evidence of a failed restart.
+2. _Is there merged work awaiting release?_ — now INFORMATION, with the sentence
+   that says what to do: it is already on dev, and Actions → Deploy with
+   `release` ticked is what sends it to the client.
+
+Two states that used to be red are now warnings rather than faults, deliberately:
+an image that does not report its commit, and a revision that is not an ancestor
+of `origin/main` — which is a rollback pin or a stale checkout, and in both cases
+the machine may be right and the checkout wrong.
+
+**Exercised against five states before pushing**, using this repository's real
+history: production on the newest commit; production three commits back with
+those three merged and unreleased (today's actual morning, and the case that used
+to go red — now green, nought problems); a release pulled but not restarted (red,
+as it should be); an image with no revision; and a revision off main entirely.
+
+**Not fixed, and named so it is not forgotten:** nothing in CI parses the ops
+scripts. Nineteen shell scripts, several of which are what the operator runs
+from a browser to repair production, and a syntax error in any of them would be
+discovered during the incident it was meant to end. `for f in ops/*.sh; do bash
+-n "$f"; done` is the whole gate; it is not added here because it was not what
+was asked for.

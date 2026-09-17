@@ -95,6 +95,12 @@ echo "BACKUPAGE=$(find backups -name '*.age' -mtime -2 2>/dev/null | wc -l | tr 
 echo "BACKUPCOUNT=$(ls backups/*.age 2>/dev/null | wc -l | tr -d ' ')"
 echo "DISK=$(df -P / | awk 'NR==2{print $5}' | tr -d '%')"
 echo "IMAGE=$(docker inspect --format '{{index .Config.Image}}' canei-erp-app-1 2>/dev/null)"
+# The two IDs that answer "has the box actually taken the release": what the
+# container is running, and what the released tag resolves to HERE, after the
+# last pull. If they differ, the image arrived and the restart did not — which
+# is a real fault, and the only one the old "behind" line ever half-caught.
+echo "RUNIMGID=$(docker inspect --format '{{.Image}}' canei-erp-app-1 2>/dev/null)"
+echo "TAGIMGID=$(docker inspect --format '{{.Id}}' "$(sed -n 's/^IMAGE_APP=//p' .env 2>/dev/null | tr -d '"' | head -1)" 2>/dev/null)"
 EOS
 )"
 val() { printf '%s\n' "$REMOTE" | sed -n "s/^$1=//p" | head -1; }
@@ -188,12 +194,38 @@ if [ -d .git ]; then
   IFS=$'\n' read -r -d '' -a IMGP < <(image_paths "." && printf '\0')
   WANTREV="$(git log -1 --format=%H origin/main -- "${IMGP[@]}" 2>/dev/null || true)"
 fi
+# HAS THE BOX TAKEN THE RELEASE? Asked of the two image IDs, which is the only
+# thing on this machine that knows. A pull that lands without a restart leaves
+# the released image on disk and the old one answering, and every other line
+# here stays green through it.
+RUNIMGID="$(val RUNIMGID)"; TAGIMGID="$(val TAGIMGID)"
+if [ -n "$RUNIMGID" ] && [ -n "$TAGIMGID" ] && [ "$RUNIMGID" != "$TAGIMGID" ]; then
+  bad "The released image is on the box, but the container is still running the previous one"
+  printf '      %sThe pull worked and the restart did not.%s\n' "$DIM" "$OFF"
+  printf '      %s./ops/deploy-now.sh%s\n' "$DIM" "$OFF"
+fi
+
+# MERGED IS NOT RELEASED, and this line used to say it was.
+#
+# It compared the running revision against the newest commit on `origin/main`
+# and called any gap "N commit(s) behind" — a red ✗ with "the box has not taken
+# it" under it. That was true until the release gate (ASSUMPTIONS S137): since
+# then `main` is what reaches DEV, and production moves only when a person ticks
+# `release`. So the ordinary, correct, everyday state of this system — work
+# merged and waiting for somebody to look at it — was reported as a fault.
+#
+# It cost exactly what noise costs. It was red through the whole of 16/09 while
+# nothing was wrong, red again during the routing incident when the operator was
+# reading this output to find a real problem, and it is the reason `status` was
+# a failing workflow run rather than a report.
+#
+# So the gap is now INFORMATION, and says which of the two things it is.
 if [ -z "$RUNREV" ] || [ "$RUNREV" = "unknown" ]; then
   warn "The running image does not report which commit it was built from"
 elif [ -z "$WANTREV" ]; then
   ok "Running revision ${RUNREV:0:8} (no origin/main here to compare it with)"
 elif [ "$RUNREV" = "$WANTREV" ]; then
-  ok "Running the newest released commit (${RUNREV:0:8})"
+  ok "Running the newest commit on main (${RUNREV:0:8}) — nothing awaiting release"
 elif git cat-file -e "${RUNREV}^{commit}" 2>/dev/null \
      && git diff --quiet "${RUNREV}" origin/main -- "${IMGP[@]}" 2>/dev/null; then
   # RUNREV and WANTREV differ as SHAs, but nothing the image is built from
@@ -201,11 +233,19 @@ elif git cat-file -e "${RUNREV}^{commit}" 2>/dev/null \
   # touch IMGP (a docs fix, say) on top of one that does, and WANTREV, found
   # commit-by-commit, named the earlier one. The running box is current.
   ok "Running revision ${RUNREV:0:8} — no image-relevant change since then (current)"
+elif git merge-base --is-ancestor "$RUNREV" origin/main 2>/dev/null; then
+  # On main, and older than its tip: merged work waiting for the gate. Exactly
+  # what the gate is for, so it is reported and not counted against anything.
+  AHEAD="$(git rev-list --count "${RUNREV}..${WANTREV}" 2>/dev/null || echo "?")"
+  ok "Running ${RUNREV:0:8} — ${AHEAD} commit(s) merged since, awaiting release"
+  printf '      %sOn dev already. To send them to the client: Actions → Deploy → Run workflow,%s\n' "$DIM" "$OFF"
+  printf '      %sfrom main, with `release` ticked.%s\n' "$DIM" "$OFF"
 else
-  BEHIND="$(git rev-list --count "${RUNREV}..${WANTREV}" 2>/dev/null || echo "?")"
-  bad "Running ${RUNREV:0:8}, but ${WANTREV:0:8} is released — ${BEHIND} commit(s) behind"
-  printf '      %sThe pipeline is green and the image is published; the box has not taken it.%s\n' "$DIM" "$OFF"
-  printf '      %s./ops/deploy-now.sh%s\n' "$DIM" "$OFF"
+  # Not on this main at all: a rollback pin, or a checkout that is behind the
+  # server. Worth saying, not worth calling a fault — the machine may be right.
+  warn "Running ${RUNREV:0:8}, which is not an ancestor of origin/main here"
+  printf '      %sEither the stack is pinned to an older build, or this checkout is stale.%s\n' "$DIM" "$OFF"
+  printf '      %sgit fetch origin main%s\n' "$DIM" "$OFF"
 fi
 [ "$(val BACKUPTIMER)" = "active" ] && ok "Nightly backup timer active (02:30 UTC)" \
                                     || warn "Backup timer is $(val BACKUPTIMER)"
