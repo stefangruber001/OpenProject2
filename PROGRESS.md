@@ -3494,3 +3494,29 @@ changed, so the committed `site/erp-factory` bundle is byte-identical.
   the copy semantics are sabotaged.
 - **Suites re-pointed** — `shape.subs` 32 → 31, the DMC-01 and Títulos blocks
   rewritten against the register.
+
+## S29 · The identifier field takes a passport (2026-09-17)
+
+**Done.** `validTaxId` refused anything that was not a Spanish document or an
+intra-EU VAT number, so a foreign customer with no NIE could not be filed at all.
+It now classifies instead of refusing: `taxIdKind` returns `dni` · `nie` · `cif` ·
+`vat` · `foreign` · the three `-bad` variants · `unknown`.
+
+- **Spanish documents are still checked.** A DNI, NIE or CIF whose control
+  character disagrees is still refused — that is a typo, and the check letter is
+  what keeps it off an invoice.
+- **Everything else is a foreign document.** A passport of digits, of letters and
+  digits, either way. Bounded 5–20 characters: `1234` is a slip and a paragraph is
+  a paste.
+- **The forms say which.** Both party drawers print the kind as you type, and the
+  label is now «NIF / CIF / NIE / Pasaporte». A `foreign` value is shown amber
+  with «no es un NIF español», so a badly mistyped CIF read as a passport is
+  visible rather than silent — see `ASSUMPTIONS.md` S136 for that trade.
+- **`LEGAL_REVIEW.md` §9** records the finding (art. 6.1.c RD 1619/2012 makes the
+  recipient's NIF mandatory only in specific cases, none of which is a foreign
+  consumer) and the gap it exposes: those same cases need a VAT number, which a
+  passport is not, and `_requireComplete` does not yet distinguish.
+
+Gates: boundaries · lint · check-types · test 198 · simulations (manageability
+520, import 25, year 149, scheduling 30, migrations 104) · comms-tokens 678 ·
+site-syntax · site-sync 20 · bundle-safety.

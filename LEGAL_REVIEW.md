@@ -168,3 +168,33 @@ in protección de datos before the app is submitted for public review. It is
 published now because an app cannot be submitted at all without one, and a
 truthful description of the real processing is a better starting point for that
 review than a template.
+
+## 9. A passport where a NIF is expected — foreign customers (session 79)
+
+- **Finding (verified 2026-09-17):** art. 6.1.c RD 1619/2012 requires the
+  recipient's **name and address** on every invoice, but their **NIF only in
+  specific cases** — an intra-EU supply exempt under art. 25 LIVA, an operation
+  where the recipient is the taxable person (reverse charge), or an operation
+  located in Spanish territory where the recipient is an established business or
+  professional. A foreign natural person buying as a consumer is **none of
+  those**, so an invoice to them is complete without a Spanish NIF, and their
+  passport is the identification actually available.
+- Sources: [BOE — RD 1619/2012](https://www.boe.es/buscar/act.php?id=BOE-A-2012-14696) ·
+  [Art. 6 consolidated (Iberley)](https://www.iberley.es/legislacion/articulo-6-reglamento-regulan-obligaciones-facturacion) ·
+  [Cuéntica — emitir factura sin el NIF del cliente](https://como-se-hace.cuentica.com/es/articles/13141113-como-emitir-una-factura-si-no-se-dispone-del-nif-del-cliente)
+- **Implementation:** `taxIdKind` in `site/erp-engine.js` classifies rather than
+  merely accepting or refusing. A value with the SHAPE of a Spanish document is
+  still checked against its control character and still refused when it fails —
+  the check letter is what keeps a mistyped DNI off an invoice. A value matching
+  no Spanish shape is stored as `foreign`, and the party forms name it on screen
+  («Pasaporte o documento extranjero — no es un NIF español») so a foreign
+  document is never passed off as a NIF.
+- **The open question, and it is the one that matters.** The cases where the NIF
+  _is_ mandatory are also the cases a passport cannot satisfy: an intra-EU B2B
+  supply needs a **VAT number**, not a passport, or the exemption/reverse charge
+  does not hold. The engine does not yet refuse to issue such an invoice against
+  a `foreign` identifier — `_requireComplete` (MDM-10) asks only that a tax id is
+  present, not that it is the right KIND for the operation. So today the product
+  permits an invoice the regulation would not. Narrow in practice for a reformas
+  SME billing local work, and worth closing before any intra-EU B2B invoicing.
+  **legally_verified: false.**

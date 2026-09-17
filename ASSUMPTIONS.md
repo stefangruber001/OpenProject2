@@ -11259,3 +11259,56 @@ re-filed, renamed, emptied and partly deleted underneath a quote already
 written. Sabotaging the copy semantics — making a line look its description up
 through `itemId` instead of carrying its own — turns it red on the exact words
 that changed on the page. That was run, not imagined.
+
+## S136 · A passport is a document too (2026-09-17)
+
+**Asked.** «When adding new clients, suppliers the field NIE allow all numbers as
+input. Means that also Passport number can be entered.»
+
+**What was actually wrong.** `validTaxId` accepted a DNI, a NIE, a CIF or an
+intra-EU VAT number and refused everything else, so a foreign natural person with
+no NIE could not be put on file **at all** — not as an incomplete record, not
+with a warning; the save threw. A company that works for foreign owners could not
+record its own customers.
+
+**What was NOT done.** The obvious reading of the request is "stop validating",
+and it would have been wrong. The check letter is the only thing standing between
+a mistyped DNI and an invoice, and an invoice carries the recipient's identifier
+by law. Deleting the validation would have satisfied the sentence and broken
+something the operator did not ask to break.
+
+**What was done instead.** `validTaxId` became `taxIdKind`, which classifies:
+
+| value                     | kind              | stored?                                           |
+| ------------------------- | ----------------- | ------------------------------------------------- |
+| `12345678Z`               | `dni`             | yes                                               |
+| `12345678A`               | `dni-bad`         | **no** — the control letter fails, that is a typo |
+| `X1234567L` / `X1234567A` | `nie` / `nie-bad` | yes / **no**                                      |
+| `A58881509` / `A58881508` | `cif` / `cif-bad` | yes / **no**                                      |
+| `ESB12345674`             | `vat`             | yes                                               |
+| `123456789`, `P1234567`   | `foreign`         | yes — passport or foreign document                |
+| `1234`, 25 characters     | `unknown`         | **no** — nobody's document number                 |
+
+Anything SHAPED like a Spanish document is still checked and still refused when
+its control character disagrees. Anything else is a foreign document.
+
+**The cost, pinned in the test rather than discovered later.** `C1234567X` used
+to be refused: `X` is outside the `[0-9A-J]` a CIF control allows, so it matched
+no Spanish shape and fell through to false. It still matches no Spanish shape —
+and is now read as a foreign document. A CIF mistyped _that_ badly is no longer
+caught by the engine. That is why `foreign` is a kind of its own and not a silent
+`true`: both party forms now print what they understood, in colour, as you type,
+so a wrong guess is visible to the person who can correct it. The label changed
+with the behaviour — «NIF / CIF / NIE / Pasaporte», because a form that accepts a
+passport under a label that does not mention one is lying about itself.
+
+**The legal side is better than expected, and has a sharper edge than the
+request.** Art. 6.1.c RD 1619/2012 requires the recipient's NIF only for intra-EU
+exempt supplies, reverse-charge operations, and operations in Spanish territory
+where the recipient is an established business — not for a foreign consumer. So
+accepting a passport is _more_ correct than refusing the customer. But those same
+mandatory cases need a **VAT number**, which a passport is not, and
+`_requireComplete` (MDM-10) only checks that a tax id is present, not that it is
+the right kind for the operation. `LEGAL_REVIEW.md` §9 records that gap with
+`legally_verified: false`; it is not closed here because it was not what was
+asked and it needs the asesor's view on the reverse-charge cases.

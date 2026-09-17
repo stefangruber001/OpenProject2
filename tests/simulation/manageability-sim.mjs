@@ -994,9 +994,14 @@ assert(
   } catch (e) {
     reason = e.message;
   }
+  /* The wording moved when the field started taking passports — it can no
+     longer say "not the length of a Spanish document", because a passport is
+     not one and is accepted. What is asserted is the intent, unchanged: the
+     refusal explains the LENGTH rather than handing back the value with the
+     adjective "invalid". */
   assert(
-    /longitud/.test(reason),
-    "a value too short to be any Spanish document says so, not «invalid»",
+    /corto|longitud/.test(reason),
+    "a value too short to be any document says so, not «invalid»",
     reason,
   );
   // And a genuinely valid identifier is unaffected by any of the above.
@@ -1144,7 +1149,7 @@ assert(
   // The DNI/NIE branches of validTaxId compute their check letter; the CIF
   // branch used to accept anything of the right SHAPE. This is what let a
   // scanned NIF come back wrong-but-plausible during the S0b OCR spike.
-  const { validTaxId } = require("../../site/erp-engine.js");
+  const { validTaxId, taxIdKind } = require("../../site/erp-engine.js");
   assert(validTaxId("A58881509"), "CIF: correct digit control passes (org type requiring a digit)");
   assert(!validTaxId("A58881508"), "CIF: wrong digit control fails");
   assert(
@@ -1156,7 +1161,38 @@ assert(
     validTaxId("C12345674") && validTaxId("C1234567D"),
     "CIF: either form passes for an org type that accepts both",
   );
-  assert(!validTaxId("C1234567X"), "CIF: neither form still fails");
+
+  /* A PASSPORT IS A DOCUMENT TOO (operator, 17/09).
+     A foreign natural person with no NIE identifies themselves with a passport,
+     and the field used to refuse one — so the company could not put a foreign
+     client on file at all. What is NOT given up is the check letter: it is what
+     catches a mistyped DNI before it reaches an invoice, and an invoice carries
+     the recipient's identifier by law. Hence the split asserted here. */
+  assert(taxIdKind("12345678Z") === "dni", "a Spanish document is still recognised as one");
+  assert(!validTaxId("12345678A"), "DNI: a wrong check letter is still refused — that is a typo");
+  assert(!validTaxId("X1234567A"), "NIE: a wrong check letter is still refused");
+  assert(
+    validTaxId("123456789") && taxIdKind("123456789") === "foreign",
+    "a passport of digits only is accepted",
+  );
+  assert(
+    validTaxId("P1234567") && taxIdKind("P1234567") === "foreign",
+    "a passport of letter+digits is accepted",
+  );
+  assert(!validTaxId("1234"), "four characters are nobody's document number");
+  assert(!validTaxId("A".repeat(25)), "twenty-five characters are a pasted sentence, not a number");
+
+  /* THE COST OF THE ABOVE, PINNED SO IT IS A DECISION AND NOT A SURPRISE.
+     `C1234567X` was refused before: X is outside the [0-9A-J] a CIF control
+     allows, so it matched no Spanish shape and fell through to false. It now
+     matches no Spanish shape and is therefore taken for a foreign document.
+     A CIF mistyped that badly is no longer caught by the engine — which is why
+     the forms name the kind they understood, so the person who can correct it
+     is told. */
+  assert(
+    taxIdKind("C1234567X") === "foreign",
+    "a value that is no longer CIF-shaped is read as a foreign document, not refused",
+  );
 }
 {
   // Gap fields 1-4 (plan): businessLine, category, sourceSystem, aliases[].

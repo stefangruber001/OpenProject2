@@ -2762,6 +2762,13 @@
         font-size: 12px;
         cursor: help;
       }
+      /* What the identifier above was understood to be. Empty most of the time,
+     so it takes no room until it has something to say — a field that reserves a
+     line for a message it usually does not show makes every form taller for
+     nothing. */
+      .taxkind:not(:empty) {
+        margin-top: 4px;
+      }
       /* The 🔍 that opens it, tucked in beside the código cell.
      The inner div is load-bearing: `.bgrid input` is `width:100%`, so once the
      column got a declared width the input claimed all of it and pushed the
@@ -27068,7 +27075,7 @@
         ];
         db.innerHTML = `<div class="fgrid">
          <div class="field full"><label>Nombre o razón social *</label><input id="e_name" value="${esc(p.name)}"></div>
-         <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="e_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha existe igual y se completa después">⚠</span></label><input id="e_tax" value="${esc(p.taxId || "")}" placeholder="12345678Z / B12345674"></div>
+         <div class="field"><label>NIF / CIF / NIE / Pasaporte <span class="lateflag" id="e_taxflag" title="Sin un documento no se puede facturar ni contratar — la ficha existe igual y se completa después">⚠</span></label><input id="e_tax" value="${esc(p.taxId || "")}" placeholder="12345678Z · B12345674 · pasaporte"><div class="taxkind" id="e_taxkind"></div></div>
          <div class="field"><label>Tipo</label><select id="e_type">${[
            ["individual", "Particular"],
            ["company", "Empresa"],
@@ -27128,7 +27135,7 @@
           '<button class="btn primary" id="e_save" style="flex:1">Guardar cambios</button>' +
             '<button class="btn danger" id="e_del">🗑 Eliminar</button>',
         );
-        wireLateFlag("#e_tax", "#e_taxflag");
+        wireLateFlag("#e_tax", "#e_taxflag", "#e_taxkind");
         wireCpProvince("#e_cp", "#e_prov");
         /* §3.1: a party carrying economic documents is never deleted, it is
            deactivated — an issued invoice must still be explainable years later,
@@ -27259,7 +27266,7 @@
         const ROLE = roleChoices ? ROLE_ALL.filter(([v]) => roleChoices.includes(v)) : ROLE_ALL;
         db.innerHTML = `<div class="fgrid">
          <div class="field full"><label>Nombre o razón social *</label><input id="f_name"></div>
-         <div class="field"><label>NIF / CIF / NIE <span class="lateflag" id="f_taxflag" title="Sin NIF no se puede facturar ni contratar — la ficha se crea igual y se completa después">⚠</span></label><input id="f_tax" placeholder="12345678Z / B12345674"></div>
+         <div class="field"><label>NIF / CIF / NIE / Pasaporte <span class="lateflag" id="f_taxflag" title="Sin un documento no se puede facturar ni contratar — la ficha se crea igual y se completa después">⚠</span></label><input id="f_tax" placeholder="12345678Z · B12345674 · pasaporte"><div class="taxkind" id="f_taxkind"></div></div>
          ${role ? "" : `<div class="field"><label>Rol</label><select id="f_role">${ROLE.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></div>`}
          <div class="field"><label>Persona de contacto</label><input id="f_contact"></div>
          <div class="field"><label>Teléfono</label><input id="f_land" placeholder="93 123 45 67"></div>
@@ -27278,7 +27285,7 @@
         // as it was, the two buttons would stack full-width on top of each other.
         if (back) $("#f_back").onclick = closeDrawer;
         wireCpProvince("#f_cp", "#f_prov");
-        wireLateFlag("#f_tax", "#f_taxflag");
+        wireLateFlag("#f_tax", "#f_taxflag", "#f_taxkind");
         $("#f_save").onclick = () => {
           // A duplicate suspect is a soft warning (findDuplicateParty), never a
           // refusal — the record is still created, but the toast that would
@@ -27419,11 +27426,40 @@
           if (prov) provInp.value = prov;
         });
       }
-      function wireLateFlag(inputSel, flagSel) {
+      /** What the identifier was understood to BE, said as you type.
+          The field takes a passport now as well as a Spanish document, and a
+          label reading "NIF / CIF / NIE / Pasaporte" cannot tell you which of
+          the four the thing you just typed was taken for. That matters in one
+          direction above all: a CIF mistyped badly enough to stop looking like
+          a CIF is accepted as a foreign document, and without this line nothing
+          on the screen would say so. */
+      const TAXKIND_NOTE = {
+        dni: ["g", "DNI/NIF"],
+        nie: ["g", "NIE"],
+        cif: ["g", "CIF"],
+        vat: ["g", "IVA intracomunitario"],
+        foreign: ["y", "Pasaporte o documento extranjero — no es un NIF español"],
+        "dni-bad": ["r", "DNI/NIF: la letra de control no cuadra"],
+        "nie-bad": ["r", "NIE: la letra de control no cuadra"],
+        "cif-bad": ["r", "CIF: el control no cuadra"],
+        unknown: ["r", "No parece un número de documento"],
+      };
+      function wireLateFlag(inputSel, flagSel, kindSel) {
         const inp = $(inputSel),
           flag = $(flagSel);
         if (!inp || !flag) return;
-        const sync = () => (flag.hidden = !!inp.value.trim());
+        const kindEl = kindSel ? $(kindSel) : null;
+        const sync = () => {
+          const raw = inp.value.trim();
+          flag.hidden = !!raw;
+          if (!kindEl) return;
+          const note = raw && ErpEngine.taxIdKind ? TAXKIND_NOTE[ErpEngine.taxIdKind(raw)] : null;
+          kindEl.innerHTML = note
+            ? `<span class="pill ${note[0]}">${esc(note[1])}</span>`
+            : /* Empty is not an error here: the record is legitimate without an
+                 identifier, it simply cannot be invoiced yet — which is what the
+                 ⚠ beside the label already says. */ "";
+        };
         inp.addEventListener("input", sync);
         sync();
       }

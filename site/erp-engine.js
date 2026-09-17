@@ -109,16 +109,54 @@
       .toUpperCase()
       .replace(/[^0-9A-Z]/g, "");
   }
-  function validTaxId(v) {
-    v = normTaxId(v);
-    if (/^[0-9]{8}[A-Z]$/.test(v)) return NIF_L[parseInt(v.slice(0, 8), 10) % 23] === v[8]; // DNI/NIF
-    if (/^[XYZ][0-9]{7}[A-Z]$/.test(v)) {
-      const n = { X: "0", Y: "1", Z: "2" }[v[0]] + v.slice(1, 8);
-      return NIF_L[parseInt(n, 10) % 23] === v[8]; // NIE
+  /**
+   * WHICH DOCUMENT IS THIS, or why is it none?
+   *
+   * A customer is not always a Spanish taxpayer. A foreign natural person with
+   * no NIE identifies themselves with a passport, and the field used to refuse
+   * one: anything that was not a DNI, a NIE, a CIF or an intra-EU VAT number
+   * was rejected outright, so the company could not put a foreign client on
+   * file at all. That is the change the operator asked for (17/09).
+   *
+   * WHAT IS NOT BEING GIVEN UP. The obvious way to satisfy that request is to
+   * stop validating, and it would be wrong. The check letter is what catches a
+   * mistyped DNI before it reaches an invoice, and an invoice carries the
+   * recipient's identifier by law. So the rule is narrower than "accept
+   * everything":
+   *
+   *   · a value that has the SHAPE of a Spanish document is still checked
+   *     against its own control character, and still refused when it fails —
+   *     that is a typo, not a passport;
+   *   · a value that matches no Spanish shape is accepted as a foreign
+   *     document, and the screens say so rather than passing it off as a NIF.
+   *
+   * The cost, stated plainly: a CIF mistyped badly enough to no longer look
+   * like a CIF is now accepted as a foreign document instead of refused. That
+   * is why `foreign` is a kind of its own rather than a silent `true` — the
+   * forms show what was understood, so a wrong guess is visible to the person
+   * who can correct it.
+   */
+  function taxIdKind(v) {
+    const s = normTaxId(v);
+    if (!s) return "empty";
+    if (/^[0-9]{8}[A-Z]$/.test(s))
+      return NIF_L[parseInt(s.slice(0, 8), 10) % 23] === s[8] ? "dni" : "dni-bad";
+    if (/^[XYZ][0-9]{7}[A-Z]$/.test(s)) {
+      const n = { X: "0", Y: "1", Z: "2" }[s[0]] + s.slice(1, 8);
+      return NIF_L[parseInt(n, 10) % 23] === s[8] ? "nie" : "nie-bad";
     }
-    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(v)) return cifControlOk(v); // CIF, digit checked
-    if (/^[A-Z]{2}[0-9A-Z]{2,13}$/.test(v)) return true; // EU VAT (structural)
-    return false;
+    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(s)) return cifControlOk(s) ? "cif" : "cif-bad";
+    if (/^[A-Z]{2}[0-9A-Z]{2,13}$/.test(s)) return "vat"; // intra-EU VAT (structural)
+    // A passport or any other foreign identifier: letters, digits or both.
+    // Bounded at both ends because "1" is a slip and forty characters is a
+    // pasted sentence — neither is somebody's document number.
+    if (/^[0-9A-Z]{5,20}$/.test(s)) return "foreign";
+    return "unknown";
+  }
+  /** The kinds that may be stored. Everything else is a mistake to correct. */
+  const TAXID_ACCEPTED = ["dni", "nie", "cif", "vat", "foreign"];
+  function validTaxId(v) {
+    return TAXID_ACCEPTED.indexOf(taxIdKind(v)) !== -1;
   }
   /**
    * CIF check digit (MDM-03: "validated for format and check digit").
@@ -173,27 +211,26 @@
    */
   function taxIdReason(v) {
     const s = normTaxId(v);
-    if (/^[0-9]{8}[A-Z]$/.test(s)) {
+    const kind = taxIdKind(s);
+    if (kind === "dni-bad") {
       const expected = NIF_L[parseInt(s.slice(0, 8), 10) % 23];
-      return expected === s[8]
-        ? null
-        : `DNI/NIF: la letra de control no corresponde — para ${s.slice(0, 8)} debería ser ${expected}, no ${s[8]}.`;
+      return `DNI/NIF: la letra de control no corresponde — para ${s.slice(0, 8)} debería ser ${expected}, no ${s[8]}.`;
     }
-    if (/^[XYZ][0-9]{7}[A-Z]$/.test(s)) {
+    if (kind === "nie-bad") {
       const n = { X: "0", Y: "1", Z: "2" }[s[0]] + s.slice(1, 8);
       const expected = NIF_L[parseInt(n, 10) % 23];
-      return expected === s[8]
-        ? null
-        : `NIE: la letra de control no corresponde — para ${s.slice(0, 8)} debería ser ${expected}, no ${s[8]}.`;
+      return `NIE: la letra de control no corresponde — para ${s.slice(0, 8)} debería ser ${expected}, no ${s[8]}.`;
     }
-    if (/^[ABCDEFGHJNPQRSUVW][0-9]{7}[0-9A-J]$/.test(s))
-      return cifControlOk(s)
-        ? null
-        : `CIF: el dígito o letra de control no corresponde a los siete dígitos ${s.slice(1, 8)}.`;
-    if (/^[A-Z]{2}[0-9A-Z]{2,13}$/.test(s)) return null; // EU VAT — structural only
-    if (s.length !== 9)
-      return `No tiene la longitud de un DNI, NIE o CIF español (9 caracteres) ni la de un IVA intracomunitario (dos letras de país + dígitos).`;
-    return `El formato no corresponde a un DNI/NIF (8 dígitos y una letra), un NIE (X, Y o Z seguido de 7 dígitos y una letra) ni un CIF (una letra seguida de 7 dígitos y un dígito o letra).`;
+    if (kind === "cif-bad")
+      return `CIF: el dígito o letra de control no corresponde a los siete dígitos ${s.slice(1, 8)}.`;
+    // Everything that is not a malformed SPANISH document is now accepted — a
+    // passport included — so the only remaining refusal is a value that is no
+    // document at all. Said in terms of what to do, not of what is wrong.
+    if (kind === "unknown")
+      return s.length < 5
+        ? `Demasiado corto para ser un documento: un DNI o NIE tiene 9 caracteres y un pasaporte al menos 5.`
+        : `Demasiado largo para ser un documento. Escriba sólo el número, sin el país ni el tipo de documento.`;
+    return null;
   }
   function validIban(v) {
     v = String(v || "")
@@ -14190,6 +14227,11 @@
     // company and a new one would bill differently and nothing would say why.
     defaultBilling,
     validTaxId,
+    // Exported so the screens can say WHICH document they understood a value
+    // to be. A form that accepts a passport silently, under a label reading
+    // "NIF / CIF / NIE", is how a mistyped CIF gets stored as a foreign
+    // document and nobody notices.
+    taxIdKind,
     validIban,
     validEmail,
     cents,
