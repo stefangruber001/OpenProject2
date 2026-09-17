@@ -3645,3 +3645,61 @@ already handles it; only the picker does not.
 Gates: site E2E 833/833 · boundaries · lint · check-types · test · test:sync 20
 · test:codes 38 · test:links 29 · test:shell 20 · test:band · test:docs ·
 test:pdf 44 · test:docx 124 · literals 158/158 · i18n coverage complete.
+
+## S32 · The shared password was nobody, and DEV saved nothing (2026-09-17)
+
+**Done, on the branch — not on dev yet.** The operator's report: «the info that
+I am putting on DEV does not survive the session in the browser.» It was worse
+than that. Nothing anybody typed on the development system had ever been saved,
+from the day it came up on 16/09, and nothing anywhere said so.
+
+- **Four correct decisions that did not know about each other.**
+  `ops/dev-up.sh` writes `ERP_USERS=""` and one `ERP_ACCESS_PASSWORD`, so the
+  shared link-and-password is the only door into dev — and there is no way to
+  create a first account either, because `POST /~/users` needs `user.manage`. A
+  shared session carries a label (`invitado-4f2a`), not an address, so
+  `findUser` returned null and `may()` — "an address I cannot place may do
+  nothing" — refused it everything. `GET /erp/state` asks `erp.read.all` to
+  decide whether to send the company document or a site worker's redacted view,
+  so dev was served a document **built from nothing**: no company, no parties,
+  no invoices. `ERP.from()` loads that happily, as an empty company. And a
+  `scoped` response makes `erp-store.js` stop sending saves **in silence**,
+  which is right for the crew and catastrophic for anybody else.
+- **So dev drew the full administrator interface** — `/api/~/session` answers
+  "admin" for anyone `findUser` cannot place — over an empty company, took work
+  all day, said «guardado», and had sent nothing. No banner, no console error,
+  no failed request, nothing in the logs.
+- **The fix: a shared session resolves to `backoffice`.** Not a new grant:
+  `lib/access.ts` and `docs/PILOT-WITHOUT-CLOUDFLARE.md` both promise that
+  credential reaches the live books like a named account, and it stopped being
+  true when the site-worker release made two doors consult `may()`. Restored in
+  `findUser`, beside the single-seat operator, for the exact shape
+  `mintSharedLabel()` produces and only while the shared route is on. Never
+  `admin`: no `user.manage`, because a credential handed out beyond the company
+  must not be able to mint credentials.
+- **An alarm, so this class cannot be mute again.** A redacted document held by
+  an account that is not a site worker now raises the red "NOT saved" banner.
+  The two answers the server gives about one account disagreeing is something
+  nobody decided, and its consequence is invisible by construction.
+- **The gates that were missing, which is why everything was green.** The
+  browser suite runs `site/` from disk with no server, the server suite speaks
+  HTTP with no browser, and the smoke container had `ERP_USERS` but never
+  `ERP_ACCESS_PASSWORD` — the one credential dev uses exclusively had never
+  been exercised by anything. `tests/site-sync/run.mjs` now opens the real
+  `erp.html` under `/workspace/` with the deployment's marker (the first time
+  anything has driven the workspace against a server) and proves a customer
+  entered in the drawer reaches the server and survives a reload; the shared
+  password is now signed in against the real image in `server-e2e`.
+- **In passing:** `docs/PILOT-WITHOUT-CLOUDFLARE.md` said a shared session had
+  no restrictions at all and that its cookie lasted eight hours. It has exactly
+  one restriction now, and the cookie has lasted twelve hours since S-earlier.
+
+**Known and next:** `site/master-data.html` still writes to its own browser
+database and is folded into the company document at most once, so anything
+typed there after the first import never leaves the device. It is no longer
+linked from the navigation — which is why it did not cause this report — but it
+is the same failure shape.
+
+Gates: boundaries · lint · check-types · test 204 · test:sync 26 · test:codes
+38 · test:links 29 · test:shell 20 · test:band · test:docs · test:pdf 44 ·
+test:docx 124 · site E2E 833/833 on the merged tree.
