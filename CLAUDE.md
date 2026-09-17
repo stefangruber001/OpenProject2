@@ -131,6 +131,14 @@ this way before it was written down. Wait, then commit.
   branch you copied _from_ stays green, and the work you overwrote on the branch
   you copied _to_ only surfaces as its own tests failing. That is exactly how
   `main` spent five commits red — see `docs/worklog/SESSION-S1A.md`.
+- **Before anything else in a session, and again before every push: fetch and
+  look at what other people have landed.** `git fetch origin main` and read
+  `git log --oneline main..origin/main`. More than one session works on this
+  repository at a time, and the cost of not looking is paid twice — once when a
+  push is rejected mid-task, and once when a gate that was red before you
+  started gets blamed on your change. (Operator, 17 Sep.) If `main` arrives red
+  from somebody else's push, fix it rather than pushing on top of it: the trunk
+  is what deploys.
 - Small green commits; push with `git push -u origin <branch>` (retry w/
   backoff on network failure). **No force-push, no history rewrite, no branch
   deletion** (mandate §3).
