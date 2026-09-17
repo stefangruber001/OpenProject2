@@ -3520,3 +3520,39 @@ It now classifies instead of refusing: `taxIdKind` returns `dni` · `nie` · `ci
 Gates: boundaries · lint · check-types · test 198 · simulations (manageability
 520, import 25, year 149, scheduling 30, migrations 104) · comms-tokens 678 ·
 site-syntax · site-sync 20 · bundle-safety.
+
+## S30 · The three levels are created the same way, from where they are needed (2026-09-17)
+
+**Done, on dev — not released.** The operator's words: «The flow is weird. It
+should be equal to all (Título, Partida and Subpartida). +Item, look up in the
+list for the one you like, if there is none, click create one which redirects
+you to the creation of the item. Once created, it automatically goes back to
+the list … or it picks it automatically.» None of the three did that.
+
+- **Título had no door at all.** The row's selector was hidden until the
+  company already had títulos, which is a dead end on an empty price book —
+  «I still can't add a title», and he was right. It is always drawn now, and
+  when the list is empty it holds the one useful option, `＋ Nuevo título…`.
+- **The cascade, in the order he asked for it.** `+ título` is the first button
+  on the builder toolbar. Choosing or creating one leads straight into the
+  partida step **narrowed to that título's partidas** (`titlePartidas`, group
+  «De este título»), and a partida created there is filed under the título in
+  the same write. That leads straight into the subpartida step, narrowed to
+  that partida. Each level is the one above it made concrete; `+ partida`
+  pressed on its own still offers the whole book, because there is nothing to
+  narrow by.
+- **Create-and-come-back, everywhere.** All three drawers call `onCreated`
+  before they persist and repaint, so the new entry and the document now using
+  it land in one write and one render.
+- **The button that opened nothing.** `addSubpartidaStep` lived inside
+  `budgetBuilder` while its second caller — the row's «+ subpartida del
+  catálogo» — is wired in `builderRows`, a sibling function. Every press threw
+  `addSubpartidaStep is not defined` into a console nobody was reading. The
+  guided flow worked and the button did not, which is exactly the combination
+  that makes a defect look like a test artefact. Lifted to top level.
+- **A handler that throws now fails a gate.** The suite collects `pageerror`
+  on the guided-flow page and names it, rather than reporting a key missing
+  from an assertion.
+
+Gates: site E2E 831/831 · boundaries · lint · check-types · test · test:codes
+38 · test:links 26 · test:shell 20 · source literals 158/158.
