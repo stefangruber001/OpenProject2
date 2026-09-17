@@ -11359,3 +11359,42 @@ from a browser to repair production, and a syntax error in any of them would be
 discovered during the incident it was meant to end. `for f in ops/*.sh; do bash
 -n "$f"; done` is the whole gate; it is not added here because it was not what
 was asked for.
+
+## S144 — the ops scripts get the parse gate S143 said they lacked
+
+Asked for and closed the same day. `pnpm test:shell`, in CI beside the others.
+
+**Widened from what was asked, by one file.** The request was the `ops/` gate;
+the check covers every _tracked_ `*.sh` — twenty, the twentieth being
+`ios/setup.sh`. Asking `git ls-files` rather than globbing a directory means a
+script added next month is covered next month without anyone remembering to
+widen a list, which is the failure mode of every hand-maintained file list in
+this repository.
+
+**Parse only, and that is a limit rather than an oversight.** `bash -n` builds a
+script without running a line of it, which is the only thing that is safe to do
+automatically with scripts that ssh into a live server as root. It catches the
+class that actually happens — an unclosed quote, a missing `fi`, a heredoc whose
+terminator drifted. It makes no claim about whether a script does the right
+thing. `shellcheck` would say more and comes with a backlog of its own; that is a
+separate decision and is not smuggled in here.
+
+**Each script parses under the shell it declares**, not under an assumed bash: a
+file whose shebang says `sh` is read as `sh`, or the gate is checking something
+the machine will never run. All twenty currently declare bash.
+
+**Verified by breaking things, three ways.** An unterminated `if` appended to
+`ops/status.sh` and an unclosed quote appended to `ops/dev-down.sh` each turn it
+red naming the file, the line and the reason. And the third is the one worth
+writing down: the gate refuses to pass on fewer than fifteen scripts, because a
+check that reads its subjects from a list can go green over an empty loop — a
+trap this session walked into earlier the same day, when `tests/list-codes`
+started passing by iterating over a `LIST_DEFAULTS` entry that had just been
+emptied. Proved by running the gate in a throwaway repository holding one script:
+it fails, as it should.
+
+**Why it is worth a gate at all.** `ops/` is not a build directory. It is the set
+of commands somebody runs, from a browser, to repair the client's production
+server — restore its address, stop the development stack, rotate a registry
+token, redeploy. A syntax error in one of those is discovered at the exact moment
+it is needed, by a person already dealing with an outage.

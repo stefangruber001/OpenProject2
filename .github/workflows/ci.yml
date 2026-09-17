@@ -125,6 +125,16 @@ jobs:
         if: always()
         run: pnpm test:links
 
+      # `ops/` is not a build directory: it is what somebody runs, from a
+      # browser, to repair the client's production server. A syntax error in one
+      # of those is found at the moment it is needed, by a person already
+      # dealing with an outage. Parse only — `bash -n` builds a script without
+      # running a line of it, which is the only thing safe to do automatically
+      # with scripts that ssh into a live box.
+      - name: Shell scripts parse
+        if: always()
+        run: pnpm test:shell
+
       # The runner's Chromium places glyphs differently from any machine this is
       # developed on, and its build cannot be downloaded here — so its PDFs are
       # the only evidence that exists for the heading-splitting question. Kept
