@@ -3592,3 +3592,56 @@ seeing them at the same time as the figures.
 Gates: site E2E 832/832 · boundaries · lint · check-types · test · test:sync 20
 · test:band · test:docs · test:pdf 44 · test:docx 124 · test:codes 38 ·
 test:links 26 · test:shell 20.
+
+## S32 · A título groups partidas in ONE budget, and the job inherits it (2026-09-17)
+
+**Done, on dev — not released.** The operator's third option, and the right
+one: «In Elementos de Presupuesto, each item are independent … the relation
+between the three is created in the Budget and is just for that specific
+budget, which afterwards will be inherited to the contract, the physical
+control, the economical control and also to assign expenses and hours of the
+workers.»
+
+- **Only the top level went.** A partida's subpartidas are a fact about the
+  trade — «Fontanería» holds a water point whoever the customer is — so
+  `itemPartidaLinks` stays, and with it the one thing keeping the subpartida
+  picker off two hundred rows. A título is a story about ONE job: «Reforma de
+  baño» here, «Planta primera» there, «Fase 1» for a developer. Curating a
+  global answer to "which partidas belong under it" was upkeep that paid
+  nobody, and it made the builder ask a question it had no business asking.
+- **Migration 24** drops `itemTitleLinks`. Nothing sent can move: a budget
+  chapter has stored the título's WORDS since v22, never its code.
+- **The engine lost six methods** (`titleLinks`, `titlePartidas`,
+  `partidaTitles`, `setTitlePartidas`, `setPartidaTitles`,
+  `clearPartidaTitles`); `removeTitle` is a plain delete and `removePartida`
+  lost its "named by a título" guard.
+- **Three independent registers.** Títulos lost its memberships pane and count,
+  Partidas lost its Títulos pane and column. Subpartidas is untouched.
+- **THE HALF THAT ADDS — inheritance.** `project.baseline.chapters` copied
+  `{num, name, sale, cost, billTo}` and dropped the título on the floor, so
+  every hour and every euro booked against a chapter knew which partida it
+  belonged to and not which part of the job. It now carries `title` — the
+  words, frozen, so renaming or deleting a heading in the price book cannot
+  retitle a running job — and it flows through `chapterEconomics`,
+  `purchaseNeeds`, the certification chapters and the labour rollup. Migration
+  24 backfills existing projects from the version the customer ACCEPTED, not
+  the latest draft, which would retitle a frozen record from a document nobody
+  agreed to.
+- **Avance económico bands by título**, one band per run — the same rule the
+  paper follows, so the budget, the document and the control screen group
+  alike.
+- **The assertions were inverted, not deleted.** «every título offers every
+  partida — the grouping is the budget's» is the exact opposite of what shipped
+  the day before, which is the honest way to record a reversal. The new
+  inheritance gate was checked by backing the baseline field out: it fails with
+  `{"baseline":[null,null,null],"economics":["","",""],"bands":[]}`.
+
+**Known and next:** the builder still hides a partida already used in this
+budget, so «Reforma de baño → Fontanería» and «Reforma de cocina → Fontanería»
+cannot both be added — a leftover from the model this replaces. The engine has
+no such guard and every cost keys on the chapter number, so the data model
+already handles it; only the picker does not.
+
+Gates: site E2E 833/833 · boundaries · lint · check-types · test · test:sync 20
+· test:codes 38 · test:links 29 · test:shell 20 · test:band · test:docs ·
+test:pdf 44 · test:docx 124 · literals 158/158 · i18n coverage complete.

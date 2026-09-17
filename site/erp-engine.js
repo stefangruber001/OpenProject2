@@ -1566,7 +1566,6 @@
            a kitchen alike. That is safe here and nowhere else: nothing joins
            this to a budget's chapters, so a membership can never reach a total,
            a progress mark or a printed number. */
-        itemTitleLinks: [],
         /* Which partidas a subpartida is filed under — rows of
            {chapterCode, itemId, order}, and the ONLY truth about that, per
            schema v23. `item.chapter` survives on the record as legacy and is
@@ -1880,128 +1879,45 @@
     }
 
     /* =========================================================================
-       TÍTULOS — the grouping above the catalogue's partidas.
+       TÍTULOS — a heading the company reuses, and nothing else.
 
        Everything a título needs in order to BE a list is already above:
        `addListEntry("itemTitles", …)` creates one, `updateListEntry` renames
-       it, `moveListEntry` orders it. What follows is only what a título has
-       that the other lists do not — a membership, and a real delete.
+       it, `moveListEntry` orders it. Since v24 that is ALL a título is. It
+       holds no membership, because it never had a stable one to hold.
+
+       WHY THE MEMBERSHIP WENT (operator, 17 Sep): "each item are independent
+       … the relation between the three is created in the Budget and is just
+       for that specific budget". A partida's subpartidas are a fact about the
+       trade and survive every job, so that relation stays one level down. A
+       título is a story about ONE job — «Reforma de baño» here, «Planta
+       primera» there, «Fase 1» for a developer — and curating a global answer
+       to "which partidas belong under it" was upkeep that paid nobody and made
+       the builder ask a question it had no business asking.
 
        WHY A REAL DELETE, against the system-wide "retire, never remove" rule.
        That rule exists because a retired code is still written on records that
        must keep rendering: `listLabel` resolves it for ever. Nothing carries a
-       título's CODE. A budget chapter stores the título's WORDS (schema v22),
-       so a deleted título cannot orphan a presupuesto, a contract or a printed
-       page — the document keeps reading exactly as it was sent. The only rows
-       pointing at the code are the memberships, and they go with it. A heading
+       título's CODE. A budget chapter stores the título's WORDS (schema v22)
+       and a project baseline inherits those same words (v24), so a deleted
+       título cannot orphan a presupuesto, a contract, a project or a printed
+       page — every one of them keeps reading exactly as it was sent. A heading
        somebody typed by mistake should be removable, not permanently greyed.
        ====================================================================== */
 
-    /** The membership rows, created on first use like every other collection. */
-    titleLinks() {
-      if (!Array.isArray(this.state.itemTitleLinks)) this.state.itemTitleLinks = [];
-      return this.state.itemTitleLinks;
-    }
-    /** The partidas filed under a título, in the order the owner put them. */
-    titlePartidas(titleCode) {
-      return this.titleLinks()
-        .filter((l) => l.titleCode === titleCode)
-        .slice()
-        .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((l) => l.chapterCode);
-    }
-    /** The títulos a partida appears under. More than one is the normal case. */
-    partidaTitles(chapterCode) {
-      return this.titleLinks()
-        .filter((l) => l.chapterCode === chapterCode)
-        .map((l) => l.titleCode);
-    }
     /** Codes that exist in a list, retired ones included — a membership may name either. */
     _knownCode(kind, code) {
       return this.listAll(kind).some((e) => e.code === code);
     }
-    /**
-     * Replace which partidas sit under one título.
-     *
-     * Stated as the whole set rather than add/remove one at a time, because
-     * that is how the screen asks it: a person ticks boxes and presses save,
-     * and a half-applied set is not a state the list should be able to reach.
-     */
-    setTitlePartidas(titleCode, chapterCodes, user) {
-      if (!this._knownCode("itemTitles", titleCode))
-        throw new Error("No such título: " + titleCode);
-      const wanted = [];
-      for (const raw of chapterCodes || []) {
-        const code = String(raw || "").trim();
-        if (!code || wanted.includes(code)) continue;
-        if (!this._knownCode("itemChapters", code)) throw new Error("No such partida: " + code);
-        wanted.push(code);
-      }
-      const links = this.titleLinks();
-      const kept = links.filter((l) => l.titleCode !== titleCode);
-      this.state.itemTitleLinks = kept.concat(
-        wanted.map((chapterCode, order) => ({ titleCode, chapterCode, order })),
-      );
-      this._log(user, "setTitlePartidas", titleCode + " ×" + wanted.length);
-      return this.titlePartidas(titleCode);
-    }
-    /**
-     * The same membership from the partida's side — "assign it to a título or
-     * several", which is the operator's own wording for the Modify Partida
-     * panel. A partida joins each título at the end of its run, so ticking a
-     * box never silently reorders a título somebody else arranged.
-     */
-    setPartidaTitles(chapterCode, titleCodes, user) {
-      if (!this._knownCode("itemChapters", chapterCode))
-        throw new Error("No such partida: " + chapterCode);
-      const wanted = [];
-      for (const raw of titleCodes || []) {
-        const code = String(raw || "").trim();
-        if (!code || wanted.includes(code)) continue;
-        if (!this._knownCode("itemTitles", code)) throw new Error("No such título: " + code);
-        wanted.push(code);
-      }
-      const links = this.titleLinks();
-      const others = links.filter((l) => l.chapterCode !== chapterCode);
-      const mine = links.filter((l) => l.chapterCode === chapterCode);
-      // A membership this partida already had is kept as the row it is, so its
-      // position inside that título survives a save that only ticked a
-      // different box. A new one joins at the end of that título's run.
-      const rows = wanted.map(
-        (titleCode) =>
-          mine.find((l) => l.titleCode === titleCode) || {
-            titleCode,
-            chapterCode,
-            order: others.filter((l) => l.titleCode === titleCode).length,
-          },
-      );
-      this.state.itemTitleLinks = others.concat(rows);
-      this._log(user, "setPartidaTitles", chapterCode + " ×" + wanted.length);
-      return this.partidaTitles(chapterCode);
-    }
-    /** Delete a título and every membership that named it. See the block above. */
+    /** Delete a título. See the block above for why this one really deletes. */
     removeTitle(code, user) {
       const rows = this.listAll("itemTitles");
       const at = rows.findIndex((e) => e.code === code);
       if (at < 0) throw new Error("No such título: " + code);
       const gone = rows[at];
-      const dropped = this.titlePartidas(code).length;
       rows.splice(at, 1);
-      this.state.itemTitleLinks = this.titleLinks().filter((l) => l.titleCode !== code);
-      this._log(user, "removeTitle", code + " · " + gone.es + " (" + dropped + " partidas)");
+      this._log(user, "removeTitle", code + " · " + gone.es);
       return gone;
-    }
-    /**
-     * Drop a partida's memberships. Called when a partida is retired, so the
-     * títulos stop offering a trade the company no longer works in — the entry
-     * itself is retired, not deleted, exactly as before.
-     */
-    clearPartidaTitles(chapterCode, user) {
-      const before = this.titleLinks().length;
-      this.state.itemTitleLinks = this.titleLinks().filter((l) => l.chapterCode !== chapterCode);
-      const removed = before - this.state.itemTitleLinks.length;
-      if (removed) this._log(user, "clearPartidaTitles", chapterCode + " ×" + removed);
-      return removed;
     }
     /* =========================================================================
        PARTIDAS ↔ SUBPARTIDAS — the same membership, one level down.
@@ -2048,9 +1964,9 @@
     /**
      * Replace which subpartidas sit under one partida.
      *
-     * Whole-set, like `setTitlePartidas`, and for the same reason: the screen
-     * asks it that way — a person ticks boxes and presses save — and a
-     * half-applied set is not a state the book should be able to reach.
+     * Whole-set rather than add-one-at-a-time, because that is how the screen
+     * asks it — a person ticks boxes and presses save — and a half-applied set
+     * is not a state the book should be able to reach.
      */
     setPartidaItems(chapterCode, itemIds, user) {
       if (!this._knownCode("itemChapters", chapterCode))
@@ -2074,8 +1990,8 @@
      * The same membership from the subpartida's side — "file this one under
      * these partidas". A subpartida joins each partida at the END of its run,
      * so ticking a box here never silently reorders a partida somebody else
-     * arranged. This is the bug `setPartidaTitles` had and the reason its fix
-     * is copied rather than rewritten.
+     * arranged — a membership this subpartida already had is kept as the row it
+     * is, so a save that only ticked a different box leaves its position alone.
      */
     setItemPartidas(itemId, chapterCodes, user) {
       if (!this._knownItem(itemId)) throw new Error("No such subpartida: " + itemId);
@@ -2127,12 +2043,17 @@
      * a corner case — and answering it with a permanently greyed-out row is
      * the sort of thing that makes people stop trusting a screen.
      *
-     * The three conditions are exactly the ones migration 23 uses to decide
-     * which shipped partidas it may drop, and that is not a coincidence: the
-     * question is the same one, and two different answers to it would be a
-     * ladder step that disagrees with the button beside it. Anything used gets
+     * The conditions are the ones migration 23 uses to decide which shipped
+     * partidas it may drop, and that is not a coincidence: the question is the
+     * same one, and two different answers to it would be a ladder step that
+     * disagrees with the button beside it. Anything used gets
      * `setListEntryActive(false)` instead, which is what the screen offers
      * when this refuses.
+     *
+     * There were three of them until v24. The título membership was the one
+     * that went, along with the memberships themselves — a título now groups
+     * partidas inside one budget and nowhere else, so there is no longer a
+     * list of headings that could be left naming a trade nobody kept.
      */
     removePartida(code, user) {
       const rows = this.listAll("itemChapters");
@@ -2141,7 +2062,6 @@
       const gone = rows[at];
       const held = this.partidaItems(code).length;
       if (held) throw new Error("That partida still holds " + held + " subpartida(s)");
-      if (this.partidaTitles(code).length) throw new Error("That partida is named by a título");
       const fold = (x) =>
         String(x || "")
           .toLowerCase()
@@ -5401,6 +5321,20 @@
             .map((c) => ({
               num: c.num,
               name: c.name,
+              /* THE SECTION THIS CHAPTER WAS SOLD UNDER (v24). The words, not a
+                 code, exactly as the budget chapter holds them — so a título
+                 renamed or deleted in the price book afterwards cannot retitle
+                 a project that is already running, for the same reason it
+                 cannot retitle a document that was already sent.
+
+                 Frozen with the rest of the baseline, and that is the point:
+                 every hour, every expense and every certification is booked
+                 against a chapter number, and until this existed they all knew
+                 which partida they belonged to and not which part of the job.
+                 The operator asked for the budget's structure to be inherited
+                 by the physical and economic control; this is the field that
+                 carries it. */
+              title: c.title || "",
               saleCents: c.saleCents,
               costCents: c.costCents,
               // WHO OWES FOR THIS CHAPTER. In the baseline, and therefore
@@ -5449,6 +5383,8 @@
             {
               num: "1",
               name: desc,
+              // No budget behind a quick project, so no section to inherit.
+              title: "",
               saleCents: valueCents,
               costCents: 0,
               billToPartyId: partyId,
@@ -5609,6 +5545,7 @@
         return {
           num: c.num,
           name: c.name,
+          title: c.title || "",
           budgetCostCents: c.costCents,
           committedCents,
           pendingCents: Math.max(0, c.costCents - committedCents),
@@ -7439,6 +7376,7 @@
           return {
             num: c.num,
             name: c.name,
+            title: c.title || "",
             valueCents: c.saleCents,
             progressPct,
             doneCents: Math.round((c.saleCents * progressPct) / 100),
@@ -7455,6 +7393,7 @@
             chapters.push({
               num: r.num,
               name: r.name,
+              title: r.title || "",
               valueCents: r.saleCents,
               progressPct,
               doneCents: Math.round((r.saleCents * progressPct) / 100),
@@ -10471,6 +10410,13 @@
           const bc =
             pr && pr.baseline && (pr.baseline.chapters || []).find((x) => x.num === c.chapterNum);
           c.name = bc ? bc.name : null;
+          /* …and which part of the job it belongs to (v24). An hour is booked
+             against a chapter number and nothing else, so without this the
+             labour rollup could say «3. Fontanería» and never «Reforma de
+             baño» — which is the grouping the person reading it is actually
+             asking about. Null, not "", when there is no baseline chapter to
+             answer from: the row is about a chapter we cannot name at all. */
+          c.title = bc ? bc.title || "" : null;
         }
         return {
           projectId: p.projectId,
@@ -10945,6 +10891,7 @@
       const rows = p.baseline.chapters.map((c) => ({
         num: c.num,
         name: c.name,
+        title: c.title || "",
         saleCents: c.saleCents,
         budgetCostCents: c.costCents,
         actualCents: actualByCh[c.num] || 0,
@@ -10972,6 +10919,9 @@
         rows.push({
           num: c.num,
           name: c.name,
+          // Straight off the variation's own chapter, which carries the words
+          // the same way the base version's did.
+          title: c.title || "",
           saleCents: sale,
           budgetCostCents: cost,
           actualCents: actualByCh[c.num] || 0,

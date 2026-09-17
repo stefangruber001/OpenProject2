@@ -2312,6 +2312,19 @@
         letter-spacing: 0.02em;
         padding-top: 14px;
       }
+      /* THE SAME BAND, ON THE CONTROL SCREEN. The budget draws it, the document
+     prints it, and since v24 the project inherits the words — so the table the
+     job is controlled from groups the same way. One rule above its run of
+     partidas; no subtotal, because this table's columns are cost against
+     budget and a título does not own a budget. */
+      .ecotree tr.ecoband td {
+        background: transparent;
+        border-bottom: 2px solid var(--greenDeep);
+        font: 700 13px var(--serif);
+        color: var(--greenDeep);
+        letter-spacing: 0.02em;
+        padding-top: 14px;
+      }
       .bgrid tr.bandsum td {
         background: transparent;
         border-top: 1px solid var(--line);
@@ -11791,20 +11804,24 @@
       /**
        * A título: the heading a run of partidas prints under.
        *
+       * A NAME AND NOTHING ELSE since v24. It used to carry a list of the
+       * partidas filed under it; the operator removed that, and the reasoning
+       * is in the engine's own block — a título is how one budget is divided,
+       * not a category the price book keeps, so there was never a stable
+       * answer for this drawer to store.
+       *
        * Delete is a real delete, and it is safe for a reason worth repeating
        * where somebody will read it before pressing the button: a budget
-       * chapter stores the título's WORDS, never its code (schema v22). So
-       * removing one cannot orphan a presupuesto, a contract or a page already
-       * sent — those documents keep reading exactly as they were written. What
-       * goes with it is the membership, and nothing else.
+       * chapter stores the título's WORDS, never its code (schema v22), and a
+       * project baseline inherits those same words (v24). So removing one
+       * cannot orphan a presupuesto, a contract, a project or a page already
+       * sent — every one of them keeps reading exactly as it was written.
        */
       /** `opts.onCreated(entry)` — see `chapterEntryDrawer`, same contract. */
       function titleDrawer(code, opts) {
         const t = code ? erp.listAll("itemTitles").find((x) => x.code === code) : null;
         const db = openDrawer(t ? t.es : "Nuevo título");
-        const mine = t ? erp.titlePartidas(t.code) : [];
         const delBtn = t ? '<button class="btn" id="ti_del">Eliminar título</button>' : "";
-        const boxes = codeChecks(erp.listAll("itemChapters"), mine);
         /* NAME FIRST, código second, and the two half-width fields paired on
            one row. Before, código led at half width and its hint made it taller
            than whatever sat beside it, so «Nom (CA)» fell through to a row of
@@ -11813,8 +11830,6 @@
          <div class="field full"><label>Nombre (ES) *</label><input id="ti_es" value="${esc(t ? t.es : "")}"></div>
          ${lockedCodeField("ti_code", t ? t.code : "", "BANO")}
          <div class="field"><label>Nom (CA)</label><input id="ti_ca" value="${esc(t ? t.ca || "" : "")}"></div>
-         <div class="field full"><label>Partidas de este título</label>
-           <div id="ti_chaps" style="max-height:38vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${boxes}</div></div>
          <div class="field full row" style="gap:8px;margin-top:4px">
            <button class="btn primary" id="ti_save">Guardar</button><span style="flex:1"></span>${delBtn}</div>
         </div>`;
@@ -11822,12 +11837,10 @@
         $("#ti_save").onclick = () => {
           const es = $("#ti_es").value.trim();
           const ca = $("#ti_ca").value.trim();
-          const picked = checksOf($("#ti_chaps"));
           const key = t ? t.code : codeToSave("itemTitles", $("#ti_code"), es);
           try {
             if (t) erp.updateListEntry("itemTitles", t.code, { es, ca }, "backoffice");
             else erp.addListEntry("itemTitles", { code: key, es, ca }, "backoffice");
-            erp.setTitlePartidas(key, picked, "backoffice");
             titleSel = key;
             if (!t && opts && typeof opts.onCreated === "function")
               opts.onCreated(erp.listAll("itemTitles").find((x) => x.code === key));
@@ -11842,10 +11855,12 @@
         const del = $("#ti_del");
         if (del)
           del.onclick = async () => {
-            const n = erp.titlePartidas(t.code).length;
-            const body = n
-              ? `Agrupa ${n} partida${n === 1 ? "" : "s"}. Las partidas y sus subpartidas no se tocan: sólo deja de existir la agrupación. Los presupuestos ya escritos conservan el rótulo impreso.`
-              : "No agrupa ninguna partida todavía.";
+            /* No count to warn about any more: a título groups partidas inside
+               a budget, and deleting the heading from the register cannot reach
+               one. What a presupuesto, a contract or a project already carries
+               is the printed wording, which stays. */
+            const body =
+              "Los presupuestos, contratos y proyectos ya escritos conservan el rótulo impreso. Las partidas y sus subpartidas no se tocan.";
             if (!(await askConfirm(`Eliminar «${t.es}»`, { body, okLabel: "Eliminar" }))) return;
             if (titleSel === t.code) titleSel = "";
             mutate(() => erp.removeTitle(t.code, "backoffice"), "Título eliminado");
@@ -11861,7 +11876,9 @@
        */
       /**
        * A partida — an entry in the catalogue's chapter list, plus the
-       * subpartidas it gathers and the títulos it appears under.
+       * subpartidas it gathers. The títulos pane went at v24: a título groups
+       * partidas inside one budget, so there was nothing global for this drawer
+       * to tick.
        *
        * `opts.onCreated(entry)` fires once, after a NEW partida is saved and
        * its memberships are written, and before the drawer persists and
@@ -11873,17 +11890,11 @@
       function chapterEntryDrawer(code, opts) {
         const c = code ? erp.listAll("itemChapters").find((x) => x.code === code) : null;
         const db = openDrawer(c ? `${c.code} · ${c.es}` : "Nueva partida");
-        const mine = c ? erp.partidaTitles(c.code) : [];
-        const titles = erp.listAll("itemTitles");
         const codeField = lockedCodeField("pa_code", c ? c.code : "", "FON");
         const off = c && c.active === false;
         const offBtn = c
           ? `<button class="btn" id="pa_off">${off ? "Reactivar" : "Retirar del catálogo"}</button>`
           : "";
-        const NO_TITLES =
-          '<div style="font-size:12.5px;color:var(--muted);padding:4px 0">Todavía no hay títulos. Créalos con «＋ Nuevo título».</div>';
-        const boxes = titles.length ? codeChecks(titles, mine) : NO_TITLES;
-
         /* THE SUBPARTIDAS THIS PARTIDA GATHERS — the operator's own sequence:
            create the subpartida, then come here and tick it. One may be ticked
            in several partidas, which is the whole of v23.
@@ -11940,8 +11951,6 @@
          ${posRow}
          <div class="field full"><label>Subpartidas de esta partida</label>
            <div id="pa_items" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${itemBoxes}</div></div>
-         <div class="field full"><label>Títulos en los que aparece</label>
-           <div id="pa_titles" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${boxes}</div></div>
          <div class="field full row" style="gap:8px;margin-top:4px">
            <button class="btn primary" id="pa_save">Guardar</button><span style="flex:1"></span>${delBtn}${offBtn}</div>
         </div>`;
@@ -11949,13 +11958,11 @@
         $("#pa_save").onclick = () => {
           const es = $("#pa_es").value.trim();
           const ca = $("#pa_ca").value.trim();
-          const picked = checksOf($("#pa_titles"));
           const items = checksOf($("#pa_items"));
           const key = c ? c.code : codeToSave("itemChapters", $("#pa_code"), es);
           try {
             if (c) erp.updateListEntry("itemChapters", c.code, { es, ca }, "backoffice");
             else erp.addListEntry("itemChapters", { code: key, es, ca }, "backoffice");
-            erp.setPartidaTitles(key, picked, "backoffice");
             erp.setPartidaItems(key, items, "backoffice");
             if (!c && opts && typeof opts.onCreated === "function")
               opts.onCreated(erp.listAll("itemChapters").find((x) => x.code === key));
@@ -12018,12 +12025,12 @@
             // the legacy field would state a number that is no longer the truth
             // in the one sentence the operator reads before deciding.
             const used = erp.partidaItems(c.code).length;
-            const body = `Retirarla la quita de los desplegables; las ${used} subpartida${used === 1 ? "" : "s"} que agrupa siguen en el catálogo y conservan su pertenencia. Deja de ofrecerse en los títulos.`;
+            const body = `Retirarla la quita de los desplegables; las ${used} subpartida${used === 1 ? "" : "s"} que agrupa siguen en el catálogo y conservan su pertenencia.`;
             if (!(await askConfirm(`Retirar «${c.es}»`, { body, okLabel: "Retirar" }))) return;
-            mutate(() => {
-              erp.setListEntryActive("itemChapters", c.code, false, "backoffice");
-              erp.clearPartidaTitles(c.code, "backoffice");
-            }, "Partida retirada");
+            mutate(
+              () => erp.setListEntryActive("itemChapters", c.code, false, "backoffice"),
+              "Partida retirada",
+            );
             closeDrawer();
           };
       }
@@ -17192,17 +17199,19 @@
             addedChapterId = "";
             const title = t ? t.es : "";
             const used = new Set(erp.version(id, vsel).chapters.map((c) => c.name));
-            /* NARROWED BY THE LEVEL ABOVE. Choosing «Reforma de baño» and then
-               being offered every partida in the book is not a hierarchy, it is
-               two unrelated questions in a row — which is what this was, and
-               what the operator sent it back for. With a título in hand the list
-               is its partidas and nothing else; «+ partida» on its own still
-               offers the whole catalogue, because there is nothing to narrow by. */
-            const inTitle = t ? new Set(erp.titlePartidas(t.code)) : null;
+            /* EVERY PARTIDA, WHETHER OR NOT A TÍTULO IS IN HAND (v24). This
+               filtered by the título's own partidas for one day, and the
+               operator took it apart for the right reason: a título is not a
+               category the price book keeps, it is how ONE budget is divided.
+               «Reforma de baño» groups fontanería and alicatado this week and
+               something else the week after, so a book that claimed to know
+               which partidas belong under it was asking to be curated and
+               giving nothing back. The subpartida step below still narrows,
+               because a partida's subpartidas really are a fact about the
+               trade — that is the relation worth keeping. */
             const options = erp
               .listActive("itemChapters")
               .filter((c) => !used.has(c.es))
-              .filter((c) => !inTitle || inTitle.has(c.code))
               .map((c) => {
                 const n = erp
                   .partidaItems(c.code)
@@ -17212,7 +17221,7 @@
                 return {
                   value: c.es,
                   label: c.es,
-                  group: t ? "De este título" : "Del catálogo",
+                  group: "Del catálogo",
                   hint: n
                     ? n + (n === 1 ? " subpartida" : " subpartidas")
                     : "sin subpartidas todavía",
@@ -17240,7 +17249,7 @@
             options.push({ value: "__free__", label: "Otro nombre…", group: "Fuera del catálogo" });
             const pick = await askChoice("Nueva partida", options, {
               body: t
-                ? `Partidas de «${t.es}». Las de fuera de este título no se ofrecen aquí.`
+                ? `Se añade bajo «${t.es}», en este presupuesto. Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.`
                 : "Las partidas salen del catálogo para que se llamen igual en todos los presupuestos.",
               okLabel: "Añadir",
               wide: true,
@@ -17253,10 +17262,11 @@
               chapterEntryDrawer(null, {
                 onCreated: (entry) => {
                   if (!entry) return;
-                  /* Filed under the título it was created from, or it would be
-                     missing from this same list the next time — created inside
-                     «Reforma de baño» and then not one of its partidas. */
-                  if (t) erp.setPartidaTitles(entry.code, [t.code], "backoffice");
+                  /* Into the catalogue as a partida, and onto THIS budget under
+                     the título in hand. Nothing files it under that título in
+                     the price book, because since v24 the price book does not
+                     hold that relation — the chapter below carries it, for this
+                     budget and the records that inherit from it. */
                   const ch = erp.addChapter(id, { name: entry.es });
                   bChapter = ch.id;
                   if (title) erp.setChapterTitle(id, ch.id, title, "backoffice");
@@ -17313,7 +17323,6 @@
                 value: t.es,
                 label: t.es,
                 group: "Del catálogo",
-                hint: `${erp.titlePartidas(t.code).length} partidas`,
               }));
               options.push({
                 value: "__create__",
@@ -23621,7 +23630,6 @@
                 { label: "Nombre", primary: true, get: (c) => c.es },
                 { label: "Nom (CA)", get: (c) => c.ca || "", html: (c) => esc(c.ca || "—") },
                 { label: "Subpartidas", num: true, get: (c) => erp.partidaItems(c.code).length },
-                { label: "Títulos", num: true, get: (c) => erp.partidaTitles(c.code).length },
                 {
                   label: "Estado",
                   get: (c) => (c.active === false ? "Retirada" : "Activa"),
@@ -23633,7 +23641,10 @@
             return;
           }
 
-          /* ---- Títulos: what gathers partidas, for the paper ---- */
+          /* ---- Títulos: the headings, and only the headings ----
+             A register of names. Which partidas sit under one is a question
+             about a BUDGET since v24, so there is no count to put here — the
+             answer differs for every presupuesto that uses it. */
           const titles = erp.listAll("itemTitles");
           const rows = titles.map((t, n) => Object.assign({ id: t.code, pos: n + 1 }, t));
           renderMasterList(host, {
@@ -23662,7 +23673,6 @@
               { label: "Código", primary: true, get: (t) => t.code },
               { label: "Nombre", primary: true, get: (t) => t.es },
               { label: "Nom (CA)", get: (t) => t.ca || "", html: (t) => esc(t.ca || "—") },
-              { label: "Partidas", num: true, get: (t) => erp.titlePartidas(t.code).length },
               {
                 label: "Estado",
                 get: (t) => (t.active === false ? "Retirado" : "Activo"),
@@ -30085,10 +30095,22 @@
         const signedPct = (cents, bp) =>
           `<td class="num" style="color:${cents < 0 ? "var(--danger)" : "var(--greenDeep)"}">${bp === null ? "—" : (bp / 100).toFixed(1) + "%"}</td>`;
         const out = [];
+        /* A RUN, NOT A GROUP-BY — the same rule the document's bands follow.
+           The partidas arrive in the order the estimator arranged and the paper
+           printed; a band that reordered them to be tidy would describe a
+           different job from the one underneath it. `title` is the words the
+           project inherited at creation (v24), so this reads the same as the
+           quote the customer accepted even if the heading was renamed in the
+           price book since. */
+        let band = null;
         for (const c of tableRows) {
           const key = "c:" + c.chapter;
           const open = ecoOpen.has(key);
           const caret = open ? "▾" : "▸";
+          if ((c.title || "") !== band) {
+            band = c.title || "";
+            if (band) out.push(`<tr class="ecoband"><td colspan="7">${esc(band)}</td></tr>`);
+          }
           out.push(
             `<tr class="click" data-chcosts="${c.chapter}" data-ecotoggle="${esc(key)}"><td class="k"><span translate="no">${caret}</span> ${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
               money(c.budgetCents) +
@@ -30455,6 +30477,7 @@
           const marginCents2 = saleCents - actualCents;
           return {
             chapter: c.num,
+            title: c.title || "",
             budgetCents,
             actualCents,
             saleCents,
@@ -30524,7 +30547,7 @@
            </div>
            ${
              ecoView === "actual"
-               ? `<div class="scroll"><table><thead><tr>
+               ? `<div class="scroll"><table class="ecotree"><thead><tr>
              <th>Partida</th><th class="num">Presupuestado</th><th class="num">Acumulado real</th>
              <th class="num">Desviación</th><th class="num">%</th>
              <th class="num">Margen</th><th class="num">Margen %</th></tr></thead><tbody>
