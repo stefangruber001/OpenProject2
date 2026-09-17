@@ -117,6 +117,10 @@ async function main() {
        `newPage` shares one browser context — one IndexedDB — with everything
        else here. Its own context keeps the writes to itself; running it last
        keeps that true even if somebody takes the context away. */
+    /* Beside testJourney and for its reason: this one CREATES records too, so
+       it takes its own context rather than sharing the browser's one IndexedDB
+       with every read-only suite above. */
+    testNotes,
     testJourney,
   ];
   const onlyAt = process.argv.indexOf("--only");
@@ -1618,6 +1622,9 @@ async function testMobile(browser, base) {
     // The recorrido's register card-ifies like every other one, and its phase
     // strip is the newest thing on it that a 390px column could push sideways.
     "journey",
+    // Notas carries six columns, three of them free prose — the widest thing
+    // this workspace asks a 390px card to hold.
+    "notes",
   ];
   try {
     await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
@@ -2864,10 +2871,10 @@ async function testShell(browser, base) {
     if (sections === 6 && subsOpen === 0) ok("shell: 6 sections, subsection panel collapsed");
     else bad("shell: sections + collapsed panel", `sections=${sections} open=${subsOpen}`);
 
-    // The count, asserted rather than assumed: six secciones, thirty
+    // The count, asserted rather than assumed: six secciones, thirty-two
     // subsecciones declared, five of them hidden (Part 2 · item 3 — hidden,
     // never deleted, so SECTIONS still declares them and their routes live).
-    // Pinned so both a thirty-second sub and a fifth hidden entry arrive
+    // Pinned so both a thirty-third sub and a sixth hidden entry arrive
     // deliberately rather than by drift. It went from 30 to 31 when
     // Configuración › Empresa was built: ORG-01 had been pointing at a screen
     // that did not exist, so no real workspace could issue an invoice.
@@ -2891,11 +2898,17 @@ async function testShell(browser, base) {
       // partidas. A separate screen and not a tab on the one below it, because
       // the two ask different questions: which partidas make up a título, and
       // which subpartidas make up a partida.
-      shape.subs === 31 &&
+      // 32 since DMC-10 · Notas: the test phase's feedback had been arriving as
+      // photographs in a chat, which is how a package of thirteen fixes came to
+      // be reconstructed from two screenshots and four defects nobody had
+      // written down. Under Configuración, beside Usuarios and Idioma — it is a
+      // screen about the software, and Datos maestros holds the company's
+      // records rather than the product's.
+      shape.subs === 32 &&
       shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
-      ok("shell: 6 secciones × 31 declared subs, 5 hidden by name");
-    else bad("shell: 6x31 (5 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 32 declared subs, 5 hidden by name");
+    else bad("shell: 6x32 (5 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -17626,3 +17639,273 @@ main().catch((e) => {
   console.error("harness crashed:", e);
   process.exit(2);
 });
+
+// ── DMC-10 · Notas. The test phase's intake: where a screen is wrong, what it
+//    does now, what it should do and why. The one register in this workspace
+//    that is about the software rather than about the business, so the checks
+//    are about the same three things every other register promises — the record
+//    reaches the engine, the screen reads it back, and the colour means
+//    something — plus the two this one adds: the «where» is a real route, and a
+//    closed note stops carrying a priority rule.
+async function testNotes(browser, base) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    // The register offers Excel and CSV; the suite proves one arrives.
+    acceptDownloads: true,
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#tower`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    // ── The route exists and is not the dead-link fallback.
+    await pg.goto(`${base}/erp.html#notes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+    const head = await pg.evaluate(() => ({
+      title: document.querySelector("#ttl")?.textContent || "",
+      unknown: /Ruta desconocida/.test(document.querySelector("#view").innerText),
+      cols: [...document.querySelectorAll("#view table.mlist th")].map((t) => t.textContent),
+    }));
+    if (head.title === "Notas" && !head.unknown && head.cols.length === 6)
+      ok(`notas: the screen exists under Configuración (${head.cols.length} columns)`);
+    else bad("notas: screen renders", JSON.stringify(head));
+
+    // The Spanish hash resolves like every other address in ROUTE_ALIASES.
+    await pg.goto(`${base}/erp.html#notas`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(600);
+    if ((await pg.evaluate(() => location.hash)) === "#notes")
+      ok("notas: «#notas» resolves to the route");
+    else bad("notas: alias resolves", await pg.evaluate(() => location.hash));
+
+    // ── A NOTE WRITTEN HERE IS A RECORD IN THE ERP. Three of them, one per
+    //    priority, so the row rule has something to distinguish.
+    await pg.goto(`${base}/erp.html#notes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    const before = await pg.evaluate(() => (erp.state.notes || []).length);
+    const seed = [
+      [
+        "journey",
+        "la tarjeta de fase",
+        "No dice por qué",
+        "Que diga la razón",
+        "Parece rota",
+        "high",
+        "open",
+      ],
+      [
+        "customers",
+        "",
+        "No busca por NIF",
+        "Que busque por NIF",
+        "Es como los llamamos",
+        "medium",
+        "doing",
+      ],
+      ["other", "el PDF", "Sale sin logo", "Con el logo", "Lo ve el cliente", "low", "done"],
+    ];
+    for (const [screen, detail, now, should, why, prio, st] of seed) {
+      await pg.click("#ntNew");
+      await pg.waitForTimeout(350);
+      await pg.selectOption("#n_screen", screen);
+      await pg.fill("#n_detail", detail);
+      await pg.fill("#n_now", now);
+      await pg.fill("#n_should", should);
+      await pg.fill("#n_why", why);
+      await pg.selectOption("#n_prio", prio);
+      await pg.selectOption("#n_status", st);
+      await pg.click("#n_save");
+      await pg.waitForTimeout(500);
+    }
+    const written = await pg.evaluate(
+      (n) => ({
+        grew: (erp.state.notes || []).length === n + 3,
+        stored: (erp.state.notes || []).slice(-3).map((x) => [x.screen, x.priority, x.status]),
+        // The KEY is stored, never the label: a label is a translation and
+        // cannot be an address.
+        keys: (erp.state.notes || []).slice(-3).every((x) => x.screen && !/ /.test(x.screen)),
+        closedStamped: (erp.state.notes || []).slice(-1)[0].closedAt !== null,
+        audit: erp.state.audit.slice(-3).every((a) => a.action === "addNote"),
+      }),
+      before,
+    );
+    if (written.grew && written.keys && written.closedStamped && written.audit)
+      ok("notas: a note entered here is a record in the ERP, keyed on the route");
+    else bad("notas: note written to the ERP", JSON.stringify(written));
+
+    const shown = await pg.evaluate(() => ({
+      rows: document.querySelectorAll("#view tr.click[data-id]").length,
+      classes: [...document.querySelectorAll("#view tr.click")].map((t) => t.className.trim()),
+      pills: [...document.querySelectorAll("#view tr.click")].map((t) =>
+        [...t.querySelectorAll(".pill")].map((x) => x.textContent).join("/"),
+      ),
+      clamped: document.querySelectorAll("#view .nclamp").length,
+      jumps: document.querySelectorAll("#view a[data-go]").length,
+    }));
+    // Priority is the rule down the edge, status is the pill — and a note that
+    // has had its decision carries no rule at all.
+    const ruled = shown.classes.filter((c) => /note-(high|medium)/.test(c)).length;
+    const done = shown.classes.filter((c) => c === "click").length;
+    if (shown.rows >= 3 && ruled === 2 && done >= 1)
+      ok("notas: priority rules the row, and a closed note stops carrying one");
+    else bad("notas: row colour follows priority", JSON.stringify(shown.classes));
+    if (shown.pills.every((p) => p.includes("/")) && shown.clamped === shown.rows * 3)
+      ok("notas: every row states its priority and its status, prose clamped");
+    else bad("notas: pills + clamp", JSON.stringify(shown).slice(0, 200));
+    // «Otro» is not a screen, so it gets no jump — the other two do.
+    if (shown.jumps === 2) ok("notas: only a real screen offers the jump");
+    else bad("notas: jump on real screens only", String(shown.jumps));
+
+    // ── The jump lands on the screen the note names.
+    await pg.evaluate(() => document.querySelector('#view a[data-go="journey"]').click());
+    await pg.waitForTimeout(700);
+    if ((await pg.evaluate(() => location.hash)) === "#journey")
+      ok("notas: the jump opens the screen the note is about");
+    else bad("notas: jump target", await pg.evaluate(() => location.hash));
+
+    // ── The engine refuses a note that says nothing, and says so.
+    await pg.goto(`${base}/erp.html#notes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(700);
+    const n0 = await pg.evaluate(() => erp.state.notes.length);
+    await pg.click("#ntNew");
+    await pg.waitForTimeout(350);
+    await pg.click("#n_save");
+    await pg.waitForTimeout(500);
+    const refused = await pg.evaluate(() => ({
+      n: erp.state.notes.length,
+      toast: document.querySelector("#toast")?.textContent || "",
+    }));
+    if (refused.n === n0 && /pantalla/i.test(refused.toast))
+      ok("notas: an empty note is refused, with the reason");
+    else bad("notas: empty note refused", JSON.stringify(refused));
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(400);
+
+    // ── Reopening a note shows what was typed, and editing it writes back.
+    //    Addressed by the ROW's id, never by `notes.slice(-1)`: the register
+    //    sorts outstanding-and-urgent to the top, so the first row and the last
+    //    record written stopped being the same note the day that sort arrived.
+    const target = await pg.evaluate(
+      () => document.querySelector("#view tr.click[data-id]").dataset.id,
+    );
+    await pg.locator(`#view tr.click[data-id="${target}"]`).click();
+    await pg.waitForTimeout(500);
+    await pg.selectOption("#n_prio", "low");
+    await pg.click("#n_save");
+    await pg.waitForTimeout(600);
+    const edited = await pg.evaluate((id) => {
+      const n = erp.state.notes.find((x) => x.id === id);
+      return { priority: n.priority, logged: erp.state.audit.slice(-1)[0].action };
+    }, target);
+    if (edited.priority === "low" && edited.logged === "updateNote")
+      ok("notas: a note reopened here is edited in place, and the change is logged");
+    else bad("notas: edit writes back", JSON.stringify(edited));
+
+    // ── It survives a reload: the register reads the blob, not the page.
+    await pg.reload({ waitUntil: "networkidle" });
+    await pg.waitForTimeout(1200);
+    const after = await pg.evaluate(() => ({
+      state: (erp.state.notes || []).length,
+      rows: document.querySelectorAll("#view tr.click[data-id]").length,
+    }));
+    if (after.state >= 3 && after.rows >= 3)
+      ok(`notas: the notes survive a reload (${after.rows} on screen)`);
+    else bad("notas: persisted across a reload", JSON.stringify(after));
+
+    // ── And they come out, which is the point of collecting them.
+    const dl = pg.waitForEvent("download", { timeout: 20000 }).catch(() => null);
+    await pg.click("#ntExp");
+    await pg.waitForTimeout(300);
+    await pg.click("#ntExpCsv");
+    const file = await dl;
+    if (file && /^notas-.*\.csv$/.test(file.suggestedFilename()))
+      ok(`notas: the register exports (${file.suggestedFilename()})`);
+    else bad("notas: export produces a file", file ? file.suggestedFilename() : "(none)");
+
+    // ── THE TALLY AND THE FILTER, which is what following the closures needs.
+    //    The counts are per status and the picker narrows the register to one.
+    const band = await pg.evaluate(() => ({
+      pills: [...document.querySelectorAll("#ntHead .pill")].map((p) =>
+        p.innerText.replace(/\s+/g, " ").trim(),
+      ),
+      all: document.querySelectorAll("#ntList tr.click[data-id]").length,
+    }));
+    if (band.pills.length === 4 && band.pills.every((p) => /\d/.test(p)))
+      ok(`notas: the head counts every status (${band.pills.join(" · ")})`);
+    else bad("notas: status tally", JSON.stringify(band.pills));
+
+    await pg.selectOption("#ntStatus", "open");
+    await pg.waitForTimeout(600);
+    const onlyOpen = await pg.evaluate(() => ({
+      rows: document.querySelectorAll("#ntList tr.click[data-id]").length,
+      states: [...document.querySelectorAll("#ntList tr.click")].map(
+        (t) => t.querySelectorAll(".pill")[1]?.textContent,
+      ),
+      open: (erp.state.notes || []).filter((n) => n.status === "open").length,
+    }));
+    const narrowed =
+      onlyOpen.rows === onlyOpen.open &&
+      onlyOpen.rows > 0 &&
+      onlyOpen.rows < band.all &&
+      new Set(onlyOpen.states).size === 1;
+    if (narrowed) ok(`notas: filtering by status shows only those (${onlyOpen.rows} open)`);
+    else bad("notas: status filter narrows the list", JSON.stringify(onlyOpen));
+    await pg.selectOption("#ntStatus", "");
+    await pg.waitForTimeout(600);
+    if (
+      (await pg.evaluate(() => document.querySelectorAll("#ntList tr.click").length)) === band.all
+    )
+      ok("notas: «Todas» puts every note back");
+    else bad("notas: filter resets", "count did not return");
+
+    /* ── A DOCUMENT WITH NO `seq` MUST STILL SAVE. The operator hit this on the
+       development system: every verb that mints an id died on «undefined is not
+       an object (evaluating 'this.state.seq.id')», because `ERP.from()` restored
+       the arrays and let the objects through. Driven here the way it actually
+       happened — the engine rebuilt from a document with the key removed, then
+       a note entered through the form. The id must also NOT restart at 1, or the
+       counter hands out identities records already hold. */
+    const existingIds = await pg.evaluate(() => {
+      const ids = new Set();
+      (function walk(n, d) {
+        if (!n || typeof n !== "object" || d > 12) return;
+        if (Array.isArray(n)) return n.forEach((x) => walk(x, d + 1));
+        if (typeof n.id === "string") ids.add(n.id);
+        for (const k of Object.keys(n)) walk(n[k], d + 1);
+      })(erp.toJSON(), 0);
+      const doc = JSON.parse(JSON.stringify(erp.toJSON()));
+      delete doc.seq;
+      erp = ErpEngine.ERP.from(doc);
+      return { all: [...ids], seq: erp.state.seq && erp.state.seq.id };
+    });
+    await pg.goto(`${base}/erp.html#notes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+    await pg.click("#ntNew");
+    await pg.waitForTimeout(350);
+    await pg.selectOption("#n_screen", "items");
+    await pg.fill("#n_should", "It saves on a document with no counter");
+    await pg.click("#n_save");
+    await pg.waitForTimeout(700);
+    const healed = await pg.evaluate((known) => {
+      const last = (erp.state.notes || []).slice(-1)[0];
+      return {
+        saved: !!last && last.should === "It saves on a document with no counter",
+        id: last && last.id,
+        reused: !!last && known.includes(last.id),
+        toast: document.querySelector("#toast")?.textContent || "",
+      };
+    }, existingIds.all);
+    if (healed.saved && !healed.reused)
+      ok(`notas: a document with no counter still saves, without reusing an id (${healed.id})`);
+    else bad("notas: seq-less document saves", JSON.stringify(healed));
+
+    if (!errors.length) ok("notas: no console/page errors");
+    else bad("notas: console clean", errors.slice(0, 3).join(" | ").slice(0, 300));
+  } catch (e) {
+    bad("notas: suite", String(e).slice(0, 200));
+  } finally {
+    await ctx.close();
+  }
+}

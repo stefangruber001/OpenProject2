@@ -4279,8 +4279,15 @@
         font: 600 11px var(--sans);
         color: var(--muted);
       }
+      /* `textarea` belongs here and was missing: a control with no font of its
+         own falls back to the browser's monospace, so every drawer with a
+         free-text box — five of them, Notas included — rendered its longest
+         field in a different typeface from the inputs beside it. The
+         `max-width` rule above already lists textarea, which is where the
+         intent was; this is the half that never got written. */
       .field input,
-      .field select {
+      .field select,
+      .field textarea {
         font: 13.5px var(--sans);
         color: var(--ink);
         background: var(--paper);
@@ -4289,7 +4296,12 @@
         padding: 8px 10px;
         outline: 0;
       }
-      .field input:focus {
+      .field textarea {
+        resize: vertical;
+        line-height: 1.5;
+      }
+      .field input:focus,
+      .field textarea:focus {
         border-color: var(--green);
         box-shadow: 0 0 0 3px var(--greenSoft);
       }
@@ -6278,6 +6290,7 @@
             { k: "alerts", lab: "Alertas", code: "DMC-07" },
             { k: "users", lab: "Usuarios", code: "DMC-08" },
             { k: "language", lab: "Idioma", code: "DMC-09" },
+            { k: "notes", lab: "Notas", code: "DMC-10" },
           ],
         },
       ];
@@ -6311,6 +6324,7 @@
         finanzas: "financials",
         catalogos: "items",
         reportes: "tower", // never had a screen behind it
+        notas: "notes",
       };
       /** The key a hash actually resolves to. Unknown keys fall through unchanged so
           a typo lands on the default rather than being rewritten into a wrong screen. */
@@ -6347,6 +6361,14 @@
           if (k === "banking")
             return S.movements.filter((m) => m.status === "unallocated").length || "";
           if (k === "alerts") return erp.managedAlerts().length || "";
+          /* What is still open, not how many were ever written — and `|| ""` so a
+             board with nothing outstanding carries no badge at all, the
+             `banking`/`alerts` reading rather than `customers`' standing zero. */
+          if (k === "notes")
+            return (
+              (S.notes || []).filter((n) => n.status === "open" || n.status === "doing").length ||
+              ""
+            );
         } catch (e) {}
         return "";
       }
@@ -12352,6 +12374,137 @@
         $("#pr_again").onclick = () => newPriceDrawer(p.itemId);
       }
 
+      /* ==================== Notas (DMT-05): the maps and the form ====================
+         `[label, tone]` like every other status enum on this workspace
+         (`CHANGE_STATUS_LABEL`, `OPP_STATUS`, `CAP_STATUS`), so the pill is built
+         the same way here as everywhere else and the words are reachable by the
+         dictionary as whole text nodes.
+
+         «No se hará» is the plain grey pill on purpose. It is a decision, and a
+         decision that something will not be done should be quiet — a red one
+         would read as a failure every time somebody scrolled past it. */
+      /* Which status the register is showing, "" for all. Module-level like
+         `chgStage` on Modificaciones, and for the same reason: the view is a
+         pure function of state re-run by `render()`, so a filter kept inside it
+         would reset on every keystroke in the search box. */
+      let jnStatus = "";
+      const NOTE_STATUS = {
+        open: ["Abierta", "y"],
+        doing: ["En curso", "b"],
+        done: ["Hecha", "g"],
+        wontdo: ["No se hará", ""],
+      };
+      /* NOT «Alta / Media / Baja». «Alta» is already this workspace's word for a
+         registration — its English is "Registered", as in alta en la Seguridad
+         Social — and «Baja» is the other half of that pair. A priority column
+         reading «Registered» is the same mistake «Pendiente» → "Outstanding" made
+         on the recorrido. These three words are this register's own. */
+      const NOTE_PRIORITY = {
+        high: ["Urgente", "r"],
+        medium: ["Normal", "y"],
+        low: ["Menor", ""],
+      };
+      /* The two orderings the register sorts on, as data rather than as a
+         comparator full of string literals: a decided note sinks, and among the
+         rest the loudest rises. */
+      const NOTE_OPEN = (n) => (n.status === "done" || n.status === "wontdo" ? 1 : 0);
+      const NOTE_RANK = { high: 0, medium: 1, low: 2 };
+      function notePill(map, k) {
+        const lab = map[k] || ["—", ""];
+        return `<span class="pill ${lab[1]}">${esc(lab[0])}</span>`;
+      }
+      /** The screen a note is about, in the READER's language. The record stores
+       *  the route KEY — a label is a translation and cannot be an address, and a
+       *  note filed on an English phone has to read in Spanish on the next one. */
+      function noteScreenLabel(n) {
+        if (SUBMAP[n.screen]) return SUBMAP[n.screen].lab;
+        return n.screen === "other" ? "Otro" : n.screen || "—";
+      }
+      /** Every screen this app has, grouped by its section, straight out of
+       *  SECTIONS — so a screen added tomorrow is on this list tomorrow, with no
+       *  second copy of the menu to keep in step. */
+      function noteScreenOptions(sel) {
+        const groups = SECTIONS.map(
+          (sec) =>
+            `<optgroup label="${esc(sec.lab)}">${sec.subs
+              .map(
+                (x) =>
+                  `<option value="${esc(x.k)}"${x.k === sel ? " selected" : ""}>${esc(x.lab)}</option>`,
+              )
+              .join("")}</optgroup>`,
+        ).join("");
+        return `<option value=""${sel ? "" : " selected"}>— elegir la pantalla —</option>${groups}<option value="other"${sel === "other" ? " selected" : ""}>Otro</option>`;
+      }
+      function noteOptions(map, sel) {
+        return Object.keys(map)
+          .map(
+            (k) => `<option value="${k}"${k === sel ? " selected" : ""}>${esc(map[k][0])}</option>`,
+          )
+          .join("");
+      }
+      /** The form, shared by «nueva» and «abrir»: one shape, so the two can never
+       *  drift into asking different questions about the same record. */
+      function noteFormHtml(n) {
+        return `<div class="fgrid">
+         <div class="field full"><label>Pantalla *</label><select id="n_screen">${noteScreenOptions(n.screen)}</select></div>
+         <div class="field full"><label>Dónde exactamente</label><input id="n_detail" value="${esc(n.screenDetail || "")}" placeholder="la tarjeta de fase, en el móvil"></div>
+         <div class="field full"><label>Cómo está ahora</label><textarea id="n_now" rows="2">${esc(n.now || "")}</textarea></div>
+         <div class="field full"><label>Cómo debería estar *</label><textarea id="n_should" rows="2">${esc(n.should || "")}</textarea></div>
+         <div class="field full"><label>Por qué</label><textarea id="n_why" rows="2">${esc(n.why || "")}</textarea></div>
+         <div class="field"><label>Prioridad</label><select id="n_prio">${noteOptions(NOTE_PRIORITY, n.priority || "medium")}</select></div>
+         <div class="field"><label>Estado</label><select id="n_status">${noteOptions(NOTE_STATUS, n.status || "open")}</select></div>
+        </div>`;
+      }
+      function noteFormValues() {
+        return {
+          screen: $("#n_screen").value,
+          screenDetail: $("#n_detail").value.trim(),
+          now: $("#n_now").value.trim(),
+          should: $("#n_should").value.trim(),
+          why: $("#n_why").value.trim(),
+          priority: $("#n_prio").value,
+          status: $("#n_status").value,
+        };
+      }
+      function newNoteDrawer() {
+        const db = openDrawer("Nueva nota");
+        db.innerHTML =
+          noteFormHtml({}) +
+          `<div class="field full" style="margin-top:8px"><button class="btn primary" id="n_save">Guardar la nota</button></div>`;
+        $("#n_save").onclick = () =>
+          mutate(() => {
+            erp.addNote(noteFormValues(), "tester");
+            finishDrawer();
+          }, "Nota guardada");
+      }
+      function noteDrawer(id) {
+        const n = (erp.state.notes || []).find((x) => x.id === id);
+        if (!n) return;
+        /* Titled by the record, like `workerDrawer` and `partyDrawer` — the
+           screen a note is about IS its name. A «Nota · » prefix would also be a
+           bare dictionary key welded to a separator, which the source audit
+           reads as its own literal. */
+        const db = openDrawer(noteScreenLabel(n));
+        db.innerHTML =
+          noteFormHtml(n) +
+          `<div class="field full" style="margin-top:8px"><button class="btn primary" id="n_save">Guardar los cambios</button></div>
+           <div class="card" style="margin-top:12px"><div class="ch"><h3>Ficha</h3></div>
+            <div class="daylist">
+              <div class="it"><span>Abierta el</span><span style="flex:1"></span><b>${fmtD(n.date)}</b></div>
+              <div class="it"><span>Quién la abrió</span><span style="flex:1"></span><b>${esc(n.author || "—")}</b></div>
+              ${
+                n.closedAt
+                  ? `<div class="it"><span>Cerrada el</span><span style="flex:1"></span><b>${fmtD(n.closedAt)}</b></div>`
+                  : ""
+              }
+            </div></div>`;
+        $("#n_save").onclick = () =>
+          mutate(() => {
+            erp.updateNote(id, noteFormValues(), "backoffice");
+            finishDrawer();
+          }, "Nota actualizada");
+      }
+
       function newWorkerDrawer() {
         const db = openDrawer("Nuevo trabajador");
         db.innerHTML = `<div class="fgrid">
@@ -17495,7 +17648,10 @@
               ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>`
               : "";
           const opts = titleRows
-            .map((t) => `<option value="${esc(t.es)}"${t.es === cur ? " selected" : ""}>${esc(t.es)}</option>`)
+            .map(
+              (t) =>
+                `<option value="${esc(t.es)}"${t.es === cur ? " selected" : ""}>${esc(t.es)}</option>`,
+            )
             .join("");
           const none = `<option value=""${cur ? "" : " selected"}>— sin título —</option>`;
           return `<select class="chaptitle" data-chaptitle="${c.id}" title="Título bajo el que se agrupa esta partida">${none}${stray}${opts}</select>`;
@@ -21738,6 +21894,167 @@
           });
         },
 
+        /* ---------- Notas (DMT-05) ----------
+          The test phase's intake, and the only screen in this workspace that is
+          about the SOFTWARE rather than about the business. A tester says where a
+          screen is wrong, what it does now, what it should do and why; the office
+          gives it a priority and walks it to a decision. Before this it arrived as
+          photographs in a chat, which is how a package of thirteen fixes came to be
+          reconstructed from two screenshots and four defects nobody had written
+          down.
+
+          Deliberately the shared register and the shared drawer, not a bespoke
+          board: the people filing these are the people testing the ERP, and a
+          feedback screen that behaved unlike every other screen would be its own
+          first bug report. */
+        notes(v) {
+          $("#sub").textContent =
+            "Qué falla, qué debería hacer y por qué. Cada nota apunta a una pantalla real y se cierra con una decisión.";
+          /* THE TALLY AND THE FILTER, which is what «seguir los cierres» needs a
+             list to have. The register alone says how many notes there are; this
+             says how many are still open, and lets you ask for exactly those.
+             Same shape Modificaciones uses for its etapa — a header above the
+             register, and the filter baked into the list id so paging resets
+             with it instead of leaving you on page 3 of a shorter list.
+
+             Each count is `<span>word</span> <b>number</b>`, never one string:
+             a number welded to a word is one text node no dictionary can hold,
+             which is `countTag`'s lesson and the reason the pill beside
+             «Sin aprobar» is built the same way. */
+          const allNotes = erp.state.notes || [];
+          const tally = { open: 0, doing: 0, done: 0, wontdo: 0 };
+          allNotes.forEach((n) => {
+            if (tally[n.status] != null) tally[n.status]++;
+          });
+          v.innerHTML = `<div id="ntHead" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+             <label style="font-size:12px;color:var(--muted)"><span>Estado</span>
+              <select id="ntStatus" style="font:inherit;font-size:12px;margin-left:6px;padding:5px 7px;border:1px solid var(--line);border-radius: 0;background:var(--paper);color:var(--ink)">
+               <option value="">Todas</option>
+               ${Object.keys(NOTE_STATUS)
+                 .map(
+                   (k) =>
+                     `<option value="${k}"${jnStatus === k ? " selected" : ""}>${esc(NOTE_STATUS[k][0])}</option>`,
+                 )
+                 .join("")}
+              </select></label>
+             <span style="flex:1"></span>
+             ${Object.keys(NOTE_STATUS)
+               .map(
+                 (k) =>
+                   `<span class="pill ${NOTE_STATUS[k][1]}"><span>${esc(NOTE_STATUS[k][0])}</span> <b>${tally[k]}</b></span>`,
+               )
+               .join(" ")}
+            </div><div id="ntList"></div>`;
+          $("#ntStatus").onchange = (e) => {
+            jnStatus = e.target.value;
+            render();
+          };
+          renderMasterList($("#ntList"), {
+            id: "notes-" + (jnStatus || "all"),
+            ids: {
+              q: "ntQ",
+              size: "ntSize",
+              prev: "ntPrev",
+              next: "ntNext",
+              newBtn: "ntNew",
+              exp: "ntExp",
+              expMenu: "ntExpMenu",
+              expXlsx: "ntExpXlsx",
+              expCsv: "ntExpCsv",
+            },
+            newLabel: "＋ Nueva nota",
+            onNew: () => newNoteDrawer(),
+            searchPlaceholder: "Buscar por pantalla o por texto",
+            nounSingular: "nota",
+            nounPlural: "notas",
+            /* WHAT IS LEFT TO DO, FIRST. Newest-first put the two notes that had
+               already been decided at the top of the list and the urgent open one
+               at the bottom, which is backwards for the only job this screen has:
+               «plan the upgrades needed». So the order is outstanding before
+               decided, then urgent before minor, and only then newest first — the
+               same three questions a person triaging asks, in that order. */
+            baseRows: allNotes
+              .map((n, i) => ({ n, i }))
+              .filter((x) => !jnStatus || x.n.status === jnStatus)
+              .sort(
+                (a, b) =>
+                  NOTE_OPEN(a.n) - NOTE_OPEN(b.n) ||
+                  NOTE_RANK[a.n.priority] - NOTE_RANK[b.n.priority] ||
+                  b.i - a.i,
+              )
+              .map((x) => x.n),
+            matches: (n, q) =>
+              [noteScreenLabel(n), n.screenDetail, n.now, n.should, n.why]
+                .join(" ")
+                .toLowerCase()
+                .includes(q),
+            /* PRIORITY IS THE ROW, STATUS IS THE PILL. Two questions, two marks,
+               so neither has to share a colour with the other. The rule down the
+               edge follows CHG-04's: keyed on the STATE, never on this screen, so
+               it cannot silently stop matching the day the table changes shape. */
+            rowClass: (n) =>
+              n.status === "done" || n.status === "wontdo" ? "" : "note-" + n.priority,
+            columns: [
+              {
+                label: "Pantalla",
+                primary: true,
+                get: (n) => noteScreenLabel(n),
+                html: (n) =>
+                  `${esc(noteScreenLabel(n))}${
+                    SUBMAP[n.screen]
+                      ? ` <a href="#" class="ngo" data-go="${esc(n.screen)}" title="Ir a la pantalla">↗</a>`
+                      : ""
+                  }${n.screenDetail ? `<span class="nsub">${esc(n.screenDetail)}</span>` : ""}`,
+              },
+              /* `get` stays plain text, so the export carries the whole note;
+                 `html` wraps it for the two-line clamp on screen. */
+              {
+                label: "Cómo está ahora",
+                get: (n) => n.now || "",
+                html: (n) => `<span class="nclamp">${esc(n.now || "—")}</span>`,
+              },
+              {
+                label: "Cómo debería estar",
+                get: (n) => n.should || "",
+                html: (n) => `<span class="nclamp">${esc(n.should || "—")}</span>`,
+              },
+              {
+                label: "Por qué",
+                get: (n) => n.why || "",
+                html: (n) => `<span class="nclamp">${esc(n.why || "—")}</span>`,
+              },
+              {
+                label: "Prioridad",
+                get: (n) => NOTE_PRIORITY[n.priority][0],
+                html: (n) => notePill(NOTE_PRIORITY, n.priority),
+                sheet: (n) => NOTE_PRIORITY[n.priority][0],
+              },
+              {
+                label: "Estado",
+                get: (n) => NOTE_STATUS[n.status][0],
+                html: (n) => notePill(NOTE_STATUS, n.status),
+                sheet: (n) => NOTE_STATUS[n.status][0],
+              },
+            ],
+            onRowClick: (id) => noteDrawer(id),
+            exportFile: "notas",
+            exportSheetName: "Notas",
+            emptyText: jnStatus
+              ? "Ninguna nota en este estado."
+              : "Ninguna nota coincide con la búsqueda.",
+          });
+          /* The jump lives on the cell, so it must not also open the row's
+             drawer — `renderMasterList` binds the click on the whole `tr`. */
+          v.querySelectorAll("a[data-go]").forEach(
+            (a) =>
+              (a.onclick = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                go(a.dataset.go);
+              }),
+          );
+        },
+
         /* ---------- Leads (COM-01, spec §COM-01) ----------
           One standard list of every opportunity — open AND closed — rather than
           the three separate blocks (en curso / visitas / cerradas) this screen
@@ -22855,8 +23172,7 @@
             nounSingular: "partida",
             nounPlural: "partidas",
             baseRows: rows,
-            matches: (c, s) =>
-              c.code.toLowerCase().includes(s) || c.es.toLowerCase().includes(s),
+            matches: (c, s) => c.code.toLowerCase().includes(s) || c.es.toLowerCase().includes(s),
             columns: [
               { label: "Código", primary: true, get: (c) => c.code },
               { label: "Nombre", primary: true, get: (c) => c.es },
@@ -29222,16 +29538,15 @@
            renderBudgetDoc drops pending lines and a band that counted them
            would not match the rows above it. */
         const titles = doc.chapters.map((c) => c.title || "");
-        const bandCents = doc.chapters.map((c) =>
-          c.lines.reduce((s, l) => s + l.totalCents, 0),
-        );
+        const bandCents = doc.chapters.map((c) => c.lines.reduce((s, l) => s + l.totalCents, 0));
         const runTotal = (i) => {
           let total = 0;
           for (let j = i; j < titles.length && titles[j] === titles[i]; j++) total += bandCents[j];
           return total;
         };
         doc.chapters.forEach((c, i) => {
-          if (titles[i] && titles[i - 1] !== titles[i]) rows.push(["", "", titles[i], "", "", "", ""]);
+          if (titles[i] && titles[i - 1] !== titles[i])
+            rows.push(["", "", titles[i], "", "", "", ""]);
           // The chapter as its own banner row, so the file reads in the same
           // order and the same groups as the paper does.
           rows.push([c.num, "", c.name, "", "", "", ""]);

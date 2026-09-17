@@ -11052,7 +11052,94 @@ working.
 Exercised against seven bodies — the real one, dev, explicit production, empty,
 a 502 page, key order reversed, and a docker error string — before pushing.
 
-## S140 — the código is proposed from the name, not demanded before it
+## S140 · Configuración → Notas, the test phase's intake (2026-09-16)
+
+**S140j · It lives under Configuración, not Datos maestros.** Built under
+Maestros and moved on the operator's word, and the word was right: Datos
+maestros holds the COMPANY's records — clientes, proveedores, personal — and a
+note is about the software. Its neighbours under Configuración are Usuarios,
+Alertas and Idioma, which are the other screens about the application rather
+than about the business. `DMC-10`, appended last so the section's tab — named by
+its FIRST sub-route, `company`/ORG-01 — is untouched and all four `nav.json`
+copies stay byte-identical. The route key never changed, so the view, the
+drawers, the `#notas` alias, the badge, the CSS and every dictionary entry moved
+with it for free; what had to change was the two places that had written the old
+section's name down.
+
+The operator is testing the ERP against the live workspace on a phone, and the
+feedback was arriving as screenshots in a chat — not counted, not prioritised,
+never visibly closed. The recorrido package was reconstructed from two
+photographs and four defects nobody had written down. This is the screen that
+stops that happening again.
+
+**S140a · «Where» is a route key, never a label.** The dropdown is built from
+`SECTIONS`, so a screen added tomorrow is on the list tomorrow with no second
+copy of the menu to keep in step, and what the record stores is the route KEY.
+A label is a translation and cannot be an address: a note filed on an English
+phone has to read in Spanish on the next one, and the `↗` has to open the screen
+either way. «Otro» plus a free-text detail covers what is not a screen — a PDF,
+an e-mail, the whole app.
+
+**S140b · Two questions, two marks.** The STATUS is the pill (Abierta gold · En
+curso slate · Hecha green · No se hará plain grey) and the PRIORITY is a 3 px
+rule down the row's left edge, `cfg.rowClass`'s second use after CHG-04. Both
+lessons from that precedent were copied rather than rediscovered: the selector
+is keyed on the STATE and not on the screen showing it — `tr.xrow.unapproved`
+silently stopped matching the day that table became a register — and it is a
+border, because the table is `border-collapse: collapse` where a cell shadow is
+not painted at all in Chromium. A note that has had its decision carries no
+rule: leaving one would mean the colour marked how loudly something was once
+filed rather than what is left to do. «No se hará» is the grey pill for the
+same reason — a decision not to act should be quiet, not red.
+
+**S140c · «Urgente / Normal / Menor», not «Alta / Media / Baja».** This
+dictionary already spends «Alta» on a registration — its English is
+"Registered", as in alta en la Seguridad Social — and «Baja» is the other half
+of that pair. A priority column reading "Registered" would be «Pendiente» →
+"Outstanding" (S77 · the recorrido) a second time, and the second time is not a
+surprise, it is a pattern: **before naming a status, look the word up.** Three
+words this register owns outright cost nothing and cannot collide.
+
+**S140d · Outstanding first, not newest first.** The first ordering put the two
+already-decided notes at the top and the urgent open one at the bottom, which
+is backwards for the only job this screen has. It is open-before-decided, then
+urgent-before-minor, then newest — the three questions a person triaging asks,
+in that order. Found by looking at the screenshot, not by a test.
+
+**S140e · No migration, against the ladder's habit.** Every other new collection
+got a rung. `ERP.from()` already backfills any array the constructor declares
+(`erp-engine.js:925`), verified on a blob with the key deleted, so a rung would
+buy nothing — and `CURRENT_VERSION` 21 → 22 would make a blob written here
+unreadable by an older cached build, because `migrate()` throws when the blob is
+newer than the code. Declared in the constructor, not migrated.
+
+**S140f · The state blob, not `meta`.** A note is about the software rather than
+about the business, which argues for keeping it out of the tenant's records —
+but `meta` is per-device UI preference storage by its own docstring, and a note
+has to reach the people who can fix it. What reaches us goes through the blob's
+persistence, sync and export. `state.feedback` is the existing precedent for a
+small non-core collection.
+
+**S140g · No `erp-ownership.json` entry.** That file is one entry per **spec
+domain area** and its guard requires a non-empty `specSection`. A QA-intake
+screen has no section in the requirements document, and inventing one to satisfy
+a schema would make the file lie about what the product owes the spec. The guard
+passes at 27 areas unchanged.
+
+**S140h · `.field textarea` had no typeface.** Not part of the ask, found while
+driving the form: the rule at `erp.html:4166` styles `input, select` and the
+`max-width` rule beside it already lists `textarea` — so the intent was there
+and the font half was never written, and all five drawers with a free-text box
+rendered their longest field in the browser's monospace. Fixed for all five.
+
+**S140i · The suite's `shape.subs` pin went 31 → 32.** Deliberately pinned so a
+thirty-second sub arrives on purpose rather than by drift; this is that purpose.
+And one bug in the new suite itself, worth writing down because it is the shape
+of a whole class: it edited the first ROW and asserted on `notes.slice(-1)`,
+which were the same record until S140d's sort arrived and then silently were not.
+Addressed by the row's own `data-id` now.
+
+## S141 — the código is proposed from the name, not demanded before it
 
 The operator's screenshot circled the `Código *` field on «Nuevo título» and
 asked for it to be automatic: they type the name, the system derives the code.

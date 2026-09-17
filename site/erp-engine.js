@@ -680,6 +680,44 @@
     return out;
   }
 
+  /**
+   * The largest `<prefix>_<n>` id anywhere in a document, or 0 if it holds none.
+   *
+   * Used by `from()` to rebuild a lost `seq` counter. It has to be the WHOLE
+   * document and not just the top-level collections, because one counter mints
+   * every id in the system and several of them live nested — a budget's
+   * versions, a version's chapters, a chapter's lines, a line's photographs.
+   * Counting only the registers would restart the counter in the middle of the
+   * range those nested records already occupy, which is the duplicate-id bug
+   * this is here to prevent rather than a smaller version of it.
+   *
+   * Depth-limited and cycle-safe: a document is JSON and cannot legally contain
+   * a cycle, but this runs on input from an importer and must not hang on one.
+   */
+  function highestIdIn(state) {
+    let max = 0;
+    const seen = new Set();
+    const walk = (node, depth) => {
+      if (!node || typeof node !== "object" || depth > 12 || seen.has(node)) return;
+      seen.add(node);
+      if (Array.isArray(node)) {
+        for (const item of node) walk(item, depth + 1);
+        return;
+      }
+      const id = node.id;
+      if (typeof id === "string") {
+        const m = /^[A-Za-z]+_(\d+)$/.exec(id);
+        if (m) {
+          const n = Number(m[1]);
+          if (Number.isFinite(n) && n > max) max = n;
+        }
+      }
+      for (const k of Object.keys(node)) walk(node[k], depth + 1);
+    };
+    walk(state, 0);
+    return max;
+  }
+
   /*
    * DAS-06 — one entry per alert CONDITION alerts() can raise, keyed by a
    * stable code. This is the single place that says what TYPE a condition
@@ -1525,6 +1563,12 @@
         // backfill in from(), which can only restore collections it can see on
         // a fresh instance.
         feedback: [],
+        /* Tester feedback about the APPLICATION, not about the business — where
+           a screen is wrong, what it should do instead and why. It lives in the
+           state blob rather than in the store's `meta` because `meta` is this
+           device's preferences and a note has to reach the people who can fix
+           it: persisted, synced and exported like every other record. */
+        notes: [],
         supplierPerf: [],
         assignments: [],
         recurring: [],
@@ -1555,23 +1599,88 @@
       // feature. Cheap here, very expensive to diagnose there.
       for (const k of Object.keys(fresh))
         if (Array.isArray(fresh[k]) && !Array.isArray(e.state[k])) e.state[k] = [];
-      // `lists` is an object, not an array, so the loop above cannot restore
-      // it — and a blob without it has no units and no payment terms, which is
-      // every picker in the application empty. The v10 migration is the real
-      // owner; this is the belt-and-braces for a blob that reached `from()`
-      // without passing through the ladder (a direct construction in a test,
-      // a fixture written by hand).
-      if (!e.state.lists || typeof e.state.lists !== "object") e.state.lists = seedLists();
+      /* THE SAME PROMISE FOR THE OBJECTS, which it did not keep.
+         The loop above restores arrays only, so six plain objects fell through
+         it — `series`, `alertOverrides`, `imports`, `plans`, `lists` and `seq` —
+         and two of them are load-bearing: `_id()` reads `seq.id` and
+         `nextNumber()` reads `series`. A blob missing either takes down EVERY
+         verb that mints something, which is most of the application, with a
+         message that names neither the document nor the cause: «undefined is
+         not an object (evaluating 'this.state.seq.id')» on pressing Save.
+
+         It is reachable: `from()` assigns the incoming document verbatim and
+         `toJSON()` hands that same object back, so `POST /erp/import` stores
+         whatever shape it was given — an export from an older build, a fixture
+         written by hand — and the gap is then permanent for that tenant. The
+         migration ladder never adds `seq` either. Restored here, where boot,
+         the command path and the importer all pass. */
+      /* Asked BEFORE the loop below, which would otherwise answer it: that loop
+         restores a missing `seq` with the fresh engine's `{id:1}`, and a counter
+         that has just been reset reads as a perfectly healthy one. */
+      const seqOk = e.state.seq && Number.isFinite(e.state.seq.id) && e.state.seq.id >= 1;
+      for (const k of Object.keys(fresh)) {
+        if (Array.isArray(fresh[k]) || fresh[k] === null || typeof fresh[k] !== "object") continue;
+        if (!e.state[k] || typeof e.state[k] !== "object" || Array.isArray(e.state[k]))
+          e.state[k] = fresh[k];
+      }
+      // `lists` needs more than presence: a blob can carry the object and be
+      // missing a kind inside it, which is one empty picker rather than all of
+      // them. The v10 migration is the real owner; this is belt-and-braces for
+      // a document that reached `from()` without passing through the ladder.
       for (const kind of LIST_KINDS)
         if (!Array.isArray(e.state.lists[kind])) e.state.lists[kind] = seedLists()[kind];
+      /* AND `seq` NEEDS MORE THAN PRESENCE TOO — it needs to be past the ids
+         already in the document. Restoring the fresh `{id:1}` onto a populated
+         blob is worse than the crash it replaces: the counter hands out `pty_1`
+         again and the second record quietly takes the first one's identity,
+         which no error ever reports. So the counter is set from the high-water
+         mark of every `<prefix>_<n>` id the document actually holds. */
+      if (!seqOk) e.state.seq = { id: highestIdIn(e.state) + 1 };
       return e;
     }
 
     /* ---------- internals ---------- */
+    /**
+     * The id minter, and the one line in the engine that must not be able to
+     * throw an unreadable error.
+     *
+     * `from()` restores a missing counter on the way in, and that is where the
+     * repair belongs. This is the second lock, here because `from()` is not the
+     * only way a document reaches an engine and because the failure it prevents
+     * is indistinguishable from a broken application: `this.state.seq.id` on an
+     * absent `seq` reads «undefined is not an object (evaluating
+     * 'this.state.seq.id')», which names neither the document nor the cause, and
+     * it fires on EVERY verb that mints anything — so the operator sees an ERP
+     * that cannot save a customer, a note or an invoice, with no clue why.
+     *
+     * One known producer strips it for real: the server redacts the document for
+     * an account without `erp.read.all`, and the redaction is built field by
+     * field with no `seq` in it. Healing here keeps that from presenting as a
+     * broken build.
+     *
+     * It resumes past the ids the document already holds — never at 1, which
+     * would hand out identities records already carry — and says so in the audit
+     * trail, because a counter that silently rebuilt itself is exactly the kind
+     * of thing somebody needs to find later.
+     */
     _id(p) {
-      return p + "_" + this.state.seq.id++;
+      const s = this.state;
+      if (!s.seq || !Number.isFinite(s.seq.id) || s.seq.id < 1) {
+        s.seq = { id: highestIdIn(s) + 1 };
+        if (Array.isArray(s.audit))
+          s.audit.push({
+            ts: s.today,
+            user: "system",
+            action: "rebuiltIdCounter",
+            ref: String(s.seq.id),
+          });
+      }
+      return p + "_" + s.seq.id++;
     }
     _log(user, action, ref) {
+      /* Same reasoning as `_id`: a document that arrived without its audit array
+         must not turn every write into an unreadable crash. */
+      if (!Array.isArray(this.state.audit)) this.state.audit = [];
       this.state.audit.push({ ts: this.state.today, user: user || "system", action, ref });
     } // ORG-07
     setToday(d) {
@@ -12690,6 +12799,63 @@
       this.state.feedback.push(rec);
       this._log(user, "addFeedback", p.code + " " + rec.kind);
       return rec;
+    }
+
+    /* ===================== Notas — feedback about this software =====================
+       The test phase's intake. A tester says WHERE (a route key of this app,
+       never its label — the label is a translation and the key is the address),
+       what it does now, what it should do and why; the office triages it with a
+       priority and walks it to a decision.
+
+       The validation is deliberately thin. A note half-typed on a phone in a
+       corridor has to be savable, or it does not get written at all and we are
+       back to screenshots — so only the two fields that make a note actionable
+       are required, and everything else may be empty and filled in later. */
+    NOTE_STATUS = ["open", "doing", "done", "wontdo"];
+    NOTE_PRIORITY = ["high", "medium", "low"];
+    addNote(n, user) {
+      const rec = Object.assign(
+        {
+          id: this._id("nte"),
+          date: this.state.today,
+          screen: "", // a route key, or "other"
+          screenDetail: "",
+          now: "",
+          should: "",
+          why: "",
+          priority: "medium",
+          status: "open",
+          author: user || "backoffice",
+          closedAt: null,
+        },
+        n,
+      );
+      if (!rec.screen) throw new Error("Una nota necesita decir en qué pantalla");
+      if (!String(rec.should).trim()) throw new Error("Una nota necesita decir cómo debería estar");
+      if (!this.NOTE_STATUS.includes(rec.status)) throw new Error("Unknown note status");
+      if (!this.NOTE_PRIORITY.includes(rec.priority)) throw new Error("Unknown note priority");
+      if (rec.status === "done" || rec.status === "wontdo") rec.closedAt = rec.date;
+      this.state.notes.push(rec);
+      this._log(user, "addNote", rec.screen);
+      return rec;
+    }
+    /** A whitelist, like `updateTask`: a patch from a form must never be able to
+     *  rewrite the id, the author or the date the note was raised. */
+    updateNote(id, patch, user) {
+      const n = this.state.notes.find((x) => x.id === id);
+      if (!n) throw new Error("Note not found");
+      const allowed = ["screen", "screenDetail", "now", "should", "why", "priority", "status"];
+      for (const k of allowed) if (patch[k] !== undefined) n[k] = patch[k];
+      if (!n.screen) throw new Error("Una nota necesita decir en qué pantalla");
+      if (!String(n.should).trim()) throw new Error("Una nota necesita decir cómo debería estar");
+      if (!this.NOTE_STATUS.includes(n.status)) throw new Error("Unknown note status");
+      if (!this.NOTE_PRIORITY.includes(n.priority)) throw new Error("Unknown note priority");
+      /* Stamped when it STOPS being open and cleared when it reopens, so
+         «cerrada el» can never outlive the decision that closed it. */
+      const closed = n.status === "done" || n.status === "wontdo";
+      n.closedAt = closed ? n.closedAt || this.state.today : null;
+      this._log(user, "updateNote", n.screen + " " + n.status);
+      return n;
     }
     validateVisit(visitId, patch, user) {
       // VIS-08: back office completes/corrects/validates the site capture
