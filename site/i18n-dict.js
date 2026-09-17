@@ -75,6 +75,7 @@ window.CANEI_DICT = {
       "Un título agrupa partidas en el presupuesto. Al elegirlo se añade la primera partida debajo.",
       "A section groups line items in the quote. Choosing one adds the first line item under it.",
     ],
+    ["ya está en este presupuesto", "already in this quote"],
     ["＋ Nuevo título…", "＋ New section…"],
     ["se añade al catálogo", "added to the catalogue"],
     ["Elementos de presupuesto", "Budget items"],

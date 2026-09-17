@@ -276,6 +276,7 @@ window.CANEI_DICT.ca = {
     "Sense un document no es pot facturar ni contractar — la fitxa es crea igualment i es completa després",
   "Un título agrupa partidas en el presupuesto. Al elegirlo se añade la primera partida debajo.":
     "Un títol agrupa partides al pressupost. En triar-lo s'afegeix la primera partida a sota.",
+  "ya está en este presupuesto": "ja hi és en aquest pressupost",
   "＋ Nuevo título…": "＋ Nou títol…",
   "se añade al catálogo": "s'afegeix al catàleg",
   "Elementos de presupuesto": "Elements de pressupost",

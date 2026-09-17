@@ -3646,7 +3646,44 @@ Gates: site E2E 833/833 · boundaries · lint · check-types · test · test:syn
 · test:codes 38 · test:links 29 · test:shell 20 · test:band · test:docs ·
 test:pdf 44 · test:docx 124 · literals 158/158 · i18n coverage complete.
 
-## S32 · The shared password was nobody, and DEV saved nothing (2026-09-17)
+## S33 · The same trade in two sections of one job (2026-09-17)
+
+**Done, on dev — not released.** Two follow-ups to S32, both found by the
+operator asking the question that breaks the model: «what if a budget has two
+titles and inside the same partida and subpartida? How do you assign this? How
+is the economical control run?»
+
+- **The data model already answered it.** A budget chapter is identified by its
+  id and numbered by position; the partida name and the título are fields on
+  it. «Reforma de baño → Fontanería» and «Salón → Fontanería» are two chapters
+  with two numbers, and every cost row — bill allocation, hours, movement,
+  captured ticket — stores `chapterNum` and `lineId`, never a name. The
+  baseline gives each its own título, so the control screen bands them apart
+  and nothing has to disambiguate anything.
+- **The builder said no.** `addChapterStep` hid a partida already used in this
+  presupuesto — right under the model where a título was a global category and
+  a partida appeared once, wrong under this one. The engine never agreed:
+  `addChapter` does not look at names. Now offered and **marked** «ya está en
+  este presupuesto», because adding it twice by accident should be visible and
+  adding it twice on purpose should be one click.
+- **And the forms now say WHICH Fontanería.** `chapterOptions` groups by the
+  baseline chapter's título, so the purchase form, the subcontract form, the
+  cost form, every bill-allocation row and the crew's hours entry show título →
+  partida → subpartida. Runs, not a group-by; a chapter with no título stays
+  ungrouped, so a company that uses none sees the list it always saw. Nothing
+  new is stored on the expense — the título is the chapter's, and the chapter
+  number is what the cost records.
+
+The three gates are the operator's own case: two Fontanerías, one hour on one
+and three on the other, asserting distinct chapter numbers and
+`cost(baño) × 3 === cost(salón)` — if the two were ever conflated one figure
+would be carrying the other's.
+
+Gates: site E2E 836/836 · boundaries · lint · check-types · test · test:sync 20
+· test:codes 38 · test:links 29 · test:shell 20 · test:band · test:pdf 44 ·
+test:docx 124 · literals 158/158.
+
+## S34 · The shared password was nobody, and DEV saved nothing (2026-09-17)
 
 **Done, on the branch — not on dev yet.** The operator's report: «the info that
 I am putting on DEV does not survive the session in the browser.» It was worse
@@ -3702,4 +3739,4 @@ is the same failure shape.
 
 Gates: boundaries · lint · check-types · test 204 · test:sync 26 · test:codes
 38 · test:links 29 · test:shell 20 · test:band · test:docs · test:pdf 44 ·
-test:docx 124 · site E2E 833/833 on the merged tree.
+test:docx 124 · site E2E on the merged tree, below.
