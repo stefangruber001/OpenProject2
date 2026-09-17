@@ -8790,12 +8790,34 @@
         // A project reached from ADM-03's allocation panel need not have a frozen
         // baseline — a cost can land on a job before its presupuesto was accepted.
         // The screen offers no partida in that case rather than throwing.
-        return ((p.baseline && p.baseline.chapters) || [])
-          .map(
-            (c) =>
-              `<option value="${c.num}"${c.num === sel ? " selected" : ""}>${c.num}. ${esc(c.name)}</option>`,
-          )
-          .join("");
+        const rows = (p.baseline && p.baseline.chapters) || [];
+        /* GROUPED BY THE SECTION OF THE JOB (v24). Where the money goes is
+           chosen here — a supplier invoice, a subcontract, a cost, an allocation
+           row, the crew's hours — and until the baseline carried the título this
+           list could only say «3. Fontanería». On a job with the same trade in
+           two sections that is a genuine question the form was not answering:
+           which Fontanería? The heading answers it without adding a second
+           control, and without storing anything on the expense — the título is
+           the chapter's, and the chapter number is what the cost records.
+
+           Runs, not a group-by, the same rule the paper and the control screen
+           follow; and a chapter with no título is left ungrouped, so a company
+           that uses none sees exactly the list it saw before. */
+        const out = [];
+        let band = null;
+        for (const c of rows) {
+          const title = c.title || "";
+          if (title !== band) {
+            if (band) out.push("</optgroup>");
+            band = title;
+            if (band) out.push(`<optgroup label="${esc(band)}">`);
+          }
+          out.push(
+            `<option value="${c.num}"${c.num === sel ? " selected" : ""}>${c.num}. ${esc(c.name)}</option>`,
+          );
+        }
+        if (band) out.push("</optgroup>");
+        return out.join("");
       }
       /* The subpartidas of one chapter of a project's ACCEPTED budget. The
                accepted version, not the current one, because costs are controlled
@@ -17208,25 +17230,38 @@
                which partidas belong under it was asking to be curated and
                giving nothing back. The subpartida step below still narrows,
                because a partida's subpartidas really are a fact about the
-               trade — that is the relation worth keeping. */
-            const options = erp
-              .listActive("itemChapters")
-              .filter((c) => !used.has(c.es))
-              .map((c) => {
-                const n = erp
-                  .partidaItems(c.code)
-                  .filter((iid) =>
-                    erp.state.catalogue.some((i) => i.id === iid && i.active !== false),
-                  ).length;
-                return {
-                  value: c.es,
-                  label: c.es,
-                  group: "Del catálogo",
-                  hint: n
+               trade — that is the relation worth keeping.
+
+               AND ONE ALREADY IN THE BUDGET IS STILL OFFERED, marked rather
+               than hidden. Hiding it was right under the old model, where a
+               partida appeared once per presupuesto because the título grouping
+               was global. It is wrong under this one, and the operator found it
+               by asking the question that breaks it: «what if a budget has two
+               titles and inside the same partida and subpartida?» Fontanería
+               genuinely belongs to «Reforma de baño» AND to «Reforma de
+               cocina», and the engine has never objected — `addChapter` does
+               not look at names, and every cost, hour and certification keys on
+               the chapter NUMBER, so the two are separate from the moment they
+               exist. Only this list said no. Marked, because adding it twice by
+               accident should be visible and adding it twice on purpose should
+               be one click. */
+            const options = erp.listActive("itemChapters").map((c) => {
+              const n = erp
+                .partidaItems(c.code)
+                .filter((iid) =>
+                  erp.state.catalogue.some((i) => i.id === iid && i.active !== false),
+                ).length;
+              return {
+                value: c.es,
+                label: c.es,
+                group: "Del catálogo",
+                hint: used.has(c.es)
+                  ? "ya está en este presupuesto"
+                  : n
                     ? n + (n === 1 ? " subpartida" : " subpartidas")
                     : "sin subpartidas todavía",
-                };
-              });
+              };
+            });
             /* CREATE ONE FROM HERE, the way the subpartida picker has always
                let you (Package 1, slide 9: "En caso de no estar creada, dar la
                opción de crearla"). The partida level never got it, and on an

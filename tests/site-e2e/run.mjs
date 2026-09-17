@@ -16375,13 +16375,44 @@ async function testTitles(browser, base) {
         [...document.querySelectorAll("button")]
           .find((x) => /Cancelar/.test(x.textContent))
           .click();
-        return { bano, coci, all };
+        await new Promise((r) => setTimeout(r, 400));
+        /* AND ONE ALREADY IN THE BUDGET IS STILL OFFERED. It used to be hidden,
+           which made the operator's own case unbuildable: «Reforma de baño →
+           Fontanería» and «Reforma de cocina → Fontanería» cannot both exist if
+           the second one is not in the list. Marked instead, so adding it twice
+           is deliberate rather than accidental. */
+        erp.addChapter(b2.id, { name: "E2E Fontanería" });
+        render();
+        await new Promise((r) => setTimeout(r, 700));
+        document.querySelector("#bAddChap").click();
+        await new Promise((r) => setTimeout(r, 700));
+        const again = [...document.querySelectorAll(".mopts input[type=radio]")].map(
+          (x) => x.value,
+        );
+        const row = document.querySelector('.mopts input[type=radio][value="E2E Fontanería"]');
+        const marked = row ? (row.closest("label") || row.parentElement).textContent : "";
+        [...document.querySelectorAll("button")]
+          .find((x) => /Cancelar/.test(x.textContent))
+          .click();
+        return { bano, coci, all, again, marked };
       });
       const ALL = ["E2E Fontanería", "E2E Albañilería", "E2E Electricidad", "E2E Pintura"];
       const everything = (got) => got && ALL.every((w) => got.includes(w));
       if (everything(narrowed.bano) && everything(narrowed.coci) && everything(narrowed.all))
         ok("presupuestador: every título offers every partida — the grouping is the budget's");
       else bad("presupuestador: the título does not filter the partidas", JSON.stringify(narrowed));
+
+      if (
+        narrowed.again &&
+        narrowed.again.includes("E2E Fontanería") &&
+        /ya está en este presupuesto/.test(narrowed.marked || "")
+      )
+        ok("presupuestador: a partida already in the budget is offered again, marked not hidden");
+      else
+        bad(
+          "presupuestador: a used partida stays on offer",
+          JSON.stringify({ again: narrowed.again, marked: narrowed.marked }),
+        );
     } finally {
       await flow.close();
     }
@@ -16496,22 +16527,66 @@ async function testTitles(browser, base) {
         });
         return ch;
       };
-      mk("E2E Fontanería", "E2E Reforma de baño");
+      const bano = mk("E2E Fontanería", "E2E Reforma de baño");
       mk("E2E Alicatado", "E2E Reforma de baño");
-      mk("E2E Pintura", "E2E Salón");
+      /* THE SAME PARTIDA IN A SECOND SECTION — the operator's question: "what
+         if a budget has two titles and inside the same partida and subpartida?"
+         Fontanería belongs to the bathroom AND to the sitting room, and the two
+         must stay apart all the way down. They are different chapters with
+         different numbers from the moment they exist, and every cost keys on
+         the number, so nothing ever has to disambiguate a name. */
+      const salon = mk("E2E Fontanería", "E2E Salón");
       erp.issueVersion(b.id, {}, "e2e");
       erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "e2e" }, "e2e");
       const prj = erp.createProjectFromAcceptance(b.id, "e2e");
+      // One hour on one Fontanería, three on the other. If the two chapters
+      // were ever conflated, one figure would be carrying the other's cost.
+      const worker = (erp.state.workers[0] || {}).id || null;
+      // Partida AND subpartida, which the engine requires for hours on a job —
+      // and which is the whole point here: the two Fontanerías have different
+      // chapters and different lines, so neither the hour nor its cost can
+      // wander from one section of the work to the other.
+      for (const [ch, h] of [
+        [bano, 1000],
+        [salon, 3000],
+      ])
+        erp.recordHours(
+          {
+            workerId: worker,
+            projectId: prj.id,
+            chapterNum: ch.num,
+            lineId: ch.lines[0].id,
+            hoursMilli: h,
+            date: erp.state.today,
+          },
+          "e2e",
+        );
       // Straight to the full-screen «Avance económico» for that job, which is
       // the table the operator named as the economic control.
       gProject = prj.id;
       ecoFull = true;
       go("economics");
       await new Promise((r) => setTimeout(r, 1200));
+      const eco = erp.chapterEconomics(prj.id);
+      const costOf = (num) =>
+        (eco.find((c) => String(c.num) === String(num)) || {}).actualCents || 0;
       return {
         baseline: prj.baseline.chapters.map((c) => c.title),
-        economics: erp.chapterEconomics(prj.id).map((c) => c.title),
+        economics: eco.map((c) => c.title),
         needs: erp.purchaseNeeds(prj.id).map((c) => c.title),
+        names: prj.baseline.chapters.map((c) => c.name),
+        twoNums: bano.num !== salon.num,
+        // Three times the hours, three times the cost, and neither borrowed.
+        split: costOf(bano.num) > 0 && costOf(bano.num) * 3 === costOf(salon.num),
+        // …and the assignment forms say WHICH Fontanería, with no second control.
+        groups: (() => {
+          const host = document.createElement("div");
+          host.innerHTML = `<select>${chapterOptions(prj.id)}</select>`;
+          return [...host.querySelectorAll("optgroup")].map((g) => [
+            g.label,
+            g.querySelectorAll("option").length,
+          ]);
+        })(),
         // One band per RUN, so the two bathroom partidas share one and the
         // salón opens its own — the same rule the paper follows.
         bands: [...document.querySelectorAll("table.ecotree tr.ecoband td")].map((t) =>
@@ -16530,6 +16605,25 @@ async function testTitles(browser, base) {
         "proyecto: the budget's títulos are inherited by the baseline, the economics and the screen",
       );
     else bad("proyecto: título inheritance", JSON.stringify(inherit));
+
+    const J = JSON.stringify;
+    if (
+      J(inherit.names) === J(["E2E Fontanería", "E2E Alicatado", "E2E Fontanería"]) &&
+      inherit.twoNums &&
+      inherit.split
+    )
+      ok("proyecto: one partida in two títulos stays two chapters, and the hours stay apart");
+    else bad("proyecto: the same partida under two títulos", J(inherit));
+
+    if (
+      J(inherit.groups) ===
+      J([
+        ["E2E Reforma de baño", 2],
+        ["E2E Salón", 1],
+      ])
+    )
+      ok("gasto: the partida picker groups by título, so «which Fontanería» has an answer");
+    else bad("gasto: partida picker grouped by título", J(inherit.groups));
 
     if (!errs.length) ok("títulos: no console errors on the screen");
     else bad("títulos: console clean", errs.slice(0, 3).join(" | "));
