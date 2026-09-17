@@ -1001,6 +1001,130 @@
         return s;
       },
     },
+    {
+      to: 23,
+      name: "a subpartida can sit in more than one partida, and partidas stop shipping",
+      /*
+       * TWO CHANGES, AND THEY ARE THE SAME CHANGE.
+       *
+       * The operator's instruction was that the price book is built bottom-up:
+       * a subpartida exists first, then a partida gathers subpartidas — and a
+       * subpartida may be gathered by SEVERAL, because the same water point
+       * belongs to a bathroom and to a kitchen alike. And that the partidas
+       * themselves must start empty, because which trades a company works in
+       * is that company's data, not ours.
+       *
+       * Both follow from the same observation, already written into v22 for
+       * títulos: a taxonomy is a statement about how a company sells. We were
+       * applying it one level up and not here. `itemTitles` ships empty for
+       * exactly this reason; `itemChapters` shipped ten trades, which arrived
+       * in a price book somebody then had to argue with before deleting.
+       *
+       * WHAT MOVES. Membership becomes `itemPartidaLinks`, rows of
+       * {chapterCode, itemId, order}, and that list is the ONLY truth about
+       * which partidas a subpartida is in — the operator chose a single source
+       * over a "home partida plus extras", and chose right: two fields that
+       * can disagree about one fact is how this repository has been bitten
+       * before. `item.chapter` is NOT deleted. It stays on the record as the
+       * legacy field it now is, so an export taken yesterday still reads and a
+       * reader that has not been updated still sees something true; nothing
+       * computes membership from it after this step.
+       *
+       * WHY THIS CANNOT MOVE A DOCUMENT, which is the only question that
+       * matters on a live system. A budget line COPIES what it took from the
+       * catalogue — description, unit, price, cost, brand, model, quality —
+       * and keeps `itemId` for provenance alone. No line, no chapter, no
+       * version and no rendered page stores a partida code. A budget chapter's
+       * name is free text the estimator typed. So re-filing a subpartida
+       * changes what the price book OFFERS and nothing that was ever sent.
+       * `tests/catalogue-links/run.mjs` asserts exactly that rather than
+       * asking anyone to take it on trust.
+       *
+       * WHICH DEFAULT PARTIDAS GO. Only the ones the shipped list put there
+       * AND that nothing references — no subpartida linked, no título
+       * membership, no budget chapter named after them. A company that has
+       * been using "Fontanería" for months keeps it; one that never touched
+       * the seeded ten loses all ten, which is the case in front of us. An
+       * entry the owner typed themselves is never touched, because it is not
+       * in the shipped set.
+       *
+       * Additive and idempotent: re-running rebuilds no link that exists and
+       * removes nothing a second time.
+       */
+      up: function (s) {
+        if (!s.lists || typeof s.lists !== "object") s.lists = {};
+        if (!Array.isArray(s.lists.itemChapters)) s.lists.itemChapters = [];
+        var catalogue = Array.isArray(s.catalogue) ? s.catalogue : [];
+
+        /* 1 ── membership, carried over from the single `chapter` field. Order
+           within a partida follows the catalogue's own order, which is what the
+           tree showed, so nothing visibly reshuffles on the first render. */
+        if (!Array.isArray(s.itemPartidaLinks)) s.itemPartidaLinks = [];
+        var links = s.itemPartidaLinks;
+        var seen = {};
+        for (var a = 0; a < links.length; a++) {
+          seen[String(links[a].chapterCode) + " " + String(links[a].itemId)] = true;
+        }
+        var nextOrder = {};
+        for (var b = 0; b < links.length; b++) {
+          var k0 = String(links[b].chapterCode);
+          var o0 = Number(links[b].order || 0) + 1;
+          if (!nextOrder[k0] || nextOrder[k0] < o0) nextOrder[k0] = o0;
+        }
+        for (var c = 0; c < catalogue.length; c++) {
+          var it = catalogue[c];
+          var chap = String((it && it.chapter) || "").trim();
+          if (!chap || !it.id) continue;
+          var key = chap + " " + String(it.id);
+          if (seen[key]) continue;
+          links.push({ chapterCode: chap, itemId: it.id, order: nextOrder[chap] || 0 });
+          nextOrder[chap] = (nextOrder[chap] || 0) + 1;
+          seen[key] = true;
+        }
+
+        /* 2 ── the shipped ten, gone unless something points at them. The set
+           is written out here rather than read from the engine on purpose: a
+           migration has to mean the same thing for ever, and LIST_DEFAULTS is
+           about to stop containing these. A ladder step that consults today's
+           defaults would quietly change what it did to yesterday's database. */
+        var SHIPPED = ["DEM", "ALB", "FON", "ELE", "CLI", "REV", "CAR", "PIN", "SAN", "VAR"];
+        var titleLinks = Array.isArray(s.itemTitleLinks) ? s.itemTitleLinks : [];
+        var used = {};
+        for (var d = 0; d < links.length; d++) used[String(links[d].chapterCode)] = true;
+        for (var e = 0; e < titleLinks.length; e++) used[String(titleLinks[e].chapterCode)] = true;
+
+        /* A budget chapter names a partida by its WORDS, so the check has to be
+           on the label, not the code — otherwise a trade a company has quoted
+           for months is deleted underneath them because the link table happens
+           to be empty. Folded the way the budget builder folds it. */
+        var fold = function (x) {
+          return String(x || "")
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[̀-ͯ]/g, "")
+            .trim();
+        };
+        var spokenFor = {};
+        var budgets = Array.isArray(s.budgets) ? s.budgets : [];
+        for (var f = 0; f < budgets.length; f++) {
+          var versions = (budgets[f] && budgets[f].versions) || [];
+          for (var g = 0; g < versions.length; g++) {
+            var chapters = (versions[g] && versions[g].chapters) || [];
+            for (var h = 0; h < chapters.length; h++) spokenFor[fold(chapters[h].name)] = true;
+          }
+        }
+
+        var rows = s.lists.itemChapters;
+        for (var i = rows.length - 1; i >= 0; i--) {
+          var row = rows[i];
+          if (!row || SHIPPED.indexOf(String(row.code)) < 0) continue;
+          if (used[String(row.code)]) continue;
+          if (spokenFor[fold(row.es)] || spokenFor[fold(row.ca)]) continue;
+          rows.splice(i, 1);
+        }
+        return s;
+      },
+    },
   ];
 
   /**

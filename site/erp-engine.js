@@ -1525,6 +1525,13 @@
            this to a budget's chapters, so a membership can never reach a total,
            a progress mark or a printed number. */
         itemTitleLinks: [],
+        /* Which partidas a subpartida is filed under — rows of
+           {chapterCode, itemId, order}, and the ONLY truth about that, per
+           schema v23. `item.chapter` survives on the record as legacy and is
+           not read for membership. More than one row per subpartida is the
+           normal case: the same water point belongs to a bathroom and to a
+           kitchen. */
+        itemPartidaLinks: [],
         packages: [],
         prices: [],
         budgets: [], // {id,number,partyId,propertyId,activityLine, versions:[], currentVersionId, acceptedVersionId, status}
