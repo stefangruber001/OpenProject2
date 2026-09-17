@@ -11993,7 +11993,8 @@
          ${
            it
              ? `<div class="field"><label>Código</label><input value="${esc(it.code)}" disabled title="Las líneas de presupuesto guardan el código; no se cambia."></div>`
-             : `<div class="field"><label>Código *</label><input id="ci_code" placeholder="ALB-011"></div>`
+             : `<div class="field"><label>Código</label><input id="ci_code" placeholder="FON-101">
+               <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo; puedes cambiarlo.</div></div>`
          }
          <div class="field full"><label>Descripción *</label><input id="ci_desc" value="${val("desc", "")}"></div>
          <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
@@ -12069,6 +12070,22 @@
            types anything of their own: `mine` latches on their first keystroke and
            never unlatches, so their code is never overwritten by a later change of
            partida. Clearing the field hands control back. */
+        /* ONE function for the proposal, reached from two places: the field as
+           it is typed into, and the save that falls back to it. They were two
+           expressions and the save path had none at all — so a subpartida whose
+           code had been generated but not re-read was refused with «El código es
+           obligatorio», which is the complaint that produced this. */
+        const proposeItemCode = () => {
+          const chapsEl = $("#ci_chaps"),
+            descEl = $("#ci_desc");
+          const picked = chapsEl ? checksOf(chapsEl) : [];
+          const stem = picked.length
+            ? picked[0]
+            : ErpEngine.normaliseCode(
+                erp.suggestListCode("itemChapters", descEl ? descEl.value : ""),
+              );
+          return stem ? nextCatalogueCode(stem) : "";
+        };
         if (!it) {
           const codeEl = $("#ci_code"),
             descEl = $("#ci_desc"),
@@ -12084,19 +12101,13 @@
                file it under. Both produce PREFIX-101, so the book reads the
                same either way, and re-filing it later never rewrites a code
                that budget lines have already stored. */
-            const propose = () => {
+            const fill = () => {
               if (typed) return;
-              const picked = chapsEl ? checksOf(chapsEl) : [];
-              const stem = picked.length
-                ? picked[0]
-                : ErpEngine.normaliseCode(
-                    erp.suggestListCode("itemChapters", descEl ? descEl.value : ""),
-                  );
-              codeEl.value = stem ? nextCatalogueCode(stem) : "";
+              codeEl.value = proposeItemCode();
             };
-            if (descEl) descEl.addEventListener("input", propose);
-            if (chapsEl) chapsEl.addEventListener("change", propose);
-            propose();
+            if (descEl) descEl.addEventListener("input", fill);
+            if (chapsEl) chapsEl.addEventListener("change", fill);
+            fill();
           }
         }
 
@@ -12128,7 +12139,8 @@
               let target = it;
               if (it) erp.updateCatalogueItem(it.id, patch, "backoffice");
               else {
-                const code = ErpEngine.normaliseCode($("#ci_code").value);
+                const code =
+                  ErpEngine.normaliseCode($("#ci_code").value) || proposeItemCode();
                 if (!code) throw new Error("El código es obligatorio");
                 if (erp.state.catalogue.some((x) => x.code === code))
                   throw new Error("Ya existe una subpartida con el código " + code);

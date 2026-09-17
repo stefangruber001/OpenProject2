@@ -14175,6 +14175,62 @@ async function testControlTowerAndDay(browser, base) {
       ok("DMC-01: a hand-typed code survives a change of partida");
     else bad("DMC-01 typed code overwritten", JSON.stringify(typedWins));
 
+    /* THE PATH THIS SUITE DID NOT COVER, and the reason the operator found it
+       first. Every check above ticks a partida before reading the code — but
+       since v23 the ORDINARY case is a price book with no partidas in it yet,
+       where the prefix has to come from the description instead. The drawer did
+       propose one; what it did not do was accept it. The Código field still
+       carried a `*`, no "se genera solo" hint, and a save path that threw
+       «El código es obligatorio» instead of falling back to the proposal the
+       way `codeToSave` does for partidas and títulos. Three asymmetries with
+       the two drawers beside it, all invisible to a check that always ticked. */
+    const fromDescription = await pg.evaluate(async () => {
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 200));
+      // A price book with nothing in it: the operator's own starting point.
+      const keptChapters = erp.state.lists.itemChapters.slice();
+      const keptLinks = erp.state.itemPartidaLinks.slice();
+      erp.state.lists.itemChapters = [];
+      erp.state.itemPartidaLinks = [];
+      render();
+      await new Promise((r) => setTimeout(r, 300));
+      document.querySelector("#biSubNew").click();
+      await new Promise((r) => setTimeout(r, 350));
+      const field = document.querySelector("#ci_code").closest(".field");
+      const out = {
+        label: field.querySelector("label").textContent,
+        hint: /Se genera solo/.test(field.textContent),
+      };
+      const desc = document.querySelector("#ci_desc");
+      desc.value = "Punto de agua E2E";
+      desc.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 200));
+      out.proposed = document.querySelector("#ci_code").value;
+      // Emptied on purpose: the save must fall back, not refuse.
+      const code = document.querySelector("#ci_code");
+      code.value = "";
+      code.dispatchEvent(new Event("input"));
+      document.querySelector("#ci_save").click();
+      await new Promise((r) => setTimeout(r, 450));
+      const made = erp.state.catalogue.find((i) => i.desc === "Punto de agua E2E");
+      out.saved = made ? made.code : null;
+      erp.state.lists.itemChapters = keptChapters;
+      erp.state.itemPartidaLinks = keptLinks;
+      render();
+      await new Promise((r) => setTimeout(r, 250));
+      return out;
+    });
+    if (
+      fromDescription.label === "Código" &&
+      fromDescription.hint &&
+      /^PUN-\d+$/.test(fromDescription.proposed) &&
+      fromDescription.saved === fromDescription.proposed
+    )
+      ok(
+        `DMC-01: with no partidas, the code comes from the description and saves itself (${fromDescription.saved})`,
+      );
+    else bad("DMC-01 code from description", JSON.stringify(fromDescription));
+
     // Margin: computed, live, and blank while there is no price.
     const marginLine = await pg.evaluate(async () => {
       const el = document.querySelector("#ci_margin"),

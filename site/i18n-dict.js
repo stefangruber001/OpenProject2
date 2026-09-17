@@ -54,6 +54,23 @@ window.CANEI_DICT = {
       "TEST ENVIRONMENT · the data here is invented · ENTORNO DE PRUEBAS",
     ],
     ["Títulos", "Sections"],
+    ["NIF / CIF / NIE / Pasaporte", "Tax ID / VAT no. / NIE / Passport"],
+    ["IVA intracomunitario", "EU VAT number"],
+    [
+      "Pasaporte o documento extranjero — no es un NIF español",
+      "Passport or foreign document — not a Spanish tax ID",
+    ],
+    ["DNI/NIF: la letra de control no cuadra", "Tax ID: the check letter does not match"],
+    ["No parece un número de documento", "That does not look like a document number"],
+    ["12345678Z · B12345674 · pasaporte", "12345678Z · B12345674 · passport"],
+    [
+      "Sin un documento no se puede facturar ni contratar — la ficha existe igual y se completa después",
+      "Without a document you cannot invoice or contract — the record still exists and is completed later",
+    ],
+    [
+      "Sin un documento no se puede facturar ni contratar — la ficha se crea igual y se completa después",
+      "Without a document you cannot invoice or contract — the record is still created and is completed later",
+    ],
     ["Elementos de presupuesto", "Budget items"],
     ["Partidas en las que aparece", "Line items it appears in"],
     ["Subpartidas de esta partida", "Sub-line items in this line item"],

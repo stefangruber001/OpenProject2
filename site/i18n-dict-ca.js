@@ -263,6 +263,17 @@ window.CANEI_DICT.ca = {
   "ENTORNO DE PRUEBAS · los datos aquí son inventados · TEST ENVIRONMENT":
     "ENTORN DE PROVES · les dades d'aquí són inventades · TEST ENVIRONMENT",
   Títulos: "Títols",
+  "NIF / CIF / NIE / Pasaporte": "NIF / CIF / NIE / Passaport",
+  "IVA intracomunitario": "IVA intracomunitari",
+  "Pasaporte o documento extranjero — no es un NIF español":
+    "Passaport o document estranger — no és un NIF espanyol",
+  "DNI/NIF: la letra de control no cuadra": "DNI/NIF: la lletra de control no quadra",
+  "No parece un número de documento": "No sembla un número de document",
+  "12345678Z · B12345674 · pasaporte": "12345678Z · B12345674 · passaport",
+  "Sin un documento no se puede facturar ni contratar — la ficha existe igual y se completa después":
+    "Sense un document no es pot facturar ni contractar — la fitxa existeix igualment i es completa després",
+  "Sin un documento no se puede facturar ni contratar — la ficha se crea igual y se completa después":
+    "Sense un document no es pot facturar ni contractar — la fitxa es crea igualment i es completa després",
   "Elementos de presupuesto": "Elements de pressupost",
   "Partidas en las que aparece": "Partides en què apareix",
   "Subpartidas de esta partida": "Subpartides d'aquesta partida",
