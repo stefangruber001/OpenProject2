@@ -879,6 +879,23 @@
    * print geometry, and a second `@page` would change how EVERYTHING the host
    * prints, not just the sheet. `@media print` survives with its inner rules
    * scoped the same way.
+   *
+   * AND THE NARROW LAYOUT IS RE-EMITTED AS AN `@container` QUERY, which is the
+   * whole reason a caged sheet differs from a standalone one. `@media
+   * (max-width:700px)` asks the WINDOW how much room there is, and a cage is
+   * not the window: the quote preview opens in a 480px drawer on an 1878px
+   * screen, so the window said 1878, the sheet stayed at its full 794px, and
+   * roughly a third of it sat outside the drawer. What that costs is not
+   * cosmetic — the amounts column and the two left-hand captions are at
+   * opposite ends of a page you can only see half of at a time, so scrolling
+   * to the figures takes the section heading and its total off screen, and the
+   * operator reported exactly that: «in the preview, we can't see the Partida
+   * and Título Subtotal».
+   *
+   * Asking the CAGE instead makes the sheet fluid whenever the box it is in is
+   * narrow, however wide the window is. The standalone page keeps the `@media`
+   * form alone (`css()` is untouched) because there it IS the window, and the
+   * twin is emitted after it so the container's answer wins when both apply.
    */
   function scopedCss(scope) {
     const pre = scope + scope + " ";
@@ -900,7 +917,11 @@
         if (rule.endsWith("}")) {
           // single-line block: scope what sits between its braces
           const i = rule.indexOf("{");
-          out.push(rule.slice(0, i + 1) + scopeRules(rule.slice(i + 1, rule.length - 1)) + "}");
+          const head = rule.slice(0, i + 1);
+          const body = scopeRules(rule.slice(i + 1, rule.length - 1));
+          out.push(head + body + "}");
+          // …and the same block keyed on the cage rather than the window.
+          if (/max-width/.test(head)) out.push(head.replace(/^@media/, "@container") + body + "}");
         } else {
           // the multi-line print block: open it, rule lines follow
           out.push(rule);

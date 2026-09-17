@@ -3320,6 +3320,20 @@
         justify-content: center;
         align-items: flex-start;
       }
+      /* THE DOCUMENT COLUMN'S CHILD FILLS IT, at every width — the phone block
+     below has said so since PK6-A and only there, which left the desktop with a
+     flex item sized by its own content. That worked by accident: the sheet
+     inside is 794px, so the item became 794px and hung 34px out of a 760px
+     column. It stops working the moment the sheet stops volunteering a width,
+     which is exactly what `container-type` on the cage does — the item had
+     nothing left to size to and collapsed to 420px, reformatting a contract
+     nobody had touched. A column tells its child how wide it is; it does not
+     ask. The sheet still centres itself inside, and anything wider than the
+     column now scrolls in the cage instead of spilling past it. */
+      .condoc > * {
+        min-width: 0;
+        width: 100%;
+      }
       .conpanel {
         min-height: 0;
         overflow: auto;
@@ -29171,8 +29185,23 @@
         st.textContent =
           CaneiSheet.scopedCss(".cnsheet") +
           /* app-side frame: a 210mm sheet scrolls inside a narrow pane
-                   rather than widening it, and loses its screen chrome in print */
+                   rather than widening it, and loses its screen chrome in print.
+
+                   `container-type:inline-size` is what makes the cage answerable:
+                   the sheet's own narrow layout is re-emitted by `scopedCss` as an
+                   `@container` query, so it now measures THIS box instead of the
+                   window. Without it the quote preview — a 480px drawer on an
+                   1878px screen — kept the full 794px page and put a third of it
+                   outside the drawer, with the amounts and the section captions at
+                   opposite ends of a document you could only see half of. */
           "\n.cnsheet{overflow-x:auto}" +
+          /* SCREEN ONLY. `container-type:inline-size` brings `contain:layout`
+                   with it, and a laid-out-contained box is monolithic — it cannot be
+                   fragmented across pages. On screen that is invisible; on paper it
+                   would force a multi-page document onto one sheet. The app's own
+                   print path needs nothing from the cage, and `@container` queries
+                   simply never match where no container is established. */
+          "\n@media screen{.cnsheet{container-type:inline-size}}" +
           /* THE HOST'S OWN FLOOR, KEPT OUT OF THE CAGE — third sighting.
                    `table{min-width:520px}` up at the top of this stylesheet is a
                    screen rule: it stops a register collapsing into unreadable

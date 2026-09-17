@@ -16378,6 +16378,83 @@ async function testTitles(browser, base) {
       await flow.close();
     }
 
+    /* THE PREVIEW HAS TO SHOW THE BAND AND BOTH SUBTOTALS — the operator's
+       report: «in the preview, we can't see the Partida and Título Subtotal».
+
+       They were being rendered all along. «Vista previa» is a 480px drawer, the
+       sheet's narrow layout was keyed on the WINDOW, and the window was 1878px,
+       so a 794px page sat in a 444px cage. The amounts are at the right edge of
+       that page and the band heading and its «Total …» caption are at the left,
+       so scrolling to the figures took both captions off screen — a document you
+       can only ever see half of.
+
+       ON A WIDE WINDOW, deliberately: a narrow one makes the media query true
+       and the bug disappears. What is asserted is the property, not the CSS —
+       the sheet fits the box it is in, and all three captions are inside it. */
+    const wide = await browser.newPage({ viewport: { width: 1878, height: 900 } });
+    try {
+      await wide.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+      await bootedShell(wide);
+      await wide.waitForTimeout(600);
+      const fit = await wide.evaluate(async () => {
+        const party =
+          erp.state.parties.find((p) => p.kind === "customer") ||
+          erp.addParty({ kind: "customer", name: "E2E previa" }, "e2e");
+        const b = erp.createBudget({ partyId: party.id }, "e2e");
+        const ch = erp.addChapter(b.id, { name: "E2E Fontanería" });
+        erp.setChapterTitle(b.id, ch.id, "E2E Reforma", "e2e");
+        erp.addLine(b.id, ch.id, {
+          code: "E2E-1",
+          desc: "punto de agua",
+          unit: "ud",
+          qtyMilli: 1000,
+          costCents: 1000,
+          marginPct: 50,
+        });
+        go("quotes", b.id);
+        await new Promise((r) => setTimeout(r, 1300));
+        const btn = [...document.querySelectorAll("button")].find((x) =>
+          /Vista previa/i.test(x.textContent),
+        );
+        if (!btn) return { noButton: true };
+        btn.click();
+        await new Promise((r) => setTimeout(r, 1500));
+        const cage =
+          document.querySelector(".drawer .cnsheet") || document.querySelector(".cnsheet");
+        if (!cage) return { noCage: true };
+        const sheet = cage.querySelector(".sheet");
+        const cr = cage.getBoundingClientRect();
+        const inside = (sel) => {
+          const el = cage.querySelector(sel);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return r.left >= cr.left - 1 && r.right <= cr.right + 1;
+        };
+        return {
+          cageW: cage.clientWidth,
+          sheetW: Math.round(sheet.getBoundingClientRect().width),
+          band: inside("tr.titleband td"),
+          sub: inside("tr.sub td.cap"),
+          bandTotal: inside("tr.titlebandsum td.cap"),
+          amount: inside("tr.titlebandsum td.num"),
+        };
+      });
+      if (
+        fit.sheetW &&
+        fit.sheetW <= fit.cageW + 1 &&
+        fit.band &&
+        fit.sub &&
+        fit.bandTotal &&
+        fit.amount
+      )
+        ok(
+          `presupuestador: the preview fits its drawer (${fit.sheetW}px in ${fit.cageW}px) and shows the band, the partida subtotal and the título total`,
+        );
+      else bad("presupuestador: the preview shows both subtotals", JSON.stringify(fit));
+    } finally {
+      await wide.close();
+    }
+
     if (!errs.length) ok("títulos: no console errors on the screen");
     else bad("títulos: console clean", errs.slice(0, 3).join(" | "));
   } finally {
