@@ -23272,11 +23272,20 @@
                 ) / 10
               : null;
 
-          const tabs = SECTIONS.map((s) => {
-            const on = biSection === s.k;
-            return `<button class="btn sm${on ? " primary" : ""}" data-bisec="${s.k}">${esc(s.lab)}</button>`;
-          }).join("");
-          v.innerHTML = `<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">${tabs}</div>
+          /* `.tabstrip`, the same strip Contratos, Proyectos and four other
+             screens already use — not a row of buttons of its own.
+
+             This screen shipped with `btn sm primary` pills because it was
+             written as three sections rather than as tabs, and the operator
+             spotted it immediately: a filled green pill is what this product
+             uses for an ACTION, so «Subpartidas» read as something you press to
+             make something happen rather than as where you already are. The
+             component existed the whole time. */
+          const tabs = SECTIONS.map(
+            (s) =>
+              `<button class="tab${biSection === s.k ? " on" : ""}" data-bisec="${s.k}">${esc(s.lab)}</button>`,
+          ).join("");
+          v.innerHTML = `<div class="tabstrip">${tabs}</div>
            <div id="biList"></div>`;
           v.querySelectorAll("[data-bisec]").forEach((b) => {
             b.onclick = () => {

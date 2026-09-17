@@ -13901,6 +13901,13 @@ async function testControlTowerAndDay(browser, base) {
     const catState = await pg.evaluate(() => ({
       hash: location.hash,
       tabs: document.querySelectorAll("[data-bisec]").length,
+      /* The HOUSE tab strip, not a row of its own buttons. This screen shipped
+         with `btn sm primary` pills and the operator sent back a screenshot of
+         Contratos with the real strip circled: a filled green pill means ACTION
+         in this product, so a section you are already on read as something to
+         press. Pinned by class, because "looks the same" is what drifted. */
+      housedTabs: document.querySelectorAll(".tabstrip .tab[data-bisec]").length,
+      strayButtons: document.querySelectorAll("[data-bisec].btn").length,
       rows: document.querySelectorAll("#biList tbody tr.click").length,
       engineItems: erp.state.catalogue.filter((i) => i.active !== false).length,
       size: Number((document.getElementById("biSubSize") || {}).value || 0),
@@ -13908,6 +13915,8 @@ async function testControlTowerAndDay(browser, base) {
     if (
       catState.hash === "#budget-items" &&
       catState.tabs === 3 &&
+      catState.housedTabs === 3 &&
+      catState.strayButtons === 0 &&
       catState.size > 0 &&
       catState.rows === Math.min(catState.size, catState.engineItems)
     )
