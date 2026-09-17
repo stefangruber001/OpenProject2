@@ -837,6 +837,17 @@
     isScoped: function () {
       return REMOTE !== null && scoped === true;
     },
+    /**
+     * Raise the store's own "NOT saved" banner from outside it.
+     *
+     * There is exactly one caller and it is the one case this module cannot
+     * judge for itself: the server has sent a REDACTED document, so `saveState`
+     * is silently dropping every write — correct for a site worker, and a
+     * catastrophe for anybody else, because the workspace then looks like it is
+     * working and stores nothing. Only the page knows who is signed in; only
+     * this module knows the document is redacted. See the alarm in erp.html.
+     */
+    warnNotSaved: saveFailed,
     putBlob: function (k, blob) {
       return REMOTE !== null ? remotePutBlob(k, blob) : put(BLOBS, k, blob);
     },

@@ -59,6 +59,35 @@ export const SESSION_COOKIE = "canei_session";
  */
 export type SessionRole = "staff" | "shared";
 
+/**
+ * THE NAME A SHARED SESSION CARRIES, AND WHY IT IS A SHAPE AND NOT A STRING.
+ *
+ * Several people use one password, so an audit trail reading "invitado" twelve
+ * times cannot be followed; each sign-in takes a short random label instead.
+ *
+ * It is minted and recognised HERE, in one place, because a second reader
+ * appeared: `findUser` has to know that this name is a shared session rather
+ * than an address nobody has heard of, and the two answers must be the same
+ * answer. They were not, and the cost is written up in ASSUMPTIONS #S145 — a
+ * development system on which nothing anybody typed was ever saved, and which
+ * said so nowhere.
+ *
+ * The pattern is exactly what `mintSharedLabel` produces and nothing else: no
+ * `@`, so it cannot collide with an address, and four hex characters, so it
+ * cannot be widened by a label somebody invents later.
+ */
+const SHARED_LABEL = /^invitado-[0-9a-f]{4}$/;
+
+/** A fresh label for one shared-password session. */
+export function mintSharedLabel(): string {
+  return `invitado-${crypto.randomUUID().slice(0, 4)}`;
+}
+
+/** Whether this identity is a shared-password session rather than an account. */
+export function isSharedLabel(name: string): boolean {
+  return SHARED_LABEL.test(name.trim().toLowerCase());
+}
+
 interface Payload {
   /** Who. The email they signed in with, or a shared-session label. */
   sub: string;

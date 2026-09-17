@@ -17,6 +17,7 @@ import { randomBytes } from "node:crypto";
 import { FactoryError } from "@repo/kernel";
 import * as db from "@repo/db";
 import { hashPassword } from "./auth";
+import { isSharedLabel } from "./session-token";
 import {
   hashToken,
   isRole,
@@ -120,13 +121,76 @@ function singleSeatOperator(): UserRecord | null {
   };
 }
 
+/**
+ * A SHARED-PASSWORD SESSION IS SOMEBODY, NOT NOBODY.
+ *
+ * `ERP_ACCESS_PASSWORD` is the link-and-password route: no account per person,
+ * one credential handed out so an owner or a colleague can open the live ERP on
+ * their own laptop. `docs/PILOT-WITHOUT-CLOUDFLARE.md` promises in as many
+ * words that such a session "can do everything a named account can", and
+ * `lib/access.ts` says the same — BOTH REACH THE LIVE DATA.
+ *
+ * It stopped being true and nothing said so. A shared session carries a label,
+ * not an address, so `findUser` answered null for it and `may()` — which reads
+ * "an address I cannot place may do nothing" — refused every permission. That
+ * was invisible for as long as nothing asked. The site-worker release (R2.3)
+ * made two doors ask:
+ *
+ *   - `GET /erp/state` reads `erp.read.all` to decide whether to send the whole
+ *     company document or a worker's redacted view. Refused, so a shared
+ *     session was served a document BUILT FROM NOTHING: no company, no parties,
+ *     no invoices. The workspace renders that perfectly happily — as an empty
+ *     company.
+ *   - the client then sees `scoped: true` and, by design, stops sending saves
+ *     ENTIRELY SILENTLY, because for a real site worker a red banner on every
+ *     save would be telling the crew their work is broken every time they use
+ *     the app.
+ *
+ * So everything typed appeared on screen, saved with a toast, and was gone on
+ * the next reload, with no error anywhere. The development system — where
+ * `ops/dev-up.sh` writes `ERP_USERS=""` and the shared password is the ONLY way
+ * in — could not store a single record from the day it came up, and reported
+ * nothing at all. See ASSUMPTIONS #S145.
+ *
+ * `backoffice`, not `admin`: the promise is that a shared session can WORK in
+ * the system, and the rule directly above `may()` is that it must never manage
+ * accounts. Backoffice is exactly both — the whole document, reads and writes,
+ * money and margins, no `user.manage`. A credential handed to people outside
+ * the company cannot mint credentials.
+ *
+ * Narrow by construction: only when the shared route is switched on at all, and
+ * only for the exact label `mintSharedLabel` produces. A row or an `ERP_USERS`
+ * line always wins, because `findUser` looks there first.
+ */
+function sharedSessionUser(name: string): UserRecord | null {
+  if (!process.env.ERP_ACCESS_PASSWORD?.trim()) return null;
+  if (!process.env.SESSION_SECRET?.trim()) return null;
+  if (!isSharedLabel(name)) return null;
+  const epoch = new Date(0);
+  return {
+    email: name.trim().toLowerCase(),
+    name: "",
+    role: "backoffice",
+    state: "active",
+    // Nothing to sign in to: the password was checked by the login route, which
+    // is the only thing that can mint this identity. This record answers "what
+    // may they do", never "is this them".
+    hash: "",
+    sessionsValidFrom: epoch,
+    createdAt: epoch,
+    createdBy: "env",
+    disabledAt: null,
+  };
+}
+
 /** The one user, or null. */
 export async function findUser(tenantId: string, email: string): Promise<UserRecord | null> {
   const wanted = email.trim().toLowerCase();
   const found = (await allUsers(tenantId)).find((u) => u.email === wanted);
   if (found) return found;
   const solo = singleSeatOperator();
-  return solo && solo.email === wanted ? solo : null;
+  if (solo && solo.email === wanted) return solo;
+  return sharedSessionUser(wanted);
 }
 
 /**

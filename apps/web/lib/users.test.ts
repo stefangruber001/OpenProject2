@@ -244,3 +244,104 @@ describe("the single-seat operator", () => {
     expect(await findUser("anybody")).toBeNull();
   });
 });
+
+/**
+ * THE SILENT DEPLOYMENT THIS PINS.
+ *
+ * `ERP_ACCESS_PASSWORD` is the link-and-password route, and both
+ * `lib/access.ts` and `docs/PILOT-WITHOUT-CLOUDFLARE.md` promise that a session
+ * opened with it reaches the live books like any named account. A shared
+ * session carries a LABEL rather than an address, though, so `findUser`
+ * answered null and `may()` — "an address I cannot place may do nothing" —
+ * refused it everything.
+ *
+ * Nothing asked, until the site-worker release made two doors ask. Then
+ * `GET /erp/state` decided the account could not read the whole document, sent
+ * the redacted worker view instead — no company, no parties, no invoices — and
+ * the workspace, which stops sending saves for a redacted document AND SAYS
+ * NOTHING (right for the crew, whose writes go one command at a time), served
+ * an empty company that took work all day and stored none of it.
+ *
+ * The development system is the deployment that proved it: `ops/dev-up.sh`
+ * writes `ERP_USERS=""`, so the shared password is the only way in, so nothing
+ * anybody typed there was ever saved — and no screen, log or gate said so.
+ *
+ * Both halves are worth holding. It may WORK in the system, which is what was
+ * promised; and it may not manage accounts, because a credential handed to
+ * people outside the company must not be able to mint credentials.
+ */
+describe("the shared-password session", () => {
+  const env = { ...process.env };
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  const findUser = async (email: string) => {
+    const { findUser: f } = await import("./user-admin");
+    return f("reformas-demo", email);
+  };
+
+  const sharedOn = () => {
+    process.env.ERP_ACCESS_PASSWORD = "canei-dev-abc123-def456";
+    process.env.SESSION_SECRET = "s".repeat(32);
+    process.env.ERP_USERS = "";
+    delete process.env.ERP_OPERATOR;
+  };
+
+  it("mints a label findUser can recognise", async () => {
+    const { isSharedLabel, mintSharedLabel } = await import("./session-token");
+    const label = mintSharedLabel();
+    expect(label).toMatch(/^invitado-[0-9a-f]{4}$/);
+    expect(isSharedLabel(label)).toBe(true);
+    // Not an address, so it can never collide with one.
+    expect(label.includes("@")).toBe(false);
+  });
+
+  it("may read the whole document and save it", async () => {
+    sharedOn();
+    const u = await findUser("invitado-4f2a");
+    expect(u?.role).toBe("backoffice");
+    expect(u?.state).toBe("active");
+    // The two permissions the two doors ask for. Without BOTH, the workspace
+    // is served a redacted document and silently stores nothing.
+    expect(roleMay(u!.role, "erp.read.all")).toBe(true);
+    expect(roleMay(u!.role, "erp.write")).toBe(true);
+  });
+
+  it("may never manage accounts", async () => {
+    sharedOn();
+    const u = await findUser("invitado-4f2a");
+    expect(roleMay(u!.role, "user.manage")).toBe(false);
+  });
+
+  it("does not exist when the shared route is switched off", async () => {
+    process.env.SESSION_SECRET = "s".repeat(32);
+    process.env.ERP_USERS = "ana@example.com:scrypt$16384$8$1$c2FsdA==$aGFzaA==";
+    delete process.env.ERP_ACCESS_PASSWORD;
+    delete process.env.ERP_OPERATOR;
+    expect(await findUser("invitado-4f2a")).toBeNull();
+  });
+
+  it("is only the shape the mint produces", async () => {
+    sharedOn();
+    // Anything else is still an address nobody can place, and still may nothing.
+    for (const name of [
+      "invitado",
+      "invitado-",
+      "invitado-zzzz",
+      "invitado-1a2b3c",
+      "invitado 4f2a",
+      "ana@example.com",
+    ])
+      expect(await findUser(name)).toBeNull();
+  });
+
+  it("never outranks a real account of the same name", async () => {
+    sharedOn();
+    process.env.ERP_USERS = "invitado-4f2a:scrypt$16384$8$1$c2FsdA==$aGFzaA==";
+    const u = await findUser("invitado-4f2a");
+    // The environment bootstrap account, which is an administrator — the
+    // synthetic record must never shadow a configured one.
+    expect(u?.role).toBe("admin");
+  });
+});

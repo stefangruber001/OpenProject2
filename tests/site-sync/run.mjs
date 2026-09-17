@@ -41,9 +41,17 @@ const blobs = new Map();
    workspace's persist() debounce is 140 ms, and the gap between those two
    numbers is the whole bug. */
 const stateDoc = { state: { seeded: true }, version: 3 };
+/** What `/api/~/session` says this account is, and whether `/erp/state`
+    redacts. The workspace section drives the pair — they are two answers about
+    ONE account and the whole point is what happens when they disagree. */
+let sessionRole = "admin";
+let stateScoped = false;
 let stateDelayMs = 0;
 /** Every PUT the server saw, in the order it saw them. */
 let statePuts = [];
+
+/** Verbatim from apps/web/scripts/sync-workspace.mjs. */
+const WORKSPACE_MARKER = '<meta name="erp-api" content="" />';
 
 const HARNESS = `<!doctype html><html><head><meta name="erp-api" content="" />
 <meta charset="utf-8" /><title>sync harness</title></head><body>
@@ -76,7 +84,7 @@ const server = createServer(async (req, res) => {
       "content-type": type.startsWith("text/") ? `${type}; charset=utf-8` : type,
       "cache-control": "no-store",
     });
-    res.end(typeof body === "string" ? body : JSON.stringify(body));
+    res.end(typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body));
   };
   const blobMatch = url.pathname.match(/^\/api\/~\/erp\/blob\/(.+)$/);
   if (blobMatch) {
@@ -131,18 +139,82 @@ const server = createServer(async (req, res) => {
     return send(200, {
       tenant: "t",
       version: stateDoc.version,
-      seeded: true,
+      seeded: stateDoc.version > 0,
       migrated: [],
+      /* The server sets this when it sends a worker's redacted view instead of
+         the company document. The client stops saving when it is true, and
+         says nothing — which is right for the crew and catastrophic for
+         anybody else. */
+      scoped: stateScoped,
       state: stateDoc.state,
     });
+  }
+  /* WHAT THE WORKSPACE ITSELF ASKS FOR AT BOOT. erp.html is the page this
+     whole module exists to serve, and until the workspace section below it was
+     never opened against a server by anything — the browser suite runs the
+     published copy, which has no server at all. That gap is how a deployment
+     where NOTHING WAS EVER SAVED passed every gate: see ASSUMPTIONS #S145. */
+  if (url.pathname === "/api/~/session")
+    return send(200, {
+      email: "operador@canei",
+      name: "",
+      role: sessionRole,
+      bankRead: true,
+      workerId: null,
+    });
+  if (url.pathname === "/api/health") return send(200, { status: "ok", database: "connected" });
+  if (url.pathname === "/api/~/erp/draft")
+    return req.method === "GET" ? send(200, { drafts: [] }) : send(200, { ok: true });
+  if (url.pathname.startsWith("/api/")) return send(200, {});
+  /* `/workspace/…` IS THE DEPLOYMENT, not a copy of it: apps/web publishes
+     site/ under that prefix and injects one tag, and that tag is the whole of
+     how erp-store.js knows the document lives on the server. Injected here the
+     same way, from the same string, so this suite opens the page the operator
+     opens rather than a lookalike. */
+  if (url.pathname.startsWith("/workspace/")) {
+    const rest = url.pathname.slice("/workspace/".length) || "index.html";
+    try {
+      const file = join(SITE, rest);
+      if (rest.endsWith(".html")) {
+        const html = await readFile(file, "utf8");
+        return send(
+          200,
+          html.includes('name="erp-api"')
+            ? html
+            : html.replace("<head>", `<head>\n  ${WORKSPACE_MARKER}`),
+          "text/html",
+        );
+      }
+      url.pathname = "/" + rest; // assets fall through to the static handler
+    } catch {
+      return send(404, { error: "not found" });
+    }
   }
   if (url.pathname === "/harness.html") return send(200, HARNESS, "text/html");
   if (url.pathname === "/local.html") return send(200, LOCAL_HARNESS, "text/html");
   if (url.pathname === "/store.html") return send(200, STORE_HARNESS, "text/html");
   if (url.pathname === "/store-local.html") return send(200, STORE_LOCAL, "text/html");
   try {
-    const body = await readFile(join(SITE, url.pathname.replace(/^\//, "")), "utf8");
-    return send(200, body, url.pathname.endsWith(".js") ? "text/javascript" : "text/html");
+    // Binary-safe and typed by extension: erp.html carries fonts and images, and
+    // a stylesheet served as text/html is simply not applied.
+    const file = join(SITE, url.pathname.replace(/^\//, ""));
+    const bytes = await readFile(file);
+    const ext = (file.match(/\.[a-z0-9]+$/i) || [""])[0].toLowerCase();
+    const TYPES = {
+      ".js": "text/javascript",
+      ".mjs": "text/javascript",
+      ".css": "text/css",
+      ".json": "application/json",
+      ".svg": "image/svg+xml",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".webp": "image/webp",
+      ".woff2": "font/woff2",
+      ".woff": "font/woff",
+      ".pdf": "application/pdf",
+    };
+    return send(200, bytes, TYPES[ext] || "text/html");
   } catch {
     return send(404, { error: "not found" });
   }
@@ -519,6 +591,146 @@ for (const [page_, expect] of [
   );
 
   stateDelayMs = 0;
+  await page.close();
+}
+
+/* ===========================================================================
+   THE WORKSPACE ON A SERVER.
+   Everything above drives the store and the watcher directly. This section
+   opens erp.html itself, over the same stub, marked the way the deployment
+   marks it — because until it existed NOTHING did, and that is precisely how a
+   whole development system spent its life storing nothing:
+
+     · a shared-password session could not be placed by `findUser`, so `may()`
+       refused it `erp.read.all`;
+     · `/erp/state` therefore sent a worker's redacted view — no company, no
+       parties, no invoices — which the engine loads happily as an empty
+       company;
+     · `scoped: true` makes the store drop every save IN SILENCE, which is
+       right for a site worker and a catastrophe for anybody else.
+
+   Three properties, one page. See ASSUMPTIONS #S145.
+   ======================================================================== */
+
+/** Open the real workspace, marked as the deployment marks it. */
+async function openWorkspace(hash = "#customers") {
+  const page = await browser.newPage();
+  page.errors = [];
+  page.on("pageerror", (e) => page.errors.push(e.message));
+  await page.goto(`${BASE}/workspace/erp.html${hash}`, { waitUntil: "load" });
+  await page.waitForFunction(() => typeof erp !== "undefined" && !!erp.state, null, {
+    timeout: 20000,
+  });
+  await page.waitForTimeout(800);
+  return page;
+}
+
+// ---------------------------------------------------------------------------
+// 8. A new company: what the workspace is given, the server keeps.
+// ---------------------------------------------------------------------------
+{
+  sessionRole = "admin";
+  stateScoped = false;
+  stateDoc.state = null; // a tenant with nothing in it yet, exactly like a fresh dev
+  stateDoc.version = 0;
+  statePuts = [];
+
+  const page = await openWorkspace();
+  const seeded = await page.evaluate(() => ({
+    remote: ErpStore.isRemote(),
+    scoped: ErpStore.isScoped(),
+    parties: erp.state.parties.length,
+  }));
+  check(
+    "the workspace on a server writes its starting document to the server",
+    seeded.remote && !seeded.scoped && stateDoc.version > 0 && stateDoc.state !== null,
+    `remote=${seeded.remote} scoped=${seeded.scoped} serverVersion=${stateDoc.version}`,
+  );
+
+  // A record entered the way a person enters one.
+  await page.evaluate(() => (location.hash = "customers"));
+  await page.waitForTimeout(500);
+  await page.evaluate(() => newPartyDrawer("customer"));
+  await page.waitForTimeout(400);
+  await page.fill("#f_name", "SYNC Cliente Servidor");
+  await page.fill("#f_mob", "600111222");
+  await page.fill("#f_street", "Carrer Prova 1");
+  await page.fill("#f_cp", "08001");
+  await page.fill("#f_city", "Barcelona");
+  await page.click("#f_save");
+  await page.waitForTimeout(1200);
+
+  const held = JSON.stringify(stateDoc.state || {}).includes("SYNC Cliente Servidor");
+  check(
+    "a customer entered in the workspace reaches the server, not just the screen",
+    held,
+    `serverVersion=${stateDoc.version} puts=${statePuts.length}`,
+  );
+
+  // The operator's own test: close it, open it again.
+  await page.reload({ waitUntil: "load" });
+  await page.waitForFunction(() => typeof erp !== "undefined" && !!erp.state, null, {
+    timeout: 20000,
+  });
+  await page.waitForTimeout(600);
+  const survived = await page.evaluate(() =>
+    erp.state.parties.some((p) => p.name === "SYNC Cliente Servidor"),
+  );
+  check(
+    "…and is still there after a reload, which is the whole point of a server",
+    survived,
+    `parties=${await page.evaluate(() => erp.state.parties.length)}`,
+  );
+  await page.close();
+}
+
+// ---------------------------------------------------------------------------
+// 9. A redacted document handed to somebody who is not a site worker is an
+//    ALARM, never a quiet read-only mode.
+// ---------------------------------------------------------------------------
+{
+  sessionRole = "admin"; // the session route says administrator …
+  stateScoped = true; //    … and the state route sends a worker's view
+  stateDoc.state = { seeded: true };
+  stateDoc.version = 4;
+  statePuts = [];
+
+  const page = await openWorkspace();
+  const banner = await page.evaluate(() => {
+    const el = document.getElementById("canei-save-failed");
+    return el ? el.textContent : "";
+  });
+  check(
+    "a partial document for an account that is not a site worker says so, loudly",
+    /cannot save/i.test(banner) && /NOT saved/i.test(banner),
+    `banner=${JSON.stringify(banner.slice(0, 120))}`,
+  );
+  check(
+    "…and nothing was quietly written on top of the company document",
+    statePuts.length === 0 && stateDoc.version === 4,
+    `puts=${statePuts.length} version=${stateDoc.version}`,
+  );
+  await page.close();
+}
+
+// ---------------------------------------------------------------------------
+// 10. The crew, on the other hand, must NOT be told their work is broken. A
+//     site account is redacted by design and writes one command at a time.
+// ---------------------------------------------------------------------------
+{
+  sessionRole = "site";
+  stateScoped = true;
+  stateDoc.state = { seeded: true };
+  stateDoc.version = 4;
+  statePuts = [];
+
+  const page = await openWorkspace("#labour");
+  const banner = await page.evaluate(() => !!document.getElementById("canei-save-failed"));
+  check(
+    "a site account sees no such warning: for them a redacted document is the design",
+    !banner,
+    `banner=${banner}`,
+  );
   await page.close();
 }
 

@@ -258,6 +258,11 @@ jobs:
       - name: Start a second copy behind named accounts
         run: |
           ADMIN_PW="smoke-$(openssl rand -hex 12)"
+          # The link-and-password route, configured here for the first time. It
+          # is the ONLY way into the development system, and the suite could not
+          # exercise it while this container had no shared password — which is
+          # exactly how a deployment that saved nothing shipped green. #S145.
+          SHARED_PW="smoke-shared-$(openssl rand -hex 12)"
           HASH=$(node -e '
             const { randomBytes, scryptSync } = require("node:crypto");
             const salt = randomBytes(16);
@@ -269,6 +274,7 @@ jobs:
             -e DATABASE_URL="postgresql://canei_app:canei_app@127.0.0.1:5432/canei_erp?schema=public" \
             -e SESSION_SECRET="smoke-$(openssl rand -hex 16)" \
             -e ERP_USERS="smoke-admin@example.com:$HASH" \
+            -e ERP_ACCESS_PASSWORD="$SHARED_PW" \
             -e ERP_DEFAULT_TENANT="reformas-demo" \
             "$IMAGE_BASE/app:sha-${{ github.sha }}"
           for i in $(seq 1 40); do
@@ -283,6 +289,7 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/api/reformas-demo/erp/state)
           [ "$code" = "401" ] || { echo "::error::unauthenticated state read answered $code, expected 401"; docker logs app-auth; exit 1; }
           echo "ADMIN_PW=$ADMIN_PW" >> "$GITHUB_ENV"
+          echo "SHARED_PW=$SHARED_PW" >> "$GITHUB_ENV"
 
       - name: A site worker must be refused what the office may do
         env:
@@ -290,7 +297,8 @@ jobs:
           ERP_TEST_TENANT: reformas-demo
           ERP_E2E_ADMIN: smoke-admin@example.com
         run: |
-          ERP_E2E_ADMIN_PASSWORD="$ADMIN_PW" node tests/server-e2e/run.mjs \
+          ERP_E2E_ADMIN_PASSWORD="$ADMIN_PW" \
+          ERP_E2E_SHARED_PASSWORD="$SHARED_PW" node tests/server-e2e/run.mjs \
             || { docker logs app-auth; exit 1; }
 
   # The actual release step: move the rolling `main` tag onto images that have

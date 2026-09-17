@@ -5765,6 +5765,29 @@
             history.replaceState(null, "", location.pathname + "#labour");
           }
         }
+        /* THE TWO ANSWERS THE SERVER GIVES ABOUT ONE ACCOUNT HAVE TO AGREE.
+           `/api/~/session` says what this account is; `/erp/state` says whether
+           it is being sent the whole company document or a redacted one. When
+           the second says "redacted" and the first does not say "site", nobody
+           decided that — and the consequence is invisible, because a redacted
+           document makes `saveState` drop every write without a word (which is
+           right for the crew, whose writes go one command at a time).
+
+           That happened, for a fortnight, on a whole deployment: a shared
+           password session was placed by nobody, so `may()` refused it
+           `erp.read.all`, the server sent a document built from nothing, and
+           the workspace served an empty company that accepted work all day and
+           stored none of it. Fixed on the server (ASSUMPTIONS #S145); this is
+           the alarm that means it cannot be silent a second time, whatever
+           makes the two disagree next. */
+        if (ErpStore.isRemote() && ErpStore.isScoped() && !isSiteWorker()) {
+          ErpStore.warnNotSaved(
+            "This account cannot save on this server.",
+            "The server is sending a partial document for " +
+              esc(SESSION.email || "this session") +
+              ". Ask an administrator before entering anything.",
+          );
+        }
         measureTopbar();
         buildPeriodControls();
         paintUserBadge();

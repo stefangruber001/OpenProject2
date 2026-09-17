@@ -11398,3 +11398,86 @@ of commands somebody runs, from a browser, to repair the client's production
 server — restore its address, stop the development stack, rotate a registry
 token, redeploy. A syntax error in one of those is discovered at the exact moment
 it is needed, by a person already dealing with an outage.
+
+## S145 — the development system could not save one record, and said so nowhere (2026-09-17)
+
+**The report, in the operator's words:** «the info that I am putting on DEV does
+not survive the session in the browser.» It was worse than that: nothing anybody
+typed on the development system had ever been saved, from the day it came up.
+
+**The chain.** Four correct decisions, none of which knew about the next one.
+
+1. `ops/dev-up.sh` writes `ERP_USERS=""` and one `ERP_ACCESS_PASSWORD`. The
+   shared link-and-password is therefore the ONLY way into dev — and there is no
+   way to create a first account either, because `POST /~/users` needs
+   `user.manage`.
+2. A shared session carries a label (`invitado-4f2a`), not an address, so
+   `findUser` answered null for it and `may()` — "an address I cannot place may
+   do nothing" — refused it every permission. That was written to stop a shared
+   session managing accounts, and it did much more than that.
+3. `GET /erp/state` asks `may(…, "erp.read.all")` to decide whether to send the
+   company document or a site worker's redacted view. Refused, so dev served a
+   document BUILT FROM NOTHING: no company, no parties, no invoices, no budgets.
+   `ERP.from()` loads that perfectly happily — as an empty company.
+4. The response is flagged `scoped`, and `erp-store.js` answers a scoped
+   document by dropping every save AND SAYING NOTHING (`return
+Promise.resolve(null)`). That silence is deliberate and right for the crew,
+   whose writes go one command at a time and who must not be told their work is
+   broken on every save.
+
+So dev drew the full administrator UI — `/api/~/session` reports `role: "admin"`
+for any account `findUser` cannot place — over an empty company, accepted work
+all day, toasted «guardado», and had sent not one byte. Reload: gone. No banner,
+no console error, no failed request, nothing in the logs.
+
+**Why every gate was green.** The browser suite runs `site/` from disk with no
+server at all, so it only ever exercised the IndexedDB path; the server suite
+speaks HTTP with no browser; and the deploy smoke container configures
+`ERP_USERS` but never `ERP_ACCESS_PASSWORD`. The one credential the development
+system uses exclusively had never been exercised by anything.
+
+**The decision: a shared session resolves to `backoffice`.** Not a new grant —
+`lib/access.ts` and `docs/PILOT-WITHOUT-CLOUDFLARE.md` both say in as many words
+that a shared session reaches the live books like a named account. That stopped
+being true when the site-worker release made two doors consult `may()`. It is
+restored in `findUser`, exactly where the single-seat operator already is, and
+recognised only for the shape `mintSharedLabel()` produces, only while the
+shared route is switched on, and never over a real row or `ERP_USERS` line.
+
+`backoffice` rather than `admin` is the one deliberate narrowing: the whole
+document, reads and writes, money and margins — and no `user.manage`, because a
+credential handed to people outside the company must not be able to mint
+credentials. That keeps the rule `may()` was written for while returning the
+access the documentation promises.
+
+**What this changes for production.** Anybody holding `ERP_ACCESS_PASSWORD` can
+now work in the live books rather than seeing an empty system — which is what
+that credential was always documented to do, and what the two operational
+habits around it exist for: back up before a session, rotate the password
+after. If a look-only shared link is ever wanted, it is one word in
+`sharedSessionUser` (`gestoria`), and it should be a decision taken on purpose
+rather than by an accident of who `findUser` can place.
+
+**The alarm, so this class cannot be silent again.** A redacted document handed
+to an account that is not a site worker is now a red banner in the workspace,
+because the two answers the server gives about one account — what
+`/api/~/session` says it is, and whether `/erp/state` redacts — disagreeing is
+something nobody decided, and its consequence is invisible by construction.
+
+**The gates.** `apps/web/lib/users.test.ts` pins what a shared session may and
+may not do (red without the fix, both halves). `tests/site-sync/run.mjs` now
+opens the real `erp.html` under `/workspace/` with the marker the deployment
+injects — the first time anything has driven the workspace against a server —
+and asserts that a customer entered in the drawer reaches the server and is
+still there after a reload, that a redacted document for a non-site account
+shouts, and that a site account is NOT shouted at. `tests/server-e2e/run.mjs`
+signs in with the shared password against the real image and asserts it is sent
+the company document, may save it, and may not manage accounts; the deploy
+workflow now configures `ERP_ACCESS_PASSWORD` on the smoke container so that
+runs.
+
+**Not done.** `site/master-data.html` still writes to its own browser database
+(`caneiMasterData`) and is folded into the company document at most once, so
+anything typed there after the first import stays on that device. It is no
+longer linked from the workspace navigation, which is why it did not cause this
+report — but it is the same failure shape and is worth removing or porting.

@@ -184,9 +184,13 @@ it, so a task had no author anywhere. Fixed, with tests.
 - **Password reset, lockout, or two-factor.** Resetting a password means editing
   `.env`. Fine while the people who can do that are the people who own the
   company; wrong once the team is bigger.
-- **Any restriction on what a shared session may do.** Somebody with the link and
-  the password can do everything a named account can, including deleting
-  records. Read-only access does not exist yet.
+- **Read-only access.** It does not exist. Somebody with the link and the
+  password works in the live books like a back-office colleague — creating,
+  changing and deleting real records. The one thing they may not do is manage
+  accounts: a credential handed out to people outside the company must not be
+  able to mint credentials, so `user.manage` is refused (`sharedSessionUser`,
+  `lib/user-admin.ts`; ASSUMPTIONS #S145 records what that boundary cost when
+  it was accidentally the whole of it).
 
 ## Honest risks
 
@@ -197,7 +201,7 @@ customer names and figures. Two habits make that manageable:
 
 - **Before a session:** take a backup. GitHub → Actions → Ops → `backup-now`.
 - **After a session:** change `ERP_ACCESS_PASSWORD` and restart. Old sessions
-  stay valid for up to eight hours; changing `SESSION_SECRET` as well ends them
+  stay valid for up to twelve hours; changing `SESSION_SECRET` as well ends them
   immediately.
 
 Consider also who is in the data. Real customer names, addresses and invoice

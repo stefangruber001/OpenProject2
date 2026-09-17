@@ -470,6 +470,78 @@ async function main() {
   }
 
   await siteWorkerBoundary();
+  await sharedSessionAccess();
+}
+
+/**
+ * R3 · the shared password is a session that can WORK, not a ghost.
+ *
+ * `ERP_ACCESS_PASSWORD` is the link-and-password route: no account per person,
+ * one credential so somebody can open the live ERP on their own laptop. Both
+ * `lib/access.ts` and `docs/PILOT-WITHOUT-CLOUDFLARE.md` promise it reaches the
+ * live books like a named account.
+ *
+ * It stopped doing so, and nothing noticed for a fortnight, because nothing
+ * here had ever signed in that way — this container configured `ERP_USERS` and
+ * never `ERP_ACCESS_PASSWORD`. A shared session carries a label rather than an
+ * address, `findUser` could not place it, `may()` refused it everything, and
+ * `GET /erp/state` therefore sent a site worker's redacted view: no company, no
+ * parties, no invoices. The workspace renders that as an empty company and, for
+ * a redacted document, stops saving IN SILENCE. The development system — where
+ * the shared password is the only way in — stored nothing at all from the day
+ * it came up, and said so nowhere. ASSUMPTIONS #S145.
+ *
+ * Three statements, because two of them are the halves of one boundary: it is
+ * sent the company document, it may save the company document, and it may not
+ * manage accounts.
+ */
+async function sharedSessionAccess() {
+  const password = process.env.ERP_E2E_SHARED_PASSWORD?.trim() || "";
+  if (!password) {
+    console.log("shared-session access: skipped (ERP_ACCESS_PASSWORD not configured here)");
+    return;
+  }
+
+  // No address at all: that is the whole of the shared route, and the reason a
+  // named account cannot fall into one by mistyping their own password.
+  const cookie = await signIn("", password);
+  check(
+    "the shared password signs in with no address at all",
+    Boolean(cookie),
+    cookie ? "cookie issued" : "no cookie",
+  );
+  if (!cookie) return;
+
+  await as(cookie, async () => {
+    const res = await api(`/api/${TENANT}/erp/state`);
+    const st = await json(res);
+    check(
+      "a shared session is sent the company document, not a worker's redaction",
+      res.status === 200 && st.scoped === false,
+      `HTTP ${res.status} scoped=${JSON.stringify(st.scoped)}`,
+    );
+    if (res.status !== 200) return;
+
+    /* THE WRITE THE WORKSPACE ACTUALLY PERFORMS. Refused, it is a red banner;
+       refused BEFORE it is attempted — which is what a scoped document does —
+       it is nothing at all, and a day's work is gone on the next reload. The
+       document goes back unchanged: this asserts the door opens, not that the
+       engine computed anything. */
+    const saved = await api(`/api/${TENANT}/erp/state`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ state: st.state, expectedVersion: st.version }),
+    });
+    check(
+      "…and may save it, which is what the link and the password are for",
+      saved.status === 200,
+      `HTTP ${saved.status}`,
+    );
+
+    // And the boundary that `may()` was written for in the first place.
+    const users = await api(`/api/${TENANT}/users`);
+    check("…but may never manage accounts", users.status === 403, `HTTP ${users.status}`);
+  });
 }
 
 /**

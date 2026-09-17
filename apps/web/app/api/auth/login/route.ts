@@ -11,9 +11,8 @@ import { isSharedPassword, loginConfigured } from "@/lib/auth";
 import { defaultTenant, sharedAccessEnabled } from "@/lib/access";
 import { authenticateUser } from "@/lib/user-admin";
 import { safeReturnPath } from "@/lib/return-path";
-import { sessionCookie, signSession } from "@/lib/session-token";
+import { mintSharedLabel, sessionCookie, signSession } from "@/lib/session-token";
 import { check, clientKey, recordFailure, recordSuccess } from "@/lib/rate-limit";
-import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +112,7 @@ export async function POST(req: Request): Promise<Response> {
     // audit trail reading "invitado" twelve times cannot be followed;
     // "invitado-4f2a" at least tells one tester's changes from another's.
     recordSuccess(keys);
-    const label = `invitado-${randomUUID().slice(0, 4)}`;
+    const label = mintSharedLabel();
     const token = await signSession(
       label,
       process.env.SESSION_SECRET!.trim(),
