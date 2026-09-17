@@ -3739,4 +3739,4 @@ is the same failure shape.
 
 Gates: boundaries · lint · check-types · test 204 · test:sync 26 · test:codes
 38 · test:links 29 · test:shell 20 · test:band · test:docs · test:pdf 44 ·
-test:docx 124 · site E2E on the merged tree, below.
+test:docx 124 · site E2E 836/836, on the tree merged with `ac7c834`.
