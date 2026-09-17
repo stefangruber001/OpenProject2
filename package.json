@@ -30,6 +30,7 @@
     "test:docs": "node tests/doc-print/run.mjs",
     "test:band": "node tests/doc-band/run.mjs",
     "test:codes": "node tests/list-codes/run.mjs",
+    "test:links": "node tests/catalogue-links/run.mjs",
     "test:docx": "node tests/doc-docx/run.mjs",
     "test:mailbox": "tsx tests/mailbox/run.mts"
   },

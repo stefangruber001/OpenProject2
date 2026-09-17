@@ -115,6 +115,16 @@ jobs:
         if: always()
         run: pnpm test:codes
 
+      # v23 · a subpartida in more than one partida. The relationship is the
+      # easy half; the half that made it safe to ship on a live system is that
+      # re-filing one cannot move a document, because a budget line COPIES what
+      # it took from the catalogue. That is measured here — totals AND the bytes
+      # of the PDF — and the check proves its own sensitivity rather than
+      # passing by comparing a constant with itself.
+      - name: A subpartida in two partidas moves no document
+        if: always()
+        run: pnpm test:links
+
       # The runner's Chromium places glyphs differently from any machine this is
       # developed on, and its build cannot be downloaded here — so its PDFs are
       # the only evidence that exists for the heading-splitting question. Kept

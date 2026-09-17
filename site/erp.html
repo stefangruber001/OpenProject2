@@ -23204,6 +23204,17 @@
              a recorded history of exactly that. */
           const RETIRED = '<span class="pill y">retirada</span>';
           const NONE = '<span style="color:var(--muted)">—</span>';
+          const NO_PRICE = '<span class="pill y">sin precio</span>';
+          /* The margin, computed and never stored: the catalogue keeps a cost
+             and a price, and a third stored number would be a fourth thing to
+             keep in step. Same formula as the drawer's own, so the table and
+             the drawer can never tell the operator two different things. */
+          const mgn = (i) =>
+            i.defaultPriceCents
+              ? Math.round(
+                  ((i.defaultPriceCents - i.defaultCostCents) / i.defaultPriceCents) * 1000,
+                ) / 10
+              : null;
 
           const tabs = SECTIONS.map((s) => {
             const on = biSection === s.k;

@@ -3477,3 +3477,20 @@ changed, so the committed `site/erp-factory` bundle is byte-identical.
   proposes a code already taken, and everything it proposes is storable.
 - **Subpartidas unchanged** — `nextCatalogueCode` has proposed `FON-101` from
   the chosen partida since Package 2.
+
+## Package 13 · Elementos de presupuesto
+
+- **Schema v23** — `itemPartidaLinks`, the single truth about which partidas a
+  subpartida sits in; the shipped ten partidas removed where nothing references
+  them.
+- **The engine** — partidas ship empty and join `OPTIONAL_LISTS`; the six link
+  methods mirror the título block name for name; `removePartida` shares its
+  three conditions with the ladder step.
+- **One screen, three sections** — Subpartidas → Partidas → Títulos, each a flat
+  register with a drawer. The two-zone trees are gone: a tree asserts one parent
+  per node and that stopped being true.
+- **A gate that proves its own sensitivity** (`pnpm test:links`, 26 assertions) —
+  totals and PDF bytes unmoved while the catalogue is rearranged, and red when
+  the copy semantics are sabotaged.
+- **Suites re-pointed** — `shape.subs` 32 → 31, the DMC-01 and Títulos blocks
+  rewritten against the register.

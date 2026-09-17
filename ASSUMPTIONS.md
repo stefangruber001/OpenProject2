@@ -11192,3 +11192,70 @@ which partida it belongs to.
 rather than tenant data, which is why the database reset did not remove them.
 The `0` beside each is its subpartida count — all zero, which is the reset
 having worked exactly as intended.
+
+## S142 — the price book becomes one screen, built bottom-up
+
+The operator's instruction of 17 September, in three parts, all confirmed by
+them before any code was written: merge Títulos and «Partidas y subpartidas»
+into one screen called Budget Items; give it three sections in the order
+Subpartidas → Partidas → Títulos, each a flat register with a drawer on the
+right; and let partidas start from scratch, "not like Unidades de Medida".
+
+**They were right about the inconsistency, and it was mine.** `itemTitles` ships
+empty for a reason written out at length in v22: which partidas belong under
+which título is a statement about how a company sells, not a fact about the
+trade. That argument applies just as exactly one level down, and I had not
+followed it through — so a price book arrived with somebody else's ten trades in
+it that had to be argued with before they could be deleted.
+
+**Decision 1 · «Elementos de presupuesto»** (CA _Elements de pressupost_, EN
+_Budget items_). Proposed; the operator chose it over "Catálogo de presupuesto"
+and "Partidas y precios".
+
+**Decision 2 · one source of truth.** `itemPartidaLinks` is the only answer to
+"which partidas is this subpartida in". The alternative — `chapter` as a home
+partida plus links for extras — reads simpler and gives two fields that can
+disagree about one fact, which is a shape this repository has bled from before.
+`item.chapter` survives on the record as legacy so an export taken yesterday
+still reads; nothing computes membership from it, and `grep` for `i.chapter` in
+`erp.html` returns nothing.
+
+**Decision 3 · the ten shipped partidas are deleted**, but only where nothing
+points at them: no subpartida linked, no título membership, no budget chapter
+whose NAME matches theirs with accents folded. On the operator's own system all
+ten are unreferenced, so all ten go — which is exactly why this was the moment,
+a week after the reset and before the catalogue is rebuilt. A company that has
+been quoting "Fontanería" for months keeps it. `removePartida` enforces the same
+three conditions from the button, so the ladder and the screen cannot disagree.
+
+**The trees went, and that is the substantive UI change.** Both old screens had
+grown the same two-zone shape because each had been, in its turn, the top of a
+tree. A tree asserts one parent per node, and from v23 that is false. Each
+section is now `renderMasterList` — search, pagination, export, ＋ Nuevo — like
+Clientes or Proveedores. The tree's one genuine advantage was showing what was
+filed nowhere; the register answers it better, because an unfiled subpartida
+sits in the list in name order with a dash in its Partidas column instead of
+being bucketed at the bottom.
+
+**A recorded decision reversed, deliberately.** The Package 8 review of 28/08
+made the partida mandatory on `addCatalogueItem`, because a subpartida with none
+was unfindable. The operator's new order of work makes that impossible to
+perform, so the guard is gone — and the objection is answered rather than
+overruled: the screen that caused it no longer exists.
+
+**Two things the plan did not foresee**, both found by running rather than by
+reading. `applyCataloguePack` is step 11's `up` AND an exported entry point the
+app calls against a state that is already current, where step 23 will never run
+again; writing `chapter` and stopping would have put two hundred subpartidas in
+the book and under no trade at all. And the first version of the new gate
+compared a PDF built from the wrong input shape — a constant, comparing equal to
+itself for ever. The sensitivity check caught it on its first run, which is the
+entire argument for writing one.
+
+**What is measured, not asserted:** `pnpm test:links`, 26 assertions. A
+subpartida in two partidas; migration 23's carry-over; the pack filing what it
+loads; and then totals and the PDF's bytes held identical while the catalogue is
+re-filed, renamed, emptied and partly deleted underneath a quote already
+written. Sabotaging the copy semantics — making a line look its description up
+through `itemId` instead of carrying its own — turns it red on the exact words
+that changed on the page. That was run, not imagined.

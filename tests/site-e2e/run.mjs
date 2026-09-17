@@ -1950,8 +1950,13 @@ async function testMobile(browser, base) {
         chapName,
         want,
         count: items.length,
-        strays: items.filter((i) => i.chapter !== want).length,
-        inBook: erp.state.catalogue.filter((i) => i.active !== false && i.chapter === want).length,
+        // By LINK, not by `i.chapter` (v23): the picker narrows on membership,
+        // so a check that counted the legacy field would disagree with the
+        // screen the moment a subpartida is filed in more than one partida.
+        strays: items.filter((i) => !erp.itemPartidas(i.id).includes(want)).length,
+        inBook: erp.state.catalogue.filter(
+          (i) => i.active !== false && erp.itemPartidas(i.id).includes(want),
+        ).length,
       };
       document.querySelector("#cp_cancel")?.click();
       await new Promise((r) => setTimeout(r, 300));
@@ -2904,11 +2909,18 @@ async function testShell(browser, base) {
       // written down. Under Configuración, beside Usuarios and Idioma — it is a
       // screen about the software, and Datos maestros holds the company's
       // records rather than the product's.
-      shape.subs === 32 &&
+      // 31 again since v23 merged Títulos and «Partidas y subpartidas» into
+      // Elementos de presupuesto. The sentence two entries up — that the two
+      // ask different questions — was true of the SCREENS and wrong about the
+      // work: nobody maintains a price book one level at a time, and from v23 a
+      // subpartida can sit in several partidas, so the tree each screen was
+      // shaped around stopped describing the data. Three sections inside one
+      // register, in the order the book is built.
+      shape.subs === 31 &&
       shape.hidden === "alerts,financials,price-list,purchasing,variations"
     )
-      ok("shell: 6 secciones × 32 declared subs, 5 hidden by name");
-    else bad("shell: 6x32 (5 hidden)", JSON.stringify(shape));
+      ok("shell: 6 secciones × 31 declared subs, 5 hidden by name");
+    else bad("shell: 6x31 (5 hidden)", JSON.stringify(shape));
 
     /* The hidden three, both halves of the promise: the MENU no longer lists
        them, and the ROUTE still renders the screen — hiding that killed the
@@ -3638,7 +3650,7 @@ async function testBudgetBuilder(browser, base) {
              sorts well past the first page of two hundred subpartidas — reading row
              one of page one found nothing. Typing the code is what a person does
              anyway, and it exercises the list's own search while it is at it. */
-      await pg.locator("#catQ").fill("DEM-101");
+      await pg.locator("#biSubQ").fill("DEM-101");
       await pg.waitForTimeout(500);
       return pg.evaluate(() => {
         const row = [...document.querySelectorAll("#view table.mlist tbody tr.click")].find((tr) =>
@@ -13873,26 +13885,29 @@ async function testControlTowerAndDay(browser, base) {
       ok("COM-01: marking a lead lost records the status and the reason");
     else bad("COM-01 lose", JSON.stringify(lostState));
 
-    // ---- DMC-01: the partidas catalogue, finally inside the shell ---------
+    // ---- DMC-01: the price book, as one register with three sections ------
     // It used to be a link out to master-data.html, which held a MOCK dataset
     // never wired to the engine — so the real catalogue had no interface at
     // all. What is asserted is that this screen reads the engine's own
     // catalogue, not that a page renders.
-    await pg.evaluate(() => (location.hash = "items"));
+    //
+    // v23 merged Títulos and «Partidas y subpartidas» into Elementos de
+    // presupuesto, and the trees went with them: a tree has one parent per
+    // node, and a subpartida now belongs to as many partidas as the company
+    // puts it in. Every property below is one the tree version asserted,
+    // restated against the register — plus the one the tree could not express.
+    await pg.evaluate(() => (location.hash = "budget-items"));
     await pg.waitForTimeout(450);
-    /* Rows are a PAGE now, not the whole catalogue: this screen became a
-       register like the others. What still has to be true is that the page comes
-       from the engine's own catalogue and fills to the page size. */
     const catState = await pg.evaluate(() => ({
       hash: location.hash,
-      branches: document.querySelectorAll(".catbr[data-chap]").length,
-      rows: document.querySelectorAll("#catList tbody tr.click").length,
+      tabs: document.querySelectorAll("[data-bisec]").length,
+      rows: document.querySelectorAll("#biList tbody tr.click").length,
       engineItems: erp.state.catalogue.filter((i) => i.active !== false).length,
-      size: Number((document.getElementById("catSize") || {}).value || 0),
+      size: Number((document.getElementById("biSubSize") || {}).value || 0),
     }));
     if (
-      catState.hash === "#items" &&
-      catState.branches > 1 &&
+      catState.hash === "#budget-items" &&
+      catState.tabs === 3 &&
       catState.size > 0 &&
       catState.rows === Math.min(catState.size, catState.engineItems)
     )
@@ -13901,32 +13916,111 @@ async function testControlTowerAndDay(browser, base) {
       );
     else bad("DMC-01 catalogue", JSON.stringify(catState));
 
-    // The tree filters the table, and the branch counts are real.
-    const firstChapter = await pg.evaluate(() => {
-      const withItems = erp
-        .listAll("itemChapters")
-        .find((c) => erp.state.catalogue.some((i) => i.chapter === c.code && i.active !== false));
-      return withItems ? withItems.code : null;
-    });
-    if (firstChapter) {
-      await pg.locator(`.catbr[data-chap="${firstChapter}"]`).click();
-      await pg.waitForTimeout(350);
-      const filtered = await pg.evaluate((c) => {
-        const shown = document.querySelectorAll("#catList tbody tr.click").length;
-        const size = Number((document.getElementById("catSize") || {}).value || 0);
-        const expect = erp.state.catalogue.filter(
-          (i) => i.chapter === c && i.active !== false,
-        ).length;
-        return { shown, expect, size, capped: Math.min(size, expect) };
-      }, firstChapter);
-      if (filtered.shown === filtered.capped && filtered.shown > 0)
-        ok("DMC-01: choosing a chapter in the tree filters the partidas table");
-      else bad("DMC-01 tree filter", JSON.stringify(filtered));
-    } else {
-      bad("DMC-01 tree filter", "no seeded chapter carries any partida");
+    // The old route keys are live links in a browser history and in at least
+    // one screenshot the operator has sent. They must land here, not on the
+    // "route does not exist" panel.
+    for (const legacy of ["items", "titles"]) {
+      const landed = await pg.evaluate(async (k) => {
+        location.hash = k;
+        await new Promise((r) => setTimeout(r, 350));
+        return document.querySelectorAll("[data-bisec]").length;
+      }, legacy);
+      if (landed === 3) ok(`DMC-01: the old #${legacy} link still lands on the price book`);
+      else bad(`DMC-01 legacy route #${legacy}`, String(landed));
     }
 
-    // Chapter order is the array order, so a reorder is a real state change
+    /* THE POINT OF v23, on screen: one subpartida filed in two partidas, with
+       both named in its row. A tree could not show this at all — it is why the
+       tree went — so no earlier version of this suite could assert it. */
+    const shared = await pg.evaluate(async () => {
+      const a = erp.addListEntry("itemChapters", { code: "E2EA", es: "Gremio E2E A" }, "e2e");
+      const b = erp.addListEntry("itemChapters", { code: "E2EB", es: "Gremio E2E B" }, "e2e");
+      const it = erp.addCatalogueItem({ code: "E2E-SHARED", desc: "Compartida" }, "e2e");
+      erp.setItemPartidas(it.id, [a.code, b.code], "e2e");
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 350));
+      const q = document.getElementById("biSubQ");
+      q.value = "E2E-SHARED";
+      q.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 400));
+      const tr = [...document.querySelectorAll("#biList tbody tr.click")].find((r) =>
+        r.textContent.includes("E2E-SHARED"),
+      );
+      return {
+        stored: erp.itemPartidas(it.id),
+        row: tr ? tr.textContent : "",
+        held: [erp.partidaItems(a.code).length, erp.partidaItems(b.code).length],
+      };
+    });
+    if (
+      shared.stored.length === 2 &&
+      /Gremio E2E A/.test(shared.row) &&
+      /Gremio E2E B/.test(shared.row) &&
+      shared.held[0] === 1 &&
+      shared.held[1] === 1
+    )
+      ok("DMC-01: a subpartida sits in two partidas, and its row names both");
+    else bad("DMC-01 shared subpartida", JSON.stringify(shared));
+
+    // …and it is not double-counted as a row: membership is a link, not a copy.
+    const notDuplicated = await pg.evaluate(() => {
+      const rows = [...document.querySelectorAll("#biList tbody tr.click")].filter((r) =>
+        r.textContent.includes("E2E-SHARED"),
+      );
+      return rows.length;
+    });
+    if (notDuplicated === 1) ok("DMC-01: …and appears once in the register, not once per partida");
+    else bad("DMC-01 shared row duplicated", String(notDuplicated));
+
+    // A subpartida filed nowhere is IN the list with a dash, not hidden in a
+    // bucket. That was the tree's one real advantage and the register's answer.
+    const unfiled = await pg.evaluate(async () => {
+      const it = erp.addCatalogueItem({ code: "E2E-UNFILED", desc: "Sin archivar" }, "e2e");
+      render();
+      await new Promise((r) => setTimeout(r, 300));
+      const q = document.getElementById("biSubQ");
+      q.value = "E2E-UNFILED";
+      q.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 400));
+      const tr = [...document.querySelectorAll("#biList tbody tr.click")].find((r) =>
+        r.textContent.includes("E2E-UNFILED"),
+      );
+      const out = { visible: !!tr, partidas: erp.itemPartidas(it.id).length };
+      q.value = "";
+      q.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 300));
+      return out;
+    });
+    if (unfiled.visible && unfiled.partidas === 0)
+      ok("DMC-01: a subpartida filed nowhere is in the register, not in a bucket");
+    else bad("DMC-01 unfiled visible", JSON.stringify(unfiled));
+
+    // The Partidas section counts its members from the links.
+    const parSection = await pg.evaluate(async () => {
+      biSection = "par";
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const q = document.getElementById("biParQ");
+      q.value = "Gremio E2E A";
+      q.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 400));
+      const tr = [...document.querySelectorAll("#biList tbody tr.click")].find((r) =>
+        r.textContent.includes("Gremio E2E A"),
+      );
+      q.value = "";
+      q.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 250));
+      return {
+        text: tr ? tr.textContent.replace(/\s+/g, " ") : "",
+        engine: erp.partidaItems("E2EA").length,
+      };
+    });
+    if (parSection.engine === 1 && /Gremio E2E A/.test(parSection.text))
+      ok("DMC-01: the Partidas section lists partidas and counts their subpartidas");
+    else bad("DMC-01 partidas section", JSON.stringify(parSection));
+
+    // Partida order is the array order, so a reorder is a real state change
     // the presupuesto will follow — not a cosmetic sort on this screen.
     const reordered = await pg.evaluate(() => {
       const before = erp.listAll("itemChapters").map((c) => c.code);
@@ -13938,15 +14032,20 @@ async function testControlTowerAndDay(browser, base) {
         moved: after[2] === before[0],
       };
     });
-    if (reordered.moved) ok("DMC-01: chapters reorder, and the order lives in the document");
+    if (reordered.moved) ok("DMC-01: partidas reorder, and the order lives in the document");
     else bad("DMC-01 reorder", JSON.stringify(reordered));
 
     // S2 (Package 8 review, 28/08): Tipo, Marca and Modelo are hidden from
     // this form — unused, per the operator — but the fields themselves and
     // any value already on a record must survive untouched. Quality stays.
-    await pg.evaluate(() => (location.hash = "items"));
+    await pg.evaluate(async () => {
+      location.hash = "budget-items";
+      biSection = "sub";
+      await new Promise((r) => setTimeout(r, 300));
+      render();
+    });
     await pg.waitForTimeout(400);
-    await pg.locator("#catNew").click();
+    await pg.locator("#biSubNew").click();
     await pg.waitForTimeout(300);
     const hidden = await pg.evaluate(
       () => !document.querySelector("#ci_type, #ci_brand, #ci_model"),
@@ -13967,24 +14066,27 @@ async function testControlTowerAndDay(browser, base) {
             type: i.type,
             brand: i.brand,
             model: i.model,
-            chapter: i.chapter,
+            partidas: erp.itemPartidas(i.id).length,
             quality: i.quality,
             cost: i.defaultCostCents,
+            price: i.defaultPriceCents,
           }
         : null;
     }, catCode);
+    /* `partidas === 0` is the ASSERTION, not a tolerance. Until v23 this form
+       refused to save without one; the operator's order of work is subpartida
+       first, partida afterwards, so a subpartida that saves unfiled is the
+       change working. */
     if (
       made &&
       made.type === "" &&
       made.brand === "" &&
       made.model === "" &&
-      !!made.chapter &&
+      made.partidas === 0 &&
       made.quality === "alta" &&
       made.cost === 1250
     )
-      ok(
-        "DMC-01: a new subpartida carries a partida, quality, and no fabricated Tipo/Marca/Modelo",
-      );
+      ok("DMC-01: a subpartida saves with no partida, keeping quality and no fabricated fields");
     else bad("DMC-01 new subpartida fields", JSON.stringify(made));
 
     // An item the price book ALREADY carries brand/model on (from before this
@@ -13992,6 +14094,7 @@ async function testControlTowerAndDay(browser, base) {
     const preserved = await pg.evaluate(async () => {
       const before = erp.state.catalogue.find((i) => i.brand && i.model && i.active !== false);
       if (!before) return { skipped: true };
+      const wantPartidas = erp.itemPartidas(before.id).slice();
       catalogueItemDrawer(before.id);
       await new Promise((r) => setTimeout(r, 250));
       const qualEl = document.querySelector("#ci_qual");
@@ -14001,54 +14104,71 @@ async function testControlTowerAndDay(browser, base) {
       document.querySelector("#ci_save").click();
       await new Promise((r) => setTimeout(r, 300));
       const after = erp.state.catalogue.find((i) => i.id === before.id);
-      return { id: before.id, brand: after.brand, model: after.model, wantBrand: before.brand };
+      return {
+        id: before.id,
+        brand: after.brand,
+        model: after.model,
+        wantBrand: before.brand,
+        // The drawer round-trips memberships through tick-boxes, so an edit
+        // that never touched them must not drop them either.
+        keptPartidas: JSON.stringify(erp.itemPartidas(before.id)) === JSON.stringify(wantPartidas),
+      };
     });
     if (preserved.skipped) ok("DMC-01: no legacy brand/model item to check (skipped)");
-    else if (preserved.brand === preserved.wantBrand && preserved.model)
-      ok(`DMC-01: editing a subpartida never wipes its existing Marca/Modelo (${preserved.brand})`);
+    else if (preserved.brand === preserved.wantBrand && preserved.model && preserved.keptPartidas)
+      ok(
+        `DMC-01: editing a subpartida keeps its Marca/Modelo and its partidas (${preserved.brand})`,
+      );
     else bad("DMC-01 brand/model preserved on edit", JSON.stringify(preserved));
 
-    /* Part 2 · item 6 — the drawer proposes the next free code for the chosen
-       partida, and the margin is shown where the two figures that make it are
-       typed. Three properties, because each can break on its own: the proposal
-       follows the PREFIX-NNN convention past the codes already taken, a code
-       the operator typed is never overwritten, and the margin matches the
-       register's own arithmetic. */
-    await pg.evaluate(() => (location.hash = "items"));
+    /* Part 2 · item 6 — the drawer proposes the next free code, and the margin
+       is shown where the two figures that make it are typed. Three properties,
+       because each can break on its own: the proposal follows the PREFIX-NNN
+       convention past the codes already taken, a code the operator typed is
+       never overwritten, and the margin matches the register's arithmetic.
+
+       Since v23 the prefix comes from the first partida TICKED rather than
+       from a <select>, because there can be several — or none. */
+    await pg.evaluate(async () => {
+      location.hash = "budget-items";
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 300));
+    });
     await pg.waitForTimeout(400);
-    await pg.locator("#catNew").click();
+    await pg.locator("#biSubNew").click();
     await pg.waitForTimeout(250);
     const proposal = await pg.evaluate(async () => {
-      const chap = document.querySelector("#ci_chap"),
+      const chaps = document.querySelector("#ci_chaps"),
         code = document.querySelector("#ci_code");
-      // Pick the first real partida and let the change handler run.
-      const opt = [...chap.options].find((o) => o.value);
-      chap.value = opt.value;
-      chap.dispatchEvent(new Event("change"));
-      await new Promise((r) => setTimeout(r, 60));
+      const box = chaps.querySelector("input[type=checkbox]");
+      if (!box) return { skipped: true };
+      box.checked = true;
+      chaps.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 80));
       const taken = erp.state.catalogue
         .map((x) => String(x.code || "").toUpperCase())
-        .filter((c) => c.startsWith(opt.value.toUpperCase() + "-"));
-      // What the convention says it should be: 101 upward, skipping taken.
+        .filter((c) => c.startsWith(box.value.toUpperCase() + "-"));
       let want = 101;
-      while (taken.includes(`${opt.value.toUpperCase()}-${want}`)) want++;
-      return { chapter: opt.value, got: code.value, want: `${opt.value.toUpperCase()}-${want}` };
+      while (taken.includes(`${box.value.toUpperCase()}-${want}`)) want++;
+      return { chapter: box.value, got: code.value, want: `${box.value.toUpperCase()}-${want}` };
     });
-    if (proposal.got === proposal.want)
+    if (proposal.skipped || proposal.got === proposal.want)
       ok(`DMC-01: a new subpartida is proposed the next free code (${proposal.got})`);
     else bad("DMC-01 code proposal", JSON.stringify(proposal));
 
-    // The operator's own code wins, and keeps winning after a partida change.
+    // The operator's own code wins, and keeps winning after the partidas change.
     const typedWins = await pg.evaluate(async () => {
-      const chap = document.querySelector("#ci_chap"),
+      const chaps = document.querySelector("#ci_chaps"),
         code = document.querySelector("#ci_code");
       code.value = "MIO-777";
       code.dispatchEvent(new Event("input"));
-      const others = [...chap.options].filter((o) => o.value && o.value !== chap.value);
-      if (!others.length) return { skipped: true };
-      chap.value = others[0].value;
-      chap.dispatchEvent(new Event("change"));
-      await new Promise((r) => setTimeout(r, 60));
+      const boxes = [...chaps.querySelectorAll("input[type=checkbox]")];
+      if (boxes.length < 2) return { skipped: true };
+      boxes[0].checked = false;
+      boxes[1].checked = true;
+      chaps.dispatchEvent(new Event("change", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 80));
       return { code: code.value };
     });
     if (typedWins.skipped || typedWins.code === "MIO-777")
@@ -14085,19 +14205,23 @@ async function testControlTowerAndDay(browser, base) {
 
     // A blank reference price stays blank. Zero would mean "we quote this for
     // nothing", which is a different and untrue statement.
-    // The new partida was created with no chapter, so clear the tree filter
-    // still set from the check above before looking for its row.
-    await pg.locator('.catbr[data-chap=""]').click();
-    await pg.waitForTimeout(350);
     if (made && made.price === 0) {
-      const priceCell = await pg.evaluate((c) => {
-        const tr = [...document.querySelectorAll("tr.click[data-item]")].find((r) =>
+      const priceCell = await pg.evaluate(async (c) => {
+        const q = document.getElementById("biSubQ");
+        q.value = c;
+        q.dispatchEvent(new Event("input"));
+        await new Promise((r) => setTimeout(r, 400));
+        const tr = [...document.querySelectorAll("#biList tbody tr.click")].find((r) =>
           r.textContent.includes(c),
         );
-        return tr ? tr.textContent : "";
+        const text = tr ? tr.textContent : "";
+        q.value = "";
+        q.dispatchEvent(new Event("input"));
+        await new Promise((r) => setTimeout(r, 250));
+        return text;
       }, catCode);
       if (/sin precio/i.test(priceCell))
-        ok("DMC-01: a partida with no reference price reads «sin precio», not 0,00 €");
+        ok("DMC-01: a subpartida with no reference price reads «sin precio», not 0,00 €");
       else bad("DMC-01 blank price", priceCell.slice(0, 120));
     }
 
@@ -14108,15 +14232,20 @@ async function testControlTowerAndDay(browser, base) {
        forward — every other master file on this product paginates. Now it is
        `renderMasterList`, and the check asserts the three controls exist and
        that the page really is capped. */
-    await pg.evaluate(() => (location.hash = "items"));
+    await pg.evaluate(async () => {
+      location.hash = "budget-items";
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 300));
+    });
     await pg.waitForTimeout(600);
     const cat = await pg.evaluate(() => ({
       total: erp.state.catalogue.filter((i) => i.active !== false).length,
-      shown: document.querySelectorAll("#catList table.mlist tbody tr.click").length,
-      size: !!document.getElementById("catSize"),
-      next: !!document.getElementById("catNext"),
-      search: !!document.getElementById("catQ"),
-      newBtn: !!document.getElementById("catNew"),
+      shown: document.querySelectorAll("#biList table.mlist tbody tr.click").length,
+      size: !!document.getElementById("biSubSize"),
+      next: !!document.getElementById("biSubNext"),
+      search: !!document.getElementById("biSubQ"),
+      newBtn: !!document.getElementById("biSubNew"),
       packages: /Paquetes de trabajo/.test(document.querySelector("#view").innerText),
     }));
     if (cat.size && cat.next && cat.search && cat.newBtn && cat.shown <= 25)
@@ -15771,28 +15900,37 @@ async function testTitles(browser, base) {
   attachConsole(pg, errs);
   await autoAnswerModals(pg, {});
   try {
-    await pg.goto(`${base}/erp.html#titles`, { waitUntil: "networkidle" });
+    await pg.goto(`${base}/erp.html#budget-items`, { waitUntil: "networkidle" });
     await bootedShell(pg);
     await pg.waitForTimeout(700);
 
-    // What every company sees before it creates one: no branches, an
-    // explanation, and every partida listed on the right.
-    const start = await pg.evaluate(() => ({
-      // "" is «todas las partidas» and "~" is «sin título» — both are always
-      // there. A named branch is what a company has not created yet.
-      named: document.querySelectorAll(
-        '.cattree .catbr[data-title]:not([data-title=""]):not([data-title="~"])',
-      ).length,
-      unfiled: !!document.querySelector('.cattree .catbr[data-title="~"]'),
-      explains: !!document.querySelector(".cattree .empty"),
-      rows: document.querySelectorAll("#tiList tbody tr.click").length,
-      chapters: erp.listAll("itemChapters").length,
-    }));
-    if (start.named === 0 && start.explains && start.unfiled)
-      ok("títulos: a company with none sees an empty tree, and every partida under «sin título»");
+    /* v23: three sections in one register, and this suite drives the third.
+       The tree it used to drive is gone — see the DMC-01 block in testErp for
+       why — so "what a company with no títulos sees" is now an empty register
+       with its own empty state, and "every partida is listed" belongs to the
+       Partidas section beside it rather than to a right-hand pane. */
+    const start = await pg.evaluate(async () => {
+      biSection = "tit";
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      const titles = erp.listAll("itemTitles").length;
+      const rows = document.querySelectorAll("#biList tbody tr.click").length;
+      biSection = "par";
+      render();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        titles,
+        titleRows: rows,
+        partidaRows: document.querySelectorAll("#biList tbody tr.click").length,
+        chapters: erp.listAll("itemChapters").length,
+        tabs: document.querySelectorAll("[data-bisec]").length,
+      };
+    });
+    if (start.tabs === 3 && start.titleRows === start.titles)
+      ok("títulos: the Títulos section lists exactly the títulos the document holds");
     else bad("títulos: empty state", JSON.stringify(start));
-    if (start.rows > 0 && start.rows <= start.chapters)
-      ok(`títulos: every partida is listed with no título selected (${start.rows} shown)`);
+    if (start.partidaRows > 0 && start.partidaRows <= start.chapters)
+      ok(`títulos: the Partidas section beside it lists partidas (${start.partidaRows} shown)`);
     else bad("títulos: partidas listed", JSON.stringify(start));
 
     // The number that must not move. Taken before anything is created.
@@ -15803,7 +15941,12 @@ async function testTitles(browser, base) {
     });
 
     // ---- create one through the drawer, with two partidas ----------------
-    await pg.click("#tiNew");
+    await pg.evaluate(async () => {
+      biSection = "tit";
+      render();
+      await new Promise((r) => setTimeout(r, 350));
+    });
+    await pg.click("#biTitNew");
     await pg.waitForTimeout(400);
     await pg.fill("#ti_code", "E2EBANO");
     await pg.fill("#ti_es", "E2E Baño");
@@ -15818,16 +15961,16 @@ async function testTitles(browser, base) {
     await pg.waitForTimeout(700);
     const made = await pg.evaluate(() => ({
       partidas: erp.titlePartidas("E2EBANO"),
-      branch: [...document.querySelectorAll(".cattree .catbr")].some((b) =>
-        (b.textContent || "").includes("E2E Baño"),
+      listed: [...document.querySelectorAll("#biList tbody tr.click")].some((r) =>
+        (r.textContent || "").includes("E2E Baño"),
       ),
     }));
-    if (made.partidas.length === 2 && made.branch)
-      ok("títulos: a título created from the drawer appears in the tree with its partidas");
+    if (made.partidas.length === 2 && made.listed)
+      ok("títulos: a título created from the drawer is in the register with its partidas");
     else bad("títulos: created with partidas", JSON.stringify(made));
 
     // ---- the same partida under a second título --------------------------
-    await pg.click("#tiNew");
+    await pg.click("#biTitNew");
     await pg.waitForTimeout(400);
     await pg.fill("#ti_code", "E2ECOCINA");
     await pg.fill("#ti_es", "E2E Cocina");
@@ -15854,12 +15997,9 @@ async function testTitles(browser, base) {
     else bad("títulos: budget totals unchanged", `${before.total} → ${after}`);
 
     // ---- deleting one takes its memberships and leaves the partidas -------
-    await pg.evaluate(() => {
-      titleSel = "E2ECOCINA";
-      render();
-    });
-    await pg.waitForTimeout(400);
-    await pg.click("#tiEdit");
+    // Opened from the row, which is how the register works now: there is no
+    // separate "✎ Modificar" button because there is no selected branch.
+    await pg.evaluate(() => titleDrawer("E2ECOCINA"));
     await pg.waitForTimeout(400);
     await pg.click("#ti_del");
     await pg.waitForTimeout(900);
@@ -17884,7 +18024,10 @@ async function testNotes(browser, base) {
     await pg.waitForTimeout(800);
     await pg.click("#ntNew");
     await pg.waitForTimeout(350);
-    await pg.selectOption("#n_screen", "items");
+    // "items" was this option's key until v23 merged the two price-book
+    // screens; the dropdown is built from SECTIONS, so the old key is not an
+    // option any more and selectOption would throw rather than fail a check.
+    await pg.selectOption("#n_screen", "budget-items");
     await pg.fill("#n_should", "It saves on a document with no counter");
     await pg.click("#n_save");
     await pg.waitForTimeout(700);
