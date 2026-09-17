@@ -257,6 +257,25 @@
 
     /* catalogue, packages, prices (with source + date) */
     const items = {};
+    /* THE PARTIDAS, CREATED HERE — they stopped shipping at v23, because which
+       trades a company works in is that company's data. This is demo data for
+       a reformas SME, so it invents a reformas SME's trades; a real tenant
+       types their own and gets none of these. The codes are the ones this
+       system used to seed, so a screenshot taken last month still reads. */
+    [
+      ["DEM", "Demoliciones", "Enderrocs"],
+      ["ALB", "Albañilería", "Paleteria"],
+      ["FON", "Fontanería", "Lampisteria"],
+      ["ELE", "Electricidad", "Electricitat"],
+      ["CLI", "Climatización", "Climatització"],
+      ["REV", "Revestimientos", "Revestiments"],
+      ["CAR", "Carpintería", "Fusteria"],
+      ["PIN", "Pintura", "Pintura"],
+      ["SAN", "Sanitarios y grifería", "Sanitaris i aixetes"],
+      ["VAR", "Varios", "Diversos"],
+    ].forEach(function (row) {
+      erp.addListEntry("itemChapters", { code: row[0], es: row[1], ca: row[2] }, "seed");
+    });
     // The chapter is what DMC-01's tree branches on, and brand/model/quality
     // are what a customer is actually being quoted — the same "punto de agua"
     // at two qualities is two different jobs. Left empty where the trade
@@ -372,6 +391,8 @@
         defaultCostCents: cost,
         defaultPriceCents: price,
       });
+      // `chapter` above is the legacy field; THIS is the membership (v23).
+      erp.setItemPartidas(items[code].id, [chapter], "seed");
     });
     erp.addPrice({
       itemId: items["ALI-101"].id,

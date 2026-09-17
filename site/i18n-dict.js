@@ -54,6 +54,20 @@ window.CANEI_DICT = {
       "TEST ENVIRONMENT · the data here is invented · ENTORNO DE PRUEBAS",
     ],
     ["Títulos", "Sections"],
+    ["Elementos de presupuesto", "Budget items"],
+    ["Partidas en las que aparece", "Line items it appears in"],
+    ["Subpartidas de esta partida", "Sub-line items in this line item"],
+    ["Posición", "Position"],
+    ["título", "section"],
+    ["títulos", "sections"],
+    [
+      "Todavía no hay partidas. Crea la subpartida y archívala luego desde la sección Partidas.",
+      "No line items yet. Create the sub-line item and file it later from the Line items section.",
+    ],
+    [
+      "Todavía no hay subpartidas. Créalas en la sección Subpartidas y vuelve a archivarlas aquí.",
+      "No sub-line items yet. Create them in the Sub-line items section, then come back and file them here.",
+    ],
     ["Nuevo título", "New section"],
     ["＋ Nuevo título", "＋ New section"],
     ["＋ Nueva partida", "＋ New line item"],
@@ -4573,7 +4587,7 @@ window.CANEI_DICT = {
       "Only possible if it has no financial documents attached. This action cannot be undone.",
     ],
     [
-      "Sólo para una subpartida que no se va a repetir. Si se va a usar más veces, añádela al catálogo en Configuración → Partidas y subpartidas.",
+      "Sólo para una subpartida que no se va a repetir. Si se va a usar más veces, añádela al catálogo en Configuración → Elementos de presupuesto.",
       "Only for a sub-line item that will not be used again. If it will be used more than once, add it to the catalogue in Settings → Line items and sub-line items.",
     ],
     [

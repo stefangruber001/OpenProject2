@@ -8,9 +8,10 @@
 
    WHY THIS IS A GATE AND NOT A UNIT TEST OF A SLUG FUNCTION. Any generator can
    be made to pass a test written against itself. The property worth pinning is
-   that the generator agrees with the data this system has ALREADY shipped: run
-   over the ten partida names in LIST_DEFAULTS, it has to produce their ten
-   codes — DEM, ALB, FON … VAR — exactly. That is what makes the proposal look
+   that the generator agrees with the convention this system has ALREADY taught
+   the operator to read: run over the ten trade names that shipped as partidas
+   until v23, it has to produce their ten codes — DEM, ALB, FON … VAR — exactly.
+   (They are a fixture here since v23; block 1 says why.) That makes the proposal look
    like the convention the company already has rather than like a generator's
    output, and it is a claim about the world that can actually fail: shorten the
    length to two and it goes red, as it did when that was tried deliberately.

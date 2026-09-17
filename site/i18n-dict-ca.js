@@ -263,6 +263,16 @@ window.CANEI_DICT.ca = {
   "ENTORNO DE PRUEBAS · los datos aquí son inventados · TEST ENVIRONMENT":
     "ENTORN DE PROVES · les dades d'aquí són inventades · TEST ENVIRONMENT",
   Títulos: "Títols",
+  "Elementos de presupuesto": "Elements de pressupost",
+  "Partidas en las que aparece": "Partides en què apareix",
+  "Subpartidas de esta partida": "Subpartides d'aquesta partida",
+  Posición: "Posició",
+  título: "títol",
+  títulos: "títols",
+  "Todavía no hay partidas. Crea la subpartida y archívala luego desde la sección Partidas.":
+    "Encara no hi ha partides. Crea la subpartida i arxiva-la després des de la secció Partides.",
+  "Todavía no hay subpartidas. Créalas en la sección Subpartidas y vuelve a archivarlas aquí.":
+    "Encara no hi ha subpartides. Crea-les a la secció Subpartides i torna a arxivar-les aquí.",
   "Nuevo título": "Nou títol",
   "＋ Nuevo título": "＋ Nou títol",
   "＋ Nueva partida": "＋ Nova partida",
@@ -2317,7 +2327,7 @@ window.CANEI_DICT.ca = {
   "Sin visita todavía": "Sense visita encara",
   "Sólo es posible si no tiene documentos económicos asociados. Esta acción no se puede deshacer.":
     "Només és possible si no té documents econòmics associats. Aquesta acció no es pot desfer.",
-  "Sólo para una subpartida que no se va a repetir. Si se va a usar más veces, añádela al catálogo en Configuración → Partidas y subpartidas.":
+  "Sólo para una subpartida que no se va a repetir. Si se va a usar más veces, añádela al catálogo en Configuración → Elementos de presupuesto.":
     "Només per a una partida que no es tornarà a fer servir. Si s'ha d'utilitzar més vegades, afegeix-la al catàleg a Configuració → Subpartides.",
   "Una alerta no se cierra sin decir cómo se resolvió.":
     "Una alerta no es tanca sense dir com s'ha resolt.",
