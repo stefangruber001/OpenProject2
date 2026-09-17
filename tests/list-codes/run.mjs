@@ -51,13 +51,30 @@ const blank = (kind) => {
 
 console.log("\n\x1b[1mThe code a name proposes\x1b[0m\n");
 
-/* 1 ── the shipped partida codes, reproduced from their names alone. */
-const shipped = ErpEngine.LIST_DEFAULTS.itemChapters;
-if (shipped.length < 10) fails.push(`expected the shipped chapter list to still be seeded`);
-for (const row of shipped) {
-  ok(`shipped ${row.es}`, blank("itemChapters").suggestListCode("itemChapters", row.es), row.code);
+/* 1 ── the ten trade codes, reproduced from their names alone.
+   These SHIPPED in LIST_DEFAULTS until v23, when partidas stopped coming with
+   the product and became the company's own data. They are written out here
+   now, rather than read from the engine, and that is the point: the list they
+   came from is gone, but the convention they encode is what the operator reads
+   on screen and the reason first-word beat initials. A fixture keeps the
+   ratchet after the source of truth has moved on — read from LIST_DEFAULTS
+   this block would now be a loop over nothing, passing by being empty. */
+const TRADE_CODES = [
+  ["Demoliciones", "DEM"],
+  ["Albañilería", "ALB"],
+  ["Fontanería", "FON"],
+  ["Electricidad", "ELE"],
+  ["Climatización", "CLI"],
+  ["Revestimientos", "REV"],
+  ["Carpintería", "CAR"],
+  ["Pintura", "PIN"],
+  ["Sanitarios y grifería", "SAN"],
+  ["Varios", "VAR"],
+];
+for (const [es, code] of TRADE_CODES) {
+  ok(`trade ${es}`, blank("itemChapters").suggestListCode("itemChapters", es), code);
 }
-console.log(`  ${shipped.length} shipped line-item codes reproduced from their names`);
+console.log(`  ${TRADE_CODES.length} line-item codes reproduced from their names`);
 
 /* 2 ── the heading list uses four, and folds the same way. */
 for (const [name, want] of [
@@ -111,11 +128,15 @@ for (let i = 0; i < 3; i++) {
 }
 ok("collision run", run.join(","), "BANO,BANO2,BANO3");
 
-/* And against the real seeded list, not an emptied one: proposing for a name
-   whose code already ships has to step aside too. */
+/* And across lists, on a real engine rather than an emptied one: a partida
+   typed after one that already took the stem steps aside. Built by hand since
+   v23, because nothing is seeded any more — which is itself worth asserting. */
+const real = new ErpEngine.ERP();
+ok("nothing is seeded", real.listAll("itemChapters").length, 0);
+real.addListEntry("itemChapters", { code: "DEM", es: "Demoliciones" }, "test");
 ok(
-  "collides with shipped",
-  new ErpEngine.ERP().suggestListCode("itemChapters", "Demoliciones"),
+  "collides with an existing partida",
+  real.suggestListCode("itemChapters", "Demoliciones"),
   "DEM2",
 );
 

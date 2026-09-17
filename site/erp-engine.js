@@ -412,22 +412,19 @@
        data, in their words, and is not translated — the same status as a
        chapter name they add themselves. */
     itemTitles: [],
-    // DMC-01. The catalogue's chapter tree, and the reason it is a LIST and
-    // not a derived set of the distinct values on items: a tree the owner can
-    // drag into order needs somewhere to keep that order, and a chapter with
-    // nothing in it yet still has to be visible or it can never be filled.
-    itemChapters: [
-      { code: "DEM", es: "Demoliciones", ca: "Enderrocs" },
-      { code: "ALB", es: "Albañilería", ca: "Paleteria" },
-      { code: "FON", es: "Fontanería", ca: "Lampisteria" },
-      { code: "ELE", es: "Electricidad", ca: "Electricitat" },
-      { code: "CLI", es: "Climatización", ca: "Climatització" },
-      { code: "REV", es: "Revestimientos", ca: "Revestiments" },
-      { code: "CAR", es: "Carpintería", ca: "Fusteria" },
-      { code: "PIN", es: "Pintura", ca: "Pintura" },
-      { code: "SAN", es: "Sanitarios y grifería", ca: "Sanitaris i aixetes" },
-      { code: "VAR", es: "Varios", ca: "Diversos" },
-    ],
+    /* DMC-01. The catalogue's partidas, and the SECOND list that ships empty
+       on purpose — schema v23 says why at length, and it is the same sentence
+       as the one above: which trades a company works in is a statement about
+       that company, not a fact about the trade. It shipped ten of them until
+       v23, which meant a price book arrived with somebody else's opinion in it
+       that had to be argued with before it could be deleted.
+
+       Still a LIST and not a derived set of the distinct values on items: a
+       list the owner can drag into order needs somewhere to keep that order,
+       and a partida with nothing in it yet still has to be visible or it can
+       never be filled. That is truer now than before, because from v23 a
+       partida is created empty BY DESIGN — the subpartidas come afterwards. */
+    itemChapters: [],
     // MDM-07 / PAY-01.
     paymentMethods: [
       { code: "cash", es: "Efectivo", ca: "Efectiu" },
@@ -670,8 +667,16 @@
    * existed. Without this the list would ship empty and then be impossible to
    * return to empty after the first título, which is a door that only opens
    * one way.
+   *
+   * `itemChapters` joined it at v23 for the same reason and with one extra of
+   * its own: a partida is now created EMPTY and filled afterwards, so "retire
+   * the only one I have got wrong and start again" is an ordinary Tuesday
+   * rather than a corner case. The guard existed to stop a form being left
+   * with no valid answer, and no form demands a partida — the budget's own
+   * chapter picker falls back to free text, which is what it did before the
+   * price book had chapters at all.
    */
-  const OPTIONAL_LISTS = new Set(["itemTitles"]);
+  const OPTIONAL_LISTS = new Set(["itemTitles", "itemChapters"]);
   /** A fresh copy — callers mutate what they get back, seeds must not drift. */
   function seedLists() {
     const out = {};
@@ -1961,10 +1966,179 @@
       if (removed) this._log(user, "clearPartidaTitles", chapterCode + " ×" + removed);
       return removed;
     }
+    /* =========================================================================
+       PARTIDAS ↔ SUBPARTIDAS — the same membership, one level down.
+
+       Deliberately the same shape as the título block above, down to the
+       method names, because it is the same relationship and a reader who has
+       understood one should not have to learn the other. What differs is the
+       far side: a título names partidas by CODE, a partida names subpartidas
+       by ID, because a subpartida's code is editable and its id is not.
+
+       `itemPartidaLinks` is the only truth about which partidas a subpartida
+       sits in (v23). `item.chapter` is legacy: still written on the record,
+       never consulted here. If you find yourself reading `.chapter` to answer
+       "which partida is this in", that is the bug.
+       ====================================================================== */
+
+    /** The membership rows, created on first use like every other collection. */
+    partidaLinks() {
+      if (!Array.isArray(this.state.itemPartidaLinks)) this.state.itemPartidaLinks = [];
+      return this.state.itemPartidaLinks;
+    }
+    /** The subpartida ids filed under a partida, in the order the owner put them. */
+    partidaItems(chapterCode) {
+      return this.partidaLinks()
+        .filter((l) => l.chapterCode === chapterCode)
+        .slice()
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .map((l) => l.itemId);
+    }
+    /** The partidas a subpartida appears in. More than one is the point of v23. */
+    itemPartidas(itemId) {
+      return this.partidaLinks()
+        .filter((l) => l.itemId === itemId)
+        .map((l) => l.chapterCode);
+    }
+    /** Subpartidas filed nowhere — the branch that empties as the book is built. */
+    unfiledItems() {
+      const filed = new Set(this.partidaLinks().map((l) => l.itemId));
+      return this.state.catalogue.filter((i) => i.active !== false && !filed.has(i.id));
+    }
+    _knownItem(itemId) {
+      return this.state.catalogue.some((i) => i.id === itemId);
+    }
+    /**
+     * Replace which subpartidas sit under one partida.
+     *
+     * Whole-set, like `setTitlePartidas`, and for the same reason: the screen
+     * asks it that way — a person ticks boxes and presses save — and a
+     * half-applied set is not a state the book should be able to reach.
+     */
+    setPartidaItems(chapterCode, itemIds, user) {
+      if (!this._knownCode("itemChapters", chapterCode))
+        throw new Error("No such partida: " + chapterCode);
+      const wanted = [];
+      for (const raw of itemIds || []) {
+        const id = String(raw || "").trim();
+        if (!id || wanted.includes(id)) continue;
+        if (!this._knownItem(id)) throw new Error("No such subpartida: " + id);
+        wanted.push(id);
+      }
+      const links = this.partidaLinks();
+      const kept = links.filter((l) => l.chapterCode !== chapterCode);
+      this.state.itemPartidaLinks = kept.concat(
+        wanted.map((itemId, order) => ({ chapterCode, itemId, order })),
+      );
+      this._log(user, "setPartidaItems", chapterCode + " ×" + wanted.length);
+      return this.partidaItems(chapterCode);
+    }
+    /**
+     * The same membership from the subpartida's side — "file this one under
+     * these partidas". A subpartida joins each partida at the END of its run,
+     * so ticking a box here never silently reorders a partida somebody else
+     * arranged. This is the bug `setPartidaTitles` had and the reason its fix
+     * is copied rather than rewritten.
+     */
+    setItemPartidas(itemId, chapterCodes, user) {
+      if (!this._knownItem(itemId)) throw new Error("No such subpartida: " + itemId);
+      const wanted = [];
+      for (const raw of chapterCodes || []) {
+        const code = String(raw || "").trim();
+        if (!code || wanted.includes(code)) continue;
+        if (!this._knownCode("itemChapters", code)) throw new Error("No such partida: " + code);
+        wanted.push(code);
+      }
+      const links = this.partidaLinks();
+      const others = links.filter((l) => l.itemId !== itemId);
+      const mine = links.filter((l) => l.itemId === itemId);
+      const rows = wanted.map(
+        (chapterCode) =>
+          mine.find((l) => l.chapterCode === chapterCode) || {
+            chapterCode,
+            itemId,
+            order: others.filter((l) => l.chapterCode === chapterCode).length,
+          },
+      );
+      this.state.itemPartidaLinks = others.concat(rows);
+      this._log(user, "setItemPartidas", itemId + " ×" + wanted.length);
+      return this.itemPartidas(itemId);
+    }
+    /**
+     * Drop a partida's subpartida memberships. Called when a partida is
+     * retired — the subpartidas themselves are untouched and simply become
+     * unfiled, which is the honest outcome: retiring a trade does not destroy
+     * the prices that were gathered under it.
+     */
+    clearPartidaItems(chapterCode, user) {
+      const before = this.partidaLinks().length;
+      this.state.itemPartidaLinks = this.partidaLinks().filter(
+        (l) => l.chapterCode !== chapterCode,
+      );
+      const removed = before - this.state.itemPartidaLinks.length;
+      if (removed) this._log(user, "clearPartidaItems", chapterCode + " ×" + removed);
+      return removed;
+    }
+    /**
+     * Delete a partida outright — but only one nothing points at.
+     *
+     * The system-wide rule is retire, never remove, and it stands: a partida
+     * that has been used stays for ever, because `listLabel` has to keep
+     * resolving the code on records that carry it. What changed at v23 is that
+     * a partida is now CREATED EMPTY and filled afterwards, so "I typed that
+     * one wrong, there is nothing in it" became an ordinary event rather than
+     * a corner case — and answering it with a permanently greyed-out row is
+     * the sort of thing that makes people stop trusting a screen.
+     *
+     * The three conditions are exactly the ones migration 23 uses to decide
+     * which shipped partidas it may drop, and that is not a coincidence: the
+     * question is the same one, and two different answers to it would be a
+     * ladder step that disagrees with the button beside it. Anything used gets
+     * `setListEntryActive(false)` instead, which is what the screen offers
+     * when this refuses.
+     */
+    removePartida(code, user) {
+      const rows = this.listAll("itemChapters");
+      const at = rows.findIndex((e) => e.code === code);
+      if (at < 0) throw new Error("No such partida: " + code);
+      const gone = rows[at];
+      const held = this.partidaItems(code).length;
+      if (held) throw new Error("That partida still holds " + held + " subpartida(s)");
+      if (this.partidaTitles(code).length) throw new Error("That partida is named by a título");
+      const fold = (x) =>
+        String(x || "")
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[̀-ͯ]/g, "")
+          .trim();
+      // By WORDS, because that is how a budget chapter names a partida — see
+      // `chapterCatalogueCode`. Checking the code would miss every one of them.
+      const spoken = new Set([fold(gone.es), fold(gone.ca)]);
+      for (const b of this.state.budgets)
+        for (const v of b.versions)
+          for (const c of v.chapters)
+            if (spoken.has(fold(c.name)))
+              throw new Error("A presupuesto already has a partida called that");
+      rows.splice(at, 1);
+      this._log(user, "removePartida", code + " · " + gone.es);
+      return gone;
+    }
+    /** As above, from the other side — for a subpartida being retired. */
+    clearItemPartidas(itemId, user) {
+      const before = this.partidaLinks().length;
+      this.state.itemPartidaLinks = this.partidaLinks().filter((l) => l.itemId !== itemId);
+      const removed = before - this.state.itemPartidaLinks.length;
+      if (removed) this._log(user, "clearItemPartidas", itemId + " ×" + removed);
+      return removed;
+    }
     /** How many stored records still carry this code — shown before retiring one. */
     listEntryUsage(kind, code) {
       const S = this.state;
-      if (kind === "itemChapters") return S.catalogue.filter((i) => i.chapter === code).length;
+      // The LINKS, not `i.chapter`: membership moved to `itemPartidaLinks` at
+      // v23 and the old field is legacy. Counting it would report the state of
+      // the world before the operator last re-filed anything — and this number
+      // is shown beside the retire button, so a wrong one is a wrong decision.
+      if (kind === "itemChapters") return this.partidaItems(code).length;
       if (kind === "leadSources")
         return (
           S.parties.filter((p) => p.leadSource === code).length +
@@ -2682,12 +2856,24 @@
         },
         it,
       );
-      // Package 8 review (28/08): a subpartida with no partida is unfindable —
-      // the register's own tree can only show it under an orphan bucket, and
-      // the builder's catalogue picker can only offer it from "todas las
-      // partidas". Existing orphans (if any) are grandfathered; only creation
-      // is refused, so nothing already in the catalogue is touched.
-      if (!rec.chapter) throw new Error("La partida es obligatoria");
+      /* A SUBPARTIDA NO LONGER NEEDS A PARTIDA, and that reverses a decision
+         rather than ignoring one. The Package 8 review of 28/08 made the
+         partida mandatory here, because a subpartida with none was unfindable:
+         the register was a tree, so the only place an unfiled one could appear
+         was an orphan bucket, and the builder's picker could only reach it
+         through "todas las partidas".
+
+         The operator's instruction of 17/09 inverts the order of creation —
+         the subpartida exists first, then a partida gathers it, and a partida
+         may gather one that another partida already has. Demanding a partida
+         at creation makes that sequence impossible to perform.
+
+         The 28/08 concern is answered rather than overruled: the register is
+         no longer a tree. Elementos de presupuesto → Subpartidas is a flat
+         list of every subpartida there is, so an unfiled one sits in it in
+         name order like all the others, and `unfiledItems()` is what the
+         screen filters on to show precisely them. Findability was the
+         objection; the screen that caused it is gone. */
       this.state.catalogue.push(rec);
       this._log(user, "addCatalogueItem", rec.code);
       return rec;
