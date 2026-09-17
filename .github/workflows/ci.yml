@@ -107,6 +107,14 @@ jobs:
         if: always()
         run: pnpm test:band
 
+      # The código a name proposes. Pinned against the ten line-item codes this
+      # system already ships: the generator has to reproduce DEM, ALB, FON … VAR
+      # from their names alone, so the proposal stays the convention the company
+      # already has rather than whatever a slug function happens to emit.
+      - name: Codes proposed from names
+        if: always()
+        run: pnpm test:codes
+
       # The runner's Chromium places glyphs differently from any machine this is
       # developed on, and its build cannot be downloaded here — so its PDFs are
       # the only evidence that exists for the heading-splitting question. Kept

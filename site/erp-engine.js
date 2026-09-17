@@ -568,6 +568,97 @@
   };
   /** The four kinds DMC-03/04/05 maintain, in the order those screens show them. */
   const LIST_KINDS = Object.keys(LIST_DEFAULTS);
+
+  /* ── Proposing a code from a name ──────────────────────────────────────
+     Only the two owner-facing taxonomies take part. The other lists here
+     carry codes that are identifiers in their own right — `transfer30`,
+     `leadPlatform`, `m2` — written to be read by the code that branches on
+     them, and a generator that "helpfully" turned those into TRA30 or LEA
+     would be rewriting an interface, not filling in a form.
+
+     Lengths are what the shipped data already uses: three for the line-item
+     list, four for the heading above it. Four buys room for the shorter,
+     blunter words a heading tends to get (BANO, COCI) where three would
+     collide constantly.
+
+     Letters AND digits, because a company that already numbers its trades
+     will type them, and refusing a digit would be refusing their convention
+     to enforce ours. Accents and ñ are folded to ASCII: the code travels
+     into filenames, spreadsheet columns and other people's systems, which is
+     exactly where a ñ stops being a letter and starts being a bug. */
+  const CODE_LENGTHS = { itemChapters: 3, itemTitles: 4 };
+  const CODE_LENGTH_FALLBACK = 4;
+
+  /* Dropped before the first word is chosen, so "El baño" proposes BANO and
+     not ELBA. It earns its place only on names that BEGIN with one of these —
+     "Sanitarios y grifería" would give SAN either way, since the choice is the
+     first word and not the initials. Only ever dropped when something is left
+     afterwards, so an entry a company genuinely calls "Y" still gets a code. */
+  const CODE_STOP_WORDS = new Set([
+    "A",
+    "AL",
+    "CON",
+    "DE",
+    "DEL",
+    "E",
+    "EL",
+    "EN",
+    "LA",
+    "LAS",
+    "LO",
+    "LOS",
+    "O",
+    "PARA",
+    "POR",
+    "SIN",
+    "U",
+    "UN",
+    "UNA",
+    "Y",
+  ]);
+
+  /**
+   * "Albañilería" → ALB. "Sanitarios y grifería" → SAN. "Reforma de baño" → REFO.
+   *
+   * One word, not initials. Initials read better in the abstract and worse in
+   * practice: "Sanitarios y grifería" would give SG, which is not the SAN this
+   * system has always used, and a two-letter code in a three-letter column
+   * looks like something went wrong.
+   */
+  function codeStem(name, len) {
+    const flat = String(name || "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, " ")
+      .trim();
+    if (!flat) return "";
+    const words = flat.split(" ");
+    const meaty = words.filter((w) => !CODE_STOP_WORDS.has(w));
+    const pool = meaty.length ? meaty : words;
+    // Prefer a word that starts with a letter: "3 capas" should propose CAPA,
+    // not 3. A name that is only digits still gets its digits.
+    const lead = pool.find((w) => /^[A-Z]/.test(w)) || pool[0];
+    return lead.slice(0, len);
+  }
+
+  /**
+   * What an operator typed by hand, put into the same shape the generator
+   * emits. Without it the two routes disagree — "ba ño" typed by hand becomes
+   * a code with a space and an ñ in it, stored for ever on every record — and
+   * the one that disagrees is always the hand-typed one, because that is the
+   * path nobody tests.
+   *
+   * Hyphen survives: the catalogue's own codes are FON-101, and a person
+   * copying that convention upward should not have it silently eaten.
+   */
+  function normaliseCode(raw) {
+    return String(raw || "")
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]+/g, "");
+  }
   /*
    * Lists that are allowed to hold nothing.
    *
@@ -1522,6 +1613,39 @@
       const hit = this.listAll(kind).find((e) => e.code === code);
       if (!hit) return String(code || "");
       return (lang === "ca" ? hit.ca : hit.es) || hit.es || hit.code;
+    }
+    /**
+     * Propose a code for a NEW entry, derived from the name just typed.
+     *
+     * Asking somebody to invent a short unique key before they are allowed to
+     * name the thing is asking them to do the machine's job, and it is the
+     * step people stall on: the field is mandatory, the rules are unwritten,
+     * and a wrong answer is permanent because records store the code.
+     *
+     * The rule is the one already in the shipped data, not a new invention:
+     * take the first meaty word, flatten it to plain ASCII capitals, cut it to
+     * the length that kind uses. Run over the ten names this system ships
+     * with, it reproduces all ten of their codes exactly — which is the
+     * property `tests/list-codes/run.mjs` pins, and the reason the proposal
+     * looks like it was always there rather than like a generator's output.
+     *
+     * Returns "" when the name yields no letters or digits at all. The caller
+     * keeps the field editable and the operator types one; a suggestion that
+     * cannot be made is not an error.
+     */
+    suggestListCode(kind, name) {
+      const stem = codeStem(name, CODE_LENGTHS[kind] || CODE_LENGTH_FALLBACK);
+      if (!stem) return "";
+      const taken = new Set(this.listAll(kind).map((e) => String(e.code || "").toUpperCase()));
+      if (!taken.has(stem)) return stem;
+      // A visible numeric tail, not a silent reshuffle of the letters: two
+      // similar names SHOULD look similar, and the operator can see at a
+      // glance that this is the second BANO and rename it if that is wrong.
+      for (let n = 2; n < 1000; n++) {
+        const candidate = stem + n;
+        if (!taken.has(candidate)) return candidate;
+      }
+      return "";
     }
     addListEntry(kind, entry, user) {
       const rows = this.listAll(kind);
@@ -13696,6 +13820,11 @@
     LISTS,
     LIST_DEFAULTS,
     LIST_KINDS,
+    // The hand-typed half of the code proposal. `suggestListCode` is a method
+    // because it has to look at what is already taken; this one is pure, and
+    // the screen needs it on the save path — where the operator may have
+    // overtyped the suggestion with something of their own.
+    normaliseCode,
     // Exported so migration 18 seeds the SAME shape a new project gets, the
     // way `LIST_DEFAULTS` is already shared with the ladder. Two copies of a
     // record's default shape drift, and the failure is quiet: a migrated

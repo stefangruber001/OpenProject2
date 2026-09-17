@@ -3424,3 +3424,15 @@ with an editor carrying cost, price, live margin, description and images.
 **Not merged to `main`.** Everything is on the branch, so the client's system is
 untouched. Still open: the manual-release gate, so these do not auto-deploy on
 merge.
+
+## Package 13 · the código stops being the operator's problem
+
+- **`suggestListCode` + `normaliseCode`** — a partida or título code derived
+  from the name as it is typed, latching off the moment the operator types one
+  of their own, falling back to the proposal on save so the field cannot be
+  forgotten.
+- **A gate that can fail** (`pnpm test:codes`, 37 assertions) — the generator
+  reproduces the ten shipped line-item codes from their names alone, never
+  proposes a code already taken, and everything it proposes is storable.
+- **Subpartidas unchanged** — `nextCatalogueCode` has proposed `FON-101` from
+  the chosen partida since Package 2.

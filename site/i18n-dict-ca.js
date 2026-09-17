@@ -266,6 +266,7 @@ window.CANEI_DICT.ca = {
   "Nuevo título": "Nou títol",
   "＋ Nuevo título": "＋ Nou títol",
   "＋ Nueva partida": "＋ Nova partida",
+  "Se genera solo; puedes cambiarlo.": "Es genera sol; el pots canviar.",
   "✎ Modificar título": "✎ Modificar títol",
   "Eliminar título": "Eliminar títol",
   "Buscar título…": "Cercar títol…",

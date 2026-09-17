@@ -11673,6 +11673,36 @@
           .filter((b) => b.checked)
           .map((b) => b.value);
 
+      /* Propose the código while the nombre is being typed.
+
+         Same latch as the subpartida drawer, deliberately — that one has been
+         in front of this operator for weeks and the two fields should not
+         behave differently on two screens that sit next to each other. `mine`
+         goes true on their first keystroke in the code and never goes back
+         while their text stands, so continuing to type the name cannot
+         overwrite what they wrote. Emptying the code hands control back.
+
+         Wired only when CREATING: an existing entry renders its code disabled,
+         because records store it. */
+      function autoCode(kind, codeEl, nameEl) {
+        if (!codeEl || !nameEl) return;
+        let mine = false;
+        codeEl.addEventListener("input", () => {
+          mine = codeEl.value.trim() !== "";
+        });
+        nameEl.addEventListener("input", () => {
+          if (mine) return;
+          codeEl.value = erp.suggestListCode(kind, nameEl.value);
+        });
+      }
+
+      /* What to store. Their text wins, in the shape the generator would have
+         produced; an empty field falls back to the proposal, so pressing
+         Guardar straight after typing a name is a complete answer and the
+         código stops being a thing you can forget. */
+      const codeToSave = (kind, codeEl, name) =>
+        ErpEngine.normaliseCode(codeEl ? codeEl.value : "") || erp.suggestListCode(kind, name);
+
       /**
        * A título: the heading a run of partidas prints under.
        *
@@ -11689,7 +11719,8 @@
         const mine = t ? erp.titlePartidas(t.code) : [];
         const codeField = t
           ? `<div class="field"><label>Código</label><input value="${esc(t.code)}" disabled title="Las pertenencias guardan el código; no se cambia."></div>`
-          : `<div class="field"><label>Código *</label><input id="ti_code" placeholder="BANO"></div>`;
+          : `<div class="field"><label>Código</label><input id="ti_code" placeholder="BANO">
+             <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo; puedes cambiarlo.</div></div>`;
         const delBtn = t ? '<button class="btn" id="ti_del">Eliminar título</button>' : "";
         const boxes = codeChecks(erp.listAll("itemChapters"), mine);
         db.innerHTML = `<div class="fgrid">
@@ -11701,11 +11732,12 @@
          <div class="field full" style="display:flex;gap:8px;align-items:center;margin-top:4px">
            <button class="btn primary" id="ti_save">Guardar</button><span style="flex:1"></span>${delBtn}</div>
         </div>`;
+        if (!t) autoCode("itemTitles", $("#ti_code"), $("#ti_es"));
         $("#ti_save").onclick = () => {
           const es = $("#ti_es").value.trim();
           const ca = $("#ti_ca").value.trim();
           const picked = checksOf($("#ti_chaps"));
-          const key = t ? t.code : $("#ti_code").value.trim();
+          const key = t ? t.code : codeToSave("itemTitles", $("#ti_code"), es);
           try {
             if (t) erp.updateListEntry("itemTitles", t.code, { es, ca }, "backoffice");
             else erp.addListEntry("itemTitles", { code: key, es, ca }, "backoffice");
@@ -11746,7 +11778,8 @@
         const titles = erp.listAll("itemTitles");
         const codeField = c
           ? `<div class="field"><label>Código</label><input value="${esc(c.code)}" disabled title="Las subpartidas y las líneas de presupuesto guardan el código; no se cambia."></div>`
-          : `<div class="field"><label>Código *</label><input id="pa_code" placeholder="FON"></div>`;
+          : `<div class="field"><label>Código</label><input id="pa_code" placeholder="FON">
+             <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo; puedes cambiarlo.</div></div>`;
         const off = c && c.active === false;
         const offBtn = c
           ? `<button class="btn" id="pa_off">${off ? "Reactivar" : "Retirar del catálogo"}</button>`
@@ -11763,11 +11796,12 @@
          <div class="field full" style="display:flex;gap:8px;align-items:center;margin-top:4px">
            <button class="btn primary" id="pa_save">Guardar</button><span style="flex:1"></span>${offBtn}</div>
         </div>`;
+        if (!c) autoCode("itemChapters", $("#pa_code"), $("#pa_es"));
         $("#pa_save").onclick = () => {
           const es = $("#pa_es").value.trim();
           const ca = $("#pa_ca").value.trim();
           const picked = checksOf($("#pa_titles"));
-          const key = c ? c.code : $("#pa_code").value.trim();
+          const key = c ? c.code : codeToSave("itemChapters", $("#pa_code"), es);
           try {
             if (c) erp.updateListEntry("itemChapters", c.code, { es, ca }, "backoffice");
             else erp.addListEntry("itemChapters", { code: key, es, ca }, "backoffice");

@@ -57,6 +57,7 @@ window.CANEI_DICT = {
     ["Nuevo título", "New section"],
     ["＋ Nuevo título", "＋ New section"],
     ["＋ Nueva partida", "＋ New line item"],
+    ["Se genera solo; puedes cambiarlo.", "Generated for you; you can change it."],
     ["✎ Modificar título", "✎ Edit section"],
     ["Eliminar título", "Delete section"],
     ["Buscar título…", "Search sections…"],

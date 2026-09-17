@@ -11051,3 +11051,57 @@ working.
 
 Exercised against seven bodies — the real one, dev, explicit production, empty,
 a 502 page, key order reversed, and a docker error string — before pushing.
+
+## S140 — the código is proposed from the name, not demanded before it
+
+The operator's screenshot circled the `Código *` field on «Nuevo título» and
+asked for it to be automatic: they type the name, the system derives the code.
+
+**Why it was worth doing rather than explaining.** The field was mandatory, its
+rules were unwritten, and the answer is permanent — `updateListEntry` refuses to
+patch a code, because every record stores it. So the first field on the form was
+the one carrying the only irreversible decision on the form, and the person
+filling it in had the least information at that moment. That is the wrong way
+round whatever the rules are.
+
+**The rule chosen: the first meaty word, ASCII capitals, cut to length.** Three
+characters for a partida, four for a título — four buys room for the short blunt
+words a heading gets (BANO, COCI) where three would collide constantly. Letters
+AND digits, because a company that already numbers its trades will type them and
+refusing a digit would be enforcing our convention over theirs. Accents and ñ are
+folded, because the code travels into filenames and other people's spreadsheets.
+
+**Why first-word and not initials**, which was the obvious alternative:
+«Sanitarios y grifería» gives SG under initials and SAN under first-word, and SAN
+is what this system has shipped since the beginning. Running the generator over
+the ten seeded partida names reproduces all ten codes exactly — DEM, ALB, FON …
+VAR — and that is pinned as `pnpm test:codes` rather than left as a nice fact.
+The point is not that the generator works; it is that it agrees with the
+convention the company already reads on screen.
+
+**Kept editable, and kept visible.** The proposal appears as the name is typed
+and latches off the moment the operator types a code of their own — the same
+latch the subpartida drawer has used for weeks, deliberately, because the two
+forms sit next to each other and should not behave differently. An empty field
+falls back to the proposal on save, so typing a name and pressing Guardar is a
+complete answer. A name yielding no letters or digits proposes nothing rather
+than something: `""` is honest, and an invented placeholder would be stored on
+records for ever.
+
+**`normaliseCode` applies to hand-typed codes too**, so both routes produce the
+same shape and «ba ño» cannot become a code with a space and an ñ in it. It is
+deliberately NOT enforced inside `addListEntry`: the other lists here carry codes
+that are identifiers in their own right — `transfer30`, `leadPlatform`, `m2` —
+and uppercasing those would rewrite an interface, not tidy a form.
+
+**Subpartidas were already automatic** and are untouched: `nextCatalogueCode`
+has been proposing `FON-101`, `FON-102` from the chosen partida since Package 2.
+The operator asked whether it was the same thing there; it is the same idea,
+already done, and by a different rule because a subpartida's code should say
+which partida it belongs to.
+
+**Not a bug, and asked about in the same message:** the ten partidas visible on
+«Partidas y subpartidas» are `LIST_DEFAULTS.itemChapters`, part of the product
+rather than tenant data, which is why the database reset did not remove them.
+The `0` beside each is its subpartida count — all zero, which is the reset
+having worked exactly as intended.
