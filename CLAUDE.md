@@ -117,6 +117,18 @@ this way before it was written down. Wait, then commit.
     client's server keeps serving what it was serving, which is the point: the
     same digest is already on dev, eight minutes and one gate earlier, and
     there was never a reason the release could not wait for a person to look.
+  - **Never tick `release` yourself. Work stops at dev and waits.** The operator
+    approves what they have seen on dev and then says, in words, that it may go
+    to production. (Operator, 17 Sep: "Keep the changes just in DEV. Once
+    approved, I will tell you to push it to PROD.") Nothing in a green gate,
+    an urgent-looking bug or a one-line fix is an exception — it is their
+    client's books, and the whole point of the gate is that a person looks
+    first. Push to `main` as usual: that IS how work reaches dev.
+  - Say which environment a change is on when you report it, and never call a
+    merge a release. `main` is a branch name AND an image tag, and the two mean
+    opposite things — pushing to the branch `main` sends work to DEV; moving the
+    tag `:main` sends it to PRODUCTION. That collision has already misled the
+    operator once; spell out "on dev, not released" rather than saying "main".
   - There is no dev branch and no `/preview` any more. There were two named dev
     branches and only one was wired to the preview, so work landed where the
     tooling was not looking, and the preview once served nine-session-old

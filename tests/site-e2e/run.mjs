@@ -14052,9 +14052,13 @@ async function testControlTowerAndDay(browser, base) {
     );
     if (hidden) ok("DMC-01: Tipo, Marca and Modelo are not in the subpartida form");
     else bad("DMC-01: Tipo/Marca/Modelo still in the form", "");
-    const catCode = "E2E-" + String(Date.now()).slice(-5);
-    await pg.locator("#ci_code").fill(catCode);
+    /* The código is READ, not typed: the field is read-only since the operator
+       asked for it to be automatic, and `fill()` on a read-only input throws
+       rather than failing a check. What the form proposes is what gets stored,
+       which is asserted below. */
     await pg.locator("#ci_desc").fill("Partida de prueba");
+    await pg.waitForTimeout(200);
+    const catCode = await pg.evaluate(() => document.querySelector("#ci_code").value);
     await pg.locator("#ci_qual").fill("alta");
     await pg.locator("#ci_cost").fill("12.50");
     await pg.locator("#ci_save").click();
@@ -14157,23 +14161,38 @@ async function testControlTowerAndDay(browser, base) {
       ok(`DMC-01: a new subpartida is proposed the next free code (${proposal.got})`);
     else bad("DMC-01 code proposal", JSON.stringify(proposal));
 
-    // The operator's own code wins, and keeps winning after the partidas change.
-    const typedWins = await pg.evaluate(async () => {
-      const chaps = document.querySelector("#ci_chaps"),
-        code = document.querySelector("#ci_code");
-      code.value = "MIO-777";
-      code.dispatchEvent(new Event("input"));
-      const boxes = [...chaps.querySelectorAll("input[type=checkbox]")];
-      if (boxes.length < 2) return { skipped: true };
-      boxes[0].checked = false;
-      boxes[1].checked = true;
-      chaps.dispatchEvent(new Event("change", { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 80));
-      return { code: code.value };
+    /* «A hand-typed code wins» stopped being a property on 17/09, when the
+       operator asked for the field to be locked because the code has to be
+       automatic. What replaces it is the property that MADE locking safe: the
+       proposal is unique by construction, so two things whose names reduce to
+       the same stem cannot collide — and the operator, who can no longer edit
+       the field, can never be handed a duplicate to fix. That was their own
+       question when they asked for the lock. */
+    const collisions = await pg.evaluate(async () => {
+      const el = document.querySelector("#ci_code");
+      const locked = el.readOnly;
+      closeDrawer();
+      await new Promise((r) => setTimeout(r, 200));
+      const seen = [];
+      for (const desc of ["E2E punto de agua", "E2E puntal de obra", "E2E punto de luz"]) {
+        document.querySelector("#biSubNew").click();
+        await new Promise((r) => setTimeout(r, 300));
+        const d = document.querySelector("#ci_desc");
+        d.value = desc;
+        d.dispatchEvent(new Event("input"));
+        await new Promise((r) => setTimeout(r, 150));
+        seen.push(document.querySelector("#ci_code").value);
+        document.querySelector("#ci_save").click();
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      const all = erp.state.catalogue.map((i) => i.code);
+      return { locked, seen, unique: new Set(all).size === all.length };
     });
-    if (typedWins.skipped || typedWins.code === "MIO-777")
-      ok("DMC-01: a hand-typed code survives a change of partida");
-    else bad("DMC-01 typed code overwritten", JSON.stringify(typedWins));
+    if (collisions.locked && collisions.unique && new Set(collisions.seen).size === 3)
+      ok(
+        `DMC-01: the código is locked, and three names sharing a stem get three codes (${collisions.seen.join(", ")})`,
+      );
+    else bad("DMC-01 locked code / collisions", JSON.stringify(collisions));
 
     /* THE PATH THIS SUITE DID NOT COVER, and the reason the operator found it
        first. Every check above ticks a partida before reading the code — but
@@ -16004,9 +16023,11 @@ async function testTitles(browser, base) {
     });
     await pg.click("#biTitNew");
     await pg.waitForTimeout(400);
-    await pg.fill("#ti_code", "E2EBANO");
+    // Name first, código derived from it — the field is read-only since 17/09.
     await pg.fill("#ti_es", "E2E Baño");
     await pg.fill("#ti_ca", "E2E Bany");
+    await pg.waitForTimeout(200);
+    const titleCode = await pg.evaluate(() => document.querySelector("#ti_code").value);
     const picked = await pg.evaluate(() => {
       const bs = [...document.querySelectorAll("#ti_chaps input[type=checkbox]")];
       bs[0].checked = true;
@@ -16015,12 +16036,15 @@ async function testTitles(browser, base) {
     });
     await pg.click("#ti_save");
     await pg.waitForTimeout(700);
-    const made = await pg.evaluate(() => ({
-      partidas: erp.titlePartidas("E2EBANO"),
-      listed: [...document.querySelectorAll("#biList tbody tr.click")].some((r) =>
-        (r.textContent || "").includes("E2E Baño"),
-      ),
-    }));
+    const made = await pg.evaluate(
+      (code) => ({
+        partidas: erp.titlePartidas(code),
+        listed: [...document.querySelectorAll("#biList tbody tr.click")].some((r) =>
+          (r.textContent || "").includes("E2E Baño"),
+        ),
+      }),
+      titleCode,
+    );
     if (made.partidas.length === 2 && made.listed)
       ok("títulos: a título created from the drawer is in the register with its partidas");
     else bad("títulos: created with partidas", JSON.stringify(made));
@@ -16028,8 +16052,9 @@ async function testTitles(browser, base) {
     // ---- the same partida under a second título --------------------------
     await pg.click("#biTitNew");
     await pg.waitForTimeout(400);
-    await pg.fill("#ti_code", "E2ECOCINA");
     await pg.fill("#ti_es", "E2E Cocina");
+    await pg.waitForTimeout(200);
+    const cocinaCode = await pg.evaluate(() => document.querySelector("#ti_code").value);
     await pg.evaluate((want) => {
       const bs = [...document.querySelectorAll("#ti_chaps input[type=checkbox]")];
       const hit = bs.find((b) => b.value === want);
@@ -16055,19 +16080,19 @@ async function testTitles(browser, base) {
     // ---- deleting one takes its memberships and leaves the partidas -------
     // Opened from the row, which is how the register works now: there is no
     // separate "✎ Modificar" button because there is no selected branch.
-    await pg.evaluate(() => titleDrawer("E2ECOCINA"));
+    await pg.evaluate((code) => titleDrawer(code), cocinaCode);
     await pg.waitForTimeout(400);
     await pg.click("#ti_del");
     await pg.waitForTimeout(900);
     const gone = await pg.evaluate(
-      (code) => ({
+      ([code, gonecode]) => ({
         titles: erp.listAll("itemTitles").map((t) => t.code),
-        links: erp.titleLinks().filter((l) => l.titleCode === "E2ECOCINA").length,
+        links: erp.titleLinks().filter((l) => l.titleCode === gonecode).length,
         partida: erp.listAll("itemChapters").some((c) => c.code === code),
       }),
-      picked[0],
+      [picked[0], cocinaCode],
     );
-    if (!gone.titles.includes("E2ECOCINA") && gone.links === 0 && gone.partida)
+    if (!gone.titles.includes(cocinaCode) && gone.links === 0 && gone.partida)
       ok("títulos: deleting one removes its memberships and leaves every partida standing");
     else bad("títulos: delete is clean", JSON.stringify(gone));
 

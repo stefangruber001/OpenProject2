@@ -4282,6 +4282,21 @@
       .field.full {
         grid-column: 1/-1;
       }
+      /* A ROW inside the form grid — a button bar, or a label beside the value
+         it describes.
+
+         It exists because `display:flex` on its own does NOT make one. `.field`
+         is already `flex` with `flex-direction: column`, so an inline
+         `style="display:flex;align-items:center"` changed nothing about the
+         direction and set the CROSS axis instead: every such bar stacked
+         vertically and centred itself. That is why «Guardar», «Crear
+         subpartida» and the Margen readout sat in the middle of the drawer
+         looking unrelated to the fields above them. Named, so the next one
+         inherits the fix instead of the bug. */
+      .field.row {
+        flex-direction: row;
+        align-items: center;
+      }
       .field label {
         font: 600 11px var(--sans);
         color: var(--muted);
@@ -11707,6 +11722,27 @@
           .filter((b) => b.checked)
           .map((b) => b.value);
 
+      /**
+       * The código field, for all three drawers.
+       *
+       * LOCKED, on the operator's instruction of 17 September: "lock the CODE
+       * for manual entry, given that needs to be Automatic". Read-only rather
+       * than disabled, so it can still be selected and copied — a code you can
+       * see but not lift out is worse than one you can type.
+       *
+       * It reads as an OUTPUT, and it is one: second in the form, after the
+       * name it is derived from, because asking for a key before the thing it
+       * names is asking a person to do the machine's job. An existing record's
+       * code was already locked — records store it — so this makes creating one
+       * behave the way editing one always has.
+       */
+      const lockedCodeField = (id, value, placeholder) =>
+        `<div class="field"><label>Código</label>
+           <input id="${id}" value="${esc(value || "")}" placeholder="${esc(placeholder)}" readonly
+             title="Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan."
+             style="background:var(--wash,#f2f4ef);cursor:default">
+           <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo a partir del nombre.</div></div>`;
+
       /* Propose the código while the nombre is being typed.
 
          Same latch as the subpartida drawer, deliberately — that one has been
@@ -11720,22 +11756,23 @@
          because records store it. */
       function autoCode(kind, codeEl, nameEl) {
         if (!codeEl || !nameEl) return;
-        let mine = false;
-        codeEl.addEventListener("input", () => {
-          mine = codeEl.value.trim() !== "";
-        });
         nameEl.addEventListener("input", () => {
-          if (mine) return;
           codeEl.value = erp.suggestListCode(kind, nameEl.value);
         });
       }
 
-      /* What to store. Their text wins, in the shape the generator would have
-         produced; an empty field falls back to the proposal, so pressing
-         Guardar straight after typing a name is a complete answer and the
-         código stops being a thing you can forget. */
-      const codeToSave = (kind, codeEl, name) =>
-        ErpEngine.normaliseCode(codeEl ? codeEl.value : "") || erp.suggestListCode(kind, name);
+      /* What to store: DERIVED AGAIN, from the name as it stands at the moment
+         Guardar is pressed, and never read back out of the field.
+
+         The field is read-only, so its contents are the machine's own and
+         re-deriving gives the same answer — but only re-deriving makes the
+         answer GUARANTEED FREE. `suggestListCode` checks the list it is about
+         to be added to and steps aside (BANO, BANO2, BANO3…), so two títulos
+         called «Baño» cannot collide. Trusting a value painted earlier would
+         hand `addListEntry` a duplicate and raise «That code already exists» on
+         a field the operator is no longer allowed to correct — a dead end, and
+         the reason this is a re-derivation rather than a read. */
+      const codeToSave = (kind, codeEl, name) => erp.suggestListCode(kind, name);
 
       /**
        * A título: the heading a run of partidas prints under.
@@ -11751,19 +11788,19 @@
         const t = code ? erp.listAll("itemTitles").find((x) => x.code === code) : null;
         const db = openDrawer(t ? t.es : "Nuevo título");
         const mine = t ? erp.titlePartidas(t.code) : [];
-        const codeField = t
-          ? `<div class="field"><label>Código</label><input value="${esc(t.code)}" disabled title="Las pertenencias guardan el código; no se cambia."></div>`
-          : `<div class="field"><label>Código</label><input id="ti_code" placeholder="BANO">
-             <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo; puedes cambiarlo.</div></div>`;
         const delBtn = t ? '<button class="btn" id="ti_del">Eliminar título</button>' : "";
         const boxes = codeChecks(erp.listAll("itemChapters"), mine);
+        /* NAME FIRST, código second, and the two half-width fields paired on
+           one row. Before, código led at half width and its hint made it taller
+           than whatever sat beside it, so «Nom (CA)» fell through to a row of
+           its own and the form read as three ragged steps. */
         db.innerHTML = `<div class="fgrid">
-         ${codeField}
-         <div class="field"><label>Nombre (ES) *</label><input id="ti_es" value="${esc(t ? t.es : "")}"></div>
+         <div class="field full"><label>Nombre (ES) *</label><input id="ti_es" value="${esc(t ? t.es : "")}"></div>
+         ${lockedCodeField("ti_code", t ? t.code : "", "BANO")}
          <div class="field"><label>Nom (CA)</label><input id="ti_ca" value="${esc(t ? t.ca || "" : "")}"></div>
          <div class="field full"><label>Partidas de este título</label>
            <div id="ti_chaps" style="max-height:38vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${boxes}</div></div>
-         <div class="field full" style="display:flex;gap:8px;align-items:center;margin-top:4px">
+         <div class="field full row" style="gap:8px;margin-top:4px">
            <button class="btn primary" id="ti_save">Guardar</button><span style="flex:1"></span>${delBtn}</div>
         </div>`;
         if (!t) autoCode("itemTitles", $("#ti_code"), $("#ti_es"));
@@ -11810,10 +11847,7 @@
         const db = openDrawer(c ? `${c.code} · ${c.es}` : "Nueva partida");
         const mine = c ? erp.partidaTitles(c.code) : [];
         const titles = erp.listAll("itemTitles");
-        const codeField = c
-          ? `<div class="field"><label>Código</label><input value="${esc(c.code)}" disabled title="Las subpartidas y las líneas de presupuesto guardan el código; no se cambia."></div>`
-          : `<div class="field"><label>Código</label><input id="pa_code" placeholder="FON">
-             <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo; puedes cambiarlo.</div></div>`;
+        const codeField = lockedCodeField("pa_code", c ? c.code : "", "FON");
         const off = c && c.active === false;
         const offBtn = c
           ? `<button class="btn" id="pa_off">${off ? "Reactivar" : "Retirar del catálogo"}</button>`
@@ -11865,22 +11899,22 @@
         const at = c ? erp.listAll("itemChapters").findIndex((x) => x.code === c.code) : -1;
         const total = erp.listAll("itemChapters").length;
         const posRow = c
-          ? `<div class="field full" style="display:flex;gap:8px;align-items:center">
+          ? `<div class="field full row" style="gap:8px">
              <label style="margin:0">Posición</label><b translate="no">${at + 1} / ${total}</b>
              <button class="btn sm" id="pa_up"${at <= 0 ? " disabled" : ""}>↑</button>
              <button class="btn sm" id="pa_down"${at < 0 || at >= total - 1 ? " disabled" : ""}>↓</button></div>`
           : "";
         const delBtn = c ? '<button class="btn" id="pa_del">Eliminar</button>' : "";
         db.innerHTML = `<div class="fgrid">
+         <div class="field full"><label>Nombre (ES) *</label><input id="pa_es" value="${esc(c ? c.es : "")}"></div>
          ${codeField}
-         <div class="field"><label>Nombre (ES) *</label><input id="pa_es" value="${esc(c ? c.es : "")}"></div>
          <div class="field"><label>Nom (CA)</label><input id="pa_ca" value="${esc(c ? c.ca || "" : "")}"></div>
          ${posRow}
          <div class="field full"><label>Subpartidas de esta partida</label>
            <div id="pa_items" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${itemBoxes}</div></div>
          <div class="field full"><label>Títulos en los que aparece</label>
            <div id="pa_titles" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${boxes}</div></div>
-         <div class="field full" style="display:flex;gap:8px;align-items:center;margin-top:4px">
+         <div class="field full row" style="gap:8px;margin-top:4px">
            <button class="btn primary" id="pa_save">Guardar</button><span style="flex:1"></span>${delBtn}${offBtn}</div>
         </div>`;
         if (!c) autoCode("itemChapters", $("#pa_code"), $("#pa_es"));
@@ -11989,27 +12023,27 @@
           '<div style="font-size:12.5px;color:var(--muted);padding:4px 0">Todavía no hay partidas. Crea la subpartida y archívala luego desde la sección Partidas.</div>';
         const chapBoxes = chapters.length ? codeChecks(chapters, mine) : NO_CHAPTERS;
         const val = (k, d) => esc(it ? (it[k] ?? d) : d);
+        /* DESCRIPTION FIRST, código second and locked, then every half-width
+           field paired so no row is left with a hole in it. The old order put
+           código alone on the top row — half a row wide, nothing beside it, and
+           taller than a normal field because of its hint — which is what made
+           the form read as a pile rather than a grid. Margen now sits directly
+           under Precio, which is one of the two numbers that make it. */
         db.innerHTML = `<div class="fgrid">
-         ${
-           it
-             ? `<div class="field"><label>Código</label><input value="${esc(it.code)}" disabled title="Las líneas de presupuesto guardan el código; no se cambia."></div>`
-             : `<div class="field"><label>Código</label><input id="ci_code" placeholder="FON-101">
-               <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo; puedes cambiarlo.</div></div>`
-         }
          <div class="field full"><label>Descripción *</label><input id="ci_desc" value="${val("desc", "")}"></div>
-         <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
+         ${lockedCodeField("ci_code", it ? it.code : "", "FON-101")}
          <div class="field"><label>Unidad</label><select id="ci_unit">${listOptionsUnits(it ? it.unit : "ud")}</select></div>
-         <div class="field"><label>Calidad</label><input id="ci_qual" value="${val("quality", "")}" placeholder="estándar / alta"></div>
+         <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
          <div class="field"><label>Coste de referencia (€)</label><input id="ci_cost" type="number" min="0" step="0.01" value="${it ? it.defaultCostCents / 100 : ""}"></div>
          <div class="field"><label>Precio de referencia (€)</label><input id="ci_price" type="number" min="0" step="0.01" value="${it && it.defaultPriceCents ? it.defaultPriceCents / 100 : ""}"></div>
-         <div class="field full" style="display:flex;align-items:center;gap:8px;margin-top:-2px">
-           <label style="margin:0">Margen</label><b id="ci_margin" translate="no">—</b></div>
+         <div class="field"><label>Calidad</label><input id="ci_qual" value="${val("quality", "")}" placeholder="estándar / alta"></div>
+         <div class="field row" style="gap:8px"><label style="margin:0">Margen</label><b id="ci_margin" translate="no">—</b></div>
          <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
            Un precio de referencia en blanco se muestra como «sin precio», nunca como cero — la subpartida
            entra en el presupuesto marcada como pendiente de valorar.</div>
          <div class="field full"><label>Partidas en las que aparece</label>
            <div id="ci_chaps" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${chapBoxes}</div></div>
-         <div class="field full" style="margin-top:8px;display:flex;gap:8px;align-items:center">
+         <div class="field full row" style="margin-top:8px;gap:8px">
            <button class="btn primary" id="ci_save">${it ? "Guardar cambios" : "Crear subpartida"}</button>
            ${it ? '<span style="flex:1"></span><button class="btn" id="ci_off">Retirar del catálogo</button>' : ""}</div></div>
          ${
@@ -12090,19 +12124,17 @@
           const codeEl = $("#ci_code"),
             descEl = $("#ci_desc"),
             chapsEl = $("#ci_chaps");
-          let typed = false;
           if (codeEl) {
-            codeEl.addEventListener("input", () => {
-              typed = codeEl.value.trim() !== "";
-            });
             /* The prefix comes from the FIRST partida ticked, and from the
                DESCRIPTION when none is — which, since v23, is the ordinary
                case: the subpartida is created before any partida exists to
                file it under. Both produce PREFIX-101, so the book reads the
                same either way, and re-filing it later never rewrites a code
-               that budget lines have already stored. */
+               that budget lines have already stored.
+
+               No "did they type their own" latch any more: the field is
+               read-only, so there is nothing of theirs to protect. */
             const fill = () => {
-              if (typed) return;
               codeEl.value = proposeItemCode();
             };
             if (descEl) descEl.addEventListener("input", fill);
@@ -12139,8 +12171,13 @@
               let target = it;
               if (it) erp.updateCatalogueItem(it.id, patch, "backoffice");
               else {
-                const code =
-                  ErpEngine.normaliseCode($("#ci_code").value) || proposeItemCode();
+                /* Derived again, not read back: `nextCatalogueCode` walks past
+                   every código already taken under that prefix, so the answer
+                   is free BY CONSTRUCTION. The duplicate check below is kept as
+                   an invariant guard and should now be unreachable — if it ever
+                   fires, the generator is wrong and the operator must not be
+                   the one to find out by being blocked. */
+                const code = proposeItemCode();
                 if (!code) throw new Error("El código es obligatorio");
                 if (erp.state.catalogue.some((x) => x.code === code))
                   throw new Error("Ya existe una subpartida con el código " + code);

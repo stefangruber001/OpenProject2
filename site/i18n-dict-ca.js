@@ -287,7 +287,9 @@ window.CANEI_DICT.ca = {
   "Nuevo título": "Nou títol",
   "＋ Nuevo título": "＋ Nou títol",
   "＋ Nueva partida": "＋ Nova partida",
-  "Se genera solo; puedes cambiarlo.": "Es genera sol; el pots canviar.",
+  "Se genera solo a partir del nombre.": "Es genera sol a partir del nom.",
+  "Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan.":
+    "Es deriva del nom i no es tecleja; un cop desat, els registres el conserven.",
   "✎ Modificar título": "✎ Modificar títol",
   "Eliminar título": "Eliminar títol",
   "Buscar título…": "Cercar títol…",

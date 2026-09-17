@@ -88,7 +88,11 @@ window.CANEI_DICT = {
     ["Nuevo título", "New section"],
     ["＋ Nuevo título", "＋ New section"],
     ["＋ Nueva partida", "＋ New line item"],
-    ["Se genera solo; puedes cambiarlo.", "Generated for you; you can change it."],
+    ["Se genera solo a partir del nombre.", "Generated for you from the name."],
+    [
+      "Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan.",
+      "Derived from the name and not typed; once saved, records keep it.",
+    ],
     ["✎ Modificar título", "✎ Edit section"],
     ["Eliminar título", "Delete section"],
     ["Buscar título…", "Search sections…"],
