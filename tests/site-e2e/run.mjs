@@ -3668,16 +3668,25 @@ async function testBudgetBuilder(browser, base) {
       await bootedShell(pg);
       await pg.waitForTimeout(600);
     };
-    const readCatalogueRow = async () => {
+    /* The entry this reads back, named by what it IS. Its código is now a
+       correlative and tells nobody which entry it is. */
+    const WANT_DESC_ES = "Demolición de tabique de ladrillo hueco, con medios manuales";
+    const readCatalogueRow = async (wantEs = WANT_DESC_ES) => {
       await pg.evaluate(() => go("items"));
       await pg.waitForTimeout(800);
-      /* SEARCH FOR IT. The catalogue is a paginated register now, and DEM-101
-             sorts well past the first page of two hundred subpartidas — reading row
-             one of page one found nothing. Typing the code is what a person does
-             anyway, and it exercises the list's own search while it is at it. */
-      await pg.locator("#biSubQ").fill("DEM-101");
+      /* SEARCH FOR IT, by DESCRIPTION rather than by código. The catalogue is
+             paginated, so the entry sorts well past page one and reading row one
+             found nothing; typing is what a person does anyway, and it exercises
+             the list's own search while it is at it.
+
+             It used to type «DEM-101». v25 renumbered the whole book onto one
+             correlative at the operator's instruction, so no código names a
+             trade any more — and a test that hunts for one is asserting the
+             convention they removed. The description is what the entry IS and is
+             also, conveniently, the very thing under test here. */
+      await pg.locator("#biSubQ").fill(WANT_DESC_ES);
       await pg.waitForTimeout(500);
-      return pg.evaluate(() => {
+      return pg.evaluate((wantEs) => {
         /* THE CELL AFTER THE CÓDIGO, not `children[2]`. The index was
            «Descripción» until two columns left this register on 18/09 and
            became «Ud» — so it compared "m2" with "m2" in three languages and
@@ -3686,14 +3695,16 @@ async function testBudgetBuilder(browser, base) {
            is the very thing under test. The código is the one cell that reads
            the same in all three languages, so the description is the cell
            beside it. */
+        const it = erp.state.catalogue.find((x) => x.desc === wantEs);
+        if (!it) return null;
         const row = [...document.querySelectorAll("#view table.mlist tbody tr.click")].find((tr) =>
-          /DEM-101/.test(tr.textContent),
+          tr.textContent.includes(it.code),
         );
         if (!row) return null;
-        const codeCell = [...row.children].find((td) => td.textContent.trim() === "DEM-101");
+        const codeCell = [...row.children].find((td) => td.textContent.trim() === it.code);
         const descCell = codeCell && codeCell.nextElementSibling;
         return descCell ? descCell.textContent.trim() : null;
-      });
+      }, wantEs);
     };
     const trio = {};
     for (const l of ["es", "en", "ca"]) {

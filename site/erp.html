@@ -5601,6 +5601,14 @@
       function seedWorkspace() {
         const e = ErpSeed.build();
         ErpMigrations.applyCataloguePack(e.state);
+        /* …and onto the same códigos every other workspace uses. The pack ships
+           its rows under their old prefixed codes (AIS-101, ALB-010); v25
+           renumbers the book to one correlative, and a fresh state never climbs
+           the ladder — so without this line a first tenant would start on the
+           convention the operator has just left, and only a MIGRATED workspace
+           would read as they asked. Exported from the ladder rather than
+           reimplemented, for the reason written above `applyCataloguePack`. */
+        ErpMigrations.renumberCatalogue(e.state);
         return e;
       }
       /**
@@ -17378,7 +17386,7 @@
                    gained a digit. Descripción is the one column with no width: it
                    takes what is left, which is the right rule for the only free text
                    on the row. -->
-              <th style="width:16px"></th><th style="width:46px">Nº</th><th style="width:100px">Código</th><th>Descripción</th><th style="width:68px">Unidad</th>
+              <th style="width:16px"></th><th style="width:46px">Nº</th><th style="width:116px">Código</th><th>Descripción</th><th style="width:68px">Unidad</th>
               <th class="num int" style="width:78px">Coste ud.</th><th class="num int" style="width:68px">Margen %</th>
               <th class="num" style="width:68px">Cantidad</th><th class="num" style="width:88px">P. venta ud.</th><th class="num" style="width:82px">Total</th>
               <th style="width:86px">Estado</th><th style="width:46px">Imág.</th>${locked ? "" : '<th style="width:34px"></th>'}
@@ -18150,6 +18158,25 @@
           "es"
         );
       }
+      /**
+       * WHICH SHIPPED ROW AN ITEM IS — the key the translations are filed under.
+       *
+       * It was the código, and stopped being able to be in v25: the operator had
+       * the price book renumbered onto one correlative, so «DEM-101» became
+       * «SUB-0001» while `erp-catalogue-i18n.js` still files its two hundred and
+       * eight English and Catalan descriptions under the pack's own codes.
+       * Reading `item.code` after that finds nothing, and the whole price book
+       * quietly reverts to Spanish in all three languages — no error, no gap in
+       * the dictionary, just a lookup that stopped matching.
+       *
+       * `packCode` is stamped at install and preserved through the renumbering.
+       * An item the operator typed has none that the pack knows, which is the
+       * right answer: nobody shipped their words and nobody should translate
+       * them.
+       */
+      function packKey(item) {
+        return (item && (item.packCode || item.code)) || "";
+      }
       /** The pack's entry for a catalogue item, or null if nobody shipped it. */
       function packDesc(code) {
         return (typeof ErpCatalogueI18n !== "undefined" && ErpCatalogueI18n.DESC[code]) || null;
@@ -18164,12 +18191,13 @@
        */
       function catalogueDesc(item, lang) {
         if (!item) return "";
-        const t = packDesc(item.code);
+        const key = packKey(item);
+        const t = packDesc(key);
         if (!t) return item.desc || "";
         const l = lang || uiLang();
         // Only when the stored text is still the pack's own Spanish. If the
         // operator has edited it, those are their words now.
-        const pack = (ErpCataloguePack.rows() || []).find((r) => r.code === item.code);
+        const pack = (ErpCataloguePack.rows() || []).find((r) => r.code === key);
         if (pack && item.desc && item.desc !== pack.desc) return item.desc;
         if (l === "en") return t[0] || item.desc || "";
         if (l === "ca") return t[1] || item.desc || "";
@@ -18198,7 +18226,7 @@
         if (!l || !l.itemId) return (l && l.desc) || "";
         const item = erp.state.catalogue.find((x) => x.id === l.itemId);
         if (!item) return l.desc || "";
-        const t = packDesc(item.code);
+        const t = packDesc(packKey(item));
         if (!t) return l.desc || "";
         const known = [item.desc, t[0], t[1]].filter(Boolean);
         if (!known.includes(l.desc)) return l.desc || "";
@@ -18404,7 +18432,7 @@
             <td class="pbdrag c-drag" data-handle="${l.id}" title="Arrastrar para reordenar">${locked ? "" : "⠿"}</td>
             <td class="c-num"><input data-line="${l.id}" data-f="num" value="${esc(l.num)}"
               title="${l.manualNum ? "Número escrito a mano — se mantiene al reordenar" : "Número automático — cambia con la posición"}"${locked ? " disabled" : ""}></td>
-            <td class="pbfind c-code"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="5"${locked ? " disabled" : ""}>${locked ? "" : `<button type="button" class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${esc(lineCatalogueLabel(l))}<span class="bcatch">›</span></button>`}</div></td>
+            <td class="pbfind c-code"><div>${locked ? "" : `<button class="bfind" data-find="${l.id}" title="Buscar en el catálogo">🔍</button>`}<input data-line="${l.id}" data-f="code" value="${esc(l.code)}" size="8"${locked ? " disabled" : ""}>${locked ? "" : `<button type="button" class="bcat" data-cat="${l.id}" data-catchap="${c.id}" title="Elegir una subpartida del catálogo">${esc(lineCatalogueLabel(l))}<span class="bcatch">›</span></button>`}</div></td>
             <td class="c-desc"><div class="descell"><span class="pictwrap">${plateFor(l, c.name, 30)}</span><input data-line="${l.id}" data-f="desc" value="${esc(lineDesc(l))}" title="${esc(lineDesc(l))}"${locked ? " disabled" : ""}></div>${lineSpecLine(l)}</td>
             <td class="c-unit"><select data-line="${l.id}" data-f="unit" title="${esc(unitName(l.unit))}"${locked ? " disabled" : ""}>${listOptionsUnits(l.unit, true)}</select></td>
             <td class="int c-cost"><input class="r" data-line="${l.id}" data-f="cost" type="number" step="0.01" value="${(l.costCents / 100).toFixed(2)}"${locked ? " disabled" : ""}></td>

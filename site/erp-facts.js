@@ -182,7 +182,7 @@
 
   /** renderBudgetDoc chapters → facts chapters (base scope only: options and
    *  out-of-scope never total into the document's money). */
-  function budgetChapters(doc, lineText, marked, plateHtml) {
+  function budgetChapters(doc, lineText, marked, plateHtml, lineChapter) {
     return doc.chapters
       .filter((c) => (c.section || "base") === "base" && c.lines.length)
       .map((c) => ({
@@ -193,7 +193,20 @@
         // titles into one band; nothing here sums or groups by it.
         title: c.title || "",
         rows: c.lines.map((l) => ({
-          chapter: (l.code || "").split("-")[0] || String(c.num),
+          /* THE TRADE, ASKED FOR RATHER THAN PARSED OUT OF THE CÓDIGO.
+             This read `code.split("-")[0]`, which worked only while a
+             subpartida's código began with its partida's — the rule the
+             operator reversed on 18 September in favour of a correlative. Under
+             `SUB-0209` that prefix is the same three letters for every line in
+             the book, so every plate on a printed quote would have come out the
+             same colour: the tint IS the trade, and one tint for all of them
+             says the job has only one.
+
+             The resolver belongs to the caller because only it can reach the
+             catalogue. The old split stays as the fallback, which keeps a
+             legacy código (AIS-101, ALB-010) reading exactly as it did and
+             costs a correlative nothing it had not already lost. */
+          chapter: (lineChapter && lineChapter(l)) || (l.code || "").split("-")[0] || String(c.num),
           code: l.code || "",
           // The caller may supply the line's wording in the document's own
           // language (the app's lineDesc knows the catalogue); the record's
@@ -326,7 +339,9 @@
         (doc.duration && doc.duration.plannedFinish) || (prj && prj.dates && prj.dates.targetEnd),
       );
       f.taxRate = (doc.vatBp || 0) / 100;
-      f.chapters = bdoc ? budgetChapters(bdoc, refs.lineText, null, refs.plateHtml) : [];
+      f.chapters = bdoc
+        ? budgetChapters(bdoc, refs.lineText, null, refs.plateHtml, refs.lineChapter)
+        : [];
 
       const total = doc.currentCents + Math.round((doc.currentCents * (doc.vatBp || 0)) / 10000);
       f.milestones = doc.installments.map((i, idx) => ({
@@ -717,7 +732,7 @@
     f.dates.validUntil = dmy(doc.validityDate);
     f.dates.accepted = dmy(v.customerResponse && v.customerResponse.date);
     f.taxRate = doc.totals.vatBp / 100;
-    f.chapters = budgetChapters(doc, refs.lineText, refs.marked, refs.plateHtml);
+    f.chapters = budgetChapters(doc, refs.lineText, refs.marked, refs.plateHtml, refs.lineChapter);
     if (v.customerResponse && v.customerResponse.acceptedBy)
       f.customer.contact = f.customer.contact || v.customerResponse.acceptedBy;
 
@@ -861,6 +876,31 @@
           };
     const DT = doctypes || (typeof CaneiDocTypes !== "undefined" ? CaneiDocTypes : null);
     if (!DT) throw new Error("erp-facts: CaneiDocTypes is not loaded");
+    /* THE TRADE RESOLVER, BUILT ONCE HERE rather than asked of every caller.
+       Seven refs bags reach this function and an eighth will be written; a
+       resolver each of them has to remember is one the eighth forgets, and the
+       symptom would be a printed quote whose plates quietly lost their colours.
+       `docFor` is handed the engine, so it can answer the question itself.
+
+       A line names its catalogue entry by `itemId`, and the entry's FIRST
+       partida is its trade — the same choice `plateFor` makes on screen, for
+       the same reason: a plate shows one trade, and a subpartida filed in both
+       Fontanería and Albañilería has no single right colour. `chapter` is the
+       legacy field, kept in step with the first membership, and is the answer
+       for a document built from a state older than the links. */
+    if (refs && !refs.lineChapter && erp && erp.state)
+      refs = Object.assign({}, refs, {
+        lineChapter: function (l) {
+          if (!l || !l.itemId) return "";
+          const it = (erp.state.catalogue || []).find((x) => x.id === l.itemId);
+          if (!it) return "";
+          try {
+            return (erp.itemPartidas(it.id) || [])[0] || it.chapter || "";
+          } catch (e) {
+            return it.chapter || "";
+          }
+        },
+      });
     CURRENT_TR = T;
     const fn = KINDS[kind];
     if (!fn)

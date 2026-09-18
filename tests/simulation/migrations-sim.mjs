@@ -22,6 +22,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const M = require("../../site/erp-migrations.js");
 const { ERP } = require("../../site/erp-engine.js");
+const SEED = require("../../site/erp-seed.js");
 
 const checks = [];
 const assert = (cond, name, detail) =>
@@ -87,6 +88,28 @@ assert(retyped.length === 0, "no pre-existing top-level key changed type", retyp
  *   on the customer that could disagree with the job's own line.
  */
 const INTENTIONAL_REMOVALS = new Set(["parties[].activityLine"]);
+
+/**
+ * THE ONE VALUE THE LADDER IS ALLOWED TO REWRITE, and it took an explicit
+ * instruction to get here.
+ *
+ * `additiveViolations` exists to hold one promise: a migration never changes
+ * something the company typed. v25 breaks it on purpose. The operator asked
+ * for the whole price book renumbered onto one correlative — «Update the codes
+ * on DEV, to keep all aligned» — after being told plainly that a código is
+ * printed on quotes that have already left the company and that renumbering
+ * cannot be undone. That is their call to make, and it is made.
+ *
+ * NARROW ON PURPOSE. The exemption is this one path and nothing else, so the
+ * promise still holds for every other value in the document. In particular it
+ * does NOT cover a budget line's código: an issued version is a paper the
+ * customer is holding, v25 leaves those untouched, and if it ever stopped
+ * doing so this checker would say so — which is the property the v25 block at
+ * the foot of this file asserts directly.
+ *
+ * A second entry here should be argued for as hard as this one was.
+ */
+const INTENTIONAL_REWRITES = new Set(["catalogue[].code"]);
 const generalise = (p) => p.replace(/\[\d+\]/g, "[]");
 
 function additiveViolations(before, after, path = "") {
@@ -121,7 +144,9 @@ function additiveViolations(before, after, path = "") {
       return INTENTIONAL_REMOVALS.has(generalise(here)) ? [] : [`${at}.${k}: dropped`];
     });
   }
-  return before === after ? [] : [`${at}: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`];
+  if (before === after) return [];
+  if (INTENTIONAL_REWRITES.has(generalise(path))) return [];
+  return [`${at}: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`];
 }
 
 const violations = additiveViolations(v1, r1.state);
@@ -1129,6 +1154,148 @@ throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws
   } catch (err) {
     assert(false, "an empty document boots and mints from 1", err.message);
   }
+}
+
+/* ---------------- v25 · the price book on one correlative ---------------- */
+/* The operator asked for the whole book renumbered and named the answer they
+   expected: «the correlative starts from what it has to start, which I
+   understand is 209». With 208 entries that is exactly right, and it is the
+   cheapest thing here to get wrong by one.
+
+   The half that matters more is the half they did not ask about: an ISSUED
+   version is a paper the customer is holding, and no renumbering may touch it.
+   The fixture below therefore carries both kinds of version and asserts the
+   draft followed the book while the issued one did not move a character. */
+{
+  const seeded = SEED.build("2026-09-18");
+  const st = seeded.toJSON();
+  M.applyCataloguePack(st);
+  st.schemaVersion = 24;
+
+  const beforeIssued = [];
+  for (const b of st.budgets || [])
+    for (const v of b.versions || [])
+      if (v.issued)
+        for (const c of v.chapters || [])
+          for (const l of c.lines || []) beforeIssued.push(String(l.code || ""));
+
+  const out = M.migrate(st);
+  const after = out.state || out;
+  const cat = after.catalogue || [];
+  const SHAPE = /^SUB-\d{4,}$/;
+
+  assert(cat.length === 208, "the shipped price book is 208 subpartidas", String(cat.length));
+  assert(
+    cat.length > 0 && cat.every((i) => SHAPE.test(String(i.code))),
+    "every subpartida carries a correlative código",
+    cat
+      .filter((i) => !SHAPE.test(String(i.code)))
+      .slice(0, 3)
+      .map((i) => i.code)
+      .join(", "),
+  );
+  assert(
+    cat[0] && cat[0].code === "SUB-0001" && cat[cat.length - 1].code === "SUB-0208",
+    "…numbered from one, in the book's own order",
+    cat.length ? cat[0].code + " … " + cat[cat.length - 1].code : "empty",
+  );
+  assert(
+    new Set(cat.map((i) => i.code)).size === cat.length,
+    "…and no two share one",
+    String(cat.length - new Set(cat.map((i) => i.code)).size) + " duplicated",
+  );
+  // The operator's own arithmetic, asserted rather than agreed with.
+  let max = 0;
+  for (const i of cat) {
+    const m = /^SUB-(\d+)$/.exec(String(i.code));
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  assert(max + 1 === 209, "the next código minted is SUB-0209", "would be " + (max + 1));
+
+  const afterIssued = [];
+  for (const b of after.budgets || [])
+    for (const v of b.versions || [])
+      if (v.issued)
+        for (const c of v.chapters || [])
+          for (const l of c.lines || []) afterIssued.push(String(l.code || ""));
+  assert(
+    beforeIssued.length > 0 && JSON.stringify(beforeIssued) === JSON.stringify(afterIssued),
+    `an issued version keeps every código it was sent with (${beforeIssued.length} lines)`,
+    "issued lines were rewritten",
+  );
+
+  let stale = 0;
+  for (const b of after.budgets || [])
+    for (const v of b.versions || [])
+      if (!v.issued)
+        for (const c of v.chapters || [])
+          for (const l of c.lines || []) {
+            if (!l.itemId) continue;
+            const it = cat.find((x) => x.id === l.itemId);
+            if (it && String(l.code) !== String(it.code)) stale++;
+          }
+  assert(stale === 0, "a draft line follows its subpartida to the new código", stale + " stale");
+
+  // Twice must be the same as once: a second climb that renumbered again would
+  // shuffle códigos under lines that had just been pointed at them.
+  const twice = M.migrate(JSON.parse(JSON.stringify(after)));
+  assert(
+    JSON.stringify((twice.state || twice).catalogue.map((i) => i.code)) ===
+      JSON.stringify(cat.map((i) => i.code)),
+    "renumbering is idempotent",
+  );
+
+  // …and the pack cannot reinstall itself over a renumbered book.
+  const n0 = after.catalogue.length;
+  M.applyCataloguePack(after);
+  assert(
+    after.catalogue.length === n0,
+    "the catalogue pack adds nothing to a book already renumbered",
+    `${n0} -> ${after.catalogue.length}`,
+  );
+
+  /* THE PRICE BOOK STILL SPEAKS THREE LANGUAGES, which renumbering nearly
+     cost it. `erp-catalogue-i18n.js` files all 208 English and Catalan
+     descriptions under the PACK's own codes, so rewriting `code` orphaned every
+     one of them: no error, no gap in any dictionary, just a lookup that stopped
+     matching and a book that read Spanish in all three languages. `packCode` is
+     the identity that survives the renumbering, and this is the assertion that
+     it does. */
+  const I18N = require("../../site/erp-catalogue-i18n.js");
+  /* Counted before and after, because the number that matters is how many are
+     LOST. Eight of the 208 are the demo seed's own rows, which nobody shipped
+     a translation for and which should stay exactly as untranslated as they
+     were; the 200 from the pack must all survive. */
+  const beforeTranslated = (() => {
+    const fresh = SEED.build("2026-09-18").toJSON();
+    M.applyCataloguePack(fresh);
+    return fresh.catalogue.filter((i) => I18N.DESC[i.code]).length;
+  })();
+  const afterTranslated = cat.filter((i) => I18N.DESC[i.packCode || i.code]).length;
+  assert(
+    beforeTranslated > 0 && afterTranslated === beforeTranslated,
+    `renumbering loses no translation (${afterTranslated}/${beforeTranslated} still speak English and Catalan)`,
+    cat
+      .filter((i) => !I18N.DESC[i.packCode || i.code])
+      .slice(0, 3)
+      .map((i) => i.code + " (packCode " + (i.packCode || "none") + ")")
+      .join(", "),
+  );
+
+  // A FRESH workspace takes the same convention, though it never climbs the
+  // ladder — the gap that would have left tenant #1 on the old codes alone.
+  const fresh = SEED.build("2026-09-18").toJSON();
+  M.applyCataloguePack(fresh);
+  M.renumberCatalogue(fresh);
+  assert(
+    fresh.catalogue.length > 0 && fresh.catalogue.every((i) => SHAPE.test(String(i.code))),
+    "a freshly seeded workspace starts on the same correlative",
+    fresh.catalogue
+      .filter((i) => !SHAPE.test(String(i.code)))
+      .slice(0, 3)
+      .map((i) => i.code)
+      .join(", "),
+  );
 }
 
 /* ---------------- report ---------------- */
