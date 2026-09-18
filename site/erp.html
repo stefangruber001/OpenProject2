@@ -995,6 +995,13 @@
         font: 600 13px var(--sans);
         color: var(--ink);
       }
+      /* The título rides after the partida on the card, quieter than it and on
+         the same line — this list has the width the 190px chart column has not. */
+      .gmob .gmt .ud {
+        font-weight: 500;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
       .gmob .gmt .dot {
         display: inline-block;
         width: 6px;
@@ -1050,6 +1057,27 @@
         overflow: hidden;
         text-overflow: ellipsis;
         cursor: pointer;
+      }
+      /* Only for a job that uses títulos — see the comment at the markup. */
+      .gnames.wt {
+        width: 250px;
+      }
+      /* The partida keeps the room it needs and the título takes what is left:
+         both shrink, neither disappears, and whichever runs out ellipsises on
+         its own instead of pushing the other off the row. */
+      .gnames .gn .gnm {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .gnames .gn .ud {
+        flex: 0 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: var(--muted);
+        font-size: 11.5px;
       }
       .gnames .gn:hover {
         background: var(--greenSoft);
@@ -2317,7 +2345,8 @@
      job is controlled from groups the same way. One rule above its run of
      partidas; no subtotal, because this table's columns are cost against
      budget and a título does not own a budget. */
-      .ecotree tr.ecoband td {
+      .ecotree tr.ecoband td,
+      tr.ecoband td {
         background: transparent;
         border-bottom: 2px solid var(--greenDeep);
         font: 700 13px var(--serif);
@@ -7960,7 +7989,69 @@
            Payment milestones are interleaved by date rather than listed apart: a
            schedule is read forwards, and money falling due is one of the things that
            happens on a day. */
-      function ganttList(plan, sch, pays) {
+      /**
+       * WHICH «Solados»? — the título a partida belongs to, for the rows that
+       * travel WITHOUT a band above them to say it.
+       *
+       * One budget may hold the same partida twice under two títulos: «Reforma
+       * de cocina → Solados» and «Reforma de baño → Solados» are two partidas
+       * with two numbers, and the engine has kept them apart since v24. The
+       * screens that print partidas one per row — the chart's name column, its
+       * task list, Avance físico — printed «1. Solados» and «4. Solados» and
+       * left the reader to guess. The operator's words, looking at their own
+       * job: «you can not distinguish which one is each».
+       *
+       * READ AT DRAW TIME, never copied onto the row. The título belongs to the
+       * partida, which already carries it; writing it onto the plan task as
+       * well would be a second copy to keep true through every rename, and the
+       * first thing to go stale.
+       *
+       * Silent for a company that uses no títulos: the suffix would then say
+       * the same nothing on every row, which is noise rather than information.
+       */
+      function chapterTitleIndex(pid) {
+        const by = {};
+        let any = false;
+        try {
+          for (const { chapter: c } of erp.projectChapters(pid)) {
+            const t = String(c.title || "").trim();
+            by[String(c.num)] = t;
+            if (t) any = true;
+          }
+        } catch (e) {
+          /* no accepted budget: no partidas, so nothing to tell apart */
+        }
+        return { by: by, any: any };
+      }
+      /** What an untitled run prints, in the one place every screen reads it from. */
+      function untitledBand() {
+        return "Sin título";
+      }
+      /**
+       * The título as a muted suffix after the name.
+       *
+       * Assembled from three pieces rather than one template on purpose: a
+       * greater-than and a less-than either side of an expression is what the
+       * source audit reads as a tag pair wrapping a sentence nobody
+       * translated, and this file has already paid for that seven times.
+       * (Eight. The first draft of THIS comment quoted the two characters and
+       * was itself reported, which is as good a demonstration as the rule
+       * deserves.)
+       */
+      function titleSuffix(title, anyTitled) {
+        if (!anyTitled) return "";
+        const OPEN = ' <span class="ud">· ';
+        const CLOSE = "</span>";
+        return OPEN + esc(String(title || "").trim() || untitledBand()) + CLOSE;
+      }
+      /** The same, for a row that knows only its partida number. */
+      function titleSuffixFor(idx, num) {
+        if (!idx || !idx.any) return "";
+        const t = idx.by[String(num)];
+        return t === undefined ? "" : titleSuffix(t, true);
+      }
+
+      function ganttList(plan, sch, pays, titles) {
         const S = {};
         if (sch) sch.tasks.forEach((t) => (S[t.taskId] = t));
         const pos = (t) =>
@@ -7980,6 +8071,9 @@
             id: t.id,
             date: p.start,
             title: t.title,
+            // The partida this task was derived from, if it was derived at all:
+            // a milestone somebody typed in has no título to print.
+            titleSuffix: titleSuffixFor(titles, (/^group:(.+)$/.exec(t.sourceRef || "") || [])[1]),
             milestone: !!t.milestone,
             critical: !!p.critical,
             start: p.start,
@@ -8027,7 +8121,7 @@
           if (i.critical) sub.push("<span>crítica</span>");
           return `<div class="gmrow${i.overdue ? " late" : ""}${i.running ? " now" : ""}" data-mrow="${esc(i.id)}">
             <div class="gmtop">
-             <span class="gmt">${i.critical ? '<span class="dot"></span>' : ""}${i.milestone ? "◆ " : ""}${esc(i.title)}</span>
+             <span class="gmt">${i.critical ? '<span class="dot"></span>' : ""}${i.milestone ? "◆ " : ""}${esc(i.title)}${i.titleSuffix || ""}</span>
              <span class="gmpct">${i.pct}%</span></div>
             <div class="bar"><i style="width:${i.pct}%"></i></div>
             <div class="gmsub">${sub.join(SEP)}</div></div>`;
@@ -8050,7 +8144,7 @@
            <span><i style="background:var(--hair)"></i>Día no laborable</span>
          </div>`;
       }
-      function ganttChart(plan, sch, cmp, pays) {
+      function ganttChart(plan, sch, cmp, pays, titles) {
         const B = ganttApi(),
           cal = plan.calendar || B.defaultCalendar(),
           C = B.calendar;
@@ -8142,7 +8236,8 @@
               <rect class="ggrip" data-task="${t.id}" data-role="resize" x="${X + w - 6}" y="${top}" width="6" height="20" rx="2"/>
               <circle class="gknob" data-task="${t.id}" data-role="link" cx="${X + w + 7}" cy="${mid}" r="4.5"/></g>`;
           }
-          names += `<div class="gn${gSel === t.id ? " on" : ""}" data-task="${t.id}" title="${esc(t.title)}">${p.critical ? '<span class="dot"></span>' : ""}${t.milestone ? "◆ " : ""}${esc(t.title)}</div>`;
+          const tSuffix = titleSuffixFor(titles, (/^group:(.+)$/.exec(t.sourceRef || "") || [])[1]);
+          names += `<div class="gn${gSel === t.id ? " on" : ""}" data-task="${t.id}" title="${esc(t.title)}">${p.critical ? '<span class="dot"></span>' : ""}${t.milestone ? "◆ " : ""}<span class="gnm">${esc(t.title)}</span>${tSuffix}</div>`;
         });
 
         /* --- dependency arrows --- */
@@ -8186,8 +8281,13 @@
            is always drawn — but on a plan that started two years ago "drawn" means
            eighteen thousand pixels to the right of where the chart opens, and a line
            you have to go looking for is not one you see. */
+        /* THE COLUMN GROWS WHEN IT HAS TWO THINGS TO SAY. At 190px a name and
+           its título clip each other, and a suffix nobody can read is worse
+           than none — it takes the width and answers nothing. It widens only
+           for a job that uses títulos, so a company that uses none keeps the
+           chart exactly as wide as it is today. */
         return `<div class="gwrap">
-          <div class="gnames"><div class="gh"></div>${names}</div>
+          <div class="gnames${titles && titles.any ? " wt" : ""}"><div class="gh"></div>${names}</div>
           <div class="gscroll"><svg class="gsvg" id="gSvg" width="${W}" height="${H}" data-from="${from}" data-today="${x(erp.today) + gZoom / 2}">
             ${axis}${grid}${deps}${bars}</svg></div>
         </div>`;
@@ -8690,6 +8790,9 @@
         try {
           erp.chapterProgress(pid).forEach((c) => (chapPct[c.num] = c.progressPct));
         } catch (e) {}
+        // Read off the partidas already in hand rather than asked for again:
+        // these ARE the rows, and a second walk could only disagree with them.
+        const anyTitled = chapters.some((c) => String(c.title || "").trim());
         if (!chapters.length && !plan.tasks.length) return "";
         return `<div class="card" id="progCtl"><div class="ch"><h3>Avance</h3>
           <span class="tag">estado y porcentaje, por partida y por subpartida</span></div>
@@ -8700,7 +8803,7 @@
                const st = c.progress || "notStarted";
                const t = taskFor[c.num];
                return `<div class="provrow chap">
-             <span class="nm">${c.num}. ${esc(c.name)}</span>
+             <span class="nm">${c.num}. ${esc(c.name)}${titleSuffix(c.title, anyTitled)}</span>
              ${t ? `<span class="gdates">${fmtD(t.plannedStart)} → ${fmtD(t.plannedEnd)}</span>` : ""}
              ${progStrip("chap", c.num, st)}
              ${progBox("pct", c.num, st, chapPct[c.num] || 0)}
@@ -23220,6 +23323,7 @@
           }
 
           const pid = gProject;
+          const gTitles = chapterTitleIndex(pid);
           const G = ganttContext(pid) || {};
           const plan = G.plan || B.get(erp.state, pid),
             sch = G.sch || B.schedule(plan);
@@ -23281,7 +23385,7 @@
          </div>
          ${
            plan.tasks.length
-             ? ganttChart(plan, sch, cmp, pays) + ganttList(plan, sch, pays)
+             ? ganttChart(plan, sch, cmp, pays, gTitles) + ganttList(plan, sch, pays, gTitles)
              : derivable
                ? `<div class="empty">Sin planificación. «Derivar del presupuesto» la construye a partir de las partidas y subpartidas aceptadas: la duración de cada partida sale de sus cantidades y del rendimiento diario del oficio.</div>`
                : `<div class="empty">Esta obra todavía no tiene un presupuesto aceptado, así que no hay partidas ni subpartidas que planificar ni sobre los que registrar avance.
@@ -26535,9 +26639,9 @@
             );
           return (
             money +
-            ganttChart(G.plan, G.sch, G.base, G.pays) +
+            ganttChart(G.plan, G.sch, G.base, G.pays, chapterTitleIndex(p.id)) +
             ganttLegend(G.base) +
-            ganttList(G.plan, G.sch, G.pays)
+            ganttList(G.plan, G.sch, G.pays, chapterTitleIndex(p.id))
           );
         }
         return "";
@@ -30244,6 +30348,17 @@
            project inherited at creation (v24), so this reads the same as the
            quote the customer accepted even if the heading was renamed in the
            price book since. */
+        /* AND AN UNTITLED RUN SAYS SO. `if (band)` printed no header for one,
+           so its partidas kept the last band drawn and READ AS BELONGING TO IT:
+           the operator's partida 4 carried no título and sat under «Reforma de
+           baño», which is the one thing this table must never say. The engine
+           was already right — `chapterBands` opens a band for the run either
+           way — so this was the screen losing it on the way out.
+
+           Silent when the job uses none, which is the other half of the rule:
+           a company that never fills the field sees the flat list it sees
+           today, not a «Sin título» banner over every partida it owns. */
+        const anyTitled = tableRows.some((c) => (c.title || "").trim());
         let band = null;
         for (const c of tableRows) {
           const key = "c:" + c.chapter;
@@ -30251,7 +30366,10 @@
           const caret = open ? "▾" : "▸";
           if ((c.title || "") !== band) {
             band = c.title || "";
-            if (band) out.push(`<tr class="ecoband"><td colspan="7">${esc(band)}</td></tr>`);
+            if (anyTitled)
+              out.push(
+                `<tr class="ecoband"><td colspan="7">${band ? esc(band) : untitledBand()}</td></tr>`,
+              );
           }
           out.push(
             `<tr class="click" data-chcosts="${c.chapter}" data-ecotoggle="${esc(key)}"><td class="k"><span translate="no">${caret}</span> ${c.chapter}. ${esc(names[c.chapter] || "—")}${variationNums.has(String(c.chapter)) ? ' <span class="pill b">variación</span>' : ""}</td>` +
@@ -30449,7 +30567,25 @@
                  nobody translated — the seventh variant of that trap in this file. */
         const VAR_PILL = ' <span class="pill b">variación</span>';
         const FLOOR_PILL = ' <span class="pill y">sin avance</span>';
-        const out = rows.map((r) => {
+        /* THE SAME BANDS AS EJECUTADO, and for the same reason. These two
+           tabs are one table read two ways — the same partidas, in the same
+           order, off the same `tableRows`. Ejecutado grouped them under their
+           título and Proyección did not, so switching tab silently changed what
+           the reader was looking at: «4. Solados» and «1. Solados» became
+           neighbours with nothing between them. A run, not a group-by, exactly
+           as above — the order is the estimator's and stays theirs. */
+        const span = showCommitted ? 8 : 7;
+        const anyTitled = rows.some((r) => String(r.title || "").trim());
+        let band = null;
+        const out = [];
+        rows.forEach((r) => {
+          if ((r.title || "") !== band) {
+            band = r.title || "";
+            if (anyTitled)
+              out.push(
+                `<tr class="ecoband"><td colspan="${span}">${band ? esc(band) : untitledBand()}</td></tr>`,
+              );
+          }
           const varTag = variationNums.has(String(r.chapter)) ? VAR_PILL : "";
           const floorTag = r.noProgress ? FLOOR_PILL : "";
           const tags = varTag + floorTag;
@@ -30461,7 +30597,7 @@
             cell(r.projectedCents) +
             dev(r.devCents) +
             signed(r.marginFcastCents);
-          return `<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${tags}</td>${body}</tr>`;
+          out.push(`<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${tags}</td>${body}</tr>`);
         });
         /* The money that names no partida is projected at exactly itself: it is
                  already spent, and nothing about it is still to come. Leaving it out
@@ -30476,7 +30612,7 @@
           );
         }
         if (!out.length)
-          return `<tr><td colspan="${showCommitted ? 8 : 7}"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`;
+          return `<tr><td colspan="${span}"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`;
         const tot = (pick) => rows.reduce((a, r) => a + r[pick], 0);
         const totProjected = tot("projectedCents") + pendCents;
         const totCells =

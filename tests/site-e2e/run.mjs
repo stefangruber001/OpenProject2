@@ -121,6 +121,7 @@ async function main() {
     /* Beside testJourney and for its reason: this one CREATES records too, so
        it takes its own context rather than sharing the browser's one IndexedDB
        with every read-only suite above. */
+    testChapterTitles,
     testNotes,
     testJourney,
   ];
@@ -18458,6 +18459,263 @@ main().catch((e) => {
 //    reaches the engine, the screen reads it back, and the colour means
 //    something — plus the two this one adds: the «where» is a real route, and a
 //    closed note stops carrying a priority rule.
+/**
+ * WHICH «Solados»? — the operator's own job, built here so the answer is not
+ * a matter of opinion.
+ *
+ * They added the same partida under two títulos and a third under none, and
+ * reported two separate faults in one breath: «you can not distinguish which
+ * one is each», and «Partida nº4 has no Title but it read as is from Reforma
+ * de baño». The first is a row travelling without its título; the second is a
+ * row inheriting somebody else's.
+ *
+ * So the shape below is theirs, exactly: Solados twice under two títulos,
+ * plus one partida with no título at all, sitting immediately after a titled
+ * run — which is the only position in which the second fault appears.
+ */
+async function testChapterTitles(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#economics`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    // ── the job, through the same engine doors the screens use ───────────────
+    const built = await pg.evaluate(() => {
+      const U = "bo";
+      const mk = (name, chapters) => {
+        const cli = erp.addParty(
+          {
+            name,
+            partyType: "individual",
+            roles: ["customer"],
+            email: name.replace(/\s+/g, ".").toLowerCase() + "@example.invalid",
+          },
+          U,
+        );
+        const b = erp.createBudget({ partyId: cli.id }, U);
+        chapters.forEach((c) => {
+          const ch = erp.addChapter(b.id, { name: c.name, title: c.title }, U);
+          erp.addLine(
+            b.id,
+            ch.id,
+            {
+              desc: c.name + " · trabajo",
+              unit: "m2",
+              qtyMilli: 10000,
+              priceCents: 5000,
+              costCents: 3000,
+            },
+            U,
+          );
+        });
+        erp.issueVersion(b.id, {}, U);
+        erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "ok" }, U);
+        return erp.createProjectFromAcceptance(b.id, U).id;
+      };
+      return {
+        // The operator's shape. Partida 4 carries NO título and follows a
+        // titled run, which is where it used to be swallowed by «Reforma de baño».
+        titled: mk("Cliente Titulos", [
+          { name: "Solados", title: "Reforma de cocina" },
+          { name: "Pintura", title: "Reforma de cocina" },
+          { name: "Solados", title: "Reforma de baño" },
+          { name: "Carpintería", title: "" },
+        ]),
+        // …and a company that fills the field in for nothing, which must keep
+        // seeing exactly what it sees today.
+        flat: mk("Cliente Sin Titulos", [
+          { name: "Solados", title: "" },
+          { name: "Pintura", title: "" },
+        ]),
+      };
+    });
+
+    const openEconomics = async (pid, view) => {
+      await pg.evaluate(
+        ([id, v]) => {
+          gProject = id;
+          ecoFull = true;
+          ecoView = v;
+          location.hash = "economics";
+          render();
+        },
+        [pid, view],
+      );
+      await pg.waitForTimeout(700);
+      return pg.evaluate(() => {
+        const rows = [...document.querySelectorAll("#ecoBody table tbody tr")];
+        const out = [];
+        rows.forEach((r) => {
+          if (r.classList.contains("ecoband")) out.push({ band: r.innerText.trim() });
+          else if (!r.classList.contains("ecototal")) {
+            const k = r.querySelector("td.k");
+            if (k) out.push({ row: k.innerText.replace(/\s+/g, " ").trim() });
+          }
+        });
+        return out;
+      });
+    };
+
+    // ── 1 · Ejecutado: every run wears its own band, the untitled one included ──
+    const actual = await openEconomics(built.titled, "actual");
+    const bands = actual.filter((x) => x.band).map((x) => x.band);
+    if (
+      JSON.stringify(bands) ===
+      JSON.stringify(["Reforma de cocina", "Reforma de baño", "Sin título"])
+    )
+      ok("avance económico: each run opens its own band, and the untitled one says so");
+    else bad("avance económico: bands", JSON.stringify(bands));
+
+    // The fault in its own words: partida 4 must not sit under «Reforma de baño».
+    // The cell opens with the expand caret, so the partida is addressed by its
+    // number rather than by the start of the text.
+    const bandOf = (list, num) => {
+      const at = new RegExp("(^|\\s)" + num + "\\.\\s");
+      let cur = null;
+      for (const x of list) {
+        if (x.band) cur = x.band;
+        else if (x.row && at.test(x.row)) return cur;
+      }
+      return "(not found)";
+    };
+    if (bandOf(actual, 4) === "Sin título")
+      ok(
+        "avance económico: the partida with no título reads under «Sin título», not the band above it",
+      );
+    else
+      bad("avance económico: partida 4 band", bandOf(actual, 4) + " in " + JSON.stringify(actual));
+    if (bandOf(actual, 1) === "Reforma de cocina" && bandOf(actual, 3) === "Reforma de baño")
+      ok("avance económico: the two «Solados» sit under the títulos they were sold under");
+    else bad("avance económico: solados bands", bandOf(actual, 1) + " / " + bandOf(actual, 3));
+
+    // ── 2 · Proyección groups the same way Ejecutado does ────────────────────
+    const fcast = await openEconomics(built.titled, "forecast");
+    const fbands = fcast.filter((x) => x.band).map((x) => x.band);
+    if (JSON.stringify(fbands) === JSON.stringify(bands))
+      ok("proyección: the same bands as Ejecutado — switching tab does not regroup the job");
+    else bad("proyección: bands", JSON.stringify(fbands) + " vs " + JSON.stringify(bands));
+
+    // ── 3 · a company that uses no títulos sees no bands at all ──────────────
+    const flatRows = await openEconomics(built.flat, "actual");
+    const flatFcast = await openEconomics(built.flat, "forecast");
+    if (!flatRows.some((x) => x.band) && !flatFcast.some((x) => x.band))
+      ok("avance económico: a job with no títulos keeps its flat list, in both tabs");
+    else bad("avance económico: flat job banded", JSON.stringify(flatRows.concat(flatFcast)));
+
+    // ── 4 · Avance físico: the row carries its título, because it travels alone ──
+    const phys = await pg.evaluate(
+      ([titled, flat]) => {
+        const read = (pid) => {
+          const B = typeof ganttApi === "function" ? ganttApi() : null;
+          const html = progressControl(pid, B ? B.get(erp.state, pid) : { tasks: [] });
+          const host = document.createElement("div");
+          host.innerHTML = html;
+          return [...host.querySelectorAll(".provrow.chap .nm")].map((n) =>
+            n.innerText.replace(/\s+/g, " ").trim(),
+          );
+        };
+        return { titled: read(titled), flat: read(flat) };
+      },
+      [built.titled, built.flat],
+    );
+    const t = phys.titled;
+    if (
+      t[0] === "1. Solados · Reforma de cocina" &&
+      t[2] === "3. Solados · Reforma de baño" &&
+      t[3] === "4. Carpintería · Sin título"
+    )
+      ok(`avance físico: the título rides after the name — «${t[0]}» vs «${t[2]}»`);
+    else bad("avance físico: suffixes", JSON.stringify(t));
+    if (phys.flat.every((x) => !/·/.test(x)))
+      ok("avance físico: a job with no títulos keeps its bare names");
+    else bad("avance físico: flat job suffixed", JSON.stringify(phys.flat));
+
+    // ── 5 · the chart's name column says it too, and only when there is something to say ──
+    const chart = await pg.evaluate(
+      ([titled, flat]) => {
+        const B = typeof ganttApi === "function" ? ganttApi() : null;
+        if (!B) return { skipped: true };
+        const read = (pid) => {
+          let plan = B.get(erp.state, pid);
+          // `fromBudget` RETURNS a plan, it does not store one — the screen
+          // saves it in a second step. Reading the chart is all this needs.
+          if (!plan.tasks.length)
+            try {
+              plan = B.fromBudget(erp, pid, {}).plan;
+            } catch (e) {
+              return { err: e.message };
+            }
+          const idx = chapterTitleIndex(pid);
+          const sch = B.schedule(plan);
+          const host = document.createElement("div");
+          host.innerHTML = ganttChart(plan, sch, null, [], idx);
+          /* The CARD LIST as well as the chart, and it is not the same code:
+             the 190px name column and the phone card render from two different
+             functions. The operator reads this one — they reported all of this
+             from an iPhone. */
+          const cards = document.createElement("div");
+          cards.innerHTML = ganttList(plan, sch, [], idx);
+          return {
+            wide: !!host.querySelector(".gnames.wt"),
+            names: [...host.querySelectorAll(".gn")].map((n) =>
+              n.innerText.replace(/\s+/g, " ").trim(),
+            ),
+            cards: [...cards.querySelectorAll(".gmrow .gmt")].map((n) =>
+              n.innerText.replace(/\s+/g, " ").trim(),
+            ),
+          };
+        };
+        return { titled: read(titled), flat: read(flat) };
+      },
+      [built.titled, built.flat],
+    );
+    if (chart.skipped) {
+      ok("gantt: scheduling capability absent in this build — nothing to check");
+    } else {
+      if (chart.titled.err || chart.flat.err)
+        bad("gantt: plan derivation", chart.titled.err || chart.flat.err);
+      // The derived task is named «<nº>. <partida>», so the partida is matched
+      // inside the row rather than at its start.
+      const solados = chart.titled.names.filter((x) => /\d+\.\s*Solados/.test(x));
+      if (solados.length === 2 && solados[0] !== solados[1] && solados.every((x) => /·/.test(x)))
+        ok(`gantt: the two «Solados» bars are told apart — «${solados.join("» / «")}»`);
+      else bad("gantt: names", JSON.stringify(chart.titled.names));
+      if (chart.titled.wide && !chart.flat.wide)
+        ok("gantt: the name column widens for a job with títulos, and only for one");
+      else bad("gantt: column width", JSON.stringify({ t: chart.titled.wide, f: chart.flat.wide }));
+      if (chart.flat.names.every((x) => !/·/.test(x)))
+        ok("gantt: a job with no títulos keeps its bare names");
+      else bad("gantt: flat job suffixed", JSON.stringify(chart.flat.names));
+
+      // …and the same, on the card list the phone actually shows.
+      const cardSolados = chart.titled.cards.filter((x) => /\d+\.\s*Solados/.test(x));
+      if (
+        cardSolados.length === 2 &&
+        cardSolados[0] !== cardSolados[1] &&
+        cardSolados.every((x) => /·/.test(x))
+      )
+        ok(
+          `gantt (tarjetas): the phone list tells them apart too — «${cardSolados.join("» / «")}»`,
+        );
+      else bad("gantt (tarjetas): names", JSON.stringify(chart.titled.cards));
+      if (chart.flat.cards.length && chart.flat.cards.every((x) => !/·/.test(x)))
+        ok("gantt (tarjetas): a job with no títulos keeps its bare names");
+      else bad("gantt (tarjetas): flat job", JSON.stringify(chart.flat.cards));
+    }
+
+    if (!errors.length) ok("títulos: no console errors");
+    else bad("títulos: console", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("títulos: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function testNotes(browser, base) {
   const ctx = await browser.newContext({
     viewport: { width: 1400, height: 1000 },
