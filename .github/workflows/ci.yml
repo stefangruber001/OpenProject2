@@ -15,7 +15,7 @@ jobs:
     name: Lint · Types · Test · Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
@@ -370,7 +370,7 @@ jobs:
     name: Capability bundle (build, browser-safety, drift)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
@@ -420,7 +420,7 @@ jobs:
     name: Business simulations (erp-engine invariants + ownership guard)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
@@ -585,7 +585,7 @@ jobs:
       # for the wrong reason — or rather, fail to fail when RLS is broken.
       RLS_TEST_DATABASE_URL: postgresql://factory_app:factory_app@localhost:5432/factory
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
@@ -622,7 +622,7 @@ jobs:
     name: End-to-end
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
 
