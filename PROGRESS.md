@@ -3889,3 +3889,85 @@ of them.
 Gates: site E2E 840/840 · doc-i18n 13 · pdf 44 · band · docs · docx 124 ·
 sync 30 · simulations 849 · i18n 158/158 en+ca · boundaries · lint ·
 check-types · test.
+
+## S38 · The annex is the gate, and the test stopped in front of it (2026-09-18)
+
+`main` had been red on «Part 1 real-life scenario», and the step that failed
+had **never** passed — it was born red on 13/09, the day it was written.
+
+    ✗ variation — {"vr":0,"cur":true}
+
+**What it demanded.** Step 7 creates a variation budget, issues it, accepts it
+and asks that its 500 € show up in the job's economics. Under today's model
+that cannot happen, and deliberately so. The rule is the operator's and is
+written into the engine itself: «Acceptance coming from Budget tool do nothing
+until we accept it on Contracts/Annex. This is key.» Accepting in the budget
+tool agrees a price and writes an **unapplied** annex; what joins the scope,
+the milestone and the money to the job is **signing** it. That is why
+`projectVariations` filters it out and `variationRevenueCents` read 0 —
+correct, not broken. Measured rather than assumed: the annex was there with
+`applied: false`, `projectVariations` returned empty, and `chapterEconomics`
+still held the five baseline chapters and none of the variation's.
+
+**The step now walks both halves**, which is more than it asked before:
+accepting moves nothing (0 €) **and** signing the annex moves it
+(+500 €, CTR-2026-0001-A2). Asserting only the second half would pass just as
+well with the gate deleted, which is the state it was in.
+
+**And a comment that lied.** `signContractAnnex`'s doc-comment said the method
+was «inert for now» and that scope, schedule and money still arrived on
+acceptance «exactly as they do today». That stopped being true when the gate
+moved there — five lines below, inside the same method — and a comment that
+contradicts the code it heads is worse than none: it is the one a reader
+believes.
+
+## S39 · A partida says which título it is under, and one with none says that too (2026-09-18)
+
+> «As you can see I have added two Partidas of Solados in different titles and
+> you can not distinguish which one is each. In the case of Economical
+> progress, Partida nº4 has no Title but it read as is from Reforma de baño.
+> This is not right.»
+
+Two faults in one sentence, and they are opposites: a row travelling **without**
+its título, and a row inheriting **somebody else's**.
+
+- **The one that inherits.** `ecoTreeRows` opened a band with `if (band)`, so an
+  untitled run printed no header and its partidas stayed visually under the
+  last one drawn. The engine was already right — `chapterBands` opens a band
+  for the run either way — so this was the screen losing it on the way out. The
+  band is now always printed, labelled **«Sin título»** when the run has none.
+- **Proyección groups like Ejecutado.** The two tabs are one table read two
+  ways: the same partidas, in the same order, off the same `tableRows`. One had
+  bands and the other did not, so switching tab silently regrouped the job.
+- **A row that travels alone carries its título.** Avance físico, the chart's
+  name column and the phone's card list printed «1. Solados» and «3. Solados».
+  Now «1. Solados · Reforma de cocina», the título muted after the name. Read at
+  draw time, never copied onto the row: the título belongs to the chapter, which
+  has carried it since v24, and a second copy on the plan task would be the
+  first thing to go stale on a rename.
+
+**Silent for a company that uses none.** All three ask first whether the job
+uses any título at all. One that never fills the field sees exactly today's
+flat list — no «Sin título» banner over every partida it owns, no suffix
+repeating the same nothing on every row, and the chart's name column at its
+usual 190px; it widens to 250 only when it has two things to say, because a
+suffix nobody can read is worse than no suffix.
+
+**The gate is the operator's own job**, built in the suite: Solados twice under
+two títulos and one partida with none **immediately after** a titled run, which
+is the only position in which the second fault appears. Thirteen checks across
+the four screens and both shapes of job, the card list included — they reported
+all of this from an iPhone.
+
+**Known and next** (operator, 18/09, the price book): one single way to create
+the subpartida↔partida relationship, in the **Subpartidas** section; the
+Partida drawer to become read-only and link through to each subpartida; the
+budgeting tool to link a newly created subpartida to the selected partida by
+itself; and the subpartida code to become an automatic correlative rather than
+one derived from the name, with the icon and «Partidas» columns dropped from
+the register.
+
+Gates: site E2E 853/853 (was 840) · real-life 8/8 · sync 30 · site-syntax ·
+pdf 44 · band · docs · docx 124 · doc-i18n 13 · codes 38 · links 29 · shell 20 ·
+simulations 849 · catalogue-i18n 12 · i18n 158/158 en+ca · boundaries · lint ·
+check-types · test.
