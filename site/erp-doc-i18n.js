@@ -349,6 +349,16 @@
     Subtotal: ["Subtotal", "Subtotal", "Subtotal"],
     "Condiciones de pago": ["Condiciones de pago", "Condicions de pagament", "Payment terms"],
     Notas: ["Notas", "Notes", "Notes"],
+    /* WHAT THE JOB IS, in each language. The document used to print the stored
+       code — «Ejecución de renovation en C/ …» on a contract a customer
+       signed — because `projectBlock` fell back to the activity line and
+       nothing translated it. erp-facts.js now says «Reforma»; these are the
+       other two columns. */
+    Reforma: ["Reforma", "Reforma", "Renovation"],
+    Reparación: ["Reparación", "Reparació", "Repairs"],
+    Humedades: ["Humedades", "Humitats", "Damp"],
+    Comercial: ["Comercial", "Comercial", "Commercial"],
+    "Otros trabajos": ["Otros trabajos", "Altres treballs", "Other works"],
     /* The two blocks the visit records and the quote now prints: what the
        price assumes, and what it does not cover. */
     Supuestos: ["Supuestos", "Supòsits", "Assumptions"],
@@ -663,12 +673,31 @@
     [/^Retencion -(\d+(?:[.,]\d+)?) %$/, "Retención −$1 %", "Retenció −$1 %", "Withholding −$1 %"],
     [/^IVA (\d+(?:[.,]\d+)?) %$/, "IVA $1 %", "IVA $1 %", "VAT $1 %"],
     [/^(\d+(?:[.,]\d+)?) dias$/, "$1 días", "$1 dies", "$1 days"],
+    /* ONE HITO IS NOT «1 hitos», AND IT WENT OUT ON A REAL CONTRACT (18/09).
+       The plural lives here rather than in the descriptor: the descriptor
+       states the fact — how many milestones — and each language decides how to
+       say it. The Spanish column is the one that was wrong on paper; Catalan
+       and English get the same treatment because «1 fites» and «1 milestones»
+       are the same mistake waiting for a one-milestone contract in those
+       languages. The replacement is a function because a count is not a
+       substitution; the dictionary has supported that since it was written. */
     [
       /^(\d+) hitos · transferencia a (.+)$/,
-      "$1 hitos · transferencia a $2",
-      "$1 fites · transferència a $2",
-      "$1 milestones · bank transfer to $2",
+      (m) =>
+        m[1] + (m[1] === "1" ? " hito · transferencia a " : " hitos · transferencia a ") + m[2],
+      (m) =>
+        m[1] + (m[1] === "1" ? " fita · transferència a " : " fites · transferència a ") + m[2],
+      (m) =>
+        m[1] +
+        (m[1] === "1" ? " milestone · bank transfer to " : " milestones · bank transfer to ") +
+        m[2],
     ],
+    /* A percentage milestone says WHICH percentage — the number is the whole
+       meaning of the trigger, so it is built rather than looked up. Added with
+       `atProgressPct` itself, which the vocabulary in erp-facts.js never had
+       and which therefore printed its own key at the customer. */
+    [/^al (\d+) % de avance$/, "al $1 % de avance", "al $1 % d'avanç", "at $1 % progress"],
+    [/^por avance de obra$/, "por avance de obra", "per avanç d'obra", "on works progress"],
     [/^N (\d+)$/, "N.º $1", "Núm. $1", "No. $1"],
     [/^(\d+) reservas$/, "$1 reservas", "$1 reserves", "$1 reservations"],
     [

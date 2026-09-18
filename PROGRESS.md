@@ -3824,3 +3824,68 @@ which nothing sets.
 
 Gates: site E2E 840/840 · site-sync 30 · site-syntax · boundaries · lint ·
 check-types · test.
+
+## S37 · A document is printed in the language it is printed in (2026-09-18)
+
+**Done, on dev — not released.** The operator sent in `CTR-2026-0004` — a
+contract their own system had produced — and it said «Garantia de 2 anos sobre
+los trabajos ejecutados». The key itself, on paper a customer signs, and «anos»
+is not a word to send anybody.
+
+- **One concatenation, in the wrong order.** The descriptors in
+  `erp-doctypes.js` are unaccented ASCII Spanish on purpose: each is a KEY into
+  `erp-doc-i18n.js`, which holds the real Spanish, the Catalan and the English.
+  `wrap()` does translate — but it was handed `"- " + r`, the bullet already
+  glued on, so the string was no longer a key, nothing matched, and the key
+  went onto the paper. The HTML sheet (`this.T(r)`) and the Word writer
+  (`this.t(r)`) both had it right, which is why the preview on screen was
+  correct and only the downloaded PDF was wrong — the one file that leaves the
+  company.
+- **The same mistake, seven more times.** `label.toUpperCase()` before `tr`
+  destroyed every band, KPI caption and column heading the same way: the
+  dictionary is keyed in sentence case, so an English contract printed TOTAL
+  CONTRATADO, FECHA, HITO and IMPORTE. Capitals are a style — the Word writer
+  has always treated them as one.
+- **«1 hitos».** The plural now lives in the dictionary, where language
+  belongs: the descriptor states how many, each language says it its own way.
+- **`atProgressPct` printed its own key**, because the vocabulary in
+  `erp-facts.js` had five triggers and the engine accepts six — the exact
+  failure `_validateContractTerms` warns about. It now says «al 50 % de
+  avance», and `renderContractDoc` passes the percentage through: it was
+  stored, validated, and dropped on the way to the document.
+- **«Ejecución de renovation en C/ …»** — the stored activity code, printed to
+  a customer. The Proyectos register has said «Reforma» all along.
+- **«Inicio comprometido» never reached the paper**: the drawer writes
+  `initiation.committedStartDate`, the document read `duration.plannedStart`,
+  which nothing sets. Three sources now, in the order a person would trust
+  them. The notes line reads as a sentence in all three cases rather than
+  «Plazo de ejecucion: — a —».
+- **A gate that could see it** (`pnpm test:doc-i18n`, 13 checks, in CI):
+  `tests/doc-pdf` renders with a PASS-THROUGH translator, because what it
+  exists to check is the WinAnsi encoding — so a translation bug is invisible
+  to it by construction. This one renders with the real
+  `CaneiDocI18n.tr(lang)` in all three languages and reads the paper back.
+  Backed out, it prints the operator's contract: «Garantia de 2 anos /
+  Cualquier modificacion / interes legal / Plazo de ejecucion:».
+
+**And the trunk was red, two of it mine.** `main` had been failing CI since
+17/09 and neither session looked. The source-literal ceiling went 158 → 163
+because S35 and S145 added five untranslated strings — three of them written in
+ENGLISH, backwards for a codebase whose source speaks Spanish and whose
+dictionary translates. They are Spanish now and in both dictionaries; the count
+is 158 again. The other was inherited: `manageability-sim` still asserted that
+a subpartida REQUIRES a partida, which 17/09 deliberately reversed. Inverted
+rather than deleted, with the second half asserting what made the reversal safe
+— an unfiled subpartida is findable through `unfiledItems()`. 521/521.
+
+**Known and next:** the contract's `docType` is stored uppercase in the
+descriptor («CONTRATO DE OBRA») while the dictionary holds «Contrato de obra»,
+so the document's own title is the one heading still untranslated; and the
+subtitle is composed («Reforma · <dirección>») before it reaches the
+translator, so the activity word stays Spanish in the other two languages. Both
+want a decision about where casing and composition belong, not a `tr` in front
+of them.
+
+Gates: site E2E 840/840 · doc-i18n 13 · pdf 44 · band · docs · docx 124 ·
+sync 30 · simulations 849 · i18n 158/158 en+ca · boundaries · lint ·
+check-types · test.

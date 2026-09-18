@@ -1215,6 +1215,16 @@ window.CANEI_DICT.ca = {
   "⚠ Elija el proveedor al que pertenece la factura":
     "⚠ Trieu el proveïdor a qui pertany la factura",
   "El proveedor necesita un nombre": "El proveïdor necessita un nom",
+  /* The write that did not reach the server, in Catalan (S35/S145). */
+  "esta sesión": "aquesta sessió",
+  "⚠ NO se ha guardado:": "⚠ NO s'ha desat:",
+  "· recargue la página": "· torni a carregar la pàgina",
+  "Esta cuenta no puede guardar en este servidor.":
+    "Aquest compte no pot desar en aquest servidor.",
+  "El servidor está enviando un documento parcial para":
+    "El servidor està enviant un document parcial per a",
+  ". Consulte con un administrador antes de introducir nada.":
+    ". Consulti amb un administrador abans d'introduir res.",
   "⚠ El proveedor necesita un nombre": "⚠ El proveïdor necessita un nom",
   "Proveedor dado de alta": "Proveïdor donat d'alta",
   "Opcionales (aparte)": "Opcionals (a part)",

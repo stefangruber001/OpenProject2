@@ -93,8 +93,9 @@
     return {
       code: h.code,
       // The engine has no project description field; the activity line is the
-      // closest thing it truthfully has.
-      description: h.activityLine || h.code,
+      // closest thing it truthfully has — in the customer's words, never as
+      // the stored code (see ACTIVITY).
+      description: ACTIVITY[h.activityLine] || h.activityLine || h.code,
       site: h.address || "—",
       version: "",
       validityDays: erp._configForRead().quoteValidityDays || 30,
@@ -124,6 +125,34 @@
     atStage: "a certificacion",
     onCompletion: "a la entrega",
     fixedDate: "en fecha fija",
+  };
+  /* SIX TRIGGERS ARE ACCEPTED AND FIVE HAD WORDS. `atProgressPct` was missing
+     from this map, so a progress milestone printed its own key at the
+     customer — «Hito 2 — 30 % · atProgressPct», in the FECHA column too. The
+     engine's list has had six since CON-04 and `_validateContractTerms`
+     checks against it; only the vocabulary was left behind, which is the exact
+     failure its own comment warns about ("any string at all was accepted and
+     the contract printed it raw at the customer").
+     A percentage milestone says WHICH percentage: the number is the whole
+     meaning of that trigger, and it lives on the milestone rather than in
+     this map, so the words are built rather than looked up. */
+  const triggerWords = (i) => {
+    if (!i || !i.trigger) return "";
+    if (i.trigger === "atProgressPct")
+      return i.progressPct != null ? "al " + i.progressPct + " % de avance" : "por avance de obra";
+    return TRIGGER[i.trigger] || dash(i.trigger);
+  };
+  /* What the JOB is, in the customer's language. `projectBlock.description`
+     falls back to the activity line, which is an internal code word — so a
+     real contract went out saying «Ejecución de renovation en C/ …». The
+     Proyectos register has said «Reforma» for these all along; the document
+     now says the same. */
+  const ACTIVITY = {
+    renovation: "Reforma",
+    repairs: "Reparación",
+    damp: "Humedades",
+    commercial: "Comercial",
+    other: "Otros trabajos",
   };
   const GUARANTEE = {
     executionAndFinishes: "de ejecucion y acabados",
@@ -281,8 +310,17 @@
       f.numbers.quote = doc.budgetNumber || "—";
       f.numbers.contract = doc.number;
       f.dates.issued = dmy(doc.date);
+      /* THE DATE THE OPERATOR TYPED. The creation drawer's «Inicio
+         comprometido» writes `initiation.committedStartDate`; this read
+         `duration.plannedStart`, which NOTHING in the engine ever sets. So
+         INICIO printed «—» however carefully that field was filled, and the
+         notes below then read «Plazo de ejecución: — a —». Three sources, in
+         the order a person would trust them: what was committed in the
+         contract, what the plan says, what the job records. */
       f.dates.start = dmy(
-        (doc.duration && doc.duration.plannedStart) || (prj && prj.dates && prj.dates.start),
+        (doc.initiation && doc.initiation.committedStartDate) ||
+          (doc.duration && doc.duration.plannedStart) ||
+          (prj && prj.dates && prj.dates.start),
       );
       f.dates.due = dmy(
         (doc.duration && doc.duration.plannedFinish) || (prj && prj.dates && prj.dates.targetEnd),
@@ -292,12 +330,12 @@
 
       const total = doc.currentCents + Math.round((doc.currentCents * (doc.vatBp || 0)) / 10000);
       f.milestones = doc.installments.map((i, idx) => ({
-        when: i.expectedDate ? dmy(i.expectedDate) : TRIGGER[i.trigger] || dash(i.trigger),
+        when: i.expectedDate ? dmy(i.expectedDate) : triggerWords(i) || dash(i.trigger),
         label:
           "Hito " +
           (idx + 1) +
           (i.pct != null ? " — " + i.pct + " %" : "") +
-          (i.trigger ? " · " + (TRIGGER[i.trigger] || i.trigger) : ""),
+          (i.trigger ? " · " + triggerWords(i) : ""),
         state: stateWord(i.status),
         amount: eur(
           i.amountCents != null ? i.amountCents : Math.round((total * (i.pct || 0)) / 100),

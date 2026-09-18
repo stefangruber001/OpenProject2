@@ -5259,6 +5259,14 @@
         installments: c.installments.map((i, idx) => ({
           idx,
           trigger: i.trigger,
+          /* WHICH percentage of progress — the fact that gives `atProgressPct`
+             its meaning, and the one thing this projection did not pass on. So
+             the document could say no more than "by works progress" for a
+             milestone the contract defines as 50 %, and the vocabulary that
+             was missing on the other side printed the trigger's own key
+             instead. CON-04 validates this number on the way in; the customer's
+             copy is where it is for. */
+          progressPct: i.progressPct != null ? i.progressPct : null,
           pct: i.pct != null ? i.pct : null,
           amountCents: i.amountCents,
           expectedDate: i.expectedDate || null,

@@ -376,7 +376,7 @@
       cells.forEach((cell, i) => {
         const cx = X0 + i * cw;
         if (i) this.rule(cx - 6, this.y - 26, 0.6, C.line, 24);
-        this.text(cx, this.y - 10, 6.5, FONT.sansB, C.muted, cell[0].toUpperCase(), {
+        this.text(cx, this.y - 10, 6.5, FONT.sansB, C.muted, this.o.tr(cell[0]).toUpperCase(), {
           tracking: 0.04,
         });
         this.text(cx, this.y - 22, 9, FONT.serifB, C.ink, cell[1]);
@@ -408,7 +408,9 @@
       facts.forEach((f, i) => {
         const cx = X0 + i * cw;
         if (i) this.rule(cx - 8, this.y - 30, 0.6, C.line, 28);
-        this.text(cx, this.y - 9, 6.5, FONT.sansB, C.muted, f[0].toUpperCase(), { tracking: 0.04 });
+        this.text(cx, this.y - 9, 6.5, FONT.sansB, C.muted, this.o.tr(f[0]).toUpperCase(), {
+          tracking: 0.04,
+        });
         const hero = i === 0;
         let vx = cx;
         if (hero) {
@@ -438,7 +440,7 @@
     d.parties.forEach((p, i) => {
       const x = X0 + i * (cw + 14);
       this.rect(x, this.y - h, cw, h, C.wash);
-      this.text(x + 8, this.y - 13, 6.5, FONT.sansB, C.muted, p.label.toUpperCase(), {
+      this.text(x + 8, this.y - 13, 6.5, FONT.sansB, C.muted, this.o.tr(p.label).toUpperCase(), {
         tracking: 0.04,
       });
       this.text(x + 8, this.y - 25, 10, FONT.serifB, C.ink, p.name);
@@ -452,7 +454,9 @@
     this.need(24);
     const colour = BAND[tone || this.o.doc.audience || "cliente"] || C.blue;
     this.rect(X0, this.y - 15, CONTENT_W, 15, colour);
-    this.text(X0 + 7, this.y - 11, 7.5, FONT.sansB, C.ink, label.toUpperCase(), { tracking: 0.04 });
+    this.text(X0 + 7, this.y - 11, 7.5, FONT.sansB, C.ink, this.o.tr(label).toUpperCase(), {
+      tracking: 0.04,
+    });
     if (note) this.textRight(X1 - 7, this.y - 11, 7, FONT.sans, C.body, note);
     this.y -= 21;
   };
@@ -501,7 +505,17 @@
     this.textRight(c.qty, this.y - 8, 6.5, FONT.sansB, C.muted, "MEDICION", { tracking: 0.04 });
     this.text(c.unit - 22, this.y - 8, 6.5, FONT.sansB, C.muted, "UD.", { tracking: 0.04 });
     this.textRight(c.price, this.y - 8, 6.5, FONT.sansB, C.muted, "PRECIO", { tracking: 0.04 });
-    this.textRight(c.amt, this.y - 8, 6.5, FONT.sansB, C.muted, "IMPORTE", { tracking: 0.04 });
+    this.textRight(
+      c.amt,
+      this.y - 8,
+      6.5,
+      FONT.sansB,
+      C.muted,
+      this.o.tr("Importe").toUpperCase(),
+      {
+        tracking: 0.04,
+      },
+    );
     this.y -= 13;
     this.rule(X0, this.y, CONTENT_W, C.line, 1.2);
     this.y -= 6;
@@ -596,7 +610,9 @@
     const d = this.o.doc;
     if (!d.lines || !d.lines.length) return;
     this.text(X0, this.y - 8, 6.5, FONT.sansB, C.muted, "CONCEPTO", { tracking: 0.04 });
-    this.textRight(X1, this.y - 8, 6.5, FONT.sansB, C.muted, "IMPORTE", { tracking: 0.04 });
+    this.textRight(X1, this.y - 8, 6.5, FONT.sansB, C.muted, this.o.tr("Importe").toUpperCase(), {
+      tracking: 0.04,
+    });
     this.y -= 13;
     this.rule(X0, this.y, CONTENT_W, C.line, 1.2);
     this.y -= 6;
@@ -646,6 +662,20 @@
     this.y -= h + 8;
   };
 
+  /* UPPERCASE IS A STYLE, NOT PART OF THE STRING — and this writer used to
+     make it part of the string. The dictionary is keyed in sentence case
+     («Total contratado» → «Contract total»), so `label.toUpperCase()` handed
+     `tr` something that could never match: every band, every KPI caption and
+     every column heading in every PDF stayed Spanish in Catalan and English.
+     An English contract printed TOTAL CONTRATADO, FECHA, HITO and IMPORTE.
+     The Word writer never had this — it passes `caps: true` as a style and
+     translates the string itself. Each call below now does the same.
+
+     `docType` is NOT among them: the descriptors store it already uppercase
+     («CONTRATO DE OBRA») while the dictionary holds «Contrato de obra», so it
+     needs a decision about where that casing belongs rather than a `tr` in
+     front of it. Recorded in PROGRESS rather than guessed at here. */
+
   /** Terms and legal notes, in two columns when they fit. */
   Doc.prototype.blocks = function () {
     const d = this.o.doc;
@@ -663,14 +693,35 @@
       .concat(d.assumptions && d.assumptions.length ? [["Supuestos", d.assumptions]] : [])
       .concat(d.exclusions && d.exclusions.length ? [["Exclusiones", d.exclusions]] : []);
     for (const [label, rows] of items) {
+      /* TRANSLATE, THEN DECORATE — in that order, and the order is the whole
+         bug. `wrap` does put its text through `tr`, but what it was handed was
+         «- Garantia de 2 anos …»: the bullet had already been glued on, so the
+         string was no longer the dictionary key, nothing matched, and the key
+         itself went onto the paper. The descriptors are written as unaccented
+         ASCII keys on purpose (see erp-doc-i18n.js), so what the customer
+         received read «Garantia de 2 anos sobre los trabajos ejecutados» —
+         and «anos» is not a word to send anybody, let alone on a contract.
+         In Catalan and English the whole block stayed in Spanish.
+
+         Reported from a real contract on 18/09. The HTML sheet and the Word
+         writer both had it right (`this.T(r)`, `this.t(r)`), which is why the
+         preview on screen was correct and only the downloaded PDF was wrong —
+         the one file that leaves the company. `tr` of an already-translated
+         string is a miss and returns it unchanged, so wrap's own call is
+         harmless. */
       const wrapped = [];
-      for (const r of rows) wrapped.push(...this.wrap("- " + r, FONT.sans, 8, CONTENT_W - 20));
+      for (const r of rows)
+        wrapped.push(...this.wrap("- " + this.o.tr(r), FONT.sans, 8, CONTENT_W - 20));
       const h = wrapped.length * 10.5 + 24;
       this.need(h + 6);
       this.rect(X0, this.y - h, CONTENT_W, h, C.white);
       this.rule(X0, this.y - h, CONTENT_W, C.line);
       this.rule(X0, this.y, CONTENT_W, C.line);
-      this.text(X0 + 8, this.y - 13, 6.5, FONT.sansB, C.green, label.toUpperCase(), {
+      /* Same order, same reason: «CONDICIONES DE PAGO» is not a key either,
+         so these headings stayed Spanish in the other two languages. The
+         capitals are a style, which is how the Word writer has always treated
+         them (`caps: true`), not part of the string. */
+      this.text(X0 + 8, this.y - 13, 6.5, FONT.sansB, C.green, this.o.tr(label).toUpperCase(), {
         tracking: 0.04,
       });
       wrapped.forEach((l, i) => this.text(X0 + 8, this.y - 25 - i * 10.5, 8, FONT.sans, C.body, l));
@@ -731,10 +782,18 @@
       labelX = X0 + 86,
       stateX = X1 - 190;
     const head = () => {
-      this.text(whenX, this.y - 8, 6.5, FONT.sansB, C.muted, "FECHA", { tracking: 0.04 });
-      this.text(labelX, this.y - 8, 6.5, FONT.sansB, C.muted, "HITO", { tracking: 0.04 });
-      this.text(stateX, this.y - 8, 6.5, FONT.sansB, C.muted, "ESTADO", { tracking: 0.04 });
-      this.textRight(X1, this.y - 8, 6.5, FONT.sansB, C.muted, "IMPORTE", { tracking: 0.04 });
+      this.text(whenX, this.y - 8, 6.5, FONT.sansB, C.muted, this.o.tr("Fecha").toUpperCase(), {
+        tracking: 0.04,
+      });
+      this.text(labelX, this.y - 8, 6.5, FONT.sansB, C.muted, this.o.tr("Hito").toUpperCase(), {
+        tracking: 0.04,
+      });
+      this.text(stateX, this.y - 8, 6.5, FONT.sansB, C.muted, this.o.tr("Estado").toUpperCase(), {
+        tracking: 0.04,
+      });
+      this.textRight(X1, this.y - 8, 6.5, FONT.sansB, C.muted, this.o.tr("Importe").toUpperCase(), {
+        tracking: 0.04,
+      });
       this.y -= 13;
       this.rule(X0, this.y, CONTENT_W, C.line, 1.2);
       this.y -= 6;
@@ -800,7 +859,7 @@
       this.need(h + 4);
       slice.forEach((r, j) => {
         const x = X0 + j * cw;
-        this.text(x, this.y - 8, 6.5, FONT.sansB, C.muted, String(r[0]).toUpperCase(), {
+        this.text(x, this.y - 8, 6.5, FONT.sansB, C.muted, this.o.tr(String(r[0])).toUpperCase(), {
           tracking: 0.04,
         });
         wrapped[j].forEach((l, k) =>

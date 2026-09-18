@@ -5795,10 +5795,10 @@
            makes the two disagree next. */
         if (ErpStore.isRemote() && ErpStore.isScoped() && !isSiteWorker()) {
           ErpStore.warnNotSaved(
-            "This account cannot save on this server.",
-            "The server is sending a partial document for " +
-              esc(SESSION.email || "this session") +
-              ". Ask an administrator before entering anything.",
+            "Esta cuenta no puede guardar en este servidor.",
+            "El servidor está enviando un documento parcial para " +
+              esc(SESSION.email || "esta sesión") +
+              ". Consulte con un administrador antes de introducir nada.",
           );
         }
         measureTopbar();

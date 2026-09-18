@@ -1305,6 +1305,22 @@ window.CANEI_DICT = {
       "⚠ Choose the supplier this invoice belongs to",
     ],
     ["El proveedor necesita un nombre", "The supplier needs a name"],
+    /* A write that did not reach the server says so, and says it in the
+       reader's language. Added with `mutateNow` and the redacted-document
+       alarm (S35/S145); they went in as five untranslated literals and took
+       the source-literal ceiling from 158 to 163. */
+    ["esta sesión", "this session"],
+    ["⚠ NO se ha guardado:", "⚠ NOT saved:"],
+    ["· recargue la página", "· reload the page"],
+    ["Esta cuenta no puede guardar en este servidor.", "This account cannot save on this server."],
+    [
+      "El servidor está enviando un documento parcial para",
+      "The server is sending a partial document for",
+    ],
+    [
+      ". Consulte con un administrador antes de introducir nada.",
+      ". Ask an administrator before entering anything.",
+    ],
     ["⚠ El proveedor necesita un nombre", "⚠ The supplier needs a name"],
     ["Proveedor dado de alta", "Supplier added"],
     ["Opcionales (aparte)", "Optional items (separate)"],

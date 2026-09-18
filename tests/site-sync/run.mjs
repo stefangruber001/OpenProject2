@@ -704,7 +704,7 @@ async function openWorkspace(hash = "#customers") {
   });
   check(
     "a partial document for an account that is not a site worker says so, loudly",
-    /cannot save/i.test(banner) && /NOT saved/i.test(banner),
+    /no puede guardar/i.test(banner) && /NOT saved/i.test(banner),
     `banner=${JSON.stringify(banner.slice(0, 120))}`,
   );
   check(

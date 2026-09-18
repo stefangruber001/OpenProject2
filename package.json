@@ -29,6 +29,7 @@
     "test:pdf": "node tests/doc-pdf/run.mjs",
     "test:docs": "node tests/doc-print/run.mjs",
     "test:band": "node tests/doc-band/run.mjs",
+    "test:doc-i18n": "node tests/doc-i18n/run.mjs",
     "test:codes": "node tests/list-codes/run.mjs",
     "test:links": "node tests/catalogue-links/run.mjs",
     "test:shell": "node tests/shell-syntax/run.mjs",

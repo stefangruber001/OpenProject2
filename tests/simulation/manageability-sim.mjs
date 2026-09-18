@@ -152,9 +152,24 @@ const item = erp.addCatalogueItem(
 assert(item.type === "", "a new catalogue item has no fabricated Tipo", item.type);
 erp.updateCatalogueItem(item.id, { desc: "Tabique cartón-yeso", defaultPriceCents: 2100 }, "bo");
 assert(erp.state.catalogue[0].defaultPriceCents === 2100, "updateCatalogueItem price");
-throws(
-  () => erp.addCatalogueItem({ code: "IT9", desc: "Sin partida", unit: "ud" }, "bo"),
-  "addCatalogueItem refuses an empty chapter",
+/* INVERTED, NOT DELETED — the honest way to record a reversal.
+   The Package 8 review of 28/08 made the partida mandatory here, because a
+   subpartida with none was unfindable: the register was a tree and the only
+   place an unfiled one could appear was an orphan bucket. The operator's
+   instruction of 17/09 turns the order of creation the other way round — the
+   subpartida exists first, then a partida gathers it, and a partida may gather
+   one another partida already has — which is impossible if a partida is
+   demanded at creation. `addCatalogueItem` says so in its own comment; this
+   assertion did not follow, so CI has been red on `main` since that change
+   landed while every local gate the sessions ran stayed green.
+   The 28/08 concern is answered rather than overruled, and that is what the
+   second half checks: an unfiled subpartida is in the flat register, and
+   `unfiledItems()` is the screen's filter for exactly them. */
+const unfiled = erp.addCatalogueItem({ code: "IT9", desc: "Sin partida", unit: "ud" }, "bo");
+assert(!!unfiled.id, "addCatalogueItem accepts a subpartida with no partida yet", unfiled.id);
+assert(
+  erp.unfiledItems().some((x) => x.id === unfiled.id),
+  "…and it is findable as an unfiled one, which is what made it safe to allow",
 );
 const wp = erp.addWorkPackage(
   { name: "Pack", unit: "u", components: [{ itemId: item.id, qtyPerUnitMilli: 1000 }] },

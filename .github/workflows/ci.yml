@@ -107,6 +107,19 @@ jobs:
         if: always()
         run: pnpm test:band
 
+      # A document printed in a language is printed in THAT language. The
+      # descriptors are unaccented ASCII keys on purpose and the dictionary
+      # holds the three real languages, so anything that reaches paper as
+      # written in the source is a translation that did not happen. It took an
+      # operator sending in their own signed contract to find that the PDF
+      # writer glued its bullet on before translating: «Garantia de 2 anos» went
+      # to a customer, and every heading in every non-Spanish document stayed
+      # Spanish. `test:pdf` renders with a pass-through translator — that is
+      # what it is for — so only a gate that uses the REAL one can see this.
+      - name: Documents speak the language they are printed in
+        if: always()
+        run: pnpm test:doc-i18n
+
       # The código a name proposes. Pinned against the ten line-item codes this
       # system already ships: the generator has to reproduce DEM, ALB, FON … VAR
       # from their names alone, so the proposal stays the convention the company
