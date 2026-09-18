@@ -3740,3 +3740,48 @@ is the same failure shape.
 Gates: boundaries · lint · check-types · test 204 · test:sync 26 · test:codes
 38 · test:links 29 · test:shell 20 · test:band · test:docs · test:pdf 44 ·
 test:docx 124 · site E2E 836/836, on the tree merged with `ac7c834`.
+
+## S35 · What cannot be undone is announced when it is stored (2026-09-18)
+
+**Done, on dev — not released.** «This one has been sent and is still marked as
+borrador. You have to send it twice, or accept it twice, to make this status
+change.» Three questions asked and three answered no: no red banner, no
+conflict, no second tab or device.
+
+- **The message ran ahead of the write.** `mutate()` — the path all 187 writes
+  on this screen take — changes the document in memory, SCHEDULES the save
+  140 ms later, and says «Presupuesto enviado — versión congelada» at once.
+  That message is about memory, not about the register. The save is
+  fire-and-forget and swallows its own failure, so if the page stops living in
+  those 140 ms — on a phone: locking the screen, switching app, Safari
+  suspending the tab — the write never leaves and there is no response for
+  anything to fail on. Hence both halves of the report: nothing warns, and the
+  second attempt works because by then somebody is watching the screen.
+- **The operator's two screenshots are the proof.** Validity jumped from
+  30/06/2026 to 18/10/2026 on the SECOND send, and that date is stamped by
+  `issueVersion` as send + 30 days. The first one had not happened anywhere.
+- **`mutateNow()`** paints first, WAITS for the write, and reports what
+  actually happened: no green confirmation until the server holds it, and a
+  «⚠ NO se ha guardado … recargue la página» when it does not. It is used by
+  the four entries that cannot be taken back — issue a quote, the customer's
+  answer either way, sign a contract, issue an invoice — and by nothing else:
+  `mutate` remains right for editing, where a message per keystroke that waited
+  for a round trip would make the app unusable.
+- **An invoice whose save failed no longer opens its own screen.** The number
+  was consumed in that page and nowhere else; showing it would be showing a
+  document the register does not have. Reloading restores the truth, number
+  included, which is what the warning now says to do.
+- **The gate drives the real send drawer twice** — against a server that
+  refuses and one that accepts — recording EVERY message, because filing the
+  covering draft answers after the save does and overwrites the same element.
+  Backed out, it prints the operator's report word for word:
+  `toasts=["Presupuesto enviado — versión congelada", …]` while the register
+  still held a draft.
+
+**Known and next:** the same hazard exists wherever a consequential write is
+still fire-and-forget; these four were the ones a person performs and then puts
+the phone away. And `site/erp-seed.js` still ships no títulos, so a fresh
+dev-reset, the public demo and the browser suite all open that screen empty.
+
+Gates: site E2E 836/836 · site-sync 30 · site-syntax · boundaries · lint ·
+check-types · test.
