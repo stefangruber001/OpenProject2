@@ -3971,3 +3971,77 @@ Gates: site E2E 853/853 (was 840) · real-life 8/8 · sync 30 · site-syntax ·
 pdf 44 · band · docs · docx 124 · doc-i18n 13 · codes 38 · links 29 · shell 20 ·
 simulations 849 · catalogue-i18n 12 · i18n 158/158 en+ca · boundaries · lint ·
 check-types · test.
+
+## S40 · One way to file a subpartida, and a código that says nothing (2026-09-18)
+
+> «I just want one way to make the relationship in Elementos de presupuesto,
+> and this has to be in the Subpartida section. What I don't want is this
+> asignation to appear on Partidas […] not with the option of editing them, but
+> with the option to click the Subpartidas to redirect to that Subpartida in
+> particular. […] If we are in the budgeting tool, and we create a new
+> Subpartida, this has to be related automatically to the Partida selected in
+> the budgeting tool. […] The Code of Subpartida should be a correlative, not a
+> code that depends on the name. Sorry for this mistake before.»
+
+- **Two panes wrote the same fact from opposite ends.** Saving a partida called
+  `setPartidaItems` with whatever happened to be ticked — every membership of
+  every subpartida in the book, decided by a list scrolled past without reading.
+  The link is now written in one direction only (one `setItemPartidas` in the
+  whole file); the partida drawer is the read-back, each row a way through to
+  the subpartida that owns it, landing on the section where it is changed.
+- **The budgeting tool files what it creates.** «＋ Nueva subpartida» took the
+  partida from the list FILTER, and the filter widens to the whole book when the
+  partida is empty — which is exactly the partida you create a subpartida from.
+  So the one born for a brand-new partida was born unfiled.
+- **The código is a correlative**, decided when the drawer opens and not moving
+  again. A código taken from the name or the first partida is a fact frozen at
+  birth: rename it, re-file it, and it still says what used to be true while
+  budget lines and issued paper hold it.
+- **Two columns left the register** — «Partidas» because it printed an unbounded
+  list where the reader sees a fixed fact, and the pictogram with it. Recorded
+  in `ASSUMPTIONS.md`: the stated reason for the second does not hold, since
+  `ErpPictograms.pick` reads the description and the partida and never the
+  código. The drawing still appears where it earns its width.
+
+## S41 · The whole book on one correlative, and two things the instruction could not see (2026-09-18)
+
+> «Update the codes on DEV, to keep all aligned and the correlative starts from
+> what it has to start, which I understand is 209, right?»
+
+Yes: 208 entries become `SUB-0001`…`SUB-0208`, so the next minted is
+`SUB-0209` — asserted in the gate rather than agreed with.
+
+**Argued against, then asked for.** A código is printed on quotes that have left
+the company. The operator weighed that and chose one convention over two. So
+migration 25 renumbers the catalogue and the lines of **editable** versions, and
+leaves an **issued** version exactly as it was sent: issuing is freezing in this
+engine, and alignment is not a reason to turn a paper the customer is holding
+into one they never received. That breaks the ladder's own «nothing renamed»
+promise, so the exemption is _declared_ — `INTENTIONAL_REWRITES`, one path,
+`catalogue[].code` — rather than the checker weakened.
+
+**Neither of the two real hazards was the renumbering itself.**
+
+1. **The price book would have stopped speaking English and Catalan.**
+   `erp-catalogue-i18n.js` files all 208 English/Catalan descriptions under the
+   _código_, so rewriting it orphaned every one — no error, no gap in any
+   dictionary, just a lookup that stopped matching, on a product whose mandate is
+   three languages. Every entry now carries `packCode`, which is what the código
+   was quietly doing on the side: an identity for a shipped row, never shown,
+   never renumbered. Caught by the check that drives the real screen in all three.
+2. **The printed quote would have lost its colours.** The PDF derived each
+   line's trade from the code prefix, so every plate on a quote would have come
+   out the same tint — and the tint _is_ the trade. It now asks for the real
+   partida, resolved once inside `docFor` so that none of the seven `refs` bags
+   (nor the eighth, still to be written) can forget it.
+
+Also: the código column 100 → 116px, because `SUB-0002` is a character longer
+than `ALI-102` and was being clipped; the catalogue pack keyed on description as
+well as código, so it cannot reinstall all 208 over a renumbered book; and
+`seedWorkspace` renumbers too, since a fresh state never climbs the ladder and
+tenant #1 would otherwise have been the only one left on the old convention.
+
+Gates: site E2E 863/863 · migrations 135/135 (was 124) · real-life 8/8 · sync 30 ·
+pdf 44 · band · docx 124 · doc-i18n 13 · codes 38 · links 29 · pictograms 42 ·
+simulations 849 · catalogue-i18n 12 · i18n 158/158 en+ca · boundaries · lint ·
+check-types · test.
