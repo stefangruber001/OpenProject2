@@ -298,8 +298,8 @@ window.CANEI_DICT.ca = {
     "S'arxiven des de la subpartida. Premi'n una per obrir-la.",
   "Ninguna subpartida está archivada en esta partida. Se archivan desde la subpartida, en la sección Subpartidas.":
     "Cap subpartida no està arxivada en aquesta partida. S'arxiven des de la subpartida, a la secció Subpartides.",
-  "Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan.":
-    "Es deriva del nom i no es tecleja; un cop desat, els registres el conserven.",
+  "Se genera solo y no se teclea; una vez guardado, los registros lo conservan.":
+    "Es genera sol i no es tecleja; un cop desat, els registres el conserven.",
   "✎ Modificar título": "✎ Modificar títol",
   "Eliminar título": "Eliminar títol",
   "Buscar título…": "Cercar títol…",

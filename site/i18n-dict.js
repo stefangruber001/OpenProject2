@@ -106,8 +106,11 @@ window.CANEI_DICT = {
       "No sub-line item is filed under this line item. They are filed from the sub-line item, in the Sub-line items section.",
     ],
     [
-      "Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan.",
-      "Derived from the name and not typed; once saved, records keep it.",
+      /* Reworded when the subpartida's código became a correlative: it is no
+         longer derived from the name, so saying so on the tooltip of all three
+         drawers had stopped being true for one of them. */
+      "Se genera solo y no se teclea; una vez guardado, los registros lo conservan.",
+      "Generated for you and not typed; once saved, records keep it.",
     ],
     ["✎ Modificar título", "✎ Edit section"],
     ["Eliminar título", "Delete section"],
