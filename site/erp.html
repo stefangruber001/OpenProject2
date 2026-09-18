@@ -15801,12 +15801,34 @@
           if (open) document.addEventListener("click", closeMenu, { once: true });
         };
         menu.onclick = (ev) => ev.stopPropagation();
+        /* WHAT A COLUMN EXPORTS WHEN IT ONLY KNOWS HOW TO DRAW ITSELF.
+           This read `c.get` and nothing else, so a column defined with `html`
+           alone — which is most of the computed ones, because they render a
+           pill, a bold total or a two-part sentence — exported an EMPTY
+           STRING. The operator sent the quotes register out on 18/09 and every
+           Versión, Base, Total and Pendientes cell in all twenty rows was
+           blank, in the CSV and in the spreadsheet alike, with nothing saying
+           so. The columns a person exports a register FOR are exactly the
+           computed ones.
+
+           Three sources, most specific first: `sheet` when a column states
+           what it means outside a screen, `get` when its value is already a
+           value, and otherwise the drawn cell with its markup taken off. The
+           fallback is what stops this recurring: a column added tomorrow with
+           only an `html` exports its text instead of silently exporting
+           nothing. */
+        const cellText = (c, r) => {
+          if (c.sheet) return c.sheet(r);
+          if (c.get) return String(c.get(r) ?? "");
+          if (!c.html) return "";
+          const el = document.createElement("div");
+          el.innerHTML = c.html(r);
+          // Collapsed, because the cell's markup is written across several
+          // lines and a CSV field carrying newlines is a broken CSV.
+          return (el.textContent || "").replace(/\s+/g, " ").trim();
+        };
         const sheet = () =>
-          [cols.map((c) => c.label)].concat(
-            rows.map((r) =>
-              cols.map((c) => (c.sheet ? c.sheet(r) : String((c.get ? c.get(r) : "") ?? ""))),
-            ),
-          );
+          [cols.map((c) => c.label)].concat(rows.map((r) => cols.map((c) => cellText(c, r))));
         const exportFile = cfg.exportFile || cfg.id,
           exportSheet = cfg.exportSheetName || plur;
         $("#" + ids.expXlsx).onclick = () => {
@@ -16735,11 +16757,19 @@
             },
             {
               label: "Base",
+              /* `sheet`, not `get`: a spreadsheet wants the NUMBER — euros, so
+                 it sums and sorts — while the screen wants «1.925 €». The
+                 fallback above would have exported the drawn text, which is
+                 correct and useless for arithmetic. */
+              sheet: (b) =>
+                erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId).baseCents / 100,
               html: (b) =>
                 eur0(erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId).baseCents),
             },
             {
               label: "Total",
+              sheet: (b) =>
+                erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId).grandCents / 100,
               html: (b) =>
                 `<b>${eur0(erp.budgetTotals(b.id, b.acceptedVersionId || b.currentVersionId).grandCents)}</b>`,
             },

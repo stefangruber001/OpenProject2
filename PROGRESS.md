@@ -3785,3 +3785,42 @@ dev-reset, the public demo and the browser suite all open that screen empty.
 
 Gates: site E2E 836/836 · site-sync 30 · site-syntax · boundaries · lint ·
 check-types · test.
+
+## S36 · A register exports what it shows (2026-09-18)
+
+**Done, on dev — not released.** The operator sent the quotes register out of
+the app and attached the file: twenty rows, and every **Versión, Base, Total
+and Pendientes** cell empty. In the CSV and in the spreadsheet alike, with
+nothing saying so.
+
+- **The exporter asked each column for its VALUE.** `cols.map((c) => c.sheet ?
+c.sheet(r) : String((c.get ? c.get(r) : "") ?? ""))`. Those four columns
+  define only `html`: they draw a bold total, a pill, «v1.0 · 1 versión». So
+  the columns a person exports a register FOR were exactly the ones that came
+  out blank — and `sheet()` returned its empty strings perfectly happily, which
+  is why nothing in the page could notice.
+- **The fallback is the part that cannot drift.** A column with no `sheet` and
+  no `get` now exports its drawn cell with the markup taken off, so one added
+  tomorrow with only an `html` exports its text rather than silently exporting
+  nothing. `sheet` and `get` still win, in that order, where a column knows
+  better.
+- **Money states its number.** `Base` and `Total` export cents/100 rather than
+  «1.925 €», so the spreadsheet adds them up instead of receiving text.
+- **The gate drives the real button and reads the real file** (`--only
+export`), because this failure was invisible from inside the page. Backed
+  out, it prints the operator's own file: `PRE-2026-0005/Versión ·
+PRE-2026-0005/Pendientes · …`. With it: no blank cell in 19 rows, money
+  numeric, and the file named `quotes-nuevos-2026-09-18.csv` — the same name as
+  the one that was sent in.
+
+**Known and next, from reading a rendered contract back:** three things the
+contract document still gets wrong. A progress milestone prints its internal
+key (`atProgressPct`) because the label map in `erp-facts.js` has five triggers
+and the engine accepts six; the activity line prints raw («Ejecucion de
+renovation en …») where the presupuesto deliberately avoids it; and «Inicio
+comprometido» never reaches the paper, because the drawer writes
+`initiation.committedStartDate` and the document reads `duration.plannedStart`,
+which nothing sets.
+
+Gates: site E2E 840/840 · site-sync 30 · site-syntax · boundaries · lint ·
+check-types · test.

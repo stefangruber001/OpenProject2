@@ -95,6 +95,7 @@ async function main() {
     testBankAndCash,
     testContract,
     testSmallFixes,
+    testRegisterExport,
     testChangeApprovalEvidence,
     testContractCreation,
     testContractObraLink,
@@ -9407,6 +9408,110 @@ async function testInvoiceGenerator(browser, base) {
    look it, [hidden] that means it, the drawer's pinned action bar, the
    builder's announced chapter filter, and the moneyed-line-with-no-words
    block. Each check reads the real screen, not the code. */
+/**
+ * WHAT A REGISTER EXPORTS IS WHAT IT SHOWS.
+ *
+ * Reported on 18/09 with the file attached: the operator sent out the quotes
+ * register and every «Versión», «Base», «Total» and «Pendientes» cell in all
+ * twenty rows was empty — in the CSV and in the spreadsheet alike, with nothing
+ * saying so. The exporter read each column's `get`, and those four columns
+ * define only `html`: they draw a bold total, a pill, a two-part sentence. So
+ * the columns a person exports a register FOR were exactly the ones that came
+ * out blank.
+ *
+ * The export now falls back to the drawn cell with its markup taken off, and
+ * the two money columns state their number outright. This drives the real
+ * button and reads the real file, because the failure was invisible from
+ * inside the page: `sheet()` returned its empty strings perfectly happily.
+ */
+async function testRegisterExport(browser, base) {
+  const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  try {
+    await pg.goto(`${base}/erp.html#quotes`, { waitUntil: "networkidle" });
+    await pg.waitForTimeout(2500);
+    await pg.evaluate(() => (location.hash = "quotes"));
+    await pg.waitForTimeout(900);
+
+    const dl = pg.waitForEvent("download", { timeout: 20000 }).catch(() => null);
+    await pg.click("#bqExp");
+    await pg.waitForTimeout(250);
+    await pg.click("#bqExpCsv");
+    const file = await dl;
+    if (!file) {
+      bad("export: the quotes register produces a CSV", "(no download)");
+      return;
+    }
+    ok(`export: the quotes register produces a CSV (${file.suggestedFilename()})`);
+
+    // Read the way the master-data export assertion already does it.
+    const nfs = await import("node:fs");
+    const text = nfs.readFileSync(await file.path(), "utf8");
+    /* A real CSV split, not a regex: a field may be quoted, may hold a comma,
+       and may carry a doubled quote. Getting this wrong reads one column as
+       another and blames the product for the test's own bug — which is
+       exactly what the first version of this did. */
+    const fields = (line) => {
+      const out = [];
+      let cur = "",
+        quoted = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (quoted) {
+          if (ch === '"' && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else if (ch === '"') quoted = false;
+          else cur += ch;
+        } else if (ch === '"') quoted = true;
+        else if (ch === ",") {
+          out.push(cur);
+          cur = "";
+        } else cur += ch;
+      }
+      out.push(cur);
+      return out;
+    };
+    const lines = text.trim().split(/\r?\n/);
+    const head = fields(lines[0]);
+    const rows = lines.slice(1).map(fields);
+    const cell = (row, label) => (row[head.indexOf(label)] ?? "").trim();
+
+    const wanted = [
+      "Número",
+      "Cliente",
+      "Versión",
+      "Base",
+      "Total",
+      "Pendientes",
+      "Validez",
+      "Estado",
+    ];
+    const missing = wanted.filter((w) => !head.includes(w));
+    if (!missing.length) ok(`export: every column of the register is in the file (${head.length})`);
+    else bad("export: the file carries every column", `missing ${missing.join(", ")}`);
+
+    // The whole of the bug, in one assertion: no row may carry an empty cell
+    // in a column the screen fills.
+    const blanks = [];
+    for (const r of rows)
+      for (const label of wanted)
+        if (!cell(r, label)) blanks.push(`${cell(r, "Número") || "?"}/${label}`);
+    if (!blanks.length) ok(`export: no blank cell in ${rows.length} exported rows`);
+    else bad("export: a column the screen fills exported blank", blanks.slice(0, 6).join(" · "));
+
+    // …and the money is a NUMBER, so the spreadsheet can add it up.
+    const bad9 = rows.filter((r) => !/^-?[\d.]+([.,]\d+)?$/.test(cell(r, "Total")));
+    if (!bad9.length) ok("export: Base and Total are numbers, not drawn text");
+    else
+      bad(
+        "export: money exports as a number",
+        `e.g. ${cell(bad9[0], "Número")} → ${cell(bad9[0], "Total")}`,
+      );
+  } finally {
+    await pg.close();
+  }
+}
+
 async function testSmallFixes(browser, base) {
   const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } });
   try {
