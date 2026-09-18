@@ -96,6 +96,15 @@ window.CANEI_DICT = {
     ["＋ Nuevo título", "＋ New section"],
     ["＋ Nueva partida", "＋ New line item"],
     ["Se genera solo a partir del nombre.", "Generated for you from the name."],
+    ["Correlativo automático.", "Sequential, generated for you."],
+    [
+      "Se archivan desde la subpartida. Pulse una para abrirla.",
+      "They are filed from the sub-line item. Tap one to open it.",
+    ],
+    [
+      "Ninguna subpartida está archivada en esta partida. Se archivan desde la subpartida, en la sección Subpartidas.",
+      "No sub-line item is filed under this line item. They are filed from the sub-line item, in the Sub-line items section.",
+    ],
     [
       "Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan.",
       "Derived from the name and not typed; once saved, records keep it.",

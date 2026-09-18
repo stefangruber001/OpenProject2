@@ -3920,6 +3920,28 @@
         font-size: 12.5px;
         color: var(--body);
       }
+      /* A row that is a way through to another record: reads as a line of the
+         list it sits in, behaves as the link it is. Used by the partida
+         drawer, which shows its subpartidas and no longer edits them. */
+      .linkrow {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border: 0;
+        background: none;
+        padding: 5px 4px;
+        font: inherit;
+        font-size: 13px;
+        color: var(--greenDeep);
+        cursor: pointer;
+        border-bottom: 1px solid var(--hair);
+      }
+      .linkrow:last-child {
+        border-bottom: 0;
+      }
+      .linkrow:hover {
+        background: var(--greenSoft);
+      }
       .provrow .ud,
       .provrow .gdates {
         color: var(--muted);
@@ -11917,12 +11939,42 @@
        * text and the uniqueness guard on save is unchanged, because a company
        * that already numbers its own way must be able to keep doing so.
        */
-      function nextCatalogueCode(chapterCode) {
-        if (!chapterCode) return "";
+      /**
+       * The next subpartida código: a CORRELATIVE, and nothing else.
+       *
+       * (Operator, 18 Sep: «The Code of Subpartida should be a correlative, not
+       * a code that depends on the name. Sorry for this mistake before. The
+       * correlative should be automatic.» — which reverses their own request
+       * of 27 Aug for a code built from the partida's prefix.)
+       *
+       * WHY THE NAME WAS THE WRONG SOURCE, now that both have been lived with:
+       * a code taken from the description or from the first partida is a FACT
+       * ABOUT THE SUBPARTIDA FROZEN AT BIRTH. Rename it, re-file it under
+       * another partida, and the code keeps saying what used to be true — while
+       * budget lines and issued paper hold it and cannot be rewritten. A
+       * correlative claims nothing, so nothing about it can go stale.
+       *
+       * ONLY NEW ONES. The two hundred and eight códigos already in the book
+       * (AIS-101, ALB-010…) keep theirs: they are printed on quotes that have
+       * left the company and stored on lines of running jobs, and renumbering
+       * them would rewrite a key the customer is holding. So the counter starts
+       * past whatever correlative already exists and steps over anything taken,
+       * and the book carries two conventions for as long as the old records
+       * live — which is the honest cost of not rewriting history. See
+       * ASSUMPTIONS.md.
+       */
+      const CATALOGUE_CODE_PREFIX = "SUB";
+      function nextCatalogueCode() {
         const taken = new Set(erp.state.catalogue.map((x) => String(x.code || "").toUpperCase()));
-        const prefix = String(chapterCode).toUpperCase();
-        for (let n = 101; n < 1000; n++) {
-          const candidate = `${prefix}-${n}`;
+        let n = 0;
+        for (const code of taken) {
+          const m = new RegExp("^" + CATALOGUE_CODE_PREFIX + "-(\\d+)$").exec(code);
+          if (m) n = Math.max(n, Number(m[1]) || 0);
+        }
+        // The guard stays even though the counter is the maximum already taken:
+        // a code typed in before this rule existed could sit on the number.
+        for (let i = n + 1; i < n + 10000; i++) {
+          const candidate = CATALOGUE_CODE_PREFIX + "-" + String(i).padStart(4, "0");
           if (!taken.has(candidate)) return candidate;
         }
         return "";
@@ -11951,6 +12003,20 @@
           .filter((b) => b.checked)
           .map((b) => b.value);
 
+      /* A row that reads as a list line and behaves as a way through to the
+         record it names. Tags as constants, never interpolated around code:
+         see the note on `codeChecks`. */
+      const LINK_OPEN = '<button type="button" class="linkrow" data-goitem="';
+      const LINK_MID = '"><span translate="no">';
+      const LINK_SEP = "</span> · ";
+      const LINK_CLOSE = "</button>";
+      const linkRow = (id, code, text) =>
+        LINK_OPEN + esc(id) + LINK_MID + esc(code) + LINK_SEP + esc(text) + LINK_CLOSE;
+      const PARTIDA_EMPTY =
+        '<div style="font-size:12.5px;color:var(--muted);padding:4px 0">' +
+        "Ninguna subpartida está archivada en esta partida. Se archivan desde la subpartida, en la sección Subpartidas." +
+        "</div>";
+
       /**
        * The código field, for all three drawers.
        *
@@ -11965,12 +12031,12 @@
        * code was already locked — records store it — so this makes creating one
        * behave the way editing one always has.
        */
-      const lockedCodeField = (id, value, placeholder) =>
+      const lockedCodeField = (id, value, placeholder, hint) =>
         `<div class="field"><label>Código</label>
            <input id="${id}" value="${esc(value || "")}" placeholder="${esc(placeholder)}" readonly
-             title="Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan."
+             title="Se genera solo y no se teclea; una vez guardado, los registros lo conservan."
              style="background:var(--wash,#f2f4ef);cursor:default">
-           <div style="font-size:12px;color:var(--muted);padding:3px 0">Se genera solo a partir del nombre.</div></div>`;
+           <div style="font-size:12px;color:var(--muted);padding:3px 0">${hint || "Se genera solo a partir del nombre."}</div></div>`;
 
       /* Propose the código while the nombre is being typed.
 
@@ -12097,41 +12163,36 @@
         const offBtn = c
           ? `<button class="btn" id="pa_off">${off ? "Reactivar" : "Retirar del catálogo"}</button>`
           : "";
-        /* THE SUBPARTIDAS THIS PARTIDA GATHERS — the operator's own sequence:
-           create the subpartida, then come here and tick it. One may be ticked
-           in several partidas, which is the whole of v23.
+        /* THE SUBPARTIDAS THIS PARTIDA GATHERS — SHOWN, NOT EDITED.
+           (Operator, 18 Sep: «I just want one way to make the relationship […]
+           and this has to be in the Subpartida section. What I don't want is
+           this asignation to appear on Partidas […] not with the option of
+           editing them, but with the option to click the Subpartidas to
+           redirect to that Subpartida in particular.»)
 
-           Ticked ones are listed FIRST and in their stored order, the rest
-           after by code. On a catalogue of two hundred that is the difference
-           between a panel you can check at a glance and one where what you
-           just added is forty rows down. */
+           TWO PLACES THAT WROTE THE SAME LINK IS ONE PLACE TOO MANY. The tick
+           list that used to live here and the one in the subpartida drawer
+           stored the identical fact from opposite ends, so «which screen did I
+           file it on» became a question with no answer visible from either —
+           and the reverse pass silently rewrote memberships the operator had
+           not touched: saving a partida called `setPartidaItems` with whatever
+           happened to be ticked, which is every membership of every subpartida
+           in the catalogue, decided by a panel scrolled past without reading.
+
+           So the relationship is written in ONE direction, from the subpartida
+           that has it, and this list is the read-back: only what is actually
+           filed here, each row a way through to the subpartida that says so. */
         const held = c ? erp.partidaItems(c.code) : [];
         const catalogue = erp.state.catalogue.filter((i) => i.active !== false);
         const byId = (id) => catalogue.find((i) => i.id === id);
-        const ordered = held
-          .map(byId)
-          .filter(Boolean)
-          .concat(
-            catalogue
-              .filter((i) => !held.includes(i.id))
-              .sort((a, b) => String(a.code).localeCompare(String(b.code))),
-          );
-        /* Keyed by ID, not by code: a subpartida's code is editable and its id
-           is not, and `setPartidaItems` stores ids. `codeChecks` cannot be
-           reused because it reads `.code`/`.es`; the shape is the same. */
-        const itemBoxes = ordered.length
-          ? ordered
-              .map((i) => {
-                const on = held.includes(i.id) ? " checked" : "";
-                return (
-                  '<label style="display:flex;gap:6px;align-items:center;padding:3px 0;font-size:13px">' +
-                  `<input type="checkbox" value="${esc(i.id)}"${on}>` +
-                  esc(i.code + " · " + catalogueDesc(i)) +
-                  "</label>"
-                );
-              })
-              .join("")
-          : '<div style="font-size:12.5px;color:var(--muted);padding:4px 0">Todavía no hay subpartidas. Créalas en la sección Subpartidas y vuelve a archivarlas aquí.</div>';
+        const ordered = held.map(byId).filter(Boolean);
+        /* Built by a helper, with every tag its own constant — the same rule
+           `codeChecks` above follows, and for the same reason: a literal that
+           ends up sitting between a greater-than and a less-than is read by the
+           source audit as a sentence nobody translated. */
+        const itemLinks = ordered.length
+          ? ordered.map((i) => linkRow(i.id, i.code, catalogueDesc(i))).join("")
+          : PARTIDA_EMPTY;
 
         /* Position, because the order of this list is the order the budget's
            «Nueva partida» chooser offers — a real consequence, not decoration.
@@ -12152,20 +12213,33 @@
          <div class="field"><label>Nom (CA)</label><input id="pa_ca" value="${esc(c ? c.ca || "" : "")}"></div>
          ${posRow}
          <div class="field full"><label>Subpartidas de esta partida</label>
-           <div id="pa_items" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${itemBoxes}</div></div>
+           <div id="pa_items" style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px">${itemLinks}</div>
+           <div style="font-size:12px;color:var(--muted);padding:3px 0">Se archivan desde la subpartida. Pulse una para abrirla.</div></div>
          <div class="field full row" style="gap:8px;margin-top:4px">
            <button class="btn primary" id="pa_save">Guardar</button><span style="flex:1"></span>${delBtn}${offBtn}</div>
         </div>`;
         if (!c) autoCode("itemChapters", $("#pa_code"), $("#pa_es"));
+        /* Through to the subpartida, and to the section that owns the link:
+           closing that drawer has to land on the register where it is edited,
+           not back on the partida that cannot edit it. */
+        $("#pa_items")
+          .querySelectorAll("[data-goitem]")
+          .forEach((b) => {
+            b.onclick = () => {
+              const goto = b.dataset.goitem;
+              closeDrawer();
+              biSection = "sub";
+              render();
+              catalogueItemDrawer(goto);
+            };
+          });
         $("#pa_save").onclick = () => {
           const es = $("#pa_es").value.trim();
           const ca = $("#pa_ca").value.trim();
-          const items = checksOf($("#pa_items"));
           const key = c ? c.code : codeToSave("itemChapters", $("#pa_code"), es);
           try {
             if (c) erp.updateListEntry("itemChapters", c.code, { es, ca }, "backoffice");
             else erp.addListEntry("itemChapters", { code: key, es, ca }, "backoffice");
-            erp.setPartidaItems(key, items, "backoffice");
             if (!c && opts && typeof opts.onCreated === "function")
               opts.onCreated(erp.listAll("itemChapters").find((x) => x.code === key));
             persist();
@@ -12270,7 +12344,7 @@
            under Precio, which is one of the two numbers that make it. */
         db.innerHTML = `<div class="fgrid">
          <div class="field full"><label>Descripción *</label><input id="ci_desc" value="${val("desc", "")}"></div>
-         ${lockedCodeField("ci_code", it ? it.code : "", "FON-101")}
+         ${lockedCodeField("ci_code", it ? it.code : "", "SUB-0001", "Correlativo automático.")}
          <div class="field"><label>Unidad</label><select id="ci_unit">${listOptionsUnits(it ? it.unit : "ud")}</select></div>
          <div class="field full"><label>Cómo se le dice al cliente <span style="font-weight:400;color:var(--muted)">(si difiere)</span></label><input id="ci_cw" value="${val("customerWording", "")}"></div>
          <div class="field"><label>Coste de referencia (€)</label><input id="ci_cost" type="number" min="0" step="0.01" value="${it ? it.defaultCostCents / 100 : ""}"></div>
@@ -12337,49 +12411,20 @@
         });
         paintMargin();
 
-        /* Proposing the code (Package 2 · item 6). Only when CREATING — an
-           existing subpartida's code is disabled, because budget lines store it.
-           The proposal follows the chosen partida and stops the moment the operator
-           types anything of their own: `mine` latches on their first keystroke and
-           never unlatches, so their code is never overwritten by a later change of
-           partida. Clearing the field hands control back. */
-        /* ONE function for the proposal, reached from two places: the field as
-           it is typed into, and the save that falls back to it. They were two
+        /* ONE function for the proposal, reached from two places: the field
+           the operator reads, and the save that falls back to it. They were two
            expressions and the save path had none at all — so a subpartida whose
            code had been generated but not re-read was refused with «El código es
-           obligatorio», which is the complaint that produced this. */
-        const proposeItemCode = () => {
-          const chapsEl = $("#ci_chaps"),
-            descEl = $("#ci_desc");
-          const picked = chapsEl ? checksOf(chapsEl) : [];
-          const stem = picked.length
-            ? picked[0]
-            : ErpEngine.normaliseCode(
-                erp.suggestListCode("itemChapters", descEl ? descEl.value : ""),
-              );
-          return stem ? nextCatalogueCode(stem) : "";
-        };
-        if (!it) {
-          const codeEl = $("#ci_code"),
-            descEl = $("#ci_desc"),
-            chapsEl = $("#ci_chaps");
-          if (codeEl) {
-            /* The prefix comes from the FIRST partida ticked, and from the
-               DESCRIPTION when none is — which, since v23, is the ordinary
-               case: the subpartida is created before any partida exists to
-               file it under. Both produce PREFIX-101, so the book reads the
-               same either way, and re-filing it later never rewrites a code
-               that budget lines have already stored.
+           obligatorio», which is the complaint that produced this.
 
-               No "did they type their own" latch any more: the field is
-               read-only, so there is nothing of theirs to protect. */
-            const fill = () => {
-              codeEl.value = proposeItemCode();
-            };
-            if (descEl) descEl.addEventListener("input", fill);
-            if (chapsEl) chapsEl.addEventListener("change", fill);
-            fill();
-          }
+           IT TAKES NOTHING NOW. It used to read the description and the ticked
+           partidas, and be re-run on every keystroke and every tick — so the
+           código moved under the operator's eyes while they typed. A correlative
+           is decided the moment the drawer opens and does not change again. */
+        const proposeItemCode = () => nextCatalogueCode();
+        if (!it) {
+          const codeEl = $("#ci_code");
+          if (codeEl) codeEl.value = proposeItemCode();
         }
 
         $("#ci_save").onclick = () =>
@@ -12410,12 +12455,15 @@
               let target = it;
               if (it) erp.updateCatalogueItem(it.id, patch, "backoffice");
               else {
-                /* Derived again, not read back: `nextCatalogueCode` walks past
-                   every código already taken under that prefix, so the answer
-                   is free BY CONSTRUCTION. The duplicate check below is kept as
-                   an invariant guard and should now be unreachable — if it ever
-                   fires, the generator is wrong and the operator must not be
-                   the one to find out by being blocked. */
+                /* Derived again, not read back: `nextCatalogueCode` starts past
+                   the highest correlative in the book and steps over anything
+                   taken, so the answer is free BY CONSTRUCTION. Re-deriving
+                   rather than reading the field also closes the window in which
+                   two drawers open at once would have been shown the same
+                   number. The duplicate check below is kept as an invariant
+                   guard and should be unreachable — if it ever fires the
+                   generator is wrong, and the operator must not be the one to
+                   find out by being blocked out of a field they cannot edit. */
                 const code = proposeItemCode();
                 if (!code) throw new Error("El código es obligatorio");
                 if (erp.state.catalogue.some((x) => x.code === code))
@@ -12596,7 +12644,20 @@
         $("#cp_new").onclick = () => {
           close();
           catalogueItemDrawer(null, {
-            chapter,
+            /* THE PARTIDA BEING QUOTED, not the list filter — `o.chapter`, not
+               `chapter`. (Operator, 18 Sep: «If we are in the budgeting tool,
+               and we create a new Subpartida, this has to be related
+               automatically to the Partida selected in the budgeting tool.»)
+
+               They are the same value right up to the moment it matters. The
+               filter starts at `o.chapter` only when that partida ALREADY HOLDS
+               something — an empty list looks broken, so it widens to the whole
+               book instead — and an empty partida is exactly the one you open
+               this drawer from. So the subpartida created for a brand-new
+               partida was the one that arrived filed under nothing, which is
+               the state that makes it unfindable again. Widening the filter by
+               hand to go looking did the same thing for the same reason. */
+            chapter: o.chapter || chapter,
             // Straight onto the line, rather than leaving the operator to
             // reopen the picker and find what they just made.
             onCreated: (made) => onPick(multi ? [made] : made),
@@ -18169,7 +18230,17 @@
         other: "otros",
       };
       /**
-       * The line drawing for a price-book entry or a quote line.
+       * The line drawing for a quote line, as a coloured plate carrying its own
+       * code — the version an operator can CHECK. A 16px monochrome mark can
+       * only be verified by somebody who knows every shape; a tinted plate that
+       * says "DEM-101" under it can be verified by reading it.
+       *
+       * THE ONLY RENDERER LEFT, since 18 September. There was a bare `pict()`
+       * beside this one drawing the 18px mark for the price-book register's
+       * icon column; the operator removed that column, it had no other caller,
+       * and a function nothing calls is a claim about the product that is no
+       * longer true. The plate stays, on the builder line and on the printed
+       * quote — the two surfaces the drawings were asked for.
        *
        * DERIVED, NOT STORED — no migration, no new field, nothing added to the
        * state blob that re-serialises on every keystroke. The drawing follows
@@ -18184,16 +18255,6 @@
        * Degrades to nothing at all if the module failed to load: a quote that
        * prices the work correctly and shows no pictures is a worse-looking
        * quote, not a wrong one.
-       */
-      function pict(item, size) {
-        if (typeof ErpPictograms === "undefined" || !item) return "";
-        return ErpPictograms.svg(ErpPictograms.pick(item), size || 18);
-      }
-      /**
-       * The drawing as a coloured plate carrying its own code — the version an
-       * operator can CHECK. A 16px monochrome mark can only be verified by
-       * somebody who knows every shape; a tinted plate that says "DEM-101"
-       * under it can be verified by reading it.
        *
        * The chapter comes from the catalogue entry the line was taken from,
        * because that is where the trade lives; a line typed by hand has no
@@ -23722,7 +23783,6 @@
              source audit reads as an untranslated sentence, and this file has
              a recorded history of exactly that. */
           const RETIRED = '<span class="pill y">retirada</span>';
-          const NONE = '<span style="color:var(--muted)">—</span>';
           const NO_PRICE = '<span class="pill y">sin precio</span>';
           /* The margin, computed and never stored: the catalogue keeps a cost
              and a price, and a third stored number would be a fourth thing to
@@ -23773,14 +23833,27 @@
               .filter((i) => i.active !== false)
               .slice()
               .sort((a, b) => String(a.code).localeCompare(String(b.code)));
-            // The partidas a subpartida is in, as words — the column that
-            // replaces the tree, and the reason an unfiled one is visible
-            // rather than bucketed.
-            const partidasOf = (i) =>
-              erp
-                .itemPartidas(i.id)
-                .map((c) => chapterLabel(c))
-                .join(", ");
+            /* TWO COLUMNS LEFT THIS REGISTER on 18 Sep, both on the operator's
+               instruction, and the reasons are different.
+
+               «Partidas» — «it doesn't make sense to have the column given that
+               can be many Partidas». It printed every partida a subpartida is
+               filed in, comma-separated, and on a book where most are filed in
+               one it read as a fixed fact about the row while being an
+               unbounded list: the same long trade name repeated down eleven
+               rows, each wrapping to two lines, for a column nobody sorts by.
+               Where a subpartida is filed is a property OF the subpartida, and
+               its drawer is where it is both shown and set — one place, which
+               is the whole of the 18 Sep change.
+
+               The pictogram — taken out with it. Worth recording that the
+               operator's stated reason does not hold: `ErpPictograms.pick`
+               reads the DESCRIPTION and the partida, never the código, so a
+               correlative código does not strip the drawing of its source. What
+               does hold is what the column was for — a glanceable mark beside a
+               row — and the drawing still does that job where it earns its
+               width: on the budget line and on the printed quote, which is
+               where `pict` and `plate` are still called from. */
             renderMasterList(host, {
               id: "bi-sub",
               defSize: 25,
@@ -23808,14 +23881,8 @@
                 (i.brand || "").toLowerCase().includes(q) ||
                 (i.model || "").toLowerCase().includes(q),
               columns: [
-                { label: "", get: () => "", html: (i) => pict(i) },
                 { label: "Código", primary: true, get: (i) => i.code },
                 { label: "Descripción", primary: true, get: (i) => catalogueDesc(i) },
-                {
-                  label: "Partidas",
-                  get: (i) => partidasOf(i),
-                  html: (i) => esc(partidasOf(i)) || NONE,
-                },
                 { label: "Ud", get: (i) => i.unit },
                 { label: "Tipo", get: (i) => TYPE[i.type] || i.type },
                 { label: "Marca", get: (i) => i.brand || "", html: (i) => esc(i.brand || "—") },

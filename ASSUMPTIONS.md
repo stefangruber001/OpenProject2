@@ -11481,3 +11481,36 @@ runs.
 anything typed there after the first import stays on that device. It is no
 longer linked from the workspace navigation, which is why it did not cause this
 report — but it is the same failure shape and is worth removing or porting.
+
+## The 208 códigos already in the price book keep them (2026-09-18)
+
+The operator reversed their own earlier instruction: «The Code of Subpartida
+should be a correlative, not a code that depends on the name. Sorry for this
+mistake before. The correlative should be automatic.» What they did not say is
+what should happen to the codes already in the book — `AIS-101`, `ALB-010` and
+two hundred and six others built under the old rule.
+
+**Decided: the correlative governs new subpartidas only. Existing códigos are
+left exactly as they are.** So `SUB-0001` starts beside `AIS-101`, and the book
+carries two conventions for as long as the old records live.
+
+Renumbering was the alternative and is the irreversible one. A código is not an
+internal key: budget lines store it, it is printed on quotes that have already
+left the company, and the operator reads it aloud on site. Rewriting all 208
+would change a value customers are holding on paper, for the sake of tidiness in
+a register — and it cannot be undone once the new numbers are themselves on
+paper. Keeping them costs a mixed-looking list and nothing else; the generator
+steps over anything taken, so the two conventions cannot collide.
+
+If the operator wants the book renumbered, that is a migration with its own
+decision about what happens to issued documents, and it should be asked for
+rather than assumed.
+
+**Also recorded, because the reasoning behind one half of the instruction does
+not hold.** They removed the pictogram column from the Subpartidas register on
+the grounds that a correlative código leaves the drawing with nothing to derive
+from. It does not: `ErpPictograms.pick` reads the description and the partida,
+never the código, so the drawings were never at risk. The column is gone as
+asked — it is theirs to decide, and a register of ten columns is better without
+one nobody sorts by — but the drawing itself is untouched and still appears
+where it earns its width, on the budget line and on the printed quote.

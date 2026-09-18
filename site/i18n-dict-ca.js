@@ -293,6 +293,11 @@ window.CANEI_DICT.ca = {
   "＋ Nuevo título": "＋ Nou títol",
   "＋ Nueva partida": "＋ Nova partida",
   "Se genera solo a partir del nombre.": "Es genera sol a partir del nom.",
+  "Correlativo automático.": "Correlatiu automàtic.",
+  "Se archivan desde la subpartida. Pulse una para abrirla.":
+    "S'arxiven des de la subpartida. Premi'n una per obrir-la.",
+  "Ninguna subpartida está archivada en esta partida. Se archivan desde la subpartida, en la sección Subpartidas.":
+    "Cap subpartida no està arxivada en aquesta partida. S'arxiven des de la subpartida, a la secció Subpartides.",
   "Se genera del nombre y no se teclea; una vez guardado, los registros lo conservan.":
     "Es deriva del nom i no es tecleja; un cop desat, els registres el conserven.",
   "✎ Modificar título": "✎ Modificar títol",

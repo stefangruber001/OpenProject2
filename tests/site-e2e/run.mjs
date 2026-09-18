@@ -122,6 +122,7 @@ async function main() {
        it takes its own context rather than sharing the browser's one IndexedDB
        with every read-only suite above. */
     testChapterTitles,
+    testPriceBookLinks,
     testNotes,
     testJourney,
   ];
@@ -3499,19 +3500,41 @@ async function testBudgetBuilder(browser, base) {
        three and fails if any of them shows a different drawing, not merely if
        one of them shows none. Three separate presence checks would pass on a
        build where the catalogue drew a tap and the quote drew a door. */
-    await pg.evaluate(() => go("items"));
-    await pg.waitForTimeout(700);
-    const cat = await pg.evaluate(() => {
-      const rows = [...document.querySelectorAll("#view table.mlist tbody tr.click")];
-      const withMark = rows.filter((r) => r.querySelector("svg.pict"));
+    /* MEASURED ON THE BUILDER, because that is where the drawings live.
+       These two checks used to read the price-book REGISTER, which carried a
+       pictogram column until the operator removed it on 18 September. The two
+       properties are not about that column and are worth keeping: that a
+       drawing is attached PER LINE and that the drawings actually differ (a
+       build where everything fell back to `generic` would satisfy any
+       presence-only check), and that they fetch nothing.
+
+       So they are asked of the surfaces that survive — the quote builder here,
+       and the printed quote in the chain below — which are also the two the
+       operator asked for these drawings on in the first place: «check that the
+       picture is also on the quote builder when I add the sub-item and finally
+       also get on the pdf quote». */
+    const cat = await pg.evaluate(async () => {
+      /* The FULLEST budget in the book, not the first draft. Distinctness is
+         the half of this check that can actually fail — a build where every
+         drawing fell back to `generic` would pass a presence-only check — and
+         it means nothing on a two-line quote. */
+      const lineCount = (x) => {
+        const v = x.versions[x.versions.length - 1];
+        return v ? v.chapters.reduce((a, c) => a + c.lines.length, 0) : 0;
+      };
+      const b = erp.state.budgets.slice().sort((p1, p2) => lineCount(p2) - lineCount(p1))[0];
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 900));
+      const rows = [...document.querySelectorAll("#bRows tr[data-row]")];
+      const withMark = rows.filter((r) => r.querySelector(".plate svg"));
       const labels = new Set(
-        withMark.map((r) => r.querySelector("svg.pict")?.getAttribute("aria-label")),
+        withMark.map((r) => r.querySelector(".plate svg")?.getAttribute("aria-label")),
       );
       return { rows: rows.length, marked: withMark.length, distinct: labels.size };
     });
-    if (cat.rows > 20 && cat.marked === cat.rows && cat.distinct >= 8)
+    if (cat.rows > 3 && cat.marked === cat.rows && cat.distinct >= 3)
       ok(
-        `catalogue: every partida shows a drawing of its job (${cat.marked}/${cat.rows} rows, ${cat.distinct} different drawings)`,
+        `presupuestador: every line carries a drawing of its job (${cat.marked}/${cat.rows} lines, ${cat.distinct} different drawings)`,
       );
     else bad("catalogue: line drawings", JSON.stringify(cat));
 
@@ -3519,7 +3542,7 @@ async function testBudgetBuilder(browser, base) {
        that quietly moved to <img src> would satisfy every other check here and
        cost the operator a megabyte a screen on a phone. */
     const cheap = await pg.evaluate(() => {
-      const svgs = [...document.querySelectorAll("svg.pict")];
+      const svgs = [...document.querySelectorAll(".plate svg")];
       const html = svgs.map((s) => s.outerHTML).join("");
       return {
         n: svgs.length,
@@ -3527,9 +3550,9 @@ async function testBudgetBuilder(browser, base) {
         external: /<image|xlink:href|url\(|https?:/.test(html),
       };
     });
-    if (cheap.n > 20 && !cheap.external && cheap.bytes / cheap.n < 1400)
+    if (cheap.n > 3 && !cheap.external && cheap.bytes / cheap.n < 1400)
       ok(
-        `catalogue: the drawings fetch nothing and cost ~${Math.round(cheap.bytes / cheap.n)} bytes each`,
+        `presupuestador: the drawings fetch nothing and cost ~${Math.round(cheap.bytes / cheap.n)} bytes each`,
       );
     else bad("catalogue: drawings stay lean", JSON.stringify(cheap));
 
@@ -3655,10 +3678,21 @@ async function testBudgetBuilder(browser, base) {
       await pg.locator("#biSubQ").fill("DEM-101");
       await pg.waitForTimeout(500);
       return pg.evaluate(() => {
+        /* THE CELL AFTER THE CÓDIGO, not `children[2]`. The index was
+           «Descripción» until two columns left this register on 18/09 and
+           became «Ud» — so it compared "m2" with "m2" in three languages and
+           reported that the screens had stopped translating. Nor can the
+           heading be used to find it: the heading is itself translated, which
+           is the very thing under test. The código is the one cell that reads
+           the same in all three languages, so the description is the cell
+           beside it. */
         const row = [...document.querySelectorAll("#view table.mlist tbody tr.click")].find((tr) =>
           /DEM-101/.test(tr.textContent),
         );
-        return row ? row.children[2].textContent.trim() : null;
+        if (!row) return null;
+        const codeCell = [...row.children].find((td) => td.textContent.trim() === "DEM-101");
+        const descCell = codeCell && codeCell.nextElementSibling;
+        return descCell ? descCell.textContent.trim() : null;
       });
     };
     const trio = {};
@@ -14044,9 +14078,12 @@ async function testControlTowerAndDay(browser, base) {
       else bad(`DMC-01 legacy route #${legacy}`, String(landed));
     }
 
-    /* THE POINT OF v23, on screen: one subpartida filed in two partidas, with
-       both named in its row. A tree could not show this at all — it is why the
-       tree went — so no earlier version of this suite could assert it. */
+    /* THE POINT OF v23: one subpartida filed in two partidas, stored once and
+       listed once. Where the two memberships are READ moved on 18/09 — the
+       «Partidas» column left the register, because a column that prints an
+       unbounded list reads as a fixed fact about the row — so this asserts
+       them in the drawer that owns them, which is also the only place they can
+       now be changed. The property itself is unchanged and still the point. */
     const shared = await pg.evaluate(async () => {
       const a = erp.addListEntry("itemChapters", { code: "E2EA", es: "Gremio E2E A" }, "e2e");
       const b = erp.addListEntry("itemChapters", { code: "E2EB", es: "Gremio E2E B" }, "e2e");
@@ -14059,23 +14096,37 @@ async function testControlTowerAndDay(browser, base) {
       q.value = "E2E-SHARED";
       q.dispatchEvent(new Event("input"));
       await new Promise((r) => setTimeout(r, 400));
-      const tr = [...document.querySelectorAll("#biList tbody tr.click")].find((r) =>
+      const hits = [...document.querySelectorAll("#biList tbody tr.click")].filter((r) =>
         r.textContent.includes("E2E-SHARED"),
       );
+      // …and the drawer names both, ticked, which is where they are now set.
+      catalogueItemDrawer(it.id);
+      await new Promise((r) => setTimeout(r, 350));
+      const pane = document.querySelector("#ci_chaps");
+      const ticked = pane
+        ? [...pane.querySelectorAll("input[type=checkbox]")]
+            .filter((x) => x.checked)
+            .map((x) => x.value)
+            .sort()
+        : [];
+      closeDrawer();
       return {
         stored: erp.itemPartidas(it.id),
-        row: tr ? tr.textContent : "",
+        rows: hits.length,
+        ticked,
         held: [erp.partidaItems(a.code).length, erp.partidaItems(b.code).length],
       };
     });
     if (
       shared.stored.length === 2 &&
-      /Gremio E2E A/.test(shared.row) &&
-      /Gremio E2E B/.test(shared.row) &&
+      shared.rows === 1 &&
+      JSON.stringify(shared.ticked) === JSON.stringify(["E2EA", "E2EB"]) &&
       shared.held[0] === 1 &&
       shared.held[1] === 1
     )
-      ok("DMC-01: a subpartida sits in two partidas, and its row names both");
+      ok(
+        "DMC-01: a subpartida sits in two partidas, stored once, listed once, both ticked in its drawer",
+      );
     else bad("DMC-01 shared subpartida", JSON.stringify(shared));
 
     // …and it is not double-counted as a row: membership is a link, not a copy.
@@ -14240,14 +14291,16 @@ async function testControlTowerAndDay(browser, base) {
       );
     else bad("DMC-01 brand/model preserved on edit", JSON.stringify(preserved));
 
-    /* Part 2 · item 6 — the drawer proposes the next free code, and the margin
-       is shown where the two figures that make it are typed. Three properties,
-       because each can break on its own: the proposal follows the PREFIX-NNN
-       convention past the codes already taken, a code the operator typed is
-       never overwritten, and the margin matches the register's arithmetic.
+    /* THE CÓDIGO IS A CORRELATIVE, and owes nothing to the name.
+       (Operator, 18 Sep: «The Code of Subpartida should be a correlative, not a
+       code that depends on the name. Sorry for this mistake before.»)
 
-       Since v23 the prefix comes from the first partida TICKED rather than
-       from a <select>, because there can be several — or none. */
+       What this used to pin — PREFIX-NNN taken from the first partida ticked,
+       or from the description when none was — is the rule they reversed, so it
+       is REWRITTEN rather than deleted: the property is now that the proposal
+       does NOT move when the description changes and does NOT move when a
+       partida is ticked, which is the whole of what «not a code that depends on
+       the name» means and the only thing that can fail silently. */
     await pg.evaluate(async () => {
       location.hash = "budget-items";
       biSection = "sub";
@@ -14259,21 +14312,40 @@ async function testControlTowerAndDay(browser, base) {
     await pg.waitForTimeout(250);
     const proposal = await pg.evaluate(async () => {
       const chaps = document.querySelector("#ci_chaps"),
+        desc = document.querySelector("#ci_desc"),
         code = document.querySelector("#ci_code");
+      const opened = code.value;
+      // Type a name: the código must not follow it anywhere.
+      desc.value = "Una descripción cualquiera";
+      desc.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 120));
+      const afterName = code.value;
+      // Tick a partida: nor that.
       const box = chaps.querySelector("input[type=checkbox]");
-      if (!box) return { skipped: true };
-      box.checked = true;
-      chaps.dispatchEvent(new Event("change", { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 80));
-      const taken = erp.state.catalogue
-        .map((x) => String(x.code || "").toUpperCase())
-        .filter((c) => c.startsWith(box.value.toUpperCase() + "-"));
-      let want = 101;
-      while (taken.includes(`${box.value.toUpperCase()}-${want}`)) want++;
-      return { chapter: box.value, got: code.value, want: `${box.value.toUpperCase()}-${want}` };
+      if (box) {
+        box.checked = true;
+        chaps.dispatchEvent(new Event("change", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 120));
+      }
+      // Free by construction: nothing in the book already carries it.
+      const taken = erp.state.catalogue.map((x) => String(x.code || "").toUpperCase());
+      return {
+        opened,
+        afterName,
+        afterTick: code.value,
+        free: !taken.includes(String(opened).toUpperCase()),
+        shape: /^SUB-\d{4,}$/.test(opened),
+      };
     });
-    if (proposal.skipped || proposal.got === proposal.want)
-      ok(`DMC-01: a new subpartida is proposed the next free code (${proposal.got})`);
+    if (
+      proposal.shape &&
+      proposal.free &&
+      proposal.afterName === proposal.opened &&
+      proposal.afterTick === proposal.opened
+    )
+      ok(
+        `DMC-01: the código is a free correlative and moves for neither the name nor the partida (${proposal.opened})`,
+      );
     else bad("DMC-01 code proposal", JSON.stringify(proposal));
 
     /* «A hand-typed code wins» stopped being a property on 17/09, when the
@@ -14309,15 +14381,17 @@ async function testControlTowerAndDay(browser, base) {
       );
     else bad("DMC-01 locked code / collisions", JSON.stringify(collisions));
 
-    /* THE PATH THIS SUITE DID NOT COVER, and the reason the operator found it
-       first. Every check above ticks a partida before reading the code — but
-       since v23 the ORDINARY case is a price book with no partidas in it yet,
-       where the prefix has to come from the description instead. The drawer did
-       propose one; what it did not do was accept it. The Código field still
-       carried a `*`, no "se genera solo" hint, and a save path that threw
-       «El código es obligatorio» instead of falling back to the proposal the
-       way `codeToSave` does for partidas and títulos. Three asymmetries with
-       the two drawers beside it, all invisible to a check that always ticked. */
+    /* THE EMPTY PRICE BOOK, which is the operator's own starting point and the
+       path this suite once did not cover: no partidas exist yet, so nothing can
+       be ticked. Under the old rule the prefix had to come from the description
+       here; under the correlative it comes from nowhere, which is the point —
+       a book with nothing in it still proposes SUB-0001 and still SAVES it.
+
+       The save is the half that matters and the half that broke before: the
+       field is read-only, so if the save path does not fall back to the
+       proposal the way `codeToSave` does for partidas and títulos, the operator
+       is refused with «El código es obligatorio» on a field they cannot fix.
+       Emptied on purpose below to hold that. */
     const fromDescription = await pg.evaluate(async () => {
       closeDrawer();
       await new Promise((r) => setTimeout(r, 200));
@@ -14333,7 +14407,7 @@ async function testControlTowerAndDay(browser, base) {
       const field = document.querySelector("#ci_code").closest(".field");
       const out = {
         label: field.querySelector("label").textContent,
-        hint: /Se genera solo/.test(field.textContent),
+        hint: /Correlativo/.test(field.textContent),
       };
       const desc = document.querySelector("#ci_desc");
       desc.value = "Punto de agua E2E";
@@ -14357,13 +14431,13 @@ async function testControlTowerAndDay(browser, base) {
     if (
       fromDescription.label === "Código" &&
       fromDescription.hint &&
-      /^PUN-\d+$/.test(fromDescription.proposed) &&
+      /^SUB-\d{4,}$/.test(fromDescription.proposed) &&
       fromDescription.saved === fromDescription.proposed
     )
       ok(
-        `DMC-01: with no partidas, the code comes from the description and saves itself (${fromDescription.saved})`,
+        `DMC-01: on an empty price book the correlative is proposed and saves itself (${fromDescription.saved})`,
       );
-    else bad("DMC-01 code from description", JSON.stringify(fromDescription));
+    else bad("DMC-01 code on an empty book", JSON.stringify(fromDescription));
 
     // Margin: computed, live, and blank while there is no price.
     const marginLine = await pg.evaluate(async () => {
@@ -18459,6 +18533,188 @@ main().catch((e) => {
 //    reaches the engine, the screen reads it back, and the colour means
 //    something — plus the two this one adds: the «where» is a real route, and a
 //    closed note stops carrying a priority rule.
+/**
+ * ONE WAY to file a subpartida under a partida, and two doors onto it.
+ *
+ * The operator, 18 September: «I just want one way to make the relationship in
+ * Elementos de presupuesto, and this has to be in the Subpartida section. What
+ * I don't want is this asignation to appear on Partidas […] not with the option
+ * of editing them, but with the option to click the Subpartidas to redirect to
+ * that Subpartida in particular. […] If we are in the budgeting tool, and we
+ * create a new Subpartida, this has to be related automatically to the Partida
+ * selected in the budgeting tool. This way you have just two options to create
+ * the relationship, through the Budgeting tool and in the section Elementos de
+ * presupuesto. The Code of Subpartida should be a correlative, not a code that
+ * depends on the name.»
+ *
+ * Four properties, and each fails on its own: the partida drawer cannot write
+ * the link, the subpartida drawer can, the budgeting tool files what it creates
+ * without being asked, and the código says nothing about either.
+ */
+async function testPriceBookLinks(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#budget-items`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    // ── 1 · the Partida drawer shows, and cannot change ──────────────────────
+    const partida = await pg.evaluate(async () => {
+      const ch = erp.addListEntry("itemChapters", { code: "E2EL", es: "Gremio enlace" }, "e2e");
+      const a = erp.addCatalogueItem({ code: "E2EL-A", desc: "Enlazada A" }, "e2e");
+      const b = erp.addCatalogueItem({ code: "E2EL-B", desc: "No enlazada B" }, "e2e");
+      erp.setItemPartidas(a.id, [ch.code], "e2e");
+      chapterEntryDrawer(ch.code);
+      await new Promise((r) => setTimeout(r, 400));
+      const pane = document.querySelector("#pa_items");
+      const out = {
+        boxes: pane ? pane.querySelectorAll("input[type=checkbox]").length : -1,
+        links: pane ? [...pane.querySelectorAll("[data-goitem]")].map((x) => x.textContent) : [],
+      };
+      // Save it untouched: the membership it cannot edit must survive.
+      document.querySelector("#pa_save").click();
+      await new Promise((r) => setTimeout(r, 400));
+      out.stillFiled = erp.partidaItems(ch.code).slice();
+      out.aId = a.id;
+      out.bId = b.id;
+      out.chCode = ch.code;
+      return out;
+    });
+    if (partida.boxes === 0)
+      ok("partidas: the drawer offers no tick-box — the link is not written from here");
+    else bad("partidas: drawer still editable", JSON.stringify(partida));
+    // Only what is actually filed, and nothing else in the catalogue.
+    if (
+      partida.links.length === 1 &&
+      /E2EL-A/.test(partida.links[0]) &&
+      !partida.links.some((x) => /E2EL-B/.test(x))
+    )
+      ok("partidas: the drawer lists what is filed here and nothing else");
+    else bad("partidas: drawer list", JSON.stringify(partida.links));
+    if (JSON.stringify(partida.stillFiled) === JSON.stringify([partida.aId]))
+      ok("partidas: saving the partida leaves its memberships exactly as they were");
+    else bad("partidas: save rewrote memberships", JSON.stringify(partida));
+
+    // ── 2 · …and it is a way through to the subpartida that owns the link ────
+    const through = await pg.evaluate(async (chCode) => {
+      chapterEntryDrawer(chCode);
+      await new Promise((r) => setTimeout(r, 400));
+      const link = document.querySelector("#pa_items [data-goitem]");
+      if (!link) return { link: false };
+      link.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const title = document.querySelector("#dttl");
+      const out = {
+        link: true,
+        opened: title ? title.textContent : "",
+        // The membership pane of the subpartida — the one place it is set.
+        editable: !!document.querySelector("#ci_chaps input[type=checkbox]"),
+        section: biSection,
+      };
+      closeDrawer();
+      return out;
+    }, partida.chCode);
+    if (through.link && /E2EL-A/.test(through.opened) && through.editable)
+      ok(
+        `partidas: tapping one opens that subpartida, where the link IS editable (${through.opened})`,
+      );
+    else bad("partidas: click through", JSON.stringify(through));
+    if (through.section === "sub")
+      ok("partidas: and it lands on the Subpartidas section, which is where the link lives");
+    else bad("partidas: section after click", String(through.section));
+
+    // ── 3 · the register drops the two columns the operator named ───────────
+    const cols = await pg.evaluate(async () => {
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 500));
+      const head = [...document.querySelectorAll("#biList thead th")].map((t) =>
+        t.textContent.trim(),
+      );
+      const firstRow = document.querySelector("#biList tbody tr.click");
+      return { head, plates: firstRow ? firstRow.querySelectorAll(".plate, svg").length : -1 };
+    });
+    if (!cols.head.includes("Partidas") && cols.head[0] === "Código" && cols.plates === 0)
+      ok(
+        `subpartidas: the register is código-first, with no pictogram and no «Partidas» column (${cols.head.join(" · ")})`,
+      );
+    else bad("subpartidas: register columns", JSON.stringify(cols));
+
+    // ── 4 · the budgeting tool files what it creates, under the partida it is on ──
+    const fromBudget = await pg.evaluate(async () => {
+      // A partida with NOTHING in it — the case the old code got wrong, because
+      // the picker widens its filter to the whole book when the partida is
+      // empty, and the drawer used to take the link from that filter.
+      const ch = erp.addListEntry("itemChapters", { code: "E2EV", es: "Gremio vacio" }, "e2e");
+      const cli = erp.addParty(
+        { name: "Cliente Enlace", partyType: "individual", roles: ["customer"] },
+        "e2e",
+      );
+      const b = erp.createBudget({ partyId: cli.id }, "e2e");
+      /* The budget chapter is tied to the price-book partida BY NAME — see
+         `chapterCatalogueCode` — so the two strings match on purpose. */
+      const chap = erp.addChapter(b.id, { name: "Gremio vacio" }, "e2e");
+      return {
+        budget: b.id,
+        version: erp.currentVersion(b.id).id,
+        chapter: chap.id,
+        partida: ch.code,
+        empty: erp.partidaItems(ch.code).length,
+      };
+    });
+    const linked = await pg.evaluate(async (ctxIn) => {
+      // Straight at the door the budgeting tool opens.
+      addSubpartidaStep(ctxIn.budget, ctxIn.version, ctxIn.chapter);
+      await new Promise((r) => setTimeout(r, 600));
+      const nw = document.querySelector("#cp_new");
+      if (!nw) return { picker: false };
+      nw.click();
+      await new Promise((r) => setTimeout(r, 700));
+      const pane = document.querySelector("#ci_chaps");
+      const preticked = pane
+        ? [...pane.querySelectorAll("input[type=checkbox]")]
+            .filter((x) => x.checked)
+            .map((x) => x.value)
+        : [];
+      const d = document.querySelector("#ci_desc");
+      if (!d) return { picker: true, drawer: false };
+      d.value = "Nacida en el presupuestador";
+      d.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 200));
+      const code = document.querySelector("#ci_code").value;
+      document.querySelector("#ci_save").click();
+      await new Promise((r) => setTimeout(r, 900));
+      const made = erp.state.catalogue.find((i) => i.desc === "Nacida en el presupuestador");
+      return {
+        picker: true,
+        drawer: true,
+        preticked,
+        code,
+        filed: made ? erp.itemPartidas(made.id) : [],
+      };
+    }, fromBudget);
+    if (linked.picker && linked.drawer && linked.preticked.includes(fromBudget.partida))
+      ok("presupuestador: a new subpartida opens already filed under the partida being quoted");
+    else bad("presupuestador: pre-tick", JSON.stringify({ linked, want: fromBudget.partida }));
+    if (linked.filed && linked.filed.includes(fromBudget.partida))
+      ok(`presupuestador: …and it is stored that way (${linked.code} → ${fromBudget.partida})`);
+    else bad("presupuestador: stored membership", JSON.stringify(linked));
+    if (/^SUB-\d{4,}$/.test(linked.code || ""))
+      ok(`presupuestador: with a correlative código, not one built from the name (${linked.code})`);
+    else bad("presupuestador: código shape", String(linked.code));
+
+    if (!errors.length) ok("libro de precios: no console errors");
+    else bad("libro de precios: console", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("libro de precios: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 /**
  * WHICH «Solados»? — the operator's own job, built here so the answer is not
  * a matter of opinion.
