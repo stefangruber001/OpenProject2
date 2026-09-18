@@ -268,7 +268,14 @@ const hours = await pg.evaluate((pid) => {
 if (hours.rate === 2700 && hours.line) ok("overtime hours priced from their band, on the partida");
 else bad("hours", JSON.stringify(hours));
 
-// 7 · a variation budget joins the project
+// 7 · a variation budget joins the project — through its ANNEX, which is the
+//     only door. The operator's rule, in their words: «Acceptance coming from
+//     Budget tool do nothing until we accept it on Contracts/Annex. This is
+//     key.» So this step asserts BOTH halves of it: the customer agreeing a
+//     price moves nothing, and signing the annex is what moves the money.
+//     Asserting only the second half would pass just as well with the gate
+//     deleted, which is the state this step used to be in — it stopped at
+//     acceptance, read zero, and had been red since the day it was written.
 const variation = await pg.evaluate((pid) => {
   const b = erp.createVariationBudget(pid, { reason: "RL extra", scheduleImpactDays: 5 }, "bo");
   const ch = erp.addChapter(b.id, { name: "Extra RL" }, "bo");
@@ -280,11 +287,24 @@ const variation = await pg.evaluate((pid) => {
   );
   erp.issueVersion(b.id, {}, "bo");
   erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "firmado" }, "bo");
+  // Agreed commercially, and deliberately inert: the annex exists, unapplied.
+  const agreedOnly = erp.projectEconomics(pid).variationRevenueCents;
+  const con = erp.state.contracts.find((x) => x.id === erp.project(pid).contractId);
+  const annex = (con.annexes || []).find((a) => a.budgetId === b.id && !a.versionId);
+  erp.signContractAnnex(con.id, annex.number, { method: "verbal", by: "Cliente RL" }, "bo");
   const ec = erp.projectEconomics(pid);
-  return { vr: ec.variationRevenueCents, cur: ec.currentRevenueCents > 0 };
+  return {
+    agreedOnly,
+    annex: annex.number,
+    vr: ec.variationRevenueCents,
+    cur: ec.currentRevenueCents > 0,
+  };
 }, cash.pid);
-if (variation.vr >= 50000)
-  ok("variation accepted and inside the economics", `+${variation.vr / 100} €`);
+if (variation.agreedOnly === 0 && variation.vr >= 50000)
+  ok(
+    "variation: accepted moves nothing, the signed annex moves it into the economics",
+    `${variation.annex} · +${variation.vr / 100} €`,
+  );
 else bad("variation", JSON.stringify(variation));
 
 // 8 · the quarter leaves as a ZIP, read back by the importer's own reader

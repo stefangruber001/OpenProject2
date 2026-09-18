@@ -6043,11 +6043,13 @@
      * The signed one carries the file, openable, because a document nobody can
      * reopen proves nothing (the same rule the evidence field was built on).
      *
-     * Inert for now, on purpose: it records the fact and moves nothing. What
-     * an annex adds to the scope, the plan and the money still arrives on
-     * acceptance, exactly as it does today. Moving that gate is its own change
-     * with its own migration, and shipping the field first means the operator
-     * can attach the paper they already have while the rest is built.
+     * AND IT IS THE GATE, not a note beside one. This paragraph used to say the
+     * method was «inert for now» and that the scope, the plan and the money
+     * still arrived on acceptance; that stopped being true when the gate moved
+     * here, five lines below, and a comment that contradicts the code it sits
+     * on is worse than no comment — it is the one a reader believes. Accepting
+     * in the budget tool agrees a price and writes an UNAPPLIED annex; signing
+     * it here is what joins it to the job.
      */
     signContractAnnex(contractId, annexNumber, { method, document, by, date } = {}, user) {
       const c = this.state.contracts.find((x) => x.id === contractId);
