@@ -6109,6 +6109,60 @@
       }
 
       /**
+       * A change the operator must not be TOLD about until it is stored.
+       *
+       * `mutate` above is right for ordinary editing: it applies the change,
+       * asks for a save on a 140 ms debounce and says so straight away,
+       * because a message per keystroke that waited for a round trip would
+       * make the app unusable. The cost is that its message is a statement
+       * about MEMORY, not about the register — and for a handful of actions
+       * that is the wrong thing to say.
+       *
+       * Reported on 18/09: «this one has been sent and is still marked as
+       * borrador — you have to send it twice, or accept it twice, to make the
+       * status change». No conflict, no red banner, no second tab. The
+       * document was issued in memory, the page said «Presupuesto enviado —
+       * versión congelada», and the write that was still 140 ms away never
+       * left: on a phone the page is suspended the moment it goes in a pocket,
+       * and a fire-and-forget save dies with it, silently, because there is no
+       * response for `saveState` to fail on.
+       *
+       * Issuing a quote, answering for the customer, signing a contract and
+       * issuing an invoice are all entries in the register that cannot be
+       * taken back, and all of them are performed by somebody who then stops
+       * looking at the screen. So these four WAIT for the write and report
+       * what actually happened. The screen is painted first, so the effect is
+       * visible while it saves; the confirmation arrives only once the server
+       * holds it.
+       *
+       * Returns whether it was stored, so a caller that opens the next screen
+       * — the issued invoice, the new contract — does not open one for a
+       * record the database does not have.
+       */
+      async function mutateNow(fn, msg) {
+        try {
+          fn();
+        } catch (e) {
+          toast("⚠ " + e.message);
+          return false;
+        }
+        render();
+        try {
+          await persistNow();
+          if (msg) toast(msg);
+          return true;
+        } catch (e) {
+          /* `saveState` has already raised its own red banner for anything the
+             SERVER refused — a conflict, a permission, a lost connection. This
+             adds what that banner cannot know: which action was lost, and that
+             the screen is now ahead of the register until the page is
+             reloaded. */
+          toast("⚠ NO se ha guardado: " + ((e && e.message) || e) + " · recargue la página");
+          return false;
+        }
+      }
+
+      /**
        * A write for an account whose document is redacted.
        *
        * `mutate` above changes the document in memory and asks the store to
@@ -20335,7 +20389,7 @@
           go.onclick = () => {
             const ch = chSel.value;
             let waLink = null;
-            mutate(() => {
+            mutateNow(() => {
               /* `issue`, NOT `opts`. This was called `opts` and shadowed the
                  drawer's own parameter of that name — the one carrying
                  `{ stay: true }` — for the whole of this block, including the
@@ -20470,7 +20524,7 @@
           hint: "Arrastra aquí el correo o el documento de aceptación (PDF o imagen), o búscalo en el dispositivo.",
         });
         $("#brOk").onclick = () =>
-          mutate(() => {
+          mutateNow(() => {
             erp.acceptVersion(
               id,
               versionId,
@@ -20501,7 +20555,7 @@
         const no = $("#brNo");
         if (no && reasons.length)
           no.onclick = () =>
-            mutate(() => {
+            mutateNow(() => {
               erp.rejectVersion(
                 id,
                 versionId,
@@ -28581,7 +28635,7 @@
             editPartyDrawer(partyId, () => newContractDrawer(held, opts));
             return;
           }
-          mutate(() => {
+          mutateNow(() => {
             const c = erp.createContract(
               budgetId,
               {
@@ -31381,11 +31435,16 @@
         });
         if (!okGo) return;
         let issued = null;
-        mutate(() => {
+        /* Awaited, and the drawer only opens if it was STORED. A refused save
+           leaves the invoice — and the number it consumed — in this page and
+           nowhere else; opening its screen would be showing the operator a
+           document the register does not have. Reloading restores the truth,
+           number included, which is why the failure says to. */
+        const saved = await mutateNow(() => {
           issued = erp.issueInvoice(invDraft(), "backoffice");
           invWork = null;
         }, "Factura emitida");
-        if (issued) invoiceDrawer(issued.number);
+        if (saved && issued) invoiceDrawer(issued.number);
       }
 
       /** The issued invoice as a PDF file — see `downloadPdf` for why it is no

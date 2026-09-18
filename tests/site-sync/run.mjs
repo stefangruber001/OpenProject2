@@ -13,6 +13,7 @@
  *     perfectly and the picture is simply absent everywhere else.
  */
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -20,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SITE = join(ROOT, "site");
+const require = createRequire(import.meta.url);
 const { chromium } = await import(
   join(ROOT, "node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core/index.mjs")
 );
@@ -731,6 +733,129 @@ async function openWorkspace(hash = "#customers") {
     !banner,
     `banner=${banner}`,
   );
+  await page.close();
+}
+
+// ---------------------------------------------------------------------------
+// 11. AN IRREVERSIBLE ENTRY IS ANNOUNCED ONLY ONCE IT IS STORED.
+//
+//     «This one has been sent and is still marked as borrador — you have to
+//     send it twice.» (18/09) The send froze the version in memory, the page
+//     said «Presupuesto enviado — versión congelada», and the write that was
+//     still 140 ms behind it never landed. Nothing lied about the conflict —
+//     there was no conflict — the message simply ran ahead of the write, and
+//     on a phone the page is suspended the moment it goes in a pocket.
+//
+//     So the four entries that cannot be taken back — issue a quote, answer
+//     for the customer, sign a contract, issue an invoice — go through
+//     `mutateNow`, which waits. This drives the REAL send drawer twice: once
+//     against a server that refuses, and once against one that accepts.
+// ---------------------------------------------------------------------------
+{
+  sessionRole = "admin";
+  stateScoped = false;
+  stateDoc.state = null; // a fresh company: the workspace seeds, then we send
+  stateDoc.version = 0;
+  statePuts = [];
+
+  const page = await openWorkspace("#quotes");
+
+  // A draft quote the engine will let us issue: a customer with an e-mail and
+  // nothing blocking on the lines.
+  const target = await page.evaluate(() => {
+    const b = (erp.state.budgets || []).find(
+      (b) =>
+        erp.budgetStage(b) === "draft" &&
+        ((erp.state.parties.find((p) => p.id === b.partyId) || {}).email || "") &&
+        erp.validateBudget(b.id).filter((i) => i.level === "block").length === 0,
+    );
+    return b ? { id: b.id, number: b.number } : null;
+  });
+  check("the seeded company offers a draft quote to send", !!target, JSON.stringify(target));
+
+  if (target) {
+    /* THE REFUSAL. The document moves under the page — another device, the
+       same operator's laptop — so the save is refused with 409. The point is
+       not that it is refused; it is what the operator is told. */
+    const heldBefore = stateDoc.version;
+    stateDoc.version += 1;
+    /* Every message this press produces, in order. The last one is not the
+       one under test: filing the covering draft answers after the save does
+       and overwrites the same element. */
+    await page.evaluate(() => {
+      window.__toasts = [];
+      new MutationObserver(() => {
+        const t = (document.querySelector("#toast") || {}).textContent || "";
+        if (t && window.__toasts[window.__toasts.length - 1] !== t) window.__toasts.push(t);
+      }).observe(document.querySelector("#toast"), {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    });
+    await page.evaluate((id) => sendBudgetDrawer(id, {}), target.id);
+    await page.waitForTimeout(600);
+    await page.evaluate(() => document.querySelector("#sbGo").click());
+    await page.waitForTimeout(2500);
+
+    const refused = await page.evaluate(() => ({
+      toasts: window.__toasts || [],
+      banner: !!document.getElementById("canei-save-failed"),
+    }));
+    const storedStage = (() => {
+      const ERP = require(join(SITE, "erp-engine.js"));
+      const e = ERP.ERP.from(JSON.parse(JSON.stringify(stateDoc.state)));
+      return e.budgetStage(e.budget(target.id));
+    })();
+    check(
+      "a send the server refused is NOT announced as sent, and says it was not saved",
+      !refused.toasts.some((t) => /Presupuesto enviado/i.test(t)) &&
+        refused.toasts.some((t) => /NO se ha guardado/i.test(t)),
+      `toasts=${JSON.stringify(refused.toasts.map((t) => t.slice(0, 60)))}`,
+    );
+    check(
+      "…the register still holds a draft, and the page said so rather than the opposite",
+      storedStage === "draft" && refused.banner,
+      `stored=${storedStage} banner=${refused.banner}`,
+    );
+
+    /* THE SAME PRESS, ON A SERVER THAT IS NOT AHEAD. Reloaded first, exactly
+       as the banner tells the operator to. */
+    stateDoc.version = heldBefore;
+    await page.reload({ waitUntil: "load" });
+    await page.waitForFunction(() => typeof erp !== "undefined" && !!erp.state, null, {
+      timeout: 20000,
+    });
+    await page.waitForTimeout(800);
+    // The page is new after the reload: arm the recorder again before pressing.
+    await page.evaluate(() => {
+      window.__toasts = [];
+      new MutationObserver(() => {
+        const t = (document.querySelector("#toast") || {}).textContent || "";
+        if (t && window.__toasts[window.__toasts.length - 1] !== t) window.__toasts.push(t);
+      }).observe(document.querySelector("#toast"), {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    });
+    await page.evaluate((id) => sendBudgetDrawer(id, {}), target.id);
+    await page.waitForTimeout(600);
+    await page.evaluate(() => document.querySelector("#sbGo").click());
+    await page.waitForTimeout(2500);
+
+    const stageNow = (() => {
+      const ERP = require(join(SITE, "erp-engine.js"));
+      const e = ERP.ERP.from(JSON.parse(JSON.stringify(stateDoc.state)));
+      return e.budgetStage(e.budget(target.id));
+    })();
+    const okToasts = await page.evaluate(() => window.__toasts || []);
+    check(
+      "a send the server accepted IS announced, and the register holds it",
+      stageNow === "issued" && okToasts.some((t) => /Presupuesto enviado/i.test(t)),
+      `stored=${stageNow} toasts=${JSON.stringify(okToasts.map((t) => t.slice(0, 60)))}`,
+    );
+  }
   await page.close();
 }
 
