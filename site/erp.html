@@ -6448,8 +6448,32 @@
             { k: "customers", lab: "Clientes", code: "DMT-01" },
             { k: "suppliers", lab: "Proveedores", code: "DMT-02" },
             { k: "staff", lab: "Personal interno", code: "DMT-04" },
+            { k: "budget-items", lab: "Elementos de presupuesto", code: "DMC-01" },
+            { k: "price-list", lab: "Lista de precios", code: "DMC-02" },
           ],
         },
+        /* THE PRICE BOOK MOVED TO MAESTROS (operator, 18 Sep: «makes more sense
+                 to be there»), and it is the same judgement the section names already
+                 make. «Configuración» is where you set how the product behaves —
+                 units, alerts, users, language. «Datos maestros» is the company's own
+                 records, the things a quote is built OUT OF. Clients, suppliers and
+                 staff were already there; the subpartidas that carry the prices and
+                 the partidas that group them were two clicks away under a heading
+                 that suggests settings.
+
+                 «Lista de precios» travels with it. The two are one subject split
+                 across a register and its rates, they sat adjacent in Configuración,
+                 and leaving one behind would have put the price book and its prices
+                 in different sections.
+
+                 NOTHING BUT THE LISTING MOVES. The routes are `#budget-items` and
+                 `#price-list` in both places, so every link, bookmark and screenshot
+                 still lands; and the navigation manifest carries the six SECTION
+                 tabs rather than their children, so all four copies of nav.json are
+                 byte-identical across this change. The codes stay DMC-01 and DMC-02:
+                 a code is what the specification names and a section is where a
+                 person looks, and renaming the first to match the second would move
+                 an identifier that documents already cite. */
         /* «Empresa» is first in Configuración, and first for a reason: on a
                  workspace that has never been configured it is the only screen that
                  matters. ORG-01 refuses every invoice until it is filled in, and
@@ -6465,8 +6489,6 @@
           short: "Config.",
           subs: [
             { k: "company", lab: "Empresa", code: "ORG-01" },
-            { k: "budget-items", lab: "Elementos de presupuesto", code: "DMC-01" },
-            { k: "price-list", lab: "Lista de precios", code: "DMC-02" },
             { k: "units", lab: "Unidades de medida", code: "DMC-03" },
             { k: "lead-sources", lab: "Fuentes de leads", code: "DMC-04" },
             { k: "payment-methods", lab: "Formas de pago", code: "DMC-05" },
