@@ -4112,3 +4112,22 @@ Rutas desde `__dir__`, y la puerta cuenta los campos antes de juzgarlos.
 **Lo que queda, y es del operador:** comprobar que el acceso de demo funciona de
 verdad (la puerta comprueba que el campo no está vacío, no que la contraseña
 sirva), decidir el cuestionario de App Privacy, y pulsar Submit.
+
+## S33 · Enviado a revisión (2026-09-24)
+
+El operador corrigió el acceso de demo y pulsó **Submit for Review**. La app
+está en manos de Apple: versión **1.1**, build **15**, treinta capturas en
+en-GB · en-US · es-ES, distribución de app personalizada al Organization ID 554059950857.
+
+Nada en este repositorio cambia el estado de una revisión, así que aquí no hay
+nada que vigilar. Lo que sigue pasa en App Store Connect: Waiting for Review →
+In Review → Pending Developer Release, y después la app aparece en Business
+Manager › Apps and Books para asignar licencias.
+
+Si Apple rechaza, los tres motivos plausibles por orden, con lo que ya se hizo
+contra cada uno: **2.1** (la reseña no puede entrar) — credenciales de demo
+comprobadas a mano por el operador, porque la puerta sólo sabe que el campo no
+está vacío; **4.2** (envoltorio web) — las notas de revisión explican que es el
+sistema de gestión de una sola empresa, distribuido en privado, y la app usa
+Face ID y la cámara; **privacidad** — el cuestionario de App Privacy responde
+que no se recoge nada, con el razonamiento escrito en `docs/RELEASE-IOS.md`.
