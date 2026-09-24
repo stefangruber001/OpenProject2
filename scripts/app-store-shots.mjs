@@ -13,12 +13,32 @@
  * TestFlight and overwrite these files — the names sort in display order, which
  * is the only thing `deliver` cares about.
  *
- * SIZE. 1320 × 2868 is the 6.9-inch iPhone, the one size Apple currently
- * requires. A 440 × 956 viewport at deviceScaleFactor 3 lands exactly on it,
- * which matters: `deliver` rejects anything off by a pixel.
+ * SIZES. Two, because the app ships for two device families.
+ *
+ *   1320 × 2868 — 6.9-inch iPhone. A 440 × 956 viewport at scale 3.
+ *   2048 × 2732 — 13-inch iPad.    A 1024 × 1366 viewport at scale 2.
+ *
+ * THE IPAD ONES ARE NOT OPTIONAL, and their absence is invisible until Apple
+ * says so. `TARGETED_DEVICE_FAMILY = "1,2"` in the Xcode project offers the app
+ * on iPad, and App Store Connect then refuses the submission until the iPad
+ * slot has pictures in it. Nothing in the repository failed, nothing went red:
+ * the listing simply could not be submitted, which is a review slot spent on
+ * finding out. tests/app-store/run.mjs now reads the device family out of the
+ * project and fails if the pictures do not match it, so the two can no longer
+ * drift apart.
+ *
+ * Of the two sizes Apple accepts for the 13-inch slot — 2064 × 2752 and
+ * 2048 × 2732 — this uses the second. Both are accepted; the second has been
+ * accepted for years and is the one `deliver` has mapped to the iPad slot for
+ * just as long, and a listing is the wrong place to find out which of two
+ * equally valid numbers a given fastlane release happens to know about.
+ *
+ * `deliver` sorts uploads by filename WITHIN a device, and works out the device
+ * from the pixel size, so both sizes live in the same locale folder and the
+ * numbered prefixes keep their order in each.
  *
  * Run:  node scripts/app-store-shots.mjs
- * Out:  ios/fastlane/screenshots/{en-US,es-ES}/*.png
+ * Out:  ios/fastlane/screenshots/{en-US,en-GB,es-ES}/*.png
  */
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
@@ -86,9 +106,22 @@ const SHOTS = [
   ["05-invoicing", "invoicing", null],
 ];
 
+/* en-GB is here because the listing has an en-GB locale. It used to be a hand
+   copy of en-US, which is fine on the day it is made and wrong on the first day
+   somebody regenerates the other two and not this one. A locale the listing
+   carries is a locale this script writes. */
 const LANGS = [
   ["en-US", "en"],
+  ["en-GB", "en"],
   ["es-ES", "es"],
+];
+
+/* Prefix, viewport, scale. The prefix keeps the two families apart in the
+   folder AND keeps each family's own numbering contiguous, which is what
+   `deliver` orders by. */
+const DEVICES = [
+  ["iphone", { width: 440, height: 956 }, 3],
+  ["ipad", { width: 1024, height: 1366 }, 2],
 ];
 
 const port = await new Promise((r) => {
@@ -116,39 +149,39 @@ const browser = await chromium.launch({ executablePath: CHROME });
 for (const [locale, lang] of LANGS) {
   const dir = join(OUT, locale);
   mkdirSync(dir, { recursive: true });
-  const ctx = await browser.newContext({
-    viewport: { width: 440, height: 956 },
-    deviceScaleFactor: 3,
-  });
-  await ctx.addInitScript(
-    `try { localStorage.setItem("caneiLang", ${JSON.stringify(lang)}); } catch (e) {}`,
-  );
-  for (const [name, route, prep] of SHOTS) {
-    const pg = await ctx.newPage();
-    await pg.goto(`${base}/erp.html#${route}`, { waitUntil: "networkidle" });
-    // The workspace renders its first screen from JS and then the i18n layer
-    // rewrites it; a capture taken before both have settled shows a half-built
-    // screen, which is exactly the sort of thing that gets a listing rejected.
-    await pg.waitForTimeout(2600);
-    if (prep) {
-      try {
-        await prep(pg);
-        await pg.waitForTimeout(1600);
-      } catch {
-        /* A screen whose sample data does not offer the row this wanted still
+  for (const [prefix, viewport, deviceScaleFactor] of DEVICES) {
+    const ctx = await browser.newContext({ viewport, deviceScaleFactor });
+    await ctx.addInitScript(
+      `try { localStorage.setItem("caneiLang", ${JSON.stringify(lang)}); } catch (e) {}`,
+    );
+    for (const [name, route, prep] of SHOTS) {
+      const pg = await ctx.newPage();
+      await pg.goto(`${base}/erp.html#${route}`, { waitUntil: "networkidle" });
+      // The workspace renders its first screen from JS and then the i18n layer
+      // rewrites it; a capture taken before both have settled shows a half-built
+      // screen, which is exactly the sort of thing that gets a listing rejected.
+      await pg.waitForTimeout(2600);
+      if (prep) {
+        try {
+          await prep(pg);
+          await pg.waitForTimeout(1600);
+        } catch {
+          /* A screen whose sample data does not offer the row this wanted still
            makes a perfectly good screenshot of that screen. */
-      }
-      /* Back to the top. Opening a row keeps the scroll position of the list it
+        }
+        /* Back to the top. Opening a row keeps the scroll position of the list it
          was clicked in, which put the capture halfway down the page — a picture
          that starts mid-row reads as a broken screen, whatever is in it. */
-      await pg.evaluate(() => window.scrollTo(0, 0));
-      await pg.waitForTimeout(500);
+        await pg.evaluate(() => window.scrollTo(0, 0));
+        await pg.waitForTimeout(500);
+      }
+      const file = `${prefix}-${name}.png`;
+      await pg.screenshot({ path: join(dir, file) });
+      console.log(`${locale}/${file}`);
+      await pg.close();
     }
-    await pg.screenshot({ path: join(dir, `${name}.png`) });
-    console.log(`${locale}/${name}.png`);
-    await pg.close();
+    await ctx.close();
   }
-  await ctx.close();
 }
 
 await browser.close();

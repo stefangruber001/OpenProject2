@@ -146,6 +146,63 @@ platform :ios do
   # if the store is ever lost. Not otherwise: each run of THIS lane is a
   # certificate against the account's cap of three, which is the whole problem
   # it exists to end.
+  # WHAT APPLE ACTUALLY HOLDS, BEFORE ANYTHING TRIES TO ADD TO IT.
+  #
+  # "Reached the maximum number of available Distribution certificates" is the
+  # one error in this file that cannot be diagnosed from the log it prints. It
+  # does not say how many there are, which kinds count, or which of them the
+  # portal is still holding after somebody has revoked what they believed to be
+  # the right rows — and the portal's own list is paginated and sorted in ways
+  # that hide the answer. Three runs were spent on that guess.
+  #
+  # So this asks, and prints. It creates nothing and revokes nothing; it is safe
+  # to run at any time, and it is run before the creating lane so that a failure
+  # arrives with its evidence already on screen.
+  #
+  # The cap is per certificate TYPE, not per account, which is the detail that
+  # makes the portal misleading: "Distribution" (Apple Distribution) and
+  # "iOS Distribution" are different types with separate counters, and a
+  # Xcode-managed row counts against one of them while looking like neither.
+  desc "Read-only: list the signing certificates Apple holds for this account"
+  lane :certificates_audit do
+    require "spaceship"
+
+    Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.create(**asc_api_key)
+
+    certs = Spaceship::ConnectAPI::Certificate.all
+    rows = certs.map do |c|
+      {
+        type: c.certificate_type.to_s,
+        name: c.display_name.to_s,
+        expires: c.expiration_date.to_s[0, 10],
+        id: c.id.to_s
+      }
+    end
+
+    puts ""
+    puts "#{rows.length} certificate(s) on the account:"
+    puts ""
+    rows.sort_by { |r| [r[:type], r[:expires]] }.each do |r|
+      puts format("  %-22s  %-28s  expires %-12s  %s",
+                  r[:type], r[:name][0, 28], r[:expires], r[:id])
+    end
+
+    puts ""
+    puts "Per type:"
+    rows.group_by { |r| r[:type] }.sort.each do |type, list|
+      puts format("  %-22s  %d", type, list.length)
+    end
+
+    # The two that matter for an App Store upload. match's `generate_apple_certs`
+    # default mints DISTRIBUTION; IOS_DISTRIBUTION is the legacy type that still
+    # occupies its own slot. Either being full stops the creating lane.
+    %w[DISTRIBUTION IOS_DISTRIBUTION].each do |type|
+      n = rows.count { |r| r[:type] == type }
+      puts "  → #{type} is at #{n} of 3#{n >= 3 ? "  ← FULL, this is what blocks creation" : ""}"
+    end
+    puts ""
+  end
+
   desc "ONE-OFF: create the signing certificate and store it encrypted"
   lane :certificates do
     setup_ci if is_ci

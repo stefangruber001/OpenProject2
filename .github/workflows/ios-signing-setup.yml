@@ -78,6 +78,19 @@ jobs:
           echo "MATCH_GIT_BASIC_AUTHORIZATION=$(printf 'x-access-token:%s' \
             "${{ secrets.GITHUB_TOKEN }}" | base64 | tr -d '\n')" >> "$GITHUB_ENV"
 
+      # EVIDENCE FIRST. This creates nothing; it prints what Apple holds, so
+      # that if the next step fails on the cap the log already says which type
+      # is full and which rows are occupying it. `continue-on-error` because a
+      # diagnostic must never be the reason the real work does not run.
+      - name: What certificates does Apple already hold?
+        continue-on-error: true
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
+        run: bundle exec fastlane certificates_audit
+
       - name: Create and store the signing identity
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}

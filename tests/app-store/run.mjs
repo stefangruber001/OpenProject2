@@ -187,12 +187,49 @@ check(
 /* ------------------------------------------------------- 4 · the screenshots
    Sizes read from the PNG header, never from the filename: a file called
    6.9-inch.png is a claim, and Apple checks the pixels. */
-const APPLE_SIZES = [
-  [1320, 2868], // 6.9-inch iPhone, portrait — the one size Apple requires
-  [2868, 1320],
-  [1290, 2796], // 6.7-inch iPhone, still accepted
-  [2796, 1290],
-];
+/* Grouped BY DEVICE FAMILY, because that is how App Store Connect counts them.
+   A listing does not need "some screenshots"; it needs screenshots for each
+   family the binary is offered on, and a family with none is a submission that
+   cannot be sent — a whole review slot spent discovering a fact that is sitting
+   in the Xcode project the whole time. */
+const APPLE_SIZES = {
+  iPhone: [
+    [1320, 2868], // 6.9-inch, portrait — the size Apple currently requires
+    [2868, 1320],
+    [1290, 2796], // 6.7-inch, still accepted
+    [2796, 1290],
+  ],
+  iPad: [
+    [2048, 2732], // 13-inch, portrait
+    [2732, 2048],
+    [2064, 2752], // 13-inch, the other accepted pair
+    [2752, 2064],
+  ],
+};
+const familyOf = (w, h) =>
+  Object.keys(APPLE_SIZES).find((f) => APPLE_SIZES[f].some(([a, b]) => a === w && b === h)) || null;
+
+/* WHICH FAMILIES THIS BINARY IS OFFERED ON — read out of the project, not
+   assumed. TARGETED_DEVICE_FAMILY is Apple's own numbering: 1 is iPhone (and
+   iPod touch), 2 is iPad. "1,2" means the app appears in the iPad App Store and
+   therefore owes it pictures. Flip the project to "1" and this check stops
+   asking for them, which is the point: one source of truth, read twice. */
+const PBXPROJ = path.join(ROOT, "ios/CaneiSubirats.xcodeproj/project.pbxproj");
+const FAMILY_NAMES = { 1: "iPhone", 2: "iPad" };
+const pbx = read(PBXPROJ);
+const families = pbx
+  ? [
+      ...new Set(
+        [...pbx.matchAll(/TARGETED_DEVICE_FAMILY\s*=\s*"?([0-9, ]+)"?\s*;/g)].flatMap((m) =>
+          m[1].split(",").map((n) => FAMILY_NAMES[n.trim()]),
+        ),
+      ),
+    ].filter(Boolean)
+  : [];
+check(
+  families.length > 0,
+  `could not read TARGETED_DEVICE_FAMILY from the Xcode project — without it there is no way to know which screenshot sizes Apple will demand`,
+);
 function pngSize(file) {
   const b = fs.readFileSync(file);
   if (b.length < 24 || b.toString("hex", 0, 8) !== "89504e470d0a1a0a") return null;
@@ -209,19 +246,32 @@ if (!fs.existsSync(SHOTS)) {
       continue;
     }
     const shots = fs.readdirSync(dir).filter((f) => f.toLowerCase().endsWith(".png"));
-    check(
-      shots.length >= 3 && shots.length <= 10,
-      `${loc}: ${shots.length} screenshots — Apple takes between 3 and 10`,
-    );
+    const perFamily = Object.fromEntries(Object.keys(APPLE_SIZES).map((f) => [f, 0]));
     for (const s of shots) {
       const size = pngSize(path.join(dir, s));
       if (!size) {
         fail.push(`${loc}/${s} is not a readable PNG`);
         continue;
       }
+      const family = familyOf(size[0], size[1]);
+      if (!family) {
+        fail.push(
+          `${loc}/${s} is ${size[0]}×${size[1]}, which is not an App Store screenshot size`,
+        );
+        continue;
+      }
+      pass += 1;
+      perFamily[family] += 1;
+    }
+    /* Counted per family, because Apple's 3-to-10 is per family too. Ten
+       pictures that are all iPhone is not a listing that can be submitted. */
+    for (const family of families) {
+      const n = perFamily[family] || 0;
       check(
-        APPLE_SIZES.some(([w, h]) => w === size[0] && h === size[1]),
-        `${loc}/${s} is ${size[0]}×${size[1]}, which is not an App Store screenshot size`,
+        n >= 3 && n <= 10,
+        `${loc}: ${n} ${family} screenshot(s) — the app is built for ${family} ` +
+          `(TARGETED_DEVICE_FAMILY in the Xcode project), and Apple takes between 3 and 10 per device. ` +
+          `Run \`node scripts/app-store-shots.mjs\`.`,
       );
     }
   }
