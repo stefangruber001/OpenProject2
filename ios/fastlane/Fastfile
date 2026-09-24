@@ -306,7 +306,33 @@ platform :ios do
   # this refuses to start rather than spend one. The password is never committed:
   # it comes from ASC_DEMO_PASSWORD and is written into the metadata only for the
   # length of the run.
-  REVIEW_DIR = "fastlane/metadata/review_information".freeze
+  # ALL OF THESE ARE ABSOLUTE, AND THAT IS THE WHOLE POINT.
+  #
+  # fastlane runs a lane with the working directory changed to the `fastlane`
+  # folder itself (runner.rb does the chdir). So the perfectly reasonable-looking
+  # "fastlane/metadata/…" resolved to ios/fastlane/**fastlane**/metadata/… — a
+  # path that has never existed. Everything downstream then failed OPEN rather
+  # than loudly:
+  #
+  #   · `Dir.exist?("fastlane/screenshots")` was false, so `skip_screenshots`
+  #     came out true and the listing went up without a single picture.
+  #   · `refuse_if_unfilled!` globbed the missing directory, got an empty list,
+  #     found nothing containing FILL-ME and returned happily. THE GATE AGAINST
+  #     SUBMITTING A PLACEHOLDER PASSWORD HAS NEVER CHECKED ANYTHING.
+  #   · `with_demo_password` never wrote the secret, because the write was
+  #     guarded on the variable being set and it was not — so the bug stayed
+  #     invisible until the day the secret was finally added, at which point the
+  #     write ran for the first time and blew up on the missing directory.
+  #
+  # That last one is the only reason this was ever seen. Had the secret been
+  # added a day earlier, the lane would have sailed through and sent Apple a
+  # demo password of "FILL-ME" — a guideline 2.1 rejection, which is the exact
+  # thing the gate exists to prevent.
+  #
+  # `__dir__` is this file's own directory. It does not move when fastlane
+  # chdirs, so nothing below depends on where anyone ran anything from.
+  META_DIR = File.expand_path("metadata", __dir__).freeze
+  REVIEW_DIR = File.join(META_DIR, "review_information").freeze
   DEMO_PW_FILE = File.join(REVIEW_DIR, "demo_password.txt").freeze
 
   # ABSOLUTE, FROM THIS FILE. Not "fastlane/screenshots" relative to whatever
@@ -358,10 +384,27 @@ platform :ios do
   end
 
   # Call inside with_demo_password, so the environment variable counts as filled.
+  #
+  # LOOKING AND FINDING NOTHING IS NOT THE SAME AS FINDING NOTHING WRONG. This
+  # used to read an empty list from a directory that did not exist and conclude
+  # that every field was filled. A check whose passing condition is "I saw no
+  # files" passes hardest exactly when it is pointed at the wrong place, which
+  # is the one situation it most needs to fail. So the files are counted first,
+  # and an implausible count is itself the failure.
+  EXPECTED_REVIEW_FIELDS = %w[
+    demo_password demo_user email_address first_name last_name notes phone_number
+  ].freeze
+
   def refuse_if_unfilled!
-    missing = Dir[File.join(REVIEW_DIR, "*.txt")].select do |f|
-      File.read(f).include?("FILL-ME")
-    end
+    found = Dir[File.join(REVIEW_DIR, "*.txt")]
+    UI.user_error!(
+      "No App Review fields found under #{REVIEW_DIR} — expected " \
+        "#{EXPECTED_REVIEW_FIELDS.length} (#{EXPECTED_REVIEW_FIELDS.join(', ')}). " \
+        "The directory is missing or the path is wrong; either way nothing was " \
+        "checked, and an unchecked submission is the thing this refuses to make."
+    ) if found.length < EXPECTED_REVIEW_FIELDS.length
+
+    missing = found.select { |f| File.read(f).include?("FILL-ME") }
     return if missing.empty?
     names = missing.map { |f| File.basename(f, ".txt") }.sort.join(", ")
     UI.user_error!(
