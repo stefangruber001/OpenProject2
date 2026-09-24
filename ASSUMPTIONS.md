@@ -11557,3 +11557,32 @@ the app to the organisation is a setting on the app record — Distribution →
 Pricing and Availability → custom app → Organization ID **554059950857**. Neither
 `deliver` nor the App Store Connect API exposes it; it is a screen. Recorded in
 `docs/RELEASE-IOS.md` so the value is not hunted for again.
+
+## S31 · Gastar una ranura libre antes que revocar (2026-09-24)
+
+Apple cuenta el cupo de certificados **por tipo**. Esta cuenta tenía
+`DISTRIBUTION` a 3 de 3 y `IOS_DISTRIBUTION` a 1 de 3. Se podía revocar uno de
+los tres llenos o crear el certificado en el tipo que tenía sitio.
+
+**Decisión: el tipo con sitio.** Una revocación es irreversible y mata el
+certificado en todas partes a la vez, incluido el Mac que guarde su clave
+privada; los tres que quedaban no eran los que el operador había visto en el
+portal y no se podía saber de quién eran, porque la API devuelve el nombre común
+del certificado —que Apple pone al titular de la cuenta lo pida quien lo pida— y
+no su procedencia. Gastar una ranura vacía no destruye nada, y un certificado
+iOS Distribution firma una subida a la App Store igual de bien.
+
+Reversible: si algún día hace falta el tipo moderno, se revoca éste y se vuelve a
+ejecutar el carril sin `legacy`.
+
+## S32 · Las capturas de iPad se generan, no se quitan (2026-09-24)
+
+El proyecto ofrece la app en iPad y no había capturas de iPad. Dos salidas:
+generarlas, o poner `TARGETED_DEVICE_FAMILY = "1"` y dejar de ofrecerla ahí.
+
+**Decisión: generarlas.** Quitar el iPad es reducir el producto para contentar a
+un guardián, y nadie lo había pedido — en una empresa de reformas el iPad en obra
+es un sitio razonable donde tener esto. De los dos tamaños que Apple acepta para
+la ranura de 13 pulgadas se usa **2048 × 2732**, el que `deliver` lleva años
+mapeando; una ficha no es el sitio donde averiguar cuál de dos números igual de
+válidos conoce la versión de fastlane que toque.

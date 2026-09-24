@@ -4074,3 +4074,41 @@ setup** (never yet run) · **iOS · TestFlight** for build **15** — TestFlight
 build 14, which predates `PrivacyInfo.xcprivacy` and would be ITMS-91056 · and
 the one screen no API exposes: Distribution → Pricing and Availability → custom
 app → the Organization ID.
+
+## S31 · Cinco puertas cerradas, y una que nunca comprobó nada (2026-09-24)
+
+**El build 15 está en TestFlight, procesado**, con el manifiesto de privacidad
+dentro. La ficha está subida a la versión **1.1** con el build 15 enganchado, las
+**treinta** capturas arriba y el precheck limpio. No se ha enviado nada a
+revisión: eso lo pulsa el operador.
+
+Entre el «todo listo» de esta mañana y aquí hubo cinco bloqueos. Ninguno estaba
+en rojo; el repositorio decía 121/121 con cuatro de ellos vivos.
+
+1. **Sin capturas de iPad.** El proyecto declara `TARGETED_DEVICE_FAMILY = "1,2"`,
+   así que App Store Connect no acepta el envío hasta que la ranura de iPad tiene
+   imágenes, y había cero. El guardián sólo conocía el iPhone de 6,9". Ahora lee
+   la familia del propio proyecto y cuenta por familia.
+2. **El cupo de certificados era el del otro tipo.** DISTRIBUTION a 3 de 3,
+   IOS_DISTRIBUTION a 1 de 3. Se gastó la ranura libre en vez de revocar: una
+   revocación es irreversible y mata la clave en el Mac que la tenga.
+3. **Firma manual sin identidad.** Pasar a `CODE_SIGN_STYLE=Manual` apaga la
+   elección automática y deja `CODE_SIGN_IDENTITY` en un valor de desarrollo. Se
+   lee ahora del llavero.
+4. **Las capturas no se subían** y **la ficha iba a la versión 1.0**, a la que
+   ningún binario 1.1 puede engancharse — de ahí que la app no tuviera icono
+   allí: el icono se lee del build adjunto, y no había build adjunto.
+5. **La causa común de 4, y la grave.** fastlane ejecuta un carril con el
+   directorio cambiado a la propia carpeta `fastlane`, así que
+   «fastlane/metadata/…» apuntaba a un sitio inexistente. `refuse_if_unfilled!`
+   recorría ese vacío, no encontraba ningún FILL-ME y aprobaba: **la puerta que
+   impide mandarle a App Review una contraseña de mentira no había comprobado
+   nunca nada.** Sólo se vio porque el día que se añadió `ASC_DEMO_PASSWORD` la
+   escritura se ejecutó por primera vez y reventó. Un día antes, el envío habría
+   salido con la contraseña «FILL-ME» — rechazo por la 2.1.
+
+Rutas desde `__dir__`, y la puerta cuenta los campos antes de juzgarlos.
+
+**Lo que queda, y es del operador:** comprobar que el acceso de demo funciona de
+verdad (la puerta comprueba que el campo no está vacío, no que la contraseña
+sirva), decidir el cuestionario de App Privacy, y pulsar Submit.
