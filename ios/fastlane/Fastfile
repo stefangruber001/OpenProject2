@@ -173,6 +173,12 @@ platform :ios do
     rows = certs.map do |c|
       {
         type: c.certificate_type.to_s,
+        # THE NAME IS NOT THE AUTHOR. This is the certificate's common name,
+        # which Apple sets to the account holder for distribution certificates
+        # whoever asked for them — so a row reading "STEFAN GRUBER" may well
+        # have been minted by a CI runner. The portal's "Created By" column is a
+        # different field and the API does not return it. Reading this column as
+        # provenance is how four certificates got revoked for the wrong reason.
         name: c.display_name.to_s,
         expires: c.expiration_date.to_s[0, 10],
         id: c.id.to_s
@@ -204,20 +210,40 @@ platform :ios do
   end
 
   desc "ONE-OFF: create the signing certificate and store it encrypted"
-  lane :certificates do
+  lane :certificates do |options|
     setup_ci if is_ci
     UI.user_error!("MATCH_PASSWORD is not set — nothing can be encrypted") if
       ENV["MATCH_PASSWORD"].to_s.strip.empty?
 
+    # WHICH OF THE TWO DISTRIBUTION BUCKETS TO SPEND.
+    #
+    # Apple caps each certificate TYPE at three, separately. "Apple
+    # Distribution" (DISTRIBUTION) is the modern one and the one match mints by
+    # default; "iOS Distribution" (IOS_DISTRIBUTION) is the older one, still
+    # issued and still perfectly able to sign an App Store build.
+    #
+    # This account's DISTRIBUTION bucket is full and its IOS_DISTRIBUTION bucket
+    # is not. The alternative to using the free bucket is revoking one of the
+    # three that are full — and a revocation is irreversible, kills that
+    # certificate everywhere at once including on whatever Mac is holding its
+    # private key, and cannot be undone if it turns out to have been the wrong
+    # one. Spending an empty slot destroys nothing. That is the whole argument.
+    #
+    # `legacy: true` picks the older type. Run certificates_audit first; it
+    # prints which bucket has room.
+    legacy = options[:legacy].to_s.strip.downcase == "true"
+
     match(
       type: "appstore",
       readonly: false,
+      generate_apple_certs: !legacy,
       api_key: asc_api_key,
       keychain_name: ENV["MATCH_KEYCHAIN_NAME"] || "fastlane_tmp_keychain",
       keychain_password: ENV["MATCH_KEYCHAIN_PASSWORD"] || ""
     )
 
-    puts "✓ Certificate and profile stored. Every build from here reuses them."
+    kind = legacy ? "iOS Distribution" : "Apple Distribution"
+    puts "✓ #{kind} certificate and profile stored. Every build from here reuses them."
   end
 
   # ---------------------------------------------------------------- release

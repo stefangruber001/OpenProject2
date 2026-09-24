@@ -34,6 +34,11 @@ on:
         description: "Type CREATE to confirm — this uses one of your three certificate slots"
         required: true
         default: ""
+      legacy:
+        description: "Use the iOS Distribution bucket instead of Apple Distribution (the audit step prints which has room)"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: ios-signing
@@ -99,7 +104,10 @@ jobs:
           DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
           APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'com.caneisubirats.erp' }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-        run: bundle exec fastlane certificates
+        # Quoted and coerced in the lane: a GitHub boolean interpolates as the
+        # STRING "false", and every string is truthy in Ruby. That exact shape
+        # once turned a "do not submit" into a submission.
+        run: bundle exec fastlane certificates legacy:"${{ inputs.legacy }}"
 
       - name: What just happened
         run: |
