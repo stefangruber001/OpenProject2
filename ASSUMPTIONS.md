@@ -11514,3 +11514,46 @@ never the código, so the drawings were never at risk. The column is gone as
 asked — it is theirs to decide, and a register of ten columns is better without
 one nobody sorts by — but the drawing itself is untouched and still appears
 where it earns its width, on the budget line and on the printed quote.
+
+## S137 · "false" is a string, and every string is true (2026-09-24)
+
+**What happened.** Business Manager approval arrived, so the listing was uploaded
+with `submit: false` — deliberately the half that changes nothing at Apple. The
+run finished with:
+
+> ✓ Listing uploaded and build submitted for review.
+
+It had not submitted. That line was printed unconditionally, outside any branch,
+so it said the same thing on both paths and could not be used to tell them apart.
+The only way to learn whether an app had gone to App Review was to open App Store
+Connect and look.
+
+**And underneath it, a real one.** `ios-release.yml` runs
+`fastlane release submit:${{ inputs.submit }}`. A GitHub boolean interpolates as
+the text `false`, a lane option from the command line arrives as a String, and in
+Ruby `"false"` is truthy. So "do not submit" reached `submit_for_review:` as a
+value meaning submit. What saved it is that fastlane's configuration layer
+coerces `"false"` for a Boolean option — a library internal standing between a
+typo and somebody's App Store account.
+
+**Both fixed, and the fix is the explicit one.** `submit_requested?` accepts only
+`true` or the word "true"; everything else — "false", empty, nil, a typo — reads
+as do-not-submit, because submitting is the irreversible half and an ambiguous
+value must fall on the side that does nothing. The default when nobody says
+anything stays `true`, matching the workflow's own default: a lane called
+`release` that quietly did not release would be its own trap. Nine cases pinned.
+The closing message now names which of the two things happened.
+
+**Two things Apple's precheck found in the same run**, both now fixed:
+`copyright.txt` carried no year («Canei Subirats, S.L.»), which is a named
+precheck failure; and the app record has an **en-GB** locale — it is the one the
+listing opens in — which we had never supplied, so it sat empty while en-US and
+es-ES were filled. `en-GB` is added as a mirror of `en-US` (metadata and the five
+screenshots, which differ per language: es-ES shows the Spanish interface). The
+gate goes 77 → **102 checks over three locales**.
+
+**What could NOT be done from here, and is not a gap in the tooling.** Assigning
+the app to the organisation is a setting on the app record — Distribution →
+Pricing and Availability → custom app → Organization ID **554059950857**. Neither
+`deliver` nor the App Store Connect API exposes it; it is a screen. Recorded in
+`docs/RELEASE-IOS.md` so the value is not hunted for again.

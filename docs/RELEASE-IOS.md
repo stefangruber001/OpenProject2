@@ -35,11 +35,18 @@ when the Organization ID exists.
 
 ### Enrolling in Apple Business Manager — what it actually involves
 
-Checked 14 Sep 2026: **Canei is not enrolled.** Until it is, there is no
-Organization ID, App Store Connect cannot be set to custom distribution, and a
-submission would go in as a PUBLIC app — into precisely the rejection this whole
-route exists to avoid. So this is the critical path, and it is worth starting
-before anything else.
+**Enrolled and verified, 24 Sep 2026.** Apple approved the Business account.
+
+|                     |                                                                         |
+| ------------------- | ----------------------------------------------------------------------- |
+| Organization name   | **Canei Subirats** (verified)                                           |
+| **Organization ID** | **554059950857**                                                        |
+| Address on record   | Carrer de les Roquetes 5 – Planta 1, 08960 Sant Just Desvern, Barcelona |
+
+That ID is not a credential — it is what you hand a developer so they can make an
+app available to the organisation — so it lives here rather than in a secret.
+
+The history below is kept because it is what the next company will go through.
 
 1. **Get a D-U-N-S number if the company has none.** It is a free nine-digit
    identifier from Dun & Bradstreet, and Apple has its own request form for it:
