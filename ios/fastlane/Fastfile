@@ -57,6 +57,21 @@ def asc_api_key
   end
 end
 
+# The code-signing identity match just installed, by its common name.
+#
+# `security find-identity -v -p codesigning` lists what the search list holds as
+#   1) A1B2C3… "Apple Distribution: Stefan Gruber (5V62K942X6)"
+# and xcodebuild's CODE_SIGN_IDENTITY matches on the quoted name. Distribution
+# comes first because a runner can hold a development identity too and picking
+# it is how a release build gets signed with the wrong key — an .ipa that
+# uploads and then fails validation, which is the slowest way to find out.
+def distribution_identity
+  names = `security find-identity -v -p codesigning 2>/dev/null`.scan(/"([^"]+)"/).flatten
+  names.find { |n| n.start_with?("Apple Distribution") } ||
+    names.find { |n| n.start_with?("iPhone Distribution") } ||
+    names.find { |n| n.include?("Distribution") }
+end
+
 platform :ios do
   desc "Build and upload a new beta build to TestFlight"
   lane :beta do
@@ -102,6 +117,31 @@ platform :ios do
     # second place to keep them in step.
     profile = lane_context[SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING][BUNDLE_ID]
 
+    # AND THE IDENTITY, WHICH SWITCHING TO MANUAL DOES NOT CARRY OVER.
+    #
+    # The project is CODE_SIGN_STYLE = Automatic with no CODE_SIGN_IDENTITY of
+    # its own, because under automatic signing Xcode picks one. Overriding the
+    # style to Manual here turns that off — and leaves CODE_SIGN_IDENTITY at
+    # Xcode's default, which is a DEVELOPMENT identity. The build then failed
+    # looking for an "iOS Development" certificate that a release runner has no
+    # reason to hold, while the distribution certificate match had just
+    # installed sat unused in the keychain.
+    #
+    # READ FROM THE KEYCHAIN, NOT WRITTEN DOWN. The two distribution kinds have
+    # different common names — "Apple Distribution: …" for the modern type,
+    # "iPhone Distribution: …" for the older one this account's free slot gave
+    # us — and xcodebuild matches on that name. Hardcoding either would be a
+    # second source of truth that breaks silently the day the other kind is
+    # stored, which is exactly the sort of thing that surfaces as a failed
+    # release build months later. So: ask the keychain what match put there.
+    identity = distribution_identity
+    UI.user_error!(
+      "No distribution identity in the keychain after match. The store on the " \
+        "`certificates` branch is empty or holds the wrong kind — run the " \
+        "'iOS · Signing setup' workflow."
+    ) if identity.nil?
+    UI.message("Signing with: #{identity}")
+
     build_app(
       project: PROJECT,
       scheme: SCHEME,
@@ -110,12 +150,14 @@ platform :ios do
       xcargs: [
         "CODE_SIGN_STYLE=Manual",
         "DEVELOPMENT_TEAM=#{TEAM_ID}",
+        "CODE_SIGN_IDENTITY=#{identity.shellescape}",
         "PROVISIONING_PROFILE_SPECIFIER=#{profile.shellescape}"
       ].join(" "),
       export_options: {
         method: "app-store",
         signingStyle: "manual",
         teamID: TEAM_ID,
+        signingCertificate: identity,
         provisioningProfiles: { BUNDLE_ID => profile }
       },
       output_directory: "build",
