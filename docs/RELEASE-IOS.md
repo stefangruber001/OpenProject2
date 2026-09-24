@@ -157,8 +157,13 @@ RGPD requires whatever the distribution method.
 
 ### The screenshots — taken
 
-`ios/fastlane/screenshots/{en-US,es-ES}/` — five screens each, at 1320 × 2868
-(the 6.9-inch iPhone, the one size Apple requires). Captured from the running
+`ios/fastlane/screenshots/{en-US,en-GB,es-ES}/` — five screens each at
+1320 × 2868 (6.9-inch iPhone) **and** five at 2048 × 2732 (13-inch iPad), thirty
+files in all. Both sizes are required because the Xcode project sets
+`TARGETED_DEVICE_FAMILY = "1,2"`: the app is offered on iPad, and App Store
+Connect will not accept a submission whose iPad slot is empty. If the app is
+ever made iPhone-only, `tests/app-store/run.mjs` reads that setting and stops
+asking for the iPad set by itself. Captured from the running
 workspace, which is the interface the app shows; they do not include the native
 tab bar the shell draws, because that belongs to the shell and not the page.
 Replace them with device captures from TestFlight if you prefer — same

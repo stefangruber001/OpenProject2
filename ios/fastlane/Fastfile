@@ -309,6 +309,22 @@ platform :ios do
   REVIEW_DIR = "fastlane/metadata/review_information".freeze
   DEMO_PW_FILE = File.join(REVIEW_DIR, "demo_password.txt").freeze
 
+  # ABSOLUTE, FROM THIS FILE. Not "fastlane/screenshots" relative to whatever
+  # the working directory happens to be.
+  #
+  # The old relative form silently disabled the screenshot upload. `deliver`
+  # printed `skip_screenshots | true` in its summary, uploaded the text, said
+  # "Listing uploaded", passed precheck and exited 0 — and the listing sat in
+  # App Store Connect with no pictures in it. Nothing failed. The screenshots
+  # were committed, the gate said 121/121, and the only way to find out was to
+  # open App Store Connect and look.
+  #
+  # `__dir__` is this Fastfile's own directory, so the path is the same whoever
+  # runs it from wherever. Passing it to `screenshots_path` as well means
+  # deliver reads the same folder this decided on, instead of re-deriving its
+  # own and possibly disagreeing.
+  SHOTS_DIR = File.expand_path("screenshots", __dir__).freeze
+
   # `deliver` reads the password out of a FILE, so the secret has to touch the
   # working copy. That file is tracked — it ships the FILL-ME placeholder — so
   # whatever is written here is put back afterwards no matter how the lane ends.
@@ -362,15 +378,50 @@ platform :ios do
     with_demo_password do
       refuse_if_unfilled!
 
+      shots = Dir[File.join(SHOTS_DIR, "*", "*.png")]
+      UI.user_error!(
+        "No screenshots under #{SHOTS_DIR} — Apple will not take a listing " \
+          "without them. Run `node scripts/app-store-shots.mjs` and commit."
+      ) if shots.empty?
+      UI.message("Uploading #{shots.length} screenshots from #{SHOTS_DIR}")
+
+      # THE VERSION AND THE BUILD, NAMED RATHER THAN INFERRED.
+      #
+      # Left to itself, deliver edited whatever version App Store Connect had
+      # open — which was 1.0, while the project has been on 1.1 and TestFlight
+      # holds 1.1 builds. So the listing went onto a version no build can ever
+      # belong to: App Store Connect will not attach a 1.1 binary to a 1.0
+      # version. That is why the app had no icon there. The icon is not
+      # something a listing carries; it is read out of the attached build, and
+      # there was no attached build.
+      #
+      # Both numbers now come from the places that already hold them — the
+      # Xcode project for the version, TestFlight for the build — so there is
+      # nothing to keep in step by hand.
+      version = get_version_number(xcodeproj: PROJECT, target: SCHEME)
+      build = latest_testflight_build_number(
+        api_key: asc_api_key,
+        app_identifier: BUNDLE_ID,
+        version: version,
+        initial_build_number: 0
+      )
+      UI.user_error!(
+        "TestFlight has no processed build for version #{version}. Run the " \
+          "'iOS · TestFlight' workflow and wait for processing before submitting."
+      ) if build.to_i.zero?
+      UI.message("Listing version #{version}, build #{build}")
+
       upload_to_app_store(
         api_key: asc_api_key,
         app_identifier: BUNDLE_ID,
+        app_version: version,
+        build_number: build.to_s,
         # The build is whatever TestFlight already has — `beta` put it there and
         # it has been tested. Building a second, different binary here would
         # submit something nobody has run.
         skip_binary_upload: true,
-        skip_screenshots: !Dir.exist?("fastlane/screenshots") ||
-          Dir[File.join("fastlane/screenshots", "*", "*.png")].empty?,
+        skip_screenshots: false,
+        screenshots_path: SHOTS_DIR,
         overwrite_screenshots: true,
         # Ask before it goes, unless the caller has already decided.
         #
