@@ -4045,3 +4045,32 @@ Gates: site E2E 863/863 · migrations 135/135 (was 124) · real-life 8/8 · sync
 pdf 44 · band · docx 124 · doc-i18n 13 · codes 38 · links 29 · pictograms 42 ·
 simulations 849 · catalogue-i18n 12 · i18n 158/158 en+ca · boundaries · lint ·
 check-types · test.
+
+## S30 · The App Store listing, filled — and a "false" that meant true (2026-09-24)
+
+**Business Manager is approved.** Canei Subirats, verified, **Organization ID
+554059950857**, recorded in `docs/RELEASE-IOS.md` — it is not a credential, it is
+what you hand a developer so an app can be made available to the organisation.
+
+**The listing is no longer empty.** `ios-release.yml` with `submit: false` had
+never been run, which is the whole reason App Store Connect showed 0 screenshots
+and no description. Uploaded for **en-GB · en-US · es-ES**, precheck clean.
+
+**Two defects found by running it.** The lane's closing line claimed the build had
+been submitted for review on every run, including the ones whose purpose was not
+to submit — printed outside any branch, so it could not distinguish the two. And
+`fastlane release submit:${{ inputs.submit }}` hands Ruby the _string_ `"false"`,
+which is truthy: "do not submit" arrived meaning submit, saved only by a coercion
+inside fastlane. `submit_requested?` now decides explicitly, nine cases pinned,
+and the message names which of the two things happened.
+
+**Two from Apple's own precheck**, both fixed: `copyright.txt` had no year, and
+the **en-GB** locale — the one the listing opens in — had never been supplied and
+sat empty. Gate 77 → **102 checks over three locales**, green in `--ready` too.
+
+**Still required before a submission is possible**, in order: revoke the four
+API-created distribution certificates · add `MATCH_PASSWORD` · **iOS · Signing
+setup** (never yet run) · **iOS · TestFlight** for build **15** — TestFlight holds
+build 14, which predates `PrivacyInfo.xcprivacy` and would be ITMS-91056 · and
+the one screen no API exposes: Distribution → Pricing and Availability → custom
+app → the Organization ID.
