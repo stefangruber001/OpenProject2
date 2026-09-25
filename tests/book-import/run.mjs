@@ -458,6 +458,72 @@ function bookErp() {
     JSON.stringify(erp.state.catalogue.map((i) => i.desc)),
   );
   is(made.lines === 3 && made.chapters === 2, "the count reports the draft", JSON.stringify(made));
+
+  /* THE SAME SHEET TWICE. Reported from dev on 25/09: «every time I import the
+     same budget this number grows by 3» — three being the partidas in the
+     sheet. `applyBudget` added a chapter and its lines unconditionally, so a
+     second upload built a second copy of the budget underneath the first. The
+     book half was idempotent and tested; this half was neither. */
+  const again = B.applyBudget(erp, b.id, B.planBudget(erp, rows), "t", { fileName: "obra.xlsx" });
+  const v2 = erp.currentVersion(b.id);
+  is(
+    v2.chapters.length === 2,
+    "importing the same sheet again adds no partida",
+    v2.chapters.length,
+  );
+  is(
+    v2.chapters.reduce((a, c) => a + c.lines.length, 0) === 3,
+    "\u2026and no line",
+    JSON.stringify(v2.chapters.map((c) => c.name + ":" + c.lines.length)),
+  );
+  is(
+    again.chapters === 0 && again.lines === 0 && again.relined === 3,
+    "\u2026and the count says so: nothing new, three rewritten",
+    JSON.stringify(again),
+  );
+
+  /* A CHANGED figure on a second pass rewrites the line rather than adding one \u2014
+     «rewrite what is different», the operator's own rule, now on this half too. */
+  const cheaper = rows.map((r) =>
+    r.item === "Punto de agua empotrado" ? Object.assign({}, r, { price: "99", qty: "7" }) : r,
+  );
+  B.applyBudget(erp, b.id, B.planBudget(erp, cheaper), "t", { fileName: "obra.xlsx" });
+  const v3 = erp.currentVersion(b.id);
+  const line = v3.chapters
+    .reduce((a, c) => a.concat(c.lines), [])
+    .filter((l) => l.desc === "Punto de agua empotrado");
+  is(
+    line.length === 1 && line[0].priceCents === 9900 && line[0].qtyMilli === 7000,
+    "a second pass with a new figure rewrites the line, and there is still one of it",
+    JSON.stringify(line.map((l) => [l.priceCents, l.qtyMilli])),
+  );
+
+  /* The same trade under two títulos must stay two chapters: matching on the
+     partida name alone would merge what the 17 Sep change deliberately split. */
+  const twice = B.applyBudget(
+    erp,
+    b.id,
+    B.planBudget(erp, [
+      {
+        row: 2,
+        title: "Reforma de cocina",
+        chapter: "Fontanería",
+        item: "Toma de lavavajillas",
+        unit: "ud",
+        qty: "1",
+        price: "60",
+        cost: "30",
+      },
+    ]),
+    "t",
+    { fileName: "obra.xlsx" },
+  );
+  const v4 = erp.currentVersion(b.id);
+  is(
+    twice.chapters === 1 && v4.chapters.filter((c) => c.name === "Fontanería").length === 2,
+    "the same partida under a different título is a second chapter, not a merge",
+    JSON.stringify(v4.chapters.map((c) => c.title + "/" + c.name)),
+  );
 }
 
 /* ---------- report ---------- */

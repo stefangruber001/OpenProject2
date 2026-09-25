@@ -697,38 +697,70 @@
     erp.state.catalogue.forEach(function (i) {
       byDesc[fold(i.desc)] = i;
     });
+    /* THE SAME SHEET TWICE MUST CHANGE NOTHING.
+       Reported from dev on 25/09: «every time I import the same budget this
+       number grows by 3» — three being the partidas in the sheet. This added a
+       chapter and its lines unconditionally, so a second upload of one file
+       built a second copy of the whole budget underneath the first, while the
+       price book stayed put because `applyBook` matches what it already has.
+       One rule for both halves now: a partida already in this version is the
+       partida the sheet means, and a line already under it is the line the sheet
+       means, so re-importing rewrites the figures instead of stacking a
+       duplicate. That is «rewrite what is different» (18/09) applied to the
+       budget, which is where the operator had asked for it in the first place. */
+    var version = erp.currentVersion(budgetId);
+    var haveChapter = {};
+    (version.chapters || []).forEach(function (ch) {
+      haveChapter[fold(ch.title || "") + "\u0000" + fold(ch.name)] = ch;
+    });
+
     var chapters = 0,
-      lines = 0;
+      lines = 0,
+      relined = 0;
     plan.chapters.forEach(function (c) {
-      var chap = erp.addChapter(budgetId, { name: c.name, title: c.title || "" }, user);
-      chapters++;
+      /* Keyed on título AND partida, the same key the planner groups by: the
+         same trade under two títulos is two chapters, so matching on the name
+         alone would merge two partidas the operator deliberately separated. */
+      var key = fold(c.title || "") + "\u0000" + fold(c.name);
+      var chap = haveChapter[key];
+      if (!chap) {
+        chap = erp.addChapter(budgetId, { name: c.name, title: c.title || "" }, user);
+        haveChapter[key] = chap;
+        chapters++;
+      }
+      var haveLine = {};
+      (chap.lines || []).forEach(function (ln) {
+        haveLine[fold(ln.desc)] = ln;
+      });
       c.lines.forEach(function (l) {
         var item = byDesc[fold(l.desc)];
-        erp.addLine(
-          budgetId,
-          chap.id,
-          {
-            itemId: item ? item.id : null,
-            code: item ? item.code : "",
-            desc: l.desc,
-            unit: l.unit || (item ? item.unit : "") || "ud",
-            qtyMilli: l.qtyMilli,
-            priceCents: l.priceCents,
-            costCents: l.costCents,
-            /* No price is «pendiente de valorar», the same state the catalogue
-               picker puts a line in — out of the total, off the document, and
-               counted on Torre until somebody prices it. */
-            pending: !l.priceCents,
-            sourceFile: o.fileName || "",
-            sourceSheet: o.sheetName || "",
-            chapterOriginal: c.name,
-          },
-          user,
-        );
+        var patch = {
+          itemId: item ? item.id : null,
+          code: item ? item.code : "",
+          desc: l.desc,
+          unit: l.unit || (item ? item.unit : "") || "ud",
+          qtyMilli: l.qtyMilli,
+          priceCents: l.priceCents,
+          costCents: l.costCents,
+          /* No price is «pendiente de valorar», the same state the catalogue
+             picker puts a line in — out of the total, off the document, and
+             counted on Torre until somebody prices it. */
+          pending: !l.priceCents,
+          sourceFile: o.fileName || "",
+          sourceSheet: o.sheetName || "",
+          chapterOriginal: c.name,
+        };
+        var existing = haveLine[fold(l.desc)];
+        if (existing) {
+          erp.updateLine(budgetId, chap.id, existing.id, patch, user);
+          relined++;
+          return;
+        }
+        haveLine[fold(l.desc)] = erp.addLine(budgetId, chap.id, patch, user);
         lines++;
       });
     });
-    return Object.assign(made, { chapters: chapters, lines: lines });
+    return Object.assign(made, { chapters: chapters, lines: lines, relined: relined });
   }
 
   return {

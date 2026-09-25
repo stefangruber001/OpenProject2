@@ -18888,6 +18888,49 @@ async function testBookImport(browser, base) {
       ok("importar: «Importar» writes the rows, with correlative códigos, and closes");
     else bad("importar: apply", JSON.stringify(applied));
 
+    /* THREE IMPORTS, THREE PARTIDAS — not nine. Reported from dev on 25/09:
+       «every time I import the same budget this number grows by 3». The budget
+       half added a chapter and its lines unconditionally, so one file uploaded
+       twice built a second copy of the budget under the first. Driven here
+       through the ⬆ Excel button because that is what grew the number. */
+    const twice = await pg.evaluate(async () => {
+      const party =
+        erp.state.parties.find((p) => p.kind === "customer") ||
+        erp.addParty({ kind: "customer", name: "E2E dos veces" }, "e2e");
+      const b = erp.createBudget({ partyId: party.id }, "e2e");
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 1300));
+      const t = ErpBookImport.plantilla("budget");
+      const blob = xlsxBlob(t.name, t.rows, { title: t.name });
+      const buf = await blob.arrayBuffer();
+      const shot = [];
+      for (let pass = 0; pass < 3; pass++) {
+        document.querySelector("#bUpload").click();
+        await new Promise((r) => setTimeout(r, 400));
+        const dt = new DataTransfer();
+        dt.items.add(new File([buf], "presu.xlsx"));
+        const input = document.querySelector("#bk_file");
+        input.files = dt.files;
+        input.dispatchEvent(new Event("change"));
+        await new Promise((r) => setTimeout(r, 900));
+        document.querySelector("#bk_go").click();
+        await new Promise((r) => setTimeout(r, 1500));
+        const v = erp.currentVersion(b.id);
+        shot.push([v.chapters.length, v.chapters.reduce((a, c) => a + c.lines.length, 0)]);
+      }
+      return { passes: shot };
+    });
+    const steady =
+      JSON.stringify(twice.passes) ===
+      JSON.stringify([
+        [3, 4],
+        [3, 4],
+        [3, 4],
+      ]);
+    if (steady)
+      ok("presupuesto: the same sheet three times leaves 3 partidas and 4 líneas, not 9 and 12");
+    else bad("presupuesto: repeated import stacks", JSON.stringify(twice));
+
     /* ── the sheet as a person actually fills it ───────────────────────
        Reported from dev on 25/09: «I have uploaded the doc but the Títulos,
        Partidas and Subpartidas were not created». The partida had been written
@@ -18897,6 +18940,12 @@ async function testBookImport(browser, base) {
        carries down. Checked through the screen, not only the planner, because
        the planner was not what the operator was using. */
     const inherited = await pg.evaluate(async () => {
+      // Back to the register: the repeated-import check above left us in the builder.
+      go("budget-items");
+      await new Promise((r) => setTimeout(r, 700));
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 500));
       const rows = [
         [
           "Título",
