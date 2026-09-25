@@ -4131,3 +4131,65 @@ está vacío; **4.2** (envoltorio web) — las notas de revisión explican que e
 sistema de gestión de una sola empresa, distribuido en privado, y la app usa
 Face ID y la cámara; **privacidad** — el cuestionario de App Privacy responde
 que no se recoge nada, con el razonamiento escrito en `docs/RELEASE-IOS.md`.
+
+## S42 · One sheet in, and nothing written until it has been read back (2026-09-25)
+
+> «I need to create an import button for: Títulos, Partidas and Subpartidas.
+> One button in each subsection. Excel file, one format only (you created). It
+> has to check if there are duplicates, and create the code. If there is no
+> Price or Cost in Subpartida, leave it marked as not completed. Also, ones I
+> am creating a budget, I want to be able to upload a budget in excel (you
+> provide the format).»
+
+Two uploads, one engine: `site/erp-book-import.js`, plus a drawer that both
+buttons open.
+
+**One format for the whole book, which was the operator's own correction.** The
+ask was a button per register; reading it back they said «maybe is a good idea
+to have just one format to upload everything. Titles can be independent and
+Partidas also, but Subpartidas will require to have a Partida associated». That
+is the right shape and the reason is the relationship: a subpartida-only sheet
+either carries its partida anyway — at which point it is this format with
+columns missing — or imports two hundred rows somebody then files by hand. So
+the three buttons hand out and accept **one** sheet; a row with only a título
+creates a título, with only a partida creates a partida, and a subpartida row
+without its partida is refused **by row number** rather than filed nowhere.
+
+**READ → PLAN → APPLY, and the middle one is the feature.** `parse*` reads the
+file, `plan*` compares it against the book and returns what _would_ change
+without touching anything, `apply*` acts on a plan the operator has already
+seen. «Rewrite what is different» is only safe if the difference is legible
+first, so the preview lists it per field — «Precio: 39,00 € → 42,00 €» — and
+counts what would be created before either button is pressed. A blank cell
+erases nothing: it means "not stated in this sheet", not "delete what you have".
+Duplicate descriptions **inside one file** merge, later row winning.
+
+**«Sin completar» is derived, never stored.** A subpartida with no price or no
+cost is marked in the register by reading the row, so filling the gap anywhere
+clears the mark with no second write to forget.
+
+**Códigos are minted, not asked for.** The correlative continues from the book's
+own maximum, so an upload onto tenant #1's renumbered 208 rows starts at
+`SUB-0209` — the convention S41 established, honoured by the importer rather
+than re-decided by it.
+
+**The budget upload drafts, it does not issue.** In the budget format the three
+columns really do nest: a blank Partida means "same partida as the row above",
+a blank Título the same. It creates whatever the sheet names that the book does
+not have — a competitor's spreadsheet knows nothing about this client's price
+book — and then writes chapters and lines into the current **editable** version.
+A line with no price arrives `pending`, the same state the catalogue picker uses:
+out of the total and counted as unpriced until somebody prices it. The budget
+must exist first, because a sheet is a list of work and not a client record;
+inventing the customer from one would put a party on the books nobody entered.
+
+**What the sheet cannot say, and the operator should know.** On a **price-book**
+row, the Título column creates the título and nothing else — since v24 a título
+groups partidas inside one budget, and the book keeps no global answer to which
+partidas sit under it. In the **budget** sheet the same three columns nest,
+because there the grouping is precisely what is being described.
+
+Gates: site E2E 872/872 (was 863, +9) · book 43/43 (new) · simulations 860 · workbook 4 ·
+sync 30 · pdf 44 · band · docx 124 · doc-i18n 13 · codes 38 · links 29 ·
+mailbox 55 · i18n 158/158 en+ca · workspace-audit 0 en+ca · dictionary complete ·
+site scripts 31 · boundaries · lint · check-types · test.

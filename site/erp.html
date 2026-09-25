@@ -5486,6 +5486,7 @@
     <script src="erp-migrations.js"></script>
     <script src="erp-store.js"></script>
     <script src="erp-import.js"></script>
+    <script src="erp-book-import.js"></script>
     <!-- The PDF sibling of erp-import.js — same bank, the other export shape.
      Depends on ErpImport for toCents/toIsoDate (loaded just above) and, only
      once a .pdf is actually chosen, on ErpOcr.loadPdfjs() (below) for pdf.js
@@ -12341,6 +12342,185 @@
           };
       }
 
+      /**
+       * THE UPLOADED WORKBOOK, and the preview that stands between a
+       * spreadsheet and the company's prices.
+       *
+       * One format for the whole book — títulos, partidas and subpartidas in
+       * one sheet — because a subpartida cannot be filed without its partida
+       * and a subpartida-only sheet would either carry the partida anyway or
+       * import rows that then have to be filed by hand, one at a time.
+       * (Operator, 25 Sep: «Maybe is a good idea to have just one format to
+       * upload everything… Subpartidas will require to have a Partida
+       * associated.»)
+       *
+       * NOTHING IS WRITTEN UNTIL THE SECOND BUTTON. The operator chose
+       * «rewrite what is different», which is the useful answer and also the
+       * one that can quietly re-price a book from a stale sheet. So the file
+       * is read, compared and SHOWN — every changed field with its old value
+       * and its new — and only «Importar» applies it. The same rule the rest
+       * of this product follows for anything that cannot be undone.
+       *
+       * The plantilla is written from the same column list the parser reads,
+       * so the file the operator downloads and the file this accepts cannot
+       * drift apart.
+       */
+      function bookImportDrawer(opts) {
+        const o = opts || {};
+        const isBudget = !!o.budgetId;
+        const db = openDrawer(isBudget ? "Subir un presupuesto" : "Importar el libro de precios");
+        const COLS = isBudget ? ErpBookImport.BUDGET_COLUMNS : ErpBookImport.BOOK_COLUMNS;
+        const intro = isBudget
+          ? "Una fila por línea. El título y la partida se repiten solos: déjalos en blanco y la fila sigue en la misma partida. Las subpartidas que no estén en el libro de precios se crean al importar."
+          : "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida; y una subpartida necesita SIEMPRE su partida en la misma fila.";
+        db.innerHTML = `<div class="fgrid">
+         <div class="field full"><div class="it" style="color:var(--muted)">${esc(intro)}</div></div>
+         <div class="field full"><label>Columnas</label>
+           <div style="font-size:12.5px">${COLS.map((c) => `<span class="pill b" style="margin:2px">${esc(c.lab)}</span>`).join("")}</div></div>
+         <div class="field full row" style="gap:8px;margin-top:4px">
+           <button class="btn" id="bk_tpl">⬇ Descargar plantilla</button>
+           <label class="btn primary">Elegir archivo<input type="file" id="bk_file" accept=".xlsx" hidden></label>
+         </div>
+         <div class="field full" id="bk_out"></div>
+        </div>`;
+
+        $("#bk_tpl").onclick = () => {
+          const t = ErpBookImport.plantilla(isBudget ? "budget" : "book");
+          downloadBlob(
+            xlsxBlob(t.name, t.rows, { title: t.name }),
+            (isBudget ? "plantilla-presupuesto" : "plantilla-libro-de-precios") + ".xlsx",
+          );
+        };
+
+        $("#bk_file").onchange = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const out = $("#bk_out");
+          out.innerHTML = `<div class="it">Leyendo ${esc(file.name)}…</div>`;
+          let parsed, plan;
+          try {
+            parsed = isBudget
+              ? await ErpBookImport.parseBudget(await file.arrayBuffer())
+              : await ErpBookImport.parseBook(await file.arrayBuffer());
+            plan = isBudget
+              ? ErpBookImport.planBudget(erp, parsed.rows)
+              : ErpBookImport.planBook(erp, parsed.rows);
+          } catch (err) {
+            out.innerHTML = `<div class="it"><span class="pill r">No se pudo leer</span>
+              <span style="flex:1;margin-left:8px">${esc(String(err.message || err))}</span></div>`;
+            return;
+          }
+          renderPlan(out, plan, parsed, file, isBudget, o);
+        };
+      }
+
+      /* The preview: what the file would do, in the operator's own terms.
+         Built as its own function because it is the half that matters — a
+         count of rows tells nobody whether a sheet is about to halve a price. */
+      function renderPlan(out, plan, parsed, file, isBudget, o) {
+        const book = isBudget ? plan.book : plan;
+        const nNew =
+          book.titles.filter((t) => t.action === "create").length +
+          book.chapters.filter((c) => c.action === "create").length +
+          book.items.filter((i) => i.action === "create").length;
+        const changed = book.items.filter((i) => i.action === "update" && i.changes.length);
+        const errs = plan.errors || [];
+        const incompletos = book.items.filter((i) => i.incomplete).length;
+
+        const rowsHtml = changed
+          .slice(0, 40)
+          .map(
+            (i) =>
+              `<div class="it"><span style="flex:1">${esc(i.desc)}</span><span style="font-size:12px;color:var(--muted)">` +
+              i.changes
+                .map(
+                  (c) =>
+                    esc(c.field) +
+                    ": " +
+                    esc(money(c.field, c.from)) +
+                    " → " +
+                    esc(money(c.field, c.to)),
+                )
+                .join(" · ") +
+              `</span></div>`,
+          )
+          .join("");
+        const errHtml = errs
+          .slice(0, 20)
+          .map(
+            (e) =>
+              `<div class="it"><span class="pill r">Fila ${e.row}</span><span style="flex:1;margin-left:8px">${esc(e.msg)}</span></div>`,
+          )
+          .join("");
+
+        /* EVERY SPANISH WORD INSIDE ONE COMPLETE LITERAL, tags and all.
+           A ternary or a variable written between a greater-than and a
+           less-than is what the source audit reads as a tag pair wrapping a
+           sentence nobody translated — this file has a recorded history of it,
+           and this preview hit it four times in one function. Numbers may be
+           concatenated because a number is not a sentence; words may not. */
+        const IT = '<div class="it">';
+        const NUM_OPEN = "<b>";
+        const NUM_CLOSE = "</b></div>";
+        const L_FILE = '<span class="tag">';
+        const L_ROWS = ' filas</span></div>';
+        const L_NEW = '<span style="flex:1">Se crearán</span>';
+        const L_UPD = '<span style="flex:1">Se actualizarán</span>';
+        const L_CHAP = '<span style="flex:1">Partidas del presupuesto</span>';
+        const L_LINES = '<span style="flex:1">Líneas</span>';
+        const L_INC_A = '<span class="pill y">sin completar</span><span style="flex:1;margin-left:8px">';
+        const L_INC_B = ' sin precio o sin coste</span></div>';
+        const L_SUB1 = " subpartida";
+        const L_SUBN = " subpartidas";
+        const CARD_A = '<div class="card" style="margin-top:10px"><div class="ch"><h3>Lo que cambia</h3>';
+        const CARD_A2 = '<span class="tag">valor actual → valor del archivo</span></div><div class="daylist">';
+        const CARD_B = '<div class="card" style="margin-top:10px"><div class="ch"><h3>Filas que no se pueden importar</h3>';
+        const CARD_B2 = '<span class="tag">';
+        const CARD_B3 = '</span></div><div class="daylist">';
+        const CARD_END = "</div></div>";
+        const ACTIONS =
+          '<div class="field full row" style="gap:8px;margin-top:10px">' +
+          '<button class="btn primary" id="bk_go">Importar</button>' +
+          '<span style="flex:1"></span><button class="btn" id="bk_cancel">Cancelar</button></div>';
+
+        const stat = (label, n) => IT + label + NUM_OPEN + n + NUM_CLOSE;
+        const parts = [
+          '<div class="daylist">',
+          IT + '<span style="flex:1">' + esc(file.name) + "</span>" + L_FILE + parsed.rows.length + L_ROWS,
+          stat(L_NEW, nNew),
+          stat(L_UPD, changed.length),
+          isBudget ? stat(L_CHAP, plan.chapters.length) : "",
+          isBudget ? stat(L_LINES, plan.chapters.reduce((a, c) => a + c.lines.length, 0)) : "",
+          incompletos
+            ? IT + L_INC_A + incompletos + (incompletos === 1 ? L_SUB1 : L_SUBN) + L_INC_B
+            : "",
+          "</div>",
+          changed.length ? CARD_A + CARD_A2 + rowsHtml + CARD_END : "",
+          errs.length ? CARD_B + CARD_B2 + errs.length + CARD_B3 + errHtml + CARD_END : "",
+          ACTIONS,
+        ];
+        out.innerHTML = parts.join("");
+
+        $("#bk_cancel").onclick = () => closeDrawer();
+        $("#bk_go").onclick = () =>
+          mutate(() => {
+            const made = isBudget
+              ? ErpBookImport.applyBudget(erp, o.budgetId, plan, "backoffice", {
+                  fileName: file.name,
+                })
+              : ErpBookImport.applyBook(erp, plan, "backoffice");
+            closeDrawer();
+            if (typeof o.onDone === "function") o.onDone(made);
+          }, isBudget ? "Presupuesto importado" : "Libro de precios importado");
+      }
+
+      /* A money column reads as money in the preview; everything else reads as
+         it is. The plan stores cents because that is what the engine keeps. */
+      function money(field, v) {
+        if (field !== "Precio" && field !== "Coste") return v == null ? "—" : String(v);
+        return v == null || v === "" ? "—" : eur(Number(v));
+      }
+
       function catalogueItemDrawer(id, opts) {
         const it = id ? erp.state.catalogue.find((x) => x.id === id) : null;
         // `opts.chapter` seeds a NEW item's Partida with the one the operator
@@ -17392,7 +17572,7 @@
                  left to add a chapter at all. Every add now sits in the one pane that
                  is always on screen. -->
             <div class="pbh"><button class="pbfold" id="pbFoldL" title="Mostrar u ocultar las partidas">⟨</button>
-             Subpartidas${locked ? "" : '<button class="btn sm" id="bAddTitle" style="margin-left:8px">+ título</button><button class="btn sm" id="bAddChap" style="margin-left:6px">+ partida</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
+             Subpartidas${locked ? "" : '<button class="btn sm" id="bAddTitle" style="margin-left:8px">+ título</button><button class="btn sm" id="bAddChap" style="margin-left:6px">+ partida</button><button class="btn sm" id="bUpload" style="margin-left:6px" title="Subir un presupuesto en Excel: crea lo que falte en el libro de precios y redacta esta versión">⬆ Excel</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
              <button class="pbfold" id="pbFoldR" title="Mostrar u ocultar los totales">⟩</button></div>
             <!-- Column order and names come from Package 1 slide 9, and they are the
                  order the work is actually done in: say what it is, in what unit, what
@@ -17496,6 +17676,23 @@
               .forEach((x) => x.classList.toggle("on", x.dataset.mtab === bMTab));
           };
         });
+        /* The whole budget from a spreadsheet, into THIS version.
+           Only on an editable version — `locked` already hides the button, and
+           the drawer writes through `addChapter`/`addLine`, which refuse a
+           frozen version anyway. The budget must exist first because it names
+           the customer: a sheet is a list of work, not a client record, and
+           inventing a party from one would put a customer on the books that
+           nobody entered. */
+        const upBtn = $("#bUpload");
+        if (upBtn)
+          upBtn.onclick = () =>
+            bookImportDrawer({
+              budgetId: id,
+              /* `mutate` already announces it. A sentence stitched out of two
+                 counts is a sentence no dictionary can hold, and the preview
+                 the operator just read said the same numbers. */
+              onDone: () => render(),
+            });
         const addChap = $("#bAddChap");
         {
           /* Package 1, slide 8 (client's words, old vocabulary): "los Capítulos
@@ -23834,6 +24031,16 @@
              a recorded history of exactly that. */
           const RETIRED = '<span class="pill y">retirada</span>';
           const NO_PRICE = '<span class="pill y">sin precio</span>';
+          /* A subpartida is «sin completar» until it carries BOTH figures.
+             (Operator, 25 Sep: «If there is no Price or Cost in Subpartida,
+             leave it marked as not completed.») Derived, never stored: there
+             is no field and no migration, and typing the missing figure
+             completes the record with nothing to re-stamp. A missing PRICE
+             keeps the consequence it always had — the line enters a budget
+             «pendiente de valorar», out of the total and off the document —
+             and a missing COST has none, because cost is what the company
+             pays and changes nothing the customer is shown. */
+          const INCOMPLETE = '<span class="pill y">sin completar</span>';
           /* The margin, computed and never stored: the catalogue keeps a cost
              and a price, and a third stored number would be a fourth thing to
              keep in step. Same formula as the drawer's own, so the table and
@@ -23866,7 +24073,19 @@
               render();
             };
           });
+          /* Delegated on the view root, not bound to the button: the register
+             below repaints itself on every search and every page turn, and a
+             handler bound to the button it drew would be wired to an element
+             that no longer exists two keystrokes later. */
+          v.addEventListener("click", (e) => {
+            if (e.target.closest("[data-bkimport]"))
+              bookImportDrawer({ onDone: () => render() });
+          });
           const host = $("#biList");
+          /* Built here rather than in each register: three copies of one
+             button is three places to change its wording. */
+          const IMPORT_LEADING =
+            '<button class="btn sm" data-bkimport="1">⬆ Importar Excel</button>';
 
           /* ---- Subpartidas: the things that carry a price ---- */
           if (biSection === "sub") {
@@ -23919,6 +24138,11 @@
                 expCsv: "biSubExpCsv",
               },
               newLabel: "＋ Nueva subpartida",
+              /* The same button in all three registers, opening the same
+                 drawer on the same format — «one format to upload everything»
+                 means the subsection you happen to be standing in does not
+                 change what a file may contain. */
+              leading: IMPORT_LEADING,
               onNew: () => catalogueItemDrawer(null),
               searchPlaceholder: "Buscar por código, descripción o marca",
               nounSingular: "subpartida",
@@ -23933,6 +24157,11 @@
               columns: [
                 { label: "Código", primary: true, get: (i) => i.code },
                 { label: "Descripción", primary: true, get: (i) => catalogueDesc(i) },
+                {
+                  label: "Estado",
+                  get: (i) => (ErpBookImport.incomplete(i) ? "sin completar" : ""),
+                  html: (i) => (ErpBookImport.incomplete(i) ? INCOMPLETE : ""),
+                },
                 { label: "Ud", get: (i) => i.unit },
                 { label: "Tipo", get: (i) => TYPE[i.type] || i.type },
                 { label: "Marca", get: (i) => i.brand || "", html: (i) => esc(i.brand || "—") },
@@ -23980,6 +24209,11 @@
                 expCsv: "biParExpCsv",
               },
               newLabel: "＋ Nueva partida",
+              /* The same button in all three registers, opening the same
+                 drawer on the same format — «one format to upload everything»
+                 means the subsection you happen to be standing in does not
+                 change what a file may contain. */
+              leading: IMPORT_LEADING,
               onNew: () => chapterEntryDrawer(null),
               searchPlaceholder: "Buscar por código o nombre",
               nounSingular: "partida",
@@ -24025,6 +24259,11 @@
               expCsv: "biTitExpCsv",
             },
             newLabel: "＋ Nuevo título",
+            /* The same button in all three registers, opening the same
+               drawer on the same format — «one format to upload everything»
+               means the subsection you happen to be standing in does not
+               change what a file may contain. */
+            leading: IMPORT_LEADING,
             onNew: () => titleDrawer(null),
             searchPlaceholder: "Buscar por código o nombre",
             nounSingular: "título",

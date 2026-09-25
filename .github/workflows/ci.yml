@@ -138,6 +138,12 @@ jobs:
         if: always()
         run: pnpm test:links
 
+      # The uploaded workbook: the format the operator downloads, the rows it
+      # reads back, and what a file would change before anything is written.
+      - name: The uploaded workbook (price book and budget)
+        if: always()
+        run: node tests/book-import/run.mjs
+
       # `ops/` is not a build directory: it is what somebody runs, from a
       # browser, to repair the client's production server. A syntax error in one
       # of those is found at the moment it is needed, by a person already

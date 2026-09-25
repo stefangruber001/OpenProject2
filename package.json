@@ -34,6 +34,7 @@
     "test:links": "node tests/catalogue-links/run.mjs",
     "test:shell": "node tests/shell-syntax/run.mjs",
     "test:docx": "node tests/doc-docx/run.mjs",
+    "test:book": "node tests/book-import/run.mjs",
     "test:mailbox": "tsx tests/mailbox/run.mts"
   },
   "devDependencies": {

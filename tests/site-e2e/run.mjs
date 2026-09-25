@@ -123,6 +123,7 @@ async function main() {
        with every read-only suite above. */
     testChapterTitles,
     testPriceBookLinks,
+    testBookImport,
     testNotes,
     testJourney,
   ];
@@ -18721,6 +18722,225 @@ async function testPriceBookLinks(browser, base) {
     else bad("libro de precios: console", errors.slice(0, 3).join(" | "));
   } catch (e) {
     bad("libro de precios: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * THE IMPORT BUTTON, driven rather than described.
+ *
+ * The planner has its own gate (`tests/book-import`) and it runs in Node,
+ * where there is no button, no drawer and no file. What can only fail HERE is
+ * the wiring: that the button exists in all three registers, that it opens the
+ * drawer, that the template it hands out is a real workbook, and — the half
+ * that matters — that NOTHING is written until the second button is pressed.
+ */
+async function testBookImport(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#budget-items`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    // ── the button is in all three registers ────────────────────────────────
+    const present = await pg.evaluate(async () => {
+      const out = {};
+      for (const sec of ["sub", "par", "tit"]) {
+        biSection = sec;
+        render();
+        await new Promise((r) => setTimeout(r, 450));
+        out[sec] = !!document.querySelector("[data-bkimport]");
+      }
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 450));
+      return out;
+    });
+    if (present.sub && present.par && present.tit)
+      ok("importar: the button is in Subpartidas, Partidas and Títulos");
+    else bad("importar: button per section", JSON.stringify(present));
+
+    // ── it opens, and hands out a template that is a real workbook ──────────
+    const opened = await pg.evaluate(async () => {
+      document.querySelector("[data-bkimport]").click();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        drawer: !!document.querySelector("#bk_file"),
+        template: !!document.querySelector("#bk_tpl"),
+        title: (document.querySelector("#dttl") || {}).textContent || "",
+      };
+    });
+    if (opened.drawer && opened.template)
+      ok(`importar: the drawer offers a template and a file picker («${opened.title}»)`);
+    else bad("importar: drawer", JSON.stringify(opened));
+
+    // The template must be readable by the very parser that accepts uploads —
+    // the only thing that stops the template and the reader drifting apart.
+    const roundTrip = await pg.evaluate(async () => {
+      const t = ErpBookImport.plantilla("book");
+      const blob = xlsxBlob(t.name, t.rows, { title: t.name });
+      const buf = await blob.arrayBuffer();
+      const parsed = await ErpBookImport.parseBook(buf);
+      const plan = ErpBookImport.planBook(erp, parsed.rows);
+      return {
+        bytes: buf.byteLength,
+        rows: parsed.rows.length,
+        errors: plan.errors.length,
+        creates:
+          plan.titles.filter((x) => x.action === "create").length +
+          plan.chapters.filter((x) => x.action === "create").length +
+          plan.items.filter((x) => x.action === "create").length,
+      };
+    });
+    if (roundTrip.bytes > 500 && roundTrip.rows >= 4 && roundTrip.errors === 0)
+      ok(
+        `importar: the template it downloads is read back by its own parser (${roundTrip.rows} rows, ${roundTrip.creates} would be created)`,
+      );
+    else bad("importar: template round trip", JSON.stringify(roundTrip));
+
+    // ── the preview writes NOTHING until Importar is pressed ────────────────
+    const preview = await pg.evaluate(async () => {
+      const before = {
+        items: erp.state.catalogue.length,
+        chapters: erp.listAll("itemChapters").length,
+        titles: erp.listAll("itemTitles").length,
+      };
+      const t = ErpBookImport.plantilla("book");
+      const blob = xlsxBlob(t.name, t.rows, { title: t.name });
+      const file = new File([await blob.arrayBuffer()], "plantilla.xlsx");
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const input = document.querySelector("#bk_file");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 900));
+      const shown = {
+        apply: !!document.querySelector("#bk_go"),
+        text: (document.querySelector("#bk_out") || {}).innerText || "",
+      };
+      const after = {
+        items: erp.state.catalogue.length,
+        chapters: erp.listAll("itemChapters").length,
+        titles: erp.listAll("itemTitles").length,
+      };
+      return { before, after, shown };
+    });
+    const untouched =
+      JSON.stringify(preview.before) === JSON.stringify(preview.after) && preview.shown.apply;
+    if (untouched) ok("importar: reading the file shows a preview and writes absolutely nothing");
+    else bad("importar: preview wrote early", JSON.stringify(preview));
+
+    // ── …and Importar does write it ────────────────────────────────────────
+    const applied = await pg.evaluate(async () => {
+      const before = erp.state.catalogue.length;
+      document.querySelector("#bk_go").click();
+      await new Promise((r) => setTimeout(r, 1200));
+      const made = erp.state.catalogue.filter((i) => /^SUB-\d{4}$/.test(String(i.code || "")));
+      return {
+        grew: erp.state.catalogue.length > before,
+        correlative: made.length > 0,
+        drawerClosed: !document.querySelector("#drawer.on"),
+      };
+    });
+    if (applied.grew && applied.correlative && applied.drawerClosed)
+      ok("importar: «Importar» writes the rows, with correlative códigos, and closes");
+    else bad("importar: apply", JSON.stringify(applied));
+
+    // ── a subpartida with no price or no cost is marked ────────────────────
+    const marked = await pg.evaluate(async () => {
+      const it = erp.addCatalogueItem(
+        { code: "SUB-9001", desc: "E2E sin coste", unit: "ud", defaultPriceCents: 1000 },
+        "e2e",
+      );
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 500));
+      const q = document.getElementById("biSubQ");
+      q.value = "E2E sin coste";
+      q.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 500));
+      const row = [...document.querySelectorAll("#biList tbody tr.click")].find((r) =>
+        r.textContent.includes("E2E sin coste"),
+      );
+      return { derived: ErpBookImport.incomplete(it), shown: row ? row.innerText : "" };
+    });
+    if (marked.derived && /sin completar/i.test(marked.shown))
+      ok("subpartidas: one with a price but no cost reads «sin completar»");
+    else bad("subpartidas: incomplete mark", JSON.stringify(marked));
+
+    /* ── the other half: a whole budget from a sheet ────────────────────────
+       The register import and this one share a drawer, so what is worth
+       checking here is the NESTING, which the register format cannot express:
+       a blank Partida cell means «same partida as the row above», and a blank
+       Título means «same título». The template is built so that reading it
+       right yields three partidas and four lines, and reading it wrong yields
+       four partidas, or one — both of which are budgets the operator would
+       have to take apart by hand. It also has to CREATE the four subpartidas
+       it names, because a sheet from a competitor's tool knows nothing about
+       this client's price book. */
+    const budget = await pg.evaluate(async () => {
+      const party =
+        erp.state.parties.find((p) => p.kind === "customer") ||
+        erp.addParty({ kind: "customer", name: "E2E hoja" }, "e2e");
+      const b = erp.createBudget({ partyId: party.id }, "e2e");
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 1300));
+      const out = { button: !!document.querySelector("#bUpload") };
+      if (!out.button) return out;
+      document.querySelector("#bUpload").click();
+      await new Promise((r) => setTimeout(r, 400));
+      out.title = (document.querySelector("#dttl") || {}).textContent || "";
+
+      const t = ErpBookImport.plantilla("budget");
+      const blob = xlsxBlob(t.name, t.rows, { title: t.name });
+      const dt = new DataTransfer();
+      dt.items.add(new File([await blob.arrayBuffer()], "presupuesto.xlsx"));
+      const input = document.querySelector("#bk_file");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 900));
+
+      const beforeLines = erp.currentVersion(b.id).chapters.length;
+      out.previewOnly = beforeLines === 0 && !!document.querySelector("#bk_go");
+      document.querySelector("#bk_go").click();
+      await new Promise((r) => setTimeout(r, 1400));
+
+      const v = erp.currentVersion(b.id);
+      out.chapters = v.chapters.map((c) => c.name + " / " + (c.title || "—"));
+      out.lines = v.chapters.reduce((a, c) => a + c.lines.length, 0);
+      /* Every line must carry the código of a real catalogue row: a line with a
+         description and no itemId is a budget that cannot be re-priced, which
+         is the whole reason for creating the subpartidas in the first place. */
+      out.linked = v.chapters.every((c) =>
+        c.lines.every((l) => !!l.itemId && /^SUB-\d{4}$/.test(String(l.code || ""))),
+      );
+      out.qty = (v.chapters[0].lines[1] || {}).qtyMilli;
+      out.drawerClosed = !document.querySelector("#drawer.on");
+      return out;
+    });
+    const nested =
+      budget.chapters &&
+      budget.chapters.length === 3 &&
+      budget.lines === 4 &&
+      budget.chapters[0] === "Fontanería / Reforma de baño" &&
+      budget.chapters[2] === "Solados / Reforma de cocina";
+    if (nested && budget.previewOnly && budget.linked && budget.drawerClosed)
+      ok(
+        `presupuesto: the sheet becomes ${budget.chapters.length} partidas and ${budget.lines} líneas, all priced from the book`,
+      );
+    else bad("presupuesto: uploaded budget", JSON.stringify(budget));
+    // 4,5 in the sheet is four and a half units, not forty-five.
+    if (budget.qty === 4500) ok("presupuesto: «4,5» in the sheet is read as four and a half");
+    else bad("presupuesto: decimal comma", JSON.stringify(budget.qty));
+
+    if (!errors.length) ok("importar: no console errors");
+    else bad("importar: console", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("importar: suite", e.message);
   } finally {
     await ctx.close();
   }
