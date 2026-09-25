@@ -72,8 +72,19 @@ function bookErp() {
     { row: 6, title: "", chapter: "Alicatado", item: "Alicatado 30x60", unit: "m2", cost: "19" },
     // a new subpartida with no cost — also incomplete
     { row: 7, title: "", chapter: "Alicatado", item: "Rodapié cerámico", unit: "ml", price: "12" },
-    // the rule: a subpartida with no partida is refused
-    { row: 8, title: "", chapter: "", item: "Huérfana" },
+    /* Blank Partida: the row belongs to the partida above it, the way a person
+       fills a sheet and the way the budget format already read one. Demanding
+       the partida on every row is what made the first real upload create almost
+       nothing. */
+    {
+      row: 8,
+      title: "",
+      chapter: "",
+      item: "Junta de dilatación",
+      unit: "ml",
+      cost: "4",
+      price: "9",
+    },
   ];
   const p = B.planBook(erp, rows);
 
@@ -113,22 +124,37 @@ function bookErp() {
   );
 
   const created = p.items.filter((i) => i.action === "create");
-  is(created.length === 2, "two new subpartidas", JSON.stringify(created.map((c) => c.desc)));
+  is(created.length === 3, "three new subpartidas", JSON.stringify(created.map((c) => c.desc)));
+  const half = created.filter((c) => c.desc !== "Junta de dilatación");
   is(
-    created.every((c) => c.incomplete),
+    half.every((c) => c.incomplete),
     "a subpartida missing EITHER price or cost is marked incomplete",
-    JSON.stringify(created.map((c) => [c.desc, c.incomplete])),
+    JSON.stringify(half.map((c) => [c.desc, c.incomplete])),
   );
   is(
     created.every((c) => c.chapters.length === 1 && c.chapters[0] === "Alicatado"),
-    "…and each is filed under the partida on its own row",
-    JSON.stringify(created.map((c) => c.chapters)),
+    "…and each is filed under Alicatado, the blank row inheriting it from above",
+    JSON.stringify(created.map((c) => [c.desc, c.chapters])),
   );
   is(
-    p.errors.length === 1 && p.errors[0].row === 8,
-    "a subpartida with no partida is an error, naming its row",
-    JSON.stringify(p.errors),
+    !created.find((c) => c.desc === "Junta de dilatación").incomplete,
+    "…and the inherited row keeps its own figures, so it is complete",
+    JSON.stringify(created.map((c) => [c.desc, c.incomplete])),
   );
+  is(p.errors.length === 0, "nothing is refused", JSON.stringify(p.errors));
+
+  /* The orphan rule that is LEFT: a subpartida with no partida anywhere above
+     it cannot be filed, and says so by row. */
+  const orph = B.planBook(bookErp(), [
+    { row: 2, title: "Reforma de cocina", chapter: "", item: "" },
+    { row: 3, title: "", chapter: "", item: "Sin partida en ninguna parte" },
+  ]);
+  is(
+    orph.errors.length === 1 && orph.errors[0].row === 3,
+    "a subpartida with no partida above it is an error, naming its row",
+    JSON.stringify(orph.errors),
+  );
+  is(!orph.items.length, "…and it creates nothing", JSON.stringify(orph.items));
 }
 
 /* ---------- 2 · a blank cell erases nothing ---------- */

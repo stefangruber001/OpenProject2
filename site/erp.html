@@ -12369,10 +12369,24 @@
         const o = opts || {};
         const isBudget = !!o.budgetId;
         const db = openDrawer(isBudget ? "Subir un presupuesto" : "Importar el libro de precios");
+        /* A drawer that cannot load its engine must SAY so rather than open
+           empty. Every line below reads `ErpBookImport`, so if that script did
+           not arrive — an old page still open in a tab after a deploy, a file
+           that 404s behind a proxy — the next statement throws and the operator
+           gets a titled drawer with nothing in it: no columns, no template, no
+           file picker. That looks exactly like "the format is not available for
+           download", and it points nowhere near the cause. Reported from dev on
+           25/09 as precisely that symptom. */
+        if (typeof ErpBookImport === "undefined") {
+          db.innerHTML =
+            '<div class="it"><span class="pill r">No se pudo cargar</span>' +
+            '<span style="flex:1;margin-left:8px">Recargue la página para actualizar la aplicación.</span></div>';
+          return;
+        }
         const COLS = isBudget ? ErpBookImport.BUDGET_COLUMNS : ErpBookImport.BOOK_COLUMNS;
         const intro = isBudget
           ? "Una fila por línea. El título y la partida se repiten solos: déjalos en blanco y la fila sigue en la misma partida. Las subpartidas que no estén en el libro de precios se crean al importar."
-          : "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida; y una subpartida necesita SIEMPRE su partida en la misma fila.";
+          : "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida. La partida se repite sola: déjala en blanco y la subpartida entra en la partida de arriba.";
         db.innerHTML = `<div class="fgrid">
          <div class="field full"><div class="it" style="color:var(--muted)">${esc(intro)}</div></div>
          <div class="field full"><label>Columnas</label>
@@ -12502,16 +12516,39 @@
         out.innerHTML = parts.join("");
 
         $("#bk_cancel").onclick = () => closeDrawer();
-        $("#bk_go").onclick = () =>
-          mutate(() => {
-            const made = isBudget
+        /* WAITS FOR THE WRITE, and says so only once the register holds it.
+           Reported from dev on 25/09: «no error, but the Titulos, Partidas and
+           Subpartidas are not available in Elementos de Presupuesto after
+           importing the budget» — with every record demonstrably created in
+           memory. `mutate` saves on a 140 ms fire-and-forget whose failure is
+           swallowed on purpose (`.catch(() => {})`, so that a keystroke cannot
+           raise a banner) and then announces success regardless: the screen
+           redraws from memory with the new títulos on it, the toast says
+           «importado», and if that one write was refused the next page load has
+           none of it. An import is precisely the case `mutateNow` was written
+           for — a large change that cannot be taken back, made by somebody who
+           then leaves the screen to go and look at the register.
+           Also disabled while in flight: a second click on a slow write would
+           apply the whole sheet twice, and every subpartida in it is new the
+           second time round because the first apply is not yet stored. */
+        $("#bk_go").onclick = async (ev) => {
+          const btn = ev.currentTarget;
+          if (btn.disabled) return;
+          btn.disabled = true;
+          let made = null;
+          const stored = await mutateNow(() => {
+            made = isBudget
               ? ErpBookImport.applyBudget(erp, o.budgetId, plan, "backoffice", {
                   fileName: file.name,
                 })
               : ErpBookImport.applyBook(erp, plan, "backoffice");
-            closeDrawer();
-            if (typeof o.onDone === "function") o.onDone(made);
           }, isBudget ? "Presupuesto importado" : "Libro de precios importado");
+          closeDrawer();
+          /* Only on a stored write: `onDone` reopens the register, and a register
+             drawn from a document the database refused shows rows that are not
+             there. `mutateNow` has already said to reload. */
+          if (stored && typeof o.onDone === "function") o.onDone(made);
+        };
       }
 
       /* A money column reads as money in the preview; everything else reads as

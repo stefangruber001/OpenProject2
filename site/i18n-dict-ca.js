@@ -301,6 +301,9 @@ window.CANEI_DICT.ca = {
   "Partidas del presupuesto": "Partides del pressupost",
   "Elegir archivo": "Triar fitxer",
   "No se pudo leer": "No s'ha pogut llegir",
+  "No se pudo cargar": "No s'ha pogut carregar",
+  "Recargue la página para actualizar la aplicación.":
+    "Recarregueu la pàgina per actualitzar l'aplicació.",
   "Se actualizarán": "S'actualitzaran",
   "Se crearán": "Es crearan",
   "valor actual → valor del archivo": "valor actual → valor del fitxer",
@@ -311,8 +314,8 @@ window.CANEI_DICT.ca = {
   "⬇ Descargar plantilla": "⬇ Descarregar plantilla",
   "Subir un presupuesto en Excel: crea lo que falte en el libro de precios y redacta esta versión":
     "Pujar un pressupost en Excel: crea el que falti al llibre de preus i redacta aquesta versió",
-  "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida; y una subpartida necesita SIEMPRE su partida en la misma fila.":
-    "Un sol full per als tres nivells. Una fila amb només el títol crea un títol; amb només la partida, una partida; i una subpartida necessita SEMPRE la seva partida a la mateixa fila.",
+  "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida. La partida se repite sola: déjala en blanco y la subpartida entra en la partida de arriba.":
+    "Un sol full per als tres nivells. Una fila amb només el títol crea un títol; amb només la partida, una partida. La partida es repeteix sola: deixa-la en blanc i la subpartida entra a la partida de dalt.",
   "Una fila por línea. El título y la partida se repiten solos: déjalos en blanco y la fila sigue en la misma partida. Las subpartidas que no estén en el libro de precios se crean al importar.":
     "Una fila per línia. El títol i la partida es repeteixen sols: deixa'ls en blanc i la fila segueix a la mateixa partida. Les subpartides que no siguin al llibre de preus es creen en importar.",
   " sin precio o sin coste": " sense preu o sense cost",

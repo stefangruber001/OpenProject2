@@ -14,7 +14,9 @@
    without a partida, so a subpartida-only sheet either carries its partida
    anyway — at which point it is this format with columns missing — or imports
    two hundred rows that then have to be filed by hand, one at a time. Títulos
-   and partidas stand alone; a subpartida row REQUIRES its partida.
+   and partidas stand alone; a subpartida needs a partida, on its own row or
+   on a row above it — a blank Partida cell means «the one above», in this
+   sheet and in the budget sheet alike.
 
    WHAT A TÍTULO IS NOT, because the sheet makes it look otherwise. Writing
    «Reforma de baño | Fontanería | Punto de agua» on one row reads like a
@@ -267,14 +269,30 @@
     var newTitles = {},
       newChapters = {};
 
+    /* The partida carries DOWN, the way it does in the budget sheet and the way
+       a person actually fills a spreadsheet: written once, left blank on the
+       rows beneath it. It did not, at first — every subpartida row had to
+       repeat its partida — and the first real upload produced almost nothing
+       while the preview explained, row by row, that rows 7 and 8 did not say
+       which partida they belonged to. Two formats with two different rules for
+       the same three columns is one rule too many; the blank cell means «the
+       one above» in both. */
+    var lastChapter = "";
+
     rows.forEach(function (r) {
       var tName = text(r.title),
         cName = text(r.chapter),
         iName = text(r.item);
+      if (cName) lastChapter = cName;
+      /* Inherited only for FILING a subpartida — never for creating a partida,
+         or a row carrying nothing but a título would silently re-file the
+         partida above it. */
+      var owner = cName || lastChapter;
 
-      /* A subpartida needs its partida — the one rule the operator stated
-         outright, and the reason this is one format rather than three. */
-      if (iName && !cName) {
+      /* A subpartida still needs a partida; now it may be one named further up
+         the sheet rather than on its own row. Nothing above it is the only case
+         left that cannot be filed, and it is named by row. */
+      if (iName && !owner) {
         plan.errors.push({ row: r.row, msg: "«" + iName + "» no dice de qué partida es" });
         return;
       }
@@ -351,7 +369,7 @@
             var v = want[f[1]];
             if (v !== "" && v != null) prev.values[f[1]] = v;
           });
-          if (prev.chapters.indexOf(cName) < 0) prev.chapters.push(cName);
+          if (prev.chapters.indexOf(owner) < 0) prev.chapters.push(owner);
           return;
         }
         plan.seen[iKey] = plan.items.length;
@@ -359,7 +377,7 @@
           row: r.row,
           action: "create",
           desc: iName,
-          chapters: [cName],
+          chapters: [owner],
           values: want,
           incomplete: incomplete(want),
         });
@@ -380,8 +398,8 @@
         });
       });
       var filed = erp.itemPartidas(existing.id) || [];
-      var chapCode = byChapter[fold(cName)] ? byChapter[fold(cName)].code : null;
-      var addChapter = cName && (!chapCode || filed.indexOf(chapCode) < 0);
+      var chapCode = byChapter[fold(owner)] ? byChapter[fold(owner)].code : null;
+      var addChapter = owner && (!chapCode || filed.indexOf(chapCode) < 0);
       if (!changes.length && !addChapter) return; // unchanged: nothing to report but a count
       plan.items.push({
         row: r.row,
@@ -389,7 +407,7 @@
         id: existing.id,
         code: existing.code,
         desc: existing.desc,
-        chapters: addChapter ? [cName] : [],
+        chapters: addChapter ? [owner] : [],
         changes: changes,
         values: want,
         incomplete: incomplete(Object.assign({}, existing, stripBlank(want))),
@@ -530,6 +548,10 @@
         "42",
         "85",
       ]);
+      /* Partida left blank ON PURPOSE: this row belongs to Fontanería above it.
+         The template is the only instruction most people will read, so it has
+         to show the carry-down rather than describe it. */
+      rows.push(["", "", "Sustitución de bajante", "", "ml", "Material", "", "", "", "26", "54"]);
       rows.push([
         "",
         "Alicatado",

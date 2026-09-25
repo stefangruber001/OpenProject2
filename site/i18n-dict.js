@@ -104,6 +104,11 @@ window.CANEI_DICT = {
     ["Partidas del presupuesto", "Budget sections"],
     ["Elegir archivo", "Choose a file"],
     ["No se pudo leer", "Could not be read"],
+    ["No se pudo cargar", "Could not be loaded"],
+    [
+      "Recargue la página para actualizar la aplicación.",
+      "Reload the page to update the application.",
+    ],
     ["Se actualizarán", "Will be updated"],
     ["Se crearán", "Will be created"],
     ["valor actual → valor del archivo", "current value → value in the file"],
@@ -117,8 +122,8 @@ window.CANEI_DICT = {
       "Upload a budget in Excel: it creates whatever the price book is missing and drafts this version",
     ],
     [
-      "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida; y una subpartida necesita SIEMPRE su partida en la misma fila.",
-      "One sheet for all three levels. A row with only the section creates a section; with only the line item, a line item; and a sub-line item ALWAYS needs its line item on the same row.",
+      "Una sola hoja para los tres niveles. Una fila con sólo el título crea un título; con sólo la partida, una partida. La partida se repite sola: déjala en blanco y la subpartida entra en la partida de arriba.",
+      "One sheet for all three levels. A row with only the section creates a section; with only the line item, a line item. The line item repeats itself: leave it blank and the sub-line item joins the one above.",
     ],
     [
       "Una fila por línea. El título y la partida se repiten solos: déjalos en blanco y la fila sigue en la misma partida. Las subpartidas que no estén en el libro de precios se crean al importar.",

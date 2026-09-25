@@ -18737,7 +18737,10 @@ async function testPriceBookLinks(browser, base) {
  * that matters — that NOTHING is written until the second button is pressed.
  */
 async function testBookImport(browser, base) {
-  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const ctx = await browser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    acceptDownloads: true,
+  });
   const pg = await ctx.newPage();
   const errors = [];
   attachConsole(pg, errors);
@@ -18777,6 +18780,41 @@ async function testBookImport(browser, base) {
     if (opened.drawer && opened.template)
       ok(`importar: the drawer offers a template and a file picker («${opened.title}»)`);
     else bad("importar: drawer", JSON.stringify(opened));
+
+    /* PRESS THE BUTTON. The round-trip check below builds the template in the
+       page and parses it, which proves the format agrees with the reader and
+       proves NOTHING about the control the operator actually clicks: it passed
+       while nobody had ever pressed «Descargar plantilla». Reported from dev on
+       25/09 as «the format to upload is not available for download», against a
+       suite that was green. So the download is taken here, off a real click,
+       and the bytes are read back through the parser. */
+    const dl = pg.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+    await pg.click("#bk_tpl");
+    const file = await dl;
+    let handed = { got: !!file, name: file ? file.suggestedFilename() : null };
+    if (file) {
+      const stream = await file.createReadStream();
+      const chunks = [];
+      for await (const c of stream) chunks.push(c);
+      const buf = Buffer.concat(chunks);
+      handed.bytes = buf.length;
+      handed.parsed = await pg.evaluate(async (b64) => {
+        const bin = atob(b64);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        try {
+          const p = await ErpBookImport.parseBook(u8.buffer);
+          return { rows: p.rows.length, errors: ErpBookImport.planBook(erp, p.rows).errors.length };
+        } catch (e) {
+          return { error: String(e.message || e) };
+        }
+      }, buf.toString("base64"));
+    }
+    if (handed.got && /\.xlsx$/.test(handed.name) && handed.bytes > 500 && handed.parsed.rows >= 4)
+      ok(
+        `importar: pressing «Descargar plantilla» hands over a real workbook (${handed.name}, ${handed.bytes} bytes, ${handed.parsed.rows} rows)`,
+      );
+    else bad("importar: template download", JSON.stringify(handed));
 
     // The template must be readable by the very parser that accepts uploads —
     // the only thing that stops the template and the reader drifting apart.
@@ -18850,6 +18888,72 @@ async function testBookImport(browser, base) {
       ok("importar: «Importar» writes the rows, with correlative códigos, and closes");
     else bad("importar: apply", JSON.stringify(applied));
 
+    /* ── the sheet as a person actually fills it ───────────────────────
+       Reported from dev on 25/09: «I have uploaded the doc but the Títulos,
+       Partidas and Subpartidas were not created». The partida had been written
+       once and left blank on the rows beneath — which is how anyone fills a
+       spreadsheet, and was how the budget sheet already read one, but the book
+       sheet demanded it on every row and refused each of them by number. Now it
+       carries down. Checked through the screen, not only the planner, because
+       the planner was not what the operator was using. */
+    const inherited = await pg.evaluate(async () => {
+      const rows = [
+        [
+          "Título",
+          "Partida",
+          "Subpartida",
+          "Nom (CA)",
+          "Unidad",
+          "Tipo",
+          "Marca",
+          "Modelo",
+          "Calidad",
+          "Coste",
+          "Precio",
+        ],
+        ["Reforma E2E", "", "", "", "", "", "", "", "", "", ""],
+        ["", "Cubiertas E2E", "Membrana E2E", "", "m2", "Material", "", "", "", "18", "36"],
+        ["", "", "Remate E2E", "", "ml", "Material", "", "", "", "7", "15"],
+        ["", "", "Sumidero E2E", "", "ud", "Material", "", "", "", "22", "44"],
+      ];
+      const blob = xlsxBlob("Libro", rows, { title: "Libro" });
+      const dt = new DataTransfer();
+      dt.items.add(new File([await blob.arrayBuffer()], "natural.xlsx"));
+      document.querySelector("[data-bkimport]").click();
+      await new Promise((r) => setTimeout(r, 400));
+      const input = document.querySelector("#bk_file");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 900));
+      const preview = (document.querySelector("#bk_out") || {}).innerText || "";
+      document.querySelector("#bk_go").click();
+      await new Promise((r) => setTimeout(r, 1400));
+
+      // List entries keep the Spanish name in `es` — `name` is the budget's own
+      // chapter field, a different record entirely.
+      const chap = erp.listAll("itemChapters").find((c) => c.es === "Cubiertas E2E");
+      const names = ["Membrana E2E", "Remate E2E", "Sumidero E2E"];
+      const items = names.map((n) => erp.state.catalogue.find((i) => i.desc === n));
+      return {
+        refused: /no dice de qué partida/.test(preview),
+        title: !!erp.listAll("itemTitles").find((t) => t.es === "Reforma E2E"),
+        chapter: !!chap,
+        made: items.filter(Boolean).length,
+        filed: chap
+          ? items.filter((i) => i && (erp.itemPartidas(i.id) || []).includes(chap.code)).length
+          : 0,
+      };
+    });
+    if (
+      !inherited.refused &&
+      inherited.title &&
+      inherited.chapter &&
+      inherited.made === 3 &&
+      inherited.filed === 3
+    )
+      ok("importar: a sheet with the partida written once files all three subpartidas under it");
+    else bad("importar: partida carried down", JSON.stringify(inherited));
+
     // ── a subpartida with no price or no cost is marked ────────────────────
     const marked = await pg.evaluate(async () => {
       const it = erp.addCatalogueItem(
@@ -18922,6 +19026,20 @@ async function testBookImport(browser, base) {
       out.drawerClosed = !document.querySelector("#drawer.on");
       return out;
     });
+    /* The budget upload must fill the REGISTER too, not only the budget. The
+       first version of this check read `erp.currentVersion(b.id).chapters`,
+       which are the budget's own records — so it passed while saying nothing
+       about Elementos de presupuesto, which is exactly where the operator
+       looked on 25/09 and found nothing. */
+    const reg = await pg.evaluate(() => ({
+      title: !!erp.listAll("itemTitles").find((t) => t.es === "Reforma de cocina"),
+      chapter: !!erp.listAll("itemChapters").find((c) => c.es === "Solados"),
+      item: !!erp.state.catalogue.find((i) => i.desc === "Solado de gres porcel\u00e1nico"),
+    }));
+    if (reg.title && reg.chapter && reg.item)
+      ok("presupuesto: the título, partida and subpartida it named are in the register");
+    else bad("presupuesto: register after budget import", JSON.stringify(reg));
+
     const nested =
       budget.chapters &&
       budget.chapters.length === 3 &&
@@ -18936,6 +19054,150 @@ async function testBookImport(browser, base) {
     // 4,5 in the sheet is four and a half units, not forty-five.
     if (budget.qty === 4500) ok("presupuesto: «4,5» in the sheet is read as four and a half");
     else bad("presupuesto: decimal comma", JSON.stringify(budget.qty));
+
+    /* THE WRITE, not the redraw. Reported from dev on 25/09: «no error, but the
+       Titulos, Partidas and Subpartidas are not available in Elementos de
+       Presupuesto after importing the budget» — while every record was
+       demonstrably created in memory. The old path called `mutate`, whose save
+       is a 140 ms fire-and-forget with `.catch(() => {})`, and then said
+       «importado» regardless: a refused write left the screen showing rows the
+       database never took. So two things are asserted here that no count of
+       created records can show — that the payload handed to the store actually
+       CONTAINS the new rows, and that a store which refuses is reported rather
+       than celebrated. */
+    const persisted = await pg.evaluate(async () => {
+      // Back to the register: the budget checks above left us in the builder.
+      go("budget-items");
+      await new Promise((r) => setTimeout(r, 700));
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 500));
+      const real = ErpStore.saveState;
+      let seen = null;
+      ErpStore.saveState = (doc) => {
+        seen = doc;
+        return Promise.resolve(null);
+      };
+      document.querySelector("[data-bkimport]").click();
+      await new Promise((r) => setTimeout(r, 400));
+      const rows = [
+        [
+          "T\u00edtulo",
+          "Partida",
+          "Subpartida",
+          "Nom (CA)",
+          "Unidad",
+          "Tipo",
+          "Marca",
+          "Modelo",
+          "Calidad",
+          "Coste",
+          "Precio",
+        ],
+        ["", "Guardado E2E", "Fila guardada E2E", "", "ud", "Material", "", "", "", "5", "11"],
+      ];
+      const blob = xlsxBlob("Libro", rows, { title: "Libro" });
+      const dt = new DataTransfer();
+      dt.items.add(new File([await blob.arrayBuffer()], "guardar.xlsx"));
+      const input = document.querySelector("#bk_file");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 900));
+      document.querySelector("#bk_go").click();
+      await new Promise((r) => setTimeout(r, 1400));
+      ErpStore.saveState = real;
+      const doc = seen || {};
+      const cat = doc.catalogue || (doc.state && doc.state.catalogue) || [];
+      const chaps =
+        (doc.lists && doc.lists.itemChapters) ||
+        (doc.state && doc.state.lists && doc.state.lists.itemChapters) ||
+        [];
+      return {
+        wrote: !!seen,
+        itemInPayload: cat.some((i) => i.desc === "Fila guardada E2E"),
+        chapterInPayload: chaps.some((c) => c.es === "Guardado E2E"),
+        toast: (document.querySelector("#toast") || {}).textContent || "",
+      };
+    });
+    if (
+      persisted.wrote &&
+      persisted.itemInPayload &&
+      persisted.chapterInPayload &&
+      !/no se ha guardado/i.test(persisted.toast)
+    )
+      ok("importar: the rows are in the document handed to the store, not just on screen");
+    else bad("importar: import persisted", JSON.stringify(persisted));
+
+    /* And the other half: a store that refuses must not be told the operator it
+       worked. This is the fault the operator actually met. */
+    const refused = await pg.evaluate(async () => {
+      // Back to the register: the budget checks above left us in the builder.
+      go("budget-items");
+      await new Promise((r) => setTimeout(r, 700));
+      biSection = "sub";
+      render();
+      await new Promise((r) => setTimeout(r, 500));
+      const real = ErpStore.saveState;
+      ErpStore.saveState = () => Promise.reject(new Error("E2E rechazado"));
+      document.querySelector("[data-bkimport]").click();
+      await new Promise((r) => setTimeout(r, 400));
+      const rows = [
+        [
+          "T\u00edtulo",
+          "Partida",
+          "Subpartida",
+          "Nom (CA)",
+          "Unidad",
+          "Tipo",
+          "Marca",
+          "Modelo",
+          "Calidad",
+          "Coste",
+          "Precio",
+        ],
+        ["", "Rechazado E2E", "Fila rechazada E2E", "", "ud", "Material", "", "", "", "5", "11"],
+      ];
+      const blob = xlsxBlob("Libro", rows, { title: "Libro" });
+      const dt = new DataTransfer();
+      dt.items.add(new File([await blob.arrayBuffer()], "rechazo.xlsx"));
+      const input = document.querySelector("#bk_file");
+      input.files = dt.files;
+      input.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 900));
+      document.querySelector("#bk_go").click();
+      await new Promise((r) => setTimeout(r, 1400));
+      const toast = (document.querySelector("#toast") || {}).textContent || "";
+      ErpStore.saveState = real;
+      return { toast };
+    });
+    if (/no se ha guardado/i.test(refused.toast) && /recargue/i.test(refused.toast))
+      ok("importar: a store that refuses the write is reported, not celebrated");
+    else bad("importar: refused write reported", JSON.stringify(refused));
+
+    /* LAST, because it takes the engine away. An old tab open across a deploy
+       loads a page whose script is gone, and every line of the drawer reads
+       `ErpBookImport`: without the guard the operator gets a titled drawer with
+       nothing inside it and no error they can see. Asserted here so the empty
+       drawer cannot come back quietly. */
+    const missing = await pg.evaluate(async () => {
+      const keep = window.ErpBookImport;
+      delete window.ErpBookImport;
+      let text = "",
+        threw = null;
+      try {
+        bookImportDrawer({});
+        await new Promise((r) => setTimeout(r, 300));
+        text = (document.querySelector("#dbody") || {}).innerText || "";
+      } catch (e) {
+        threw = String(e.message || e);
+      }
+      closeDrawer();
+      window.ErpBookImport = keep;
+      return { text: text.trim().slice(0, 120), threw };
+    });
+    if (!missing.threw && /no se pudo cargar/i.test(missing.text) && /recargue/i.test(missing.text))
+      ok("importar: with the module missing the drawer says so instead of opening empty");
+    else bad("importar: missing-module guard", JSON.stringify(missing));
 
     if (!errors.length) ok("importar: no console errors");
     else bad("importar: console", errors.slice(0, 3).join(" | "));
