@@ -38,6 +38,10 @@ on:
         description: "Submit for review (false = upload the listing only)"
         type: boolean
         default: true
+      cancel_existing:
+        description: "Cancel a submission that is in the way (needed after a REJECTION — never while a review is progressing)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ios-release
@@ -77,4 +81,10 @@ jobs:
           DEVELOPER_TEAM_ID: ${{ secrets.DEVELOPER_TEAM_ID }}
           ASC_DEMO_PASSWORD: ${{ secrets.ASC_DEMO_PASSWORD }}
           APP_BUNDLE_ID: ${{ vars.APP_BUNDLE_ID || 'com.caneisubirats.erp' }}
-        run: bundle exec fastlane release submit:${{ inputs.submit }}
+        # Both quoted: a GitHub boolean arrives as the STRING "false", and every
+        # string is truthy in Ruby. The lane coerces them; the quoting keeps an
+        # empty value from becoming a syntax error.
+        run: |
+          bundle exec fastlane release \
+            submit:"${{ inputs.submit }}" \
+            cancel_existing:"${{ inputs.cancel_existing }}"
