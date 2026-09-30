@@ -31,7 +31,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const OUT = join(ROOT, "tests", "review-repro", "shots");
+/* Namespaced by engine, so a WebKit run and a Chromium run of the same screen
+   sit side by side instead of one quietly overwriting the other — which would
+   destroy the exact comparison this exists to make. */
+const OUT = join(ROOT, "tests", "review-repro", "shots", process.env.BROWSER || "webkit");
 
 const BASE = (process.env.ERP_BASE_URL || "https://178-105-10-156.sslip.io").replace(/\/$/, "");
 const USER = process.env.ERP_USER || "";
@@ -62,7 +65,16 @@ const CHROME =
   ["/opt/pw-browsers/chromium-1194/chrome-linux/chrome"].find((p) => existsSync(p)) ||
   undefined;
 
-async function loadChromium() {
+/* WEBKIT BY DEFAULT, AND THAT IS THE POINT.
+   WKWebView is Safari's engine. Chromium is not, and the difference is not
+   academic: one unsupported syntax or one missing API throws at parse time, the
+   page stops dead, and every tab in the shell is blank — while the same page in
+   Chrome, and in the operator's browser, is perfect. Running this against
+   Chromium was testing the engine the app does NOT use. BROWSER=chromium is
+   kept for comparing the two, which is itself the diagnosis when they differ. */
+const ENGINE = process.env.BROWSER || "webkit";
+
+async function loadEngine() {
   const pnpmDir = join(ROOT, "node_modules", ".pnpm");
   const stamped = existsSync(pnpmDir)
     ? (await import("node:fs"))
@@ -80,11 +92,11 @@ async function loadChromium() {
   for (const spec of candidates) {
     try {
       const m = await import(spec.startsWith("/") ? `file://${spec}` : spec);
-      const c = (m.default || m).chromium;
-      if (c) return c;
+      const e = (m.default || m)[ENGINE];
+      if (e) return e;
     } catch {}
   }
-  throw new Error("playwright-core not found (run `pnpm install`)");
+  throw new Error(`playwright-core not found, or no ${ENGINE} (run \`pnpm install\`)`);
 }
 
 /* How much of the page is actually THERE. A shell that loads its HTML and then
@@ -107,8 +119,12 @@ const measure = (pg) =>
 
 const main = async () => {
   mkdirSync(OUT, { recursive: true });
-  const chromium = await loadChromium();
-  const browser = await chromium.launch({ executablePath: CHROME });
+  const engine = await loadEngine();
+  // The bundled browser is the right one for anything but the local Chromium.
+  const browser = await engine.launch(
+    ENGINE === "chromium" && CHROME ? { executablePath: CHROME } : {},
+  );
+  console.log(`engine: ${ENGINE}`);
 
   const failures = [];
   let worst = 0;
@@ -123,9 +139,21 @@ const main = async () => {
   });
   // The shell injects these before first paint; without them this would be
   // testing a browser, which is the thing that already works.
+  // GUARDED, BECAUSE THE FIRST ATTEMPT SILENTLY DID NOTHING. An init script
+  // runs before any page script, which is before `document.documentElement`
+  // necessarily exists — so the unguarded `classList.add` threw, took the rest
+  // of the script with it, and the run reported `native-app=false` while
+  // claiming to be reproducing the shell. The shell itself injects at
+  // `.atDocumentStart`, where the element does exist; this has to wait for it.
   await ctx.addInitScript(`
-    document.documentElement.classList.add('native-app');
     window.__caneiTabs = 6;
+    (function mark() {
+      if (document.documentElement) {
+        document.documentElement.classList.add('native-app');
+      } else {
+        document.addEventListener('readystatechange', mark, { once: true });
+      }
+    })();
   `);
 
   const console_ = [];

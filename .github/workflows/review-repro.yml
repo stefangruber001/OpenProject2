@@ -36,13 +36,30 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Install Chromium
+      - name: Install WebKit and Chromium
+        # WebKit is the one that matters — it is the engine WKWebView runs, so
+        # it is the engine App Review saw. Chromium comes too, only so the two
+        # can be compared: a page that is fine in one and blank in the other is
+        # the diagnosis, not a curiosity.
         # playwright is declared in apps/web, so the bin lives there, not at the
         # root — same as site-e2e.yml.
-        run: pnpm --filter web exec playwright install --with-deps chromium
+        run: pnpm --filter web exec playwright install --with-deps webkit chromium
 
-      - name: What the reviewer saw
+      - name: What the reviewer saw — WebKit, the engine the app runs
         env:
+          BROWSER: webkit
+          ERP_BASE_URL: ${{ inputs.base_url || 'https://178-105-10-156.sslip.io' }}
+          ERP_USER: ${{ vars.ASC_DEMO_USER || 'stefan@caneisubirats.com' }}
+          ERP_PASSWORD: ${{ secrets.ASC_DEMO_PASSWORD }}
+        run: node tests/review-repro/run.mjs
+
+      # Always, so the two engines can be read side by side even when WebKit
+      # has already failed the job. The comparison is the point.
+      - name: The same run in Chromium, for comparison
+        if: always()
+        continue-on-error: true
+        env:
+          BROWSER: chromium
           ERP_BASE_URL: ${{ inputs.base_url || 'https://178-105-10-156.sslip.io' }}
           ERP_USER: ${{ vars.ASC_DEMO_USER || 'stefan@caneisubirats.com' }}
           ERP_PASSWORD: ${{ secrets.ASC_DEMO_PASSWORD }}
