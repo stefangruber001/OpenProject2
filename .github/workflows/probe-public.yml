@@ -1,0 +1,98 @@
+name: Probe · is the public site reachable
+
+# WHAT APPLE SEES, FROM SOMEWHERE THAT IS NOT THE OFFICE.
+#
+# App Review rejected 1.1 (15) under guideline 2.1(a) — "the app did not load
+# content on any tab" — from an iPad in California, with the internet working.
+# The operator had opened the same address in a browser in Spain six days
+# earlier and it answered. Both of those can be true at once, and that is the
+# whole reason this exists: the only checks this repository had were `smoke`,
+# which runs the image against a throwaway database inside the CI job and never
+# touches the server, and `verify`, which has never passed because APP_URL was
+# never set. Nothing has ever looked at the live address from outside.
+#
+# This creates nothing, changes nothing and needs no secret. It resolves the
+# name, inspects the certificate, and asks for the four paths the product
+# actually depends on — including the one the iOS app loads, which is NOT the
+# one a person types into a browser:
+#
+#   /                      what the operator checks
+#   /api/health            what the deploy pipeline checks
+#   /workspace/            the app's base
+#   /workspace/erp.html    WHAT EVERY TAB IN THE APP LOADS
+#
+# A server that answers the first two and not the last is exactly a server that
+# looks healthy to everyone who has been looking, and blank to a reviewer.
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Hostname to probe"
+        required: false
+        default: "178-105-10-156.sslip.io"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HOST: ${{ inputs.host || '178-105-10-156.sslip.io' }}
+    steps:
+      - name: Does the name resolve at all?
+        run: |
+          echo "### DNS for $HOST" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # sslip.io is a third-party wildcard DNS service and the Caddyfile
+          # names it as a known single point of failure. If A comes back empty
+          # the address is simply gone, whatever the server is doing.
+          { echo "A    : $(dig +short A "$HOST" | tr '\n' ' ')"; } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          { echo "AAAA : $(dig +short AAAA "$HOST" | tr '\n' ' ')"; } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The certificate, as a client sees it
+        continue-on-error: true
+        run: |
+          echo "### TLS" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null \
+            | openssl x509 -noout -subject -issuer -dates 2>&1 \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The four paths
+        run: |
+          echo "### HTTP" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for p in / /api/health /workspace/ /workspace/erp.html; do
+            out="$(curl -sS -o /tmp/body -w '%{http_code} %{size_download}B %{time_total}s' \
+                    --max-time 25 "https://$HOST$p" 2>&1 || echo 'REQUEST FAILED')"
+            printf '%-24s %s\n' "$p" "$out" | tee -a "$GITHUB_STEP_SUMMARY"
+            # The first line of the body says more than the status often does:
+            # a Next.js 404 page and the real workspace shell are both 200-ish
+            # shaped to a status check and completely different to a web view.
+            head -c 160 /tmp/body | tr -d '\n' | sed 's/^/    ↳ /' | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The assets that page pulls in
+        continue-on-error: true
+        run: |
+          # A shell that loads and then draws nothing is a shell whose scripts
+          # 404. The reviewer would report both the same way.
+          echo "### Assets referenced by erp.html" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          curl -sS --max-time 25 "https://$HOST/workspace/erp.html" -o /tmp/erp.html || true
+          grep -oE '(src|href)="[^"]+\.(js|css)"' /tmp/erp.html 2>/dev/null \
+            | sed -E 's/.*"(.*)"/\1/' | sort -u | head -20 > /tmp/assets || true
+          while read -r a; do
+            [ -z "$a" ] && continue
+            case "$a" in http*) u="$a" ;; /*) u="https://$HOST$a" ;; *) u="https://$HOST/workspace/$a" ;; esac
+            printf '%-40s %s\n' "$a" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$u" || echo FAIL)" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+          done < /tmp/assets
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
