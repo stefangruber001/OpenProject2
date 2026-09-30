@@ -43,6 +43,21 @@ final class AppState: ObservableObject {
             }
         }
 
+        // ONE TAB LOADS AT LAUNCH, NOT SIX.
+        //
+        // The other five load when they are first selected, or when a sign-in
+        // completes — see the broadcast below, which loads any tab whose view
+        // has no URL yet. Before, all six fetched at once and all six were
+        // redirected to the sign-in screen, so the app opened showing a login
+        // page on every tab and its own content on none. That is what App
+        // Review saw, and "did not load content on any tab" describes it
+        // exactly.
+        //
+        // It is also six TLS handshakes and six page loads in the same instant
+        // on a device that may have just joined a network, to fetch six copies
+        // of one screen that nobody asked for.
+        stores[self.selection]?.loadInitial()
+
         // Sign in once, not once per tab. Every tab shares the cookie store, so
         // the session was never per-tab — but a tab that loaded BEFORE sign-in
         // keeps showing its own login page until something reloads it, and
@@ -105,6 +120,11 @@ final class AppState: ObservableObject {
     /// session that expired while the app was in the background, where the tab
     /// being opened is stale but no sign-in has happened to announce.
     func didSelect(_ id: String) {
+        // A tab that has never been opened has no page yet — see `init`, where
+        // only the first one loads. Idempotent: `loadInitial` does nothing to a
+        // view that already has a URL, so re-selecting a tab never reloads it
+        // and never discards what is on it.
+        store(for: id).loadInitial()
         store(for: id).reloadIfShowingLogin()
         // Who is signed in may have changed in ANOTHER tab since this one was
         // last looked at — these web views are long-lived and independent. Ask
