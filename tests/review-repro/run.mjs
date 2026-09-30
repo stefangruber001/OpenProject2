@@ -52,19 +52,34 @@ function tabs() {
   return (j.tabs || []).map((t) => ({ id: t.id, path: t.path }));
 }
 
-const PW = resolve(
-  ROOT,
-  "node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core/index.js",
-);
+/* Playwright is declared in apps/web, not at the root, and pnpm puts it under a
+   version-stamped directory — so neither a bare import from here nor a pinned
+   path is reliable. Look for whatever is actually installed. Leaving the
+   browser path undefined is deliberate: Playwright then finds the browser it
+   installed itself, which is what CI has. */
 const CHROME =
   process.env.CHROME_PATH ||
   ["/opt/pw-browsers/chromium-1194/chrome-linux/chrome"].find((p) => existsSync(p)) ||
   undefined;
 
 async function loadChromium() {
-  for (const spec of [PW, "playwright-core", "playwright"]) {
+  const pnpmDir = join(ROOT, "node_modules", ".pnpm");
+  const stamped = existsSync(pnpmDir)
+    ? (await import("node:fs"))
+        .readdirSync(pnpmDir)
+        .filter((d) => d.startsWith("playwright-core@"))
+        .map((d) => join(pnpmDir, d, "node_modules", "playwright-core", "index.js"))
+    : [];
+  const candidates = [
+    ...stamped,
+    join(ROOT, "apps", "web", "node_modules", "playwright-core", "index.js"),
+    join(ROOT, "node_modules", "playwright-core", "index.js"),
+    "playwright-core",
+    "playwright",
+  ];
+  for (const spec of candidates) {
     try {
-      const m = await import(spec);
+      const m = await import(spec.startsWith("/") ? `file://${spec}` : spec);
       const c = (m.default || m).chromium;
       if (c) return c;
     } catch {}

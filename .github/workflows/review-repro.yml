@@ -37,7 +37,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        # playwright is declared in apps/web, so the bin lives there, not at the
+        # root — same as site-e2e.yml.
+        run: pnpm --filter web exec playwright install --with-deps chromium
 
       - name: What the reviewer saw
         env:
