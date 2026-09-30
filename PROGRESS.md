@@ -4227,3 +4227,23 @@ DNS comodín gratuito, sólo IPv4, con un nombre con forma de dirección IP. El
 propio Caddyfile ya lo señala como punto único de fallo. Un dominio de verdad
 quita ese riesgo, permite un registro AAAA para la red IPv6 de Apple y deja
 elegir la cadena de certificados.
+
+## S35 · Reenviado con la 1.1 (16) (2026-09-30)
+
+Build 16 en TestFlight y procesado, ficha al día, las treinta capturas, las
+notas de revisión reescritas, y **enviado**: «Successfully submitted the app for
+review», build 1.1 (16) seleccionado.
+
+Hizo falta un rodeo que conviene dejar escrito: un envío rechazado **no se
+cierra solo**. Se queda abierto en «Developer Action Needed» y mientras esté ahí
+Apple rechaza de plano el siguiente con «A review submission is already in
+progress» — o sea que el arreglo de un rechazo no se puede mandar hasta cancelar
+el rechazo. El carril tiene ahora `cancel_existing`, apagado por defecto porque
+cancelar un envío que está avanzando en revisión tira el puesto en la cola.
+
+**Lo que no se cambió, y por qué importa:** el emisor de certificados de
+producción. La cadena de cuatro niveles con raíz de Let's Encrypt de mayo de
+2026 parecía la culpable perfecta —explicaba que funcionara en España y en los
+runners y fallara en un iPad— y estuve a un paso de tocarla. Un `WKWebView` de
+verdad en un runner de macOS dijo que no: Apple confía en ese certificado. Se
+descartó midiendo.
