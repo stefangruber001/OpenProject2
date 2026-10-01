@@ -108,7 +108,15 @@ const SHARED = new Set(
     "web app control tower dashboard sms whatsapp google outlook gmail excel " +
     "euro euros s.l. sl sa cliente client material materials normal individual " +
     "general legal digital original base extra plan area zona factor sector " +
-    "director region version gas internet backup"
+    "director region version gas internet backup " +
+    /* Two month names are spelled identically in Spanish and in Catalan, so a
+       screen showing one looks untranslated on the day it is rendered and
+       perfectly fine on every other. This gate went red on 1 Oct 2026 for
+       «octubre 2026» on the hours summary, on a tree nobody had touched, and
+       would have done the same every April and every October since it was
+       written. The other ten differ (enero/gener, marzo/març, mayo/maig …) and
+       are left to the dictionary, which translates them. */
+    "abril octubre"
   ).split(/\s+/),
 );
 const PROPER = new Set([

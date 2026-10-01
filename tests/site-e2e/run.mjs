@@ -19223,6 +19223,95 @@ async function testBookImport(browser, base) {
       ok("importar: a store that refuses the write is reported, not celebrated");
     else bad("importar: refused write reported", JSON.stringify(refused));
 
+    /* RECOVERING FROM AN EARLIER VERSION, through the button.
+       Asked for on 1 Oct. The engine suite already proves the planner; what can
+       only fail HERE is the wiring — that the drawer lists the right versions,
+       that it does not offer the current one as a source, that a checkbox
+       actually narrows what comes back, and that the write is waited for. The
+       three faults of 25/09 were all of this kind. */
+    const recover = await pg.evaluate(async () => {
+      const party =
+        erp.state.parties.find((p) => p.kind === "customer") ||
+        erp.addParty({ kind: "customer", name: "E2E versión" }, "e2e");
+      const b = erp.createBudget({ partyId: party.id }, "e2e");
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 1300));
+
+      // v1.0 from a sheet, then a new version with one partida deleted.
+      const rows = [
+        ["Título", "Partida", "Subpartida", "Unidad", "Cantidad", "Precio", "Coste"],
+        ["Reforma V", "Fontanería V", "Punto V", "ud", "3", "85", "42"],
+        ["Reforma V", "Alicatado V", "Alicatado V", "m2", "24", "39", "19"],
+      ];
+      const parsed = await ErpBookImport.parseBudget(
+        await xlsxBlob("P", rows, { title: "P" }).arrayBuffer(),
+      );
+      ErpBookImport.applyBudget(erp, b.id, ErpBookImport.planBudget(erp, parsed.rows), "e2e", {});
+      erp.newVersion(b.id, { reason: "recorte E2E", author: "e2e" });
+      const v2 = erp.currentVersion(b.id);
+      const drop = v2.chapters.find((c) => c.name === "Alicatado V");
+      v2.chapters.splice(v2.chapters.indexOf(drop), 1);
+      persist();
+      render();
+      await new Promise((r) => setTimeout(r, 900));
+      const before = erp.currentVersion(b.id).chapters.length;
+
+      const btn = document.querySelector("#bFromVer");
+      if (!btn) return { fail: "no #bFromVer button" };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 500));
+      const radios = [...document.querySelectorAll('input[name="vrv"]')];
+      const boxes = [...document.querySelectorAll("[data-vrc]")];
+      const text = (document.querySelector("#vrBody") || {}).innerText || "";
+      document.querySelector("#vrGo").click();
+      await new Promise((r) => setTimeout(r, 1400));
+
+      const v = erp.currentVersion(b.id);
+      return {
+        before,
+        versions: radios.length,
+        boxes: boxes.length,
+        marksPresent: /ya est\u00e1/.test(text),
+        after: v.chapters.length,
+        names: v.chapters.map((c) => c.name),
+        drawerClosed: !document.querySelector("#drawer.on"),
+      };
+    });
+    const recovered =
+      recover.before === 1 &&
+      recover.versions === 1 &&
+      recover.after === 2 &&
+      recover.names.includes("Alicatado V") &&
+      recover.marksPresent &&
+      recover.drawerClosed;
+    if (recovered)
+      ok("versión: a partida deleted in a later version is recovered from the earlier one");
+    else bad("versión: recover from earlier version", JSON.stringify(recover));
+
+    /* And again changes nothing \u2014 it goes through the upload's own apply, so
+       the duplication fault cannot come back through this door either. */
+    const twiceVer = await pg.evaluate(async () => {
+      const b = erp.state.budgets[erp.state.budgets.length - 1];
+      document.querySelector("#bFromVer").click();
+      await new Promise((r) => setTimeout(r, 500));
+      const go2 = document.querySelector("#vrGo");
+      if (!go2)
+        return {
+          note: "nothing left to recover",
+          chapters: erp.currentVersion(b.id).chapters.length,
+        };
+      go2.click();
+      await new Promise((r) => setTimeout(r, 1400));
+      const v = erp.currentVersion(b.id);
+      return {
+        chapters: v.chapters.length,
+        lines: v.chapters.reduce((a, c) => a + c.lines.length, 0),
+      };
+    });
+    if (twiceVer.chapters === 2 && (twiceVer.lines === undefined || twiceVer.lines === 2))
+      ok("versión: recovering a second time adds nothing");
+    else bad("versión: repeated recovery", JSON.stringify(twiceVer));
+
     /* LAST, because it takes the engine away. An old tab open across a deploy
        loads a page whose script is gone, and every line of the drawer reads
        `ErpBookImport`: without the guard the operator gets a titled drawer with

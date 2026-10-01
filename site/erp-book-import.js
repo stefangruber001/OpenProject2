@@ -763,8 +763,134 @@
     return Object.assign(made, { chapters: chapters, lines: lines, relined: relined });
   }
 
+  /* ===================== back out of an earlier version =====================
+
+     Asked for on 1 Oct: «create an option to import the Títulos, Partidas and
+     Subpartidas from a previous version».
+
+     WHY THIS IS NOT ALREADY FREE. `newVersion` deep-clones the version it
+     supersedes, so everything travels FORWARD on its own and nobody needs a
+     button for that. What has no route at all is backwards: a partida deleted
+     in v1.1 is still sitting in v1.0, intact, and the only way to get it back
+     today is to type it again from a frozen document on screen. That is the
+     whole of this feature — not copying a version, recovering from one.
+
+     IT READS A VERSION AS IF IT WERE AN UPLOADED SHEET. The rows below are the
+     same shape `planBudget` takes from a workbook, so a recovered partida goes
+     through the identical planner, the identical título+partida matching and
+     the identical idempotent apply. Two consequences worth having: bringing the
+     same partida back twice cannot duplicate it (the fault reported on 25/09
+     cannot come back through this door), and a subpartida that was deleted from
+     the price book as well is re-created there by `applyBook`, because the plan
+     carries it.
+     ========================================================================= */
+
+  /**
+   * The versions of this budget that something could be recovered FROM, newest
+   * first, each with what it holds and what of that is missing from the current
+   * one. The current version is never among them: it is the destination.
+   */
+  function recoverableVersions(erp, budgetId) {
+    var b = erp.budget(budgetId);
+    var cur = erp.currentVersion(budgetId);
+    var have = {};
+    ((cur && cur.chapters) || []).forEach(function (ch) {
+      var key = fold(ch.title || "") + "\u0000" + fold(ch.name);
+      have[key] = {};
+      (ch.lines || []).forEach(function (l) {
+        have[key][fold(l.desc)] = true;
+      });
+    });
+
+    return (b.versions || [])
+      .filter(function (v) {
+        return !cur || v.id !== cur.id;
+      })
+      .map(function (v) {
+        var chapters = (v.chapters || []).map(function (ch) {
+          var key = fold(ch.title || "") + "\u0000" + fold(ch.name);
+          var mine = have[key];
+          var lines = (ch.lines || []).map(function (l) {
+            return {
+              id: l.id,
+              desc: l.desc,
+              unit: l.unit || "",
+              qtyMilli: l.qtyMilli || 0,
+              priceCents: l.priceCents || 0,
+              costCents: l.costCents || 0,
+              /* Already in the current version under the same partida. Shown
+                 rather than hidden: «this one is not lost» is the answer to
+                 half the questions somebody opens this panel with. */
+              present: !!(mine && mine[fold(l.desc)]),
+            };
+          });
+          return {
+            id: ch.id,
+            name: ch.name,
+            title: ch.title || "",
+            present: !!mine,
+            lines: lines,
+            missing: lines.filter(function (l) {
+              return !l.present;
+            }).length,
+          };
+        });
+        return {
+          id: v.id,
+          vNumber: v.vNumber,
+          date: v.date,
+          reason: v.reason || "",
+          issued: !!v.issued,
+          frozen: !!v.frozen,
+          chapters: chapters,
+          lines: chapters.reduce(function (a, c) {
+            return a + c.lines.length;
+          }, 0),
+          missing: chapters.reduce(function (a, c) {
+            return a + c.missing;
+          }, 0),
+        };
+      })
+      .reverse();
+  }
+
+  /**
+   * A chosen version, as the rows a budget sheet would have carried.
+   *
+   * `pick` is the set of chapter ids to take; leaving it out takes the lot.
+   * Blank-cell inheritance is not used — every row names its own título and
+   * partida — because these rows are generated rather than typed and an
+   * inherited blank would be a second way to say the same thing.
+   */
+  function versionRows(version, pick) {
+    var want = pick && pick.length ? pick : null;
+    var rows = [];
+    var n = 1;
+    (version.chapters || []).forEach(function (ch) {
+      if (want && want.indexOf(ch.id) < 0) return;
+      (ch.lines || []).forEach(function (l) {
+        rows.push({
+          row: n++,
+          title: ch.title || "",
+          chapter: ch.name,
+          item: l.desc,
+          unit: l.unit || "",
+          /* Back to the text the parser reads, so that one code path turns a
+             quantity into thousandths and a price into cents, rather than two
+             that can disagree about a comma. */
+          qty: String((l.qtyMilli || 0) / 1000).replace(".", ","),
+          price: String((l.priceCents || 0) / 100).replace(".", ","),
+          cost: String((l.costCents || 0) / 100).replace(".", ","),
+        });
+      });
+    });
+    return rows;
+  }
+
   return {
     BOOK_COLUMNS: BOOK_COLUMNS,
+    recoverableVersions: recoverableVersions,
+    versionRows: versionRows,
     BUDGET_COLUMNS: BUDGET_COLUMNS,
     parseBook: parseBook,
     parseBudget: parseBudget,

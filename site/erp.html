@@ -12551,6 +12551,186 @@
         };
       }
 
+      /* ============ recovering from an earlier version of this budget ========
+         Asked for on 1 Oct. A new version deep-clones the one it supersedes, so
+         everything travels forward by itself; what has no route is backwards. A
+         partida deleted in v1.1 is still whole in v1.0, and until now the only
+         way back was to read it off a frozen document and type it again.
+
+         It goes through the UPLOAD's planner, not a second one: the chosen
+         version becomes the rows a workbook would have carried, and from there
+         it is the same título+partida matching and the same idempotent apply.
+         So recovering the same partida twice cannot duplicate it, and a
+         subpartida deleted from the price book as well comes back there too.
+
+         EVERY CONDITIONAL IS COMPUTED BEFORE THE MARKUP, never spliced into the
+         middle of it. A ternary written between a literal ending in a closing
+         angle bracket and one opening a tag is what the source audit reads as a
+         pair wrapping a sentence nobody translated — this file has a recorded
+         history of it and this drawer tripped it seven times before it was
+         straightened out. Numbers may be concatenated, because a number is not
+         a sentence; words live inside a complete literal with their own tags. */
+      const VR_TAG_O = '<span class="tag">';
+      const VR_TAG_C = "</span>";
+      const VR_PILL_Y = '<span class="pill y" style="margin-left:8px">';
+      const VR_PILL_B = '<span class="pill b" style="margin-left:8px">';
+      const VR_ROW_O = '<label class="it" style="cursor:pointer">';
+      const VR_ROW_C = "</label>";
+      const VR_NAME_O = '<span style="flex:1">';
+      const VR_NAME_C = "</span>";
+      const VR_MUTED_O = '<span style="flex:1;color:var(--muted)">';
+      const VR_HERE = '<span class="tag">ya está</span>';
+      const VR_LINE_O = '<div class="it" style="padding-left:26px">';
+      const VR_LINE_C = "</div>";
+      const VR_WHY_O = '<span style="margin-left:8px;color:var(--muted);font-size:12px">';
+      const VR_NONE =
+        '<div class="it"><span style="flex:1">Este presupuesto no tiene ninguna versión anterior.</span></div>';
+      const VR_INTRO =
+        '<div class="field full"><div class="it" style="color:var(--muted)">Elija una versión y marque lo que quiera traer. Lo que ya está en la versión actual se muestra pero no se vuelve a crear.</div></div>';
+      const VR_VERLBL =
+        '<div class="field full"><label>Versión</label><div class="daylist" id="vrVers">';
+      const VR_VEREND = '</div></div><div class="field full" id="vrBody"></div>';
+      const VR_CARD_O =
+        '<div class="card" style="margin-top:4px"><div class="ch"><h3>Partidas de esa versión</h3><span class="tag">en amarillo, lo que falta aquí</span></div><div class="daylist">';
+      const VR_CARD_C = "</div></div>";
+      const VR_ACTIONS =
+        '<div class="field full row" style="gap:8px;margin-top:10px"><button class="btn primary" id="vrGo">Recuperar</button><span style="flex:1"></span><button class="btn" id="vrCancel">Cancelar</button></div>';
+      const VR_GRID_O = '<div class="fgrid">';
+      const VR_GRID_C = "</div>";
+      const VR_RADIO_O = '<input type="radio" name="vrv" value="';
+      const VR_BOX_O = '<input type="checkbox" data-vrc="';
+      const VR_ATTR_END = '"';
+      const VR_GAP = ' style="margin-right:8px">';
+      const VR_V = "v";
+      const VR_SP = " ";
+      const vrPill = (n) => (n ? VR_PILL_Y : VR_PILL_B) + n + VR_TAG_C;
+
+      function versionRecoverDrawer(budgetId) {
+        const db = openDrawer("Recuperar de una versión anterior");
+        const vers = ErpBookImport.recoverableVersions(erp, budgetId);
+        if (!vers.length) {
+          db.innerHTML = VR_NONE;
+          return;
+        }
+        /* Chosen per version rather than remembered across them: the ids belong
+           to one version's chapters and mean nothing in another. */
+        let pickedVer = vers[0].id,
+          picked = {};
+
+        const vRow = (v) => {
+          const checked = v.id === pickedVer ? " checked" : "";
+          const why = v.reason ? VR_WHY_O + esc(v.reason) + VR_TAG_C : "";
+          return (
+            VR_ROW_O +
+            VR_RADIO_O +
+            esc(v.id) +
+            VR_ATTR_END +
+            checked +
+            VR_GAP +
+            VR_NAME_O +
+            VR_V +
+            esc(v.vNumber) +
+            VR_NAME_C +
+            VR_TAG_O +
+            esc(fmtD(v.date)) +
+            VR_TAG_C +
+            why +
+            vrPill(v.missing) +
+            VR_ROW_C
+          );
+        };
+
+        db.innerHTML =
+          VR_GRID_O +
+          VR_INTRO +
+          VR_VERLBL +
+          vers.map(vRow).join("") +
+          VR_VEREND +
+          VR_GRID_C;
+
+        const body = () => {
+          const v = vers.find((x) => x.id === pickedVer);
+          const out = $("#vrBody");
+          if (!v || !out) return;
+          const rows = v.chapters
+            .map((c) => {
+              const lines = c.lines
+                .map((l) => {
+                  const open = l.present ? VR_MUTED_O : VR_NAME_O;
+                  const qty =
+                    VR_TAG_O +
+                    esc(String((l.qtyMilli || 0) / 1000).replace(".", ",")) +
+                    VR_SP +
+                    esc(l.unit || "") +
+                    VR_TAG_C;
+                  const right = l.present ? VR_HERE : qty;
+                  return VR_LINE_O + open + esc(l.desc) + VR_NAME_C + right + VR_LINE_C;
+                })
+                .join("");
+              const checked = picked[c.id] !== false && c.missing > 0 ? " checked" : "";
+              const off = c.missing ? "" : " disabled";
+              const titleTag = c.title ? VR_TAG_O + esc(c.title) + VR_TAG_C : "";
+              return (
+                VR_ROW_O +
+                VR_BOX_O +
+                esc(c.id) +
+                VR_ATTR_END +
+                checked +
+                off +
+                VR_GAP +
+                VR_NAME_O +
+                esc(c.name) +
+                VR_NAME_C +
+                titleTag +
+                vrPill(c.missing) +
+                VR_ROW_C +
+                lines
+              );
+            })
+            .join("");
+          out.innerHTML = VR_CARD_O + rows + VR_CARD_C + VR_ACTIONS;
+
+          out.querySelectorAll("[data-vrc]").forEach((cb) => {
+            cb.onchange = () => {
+              picked[cb.dataset.vrc] = cb.checked;
+            };
+          });
+          $("#vrCancel").onclick = () => closeDrawer();
+          /* Waits for the write, like the upload: this is a change somebody
+             makes and then leaves the screen to go and look at. */
+          $("#vrGo").onclick = async (ev) => {
+            const btn = ev.currentTarget;
+            if (btn.disabled) return;
+            btn.disabled = true;
+            const take = v.chapters
+              .filter((c) => c.missing > 0 && picked[c.id] !== false)
+              .map((c) => c.id);
+            if (!take.length) {
+              toast("⚠ No hay nada marcado");
+              btn.disabled = false;
+              return;
+            }
+            const plan = ErpBookImport.planBudget(erp, ErpBookImport.versionRows(v, take));
+            const stored = await mutateNow(() => {
+              ErpBookImport.applyBudget(erp, budgetId, plan, "backoffice", {
+                fileName: "v" + v.vNumber,
+              });
+            }, "Recuperado de la versión anterior");
+            closeDrawer();
+            if (stored) render();
+          };
+        };
+
+        db.querySelectorAll('input[name="vrv"]').forEach((r) => {
+          r.onchange = () => {
+            pickedVer = r.value;
+            picked = {};
+            body();
+          };
+        });
+        body();
+      }
+
       /* A money column reads as money in the preview; everything else reads as
          it is. The plan stores cents because that is what the engine keeps. */
       function money(field, v) {
@@ -17609,7 +17789,7 @@
                  left to add a chapter at all. Every add now sits in the one pane that
                  is always on screen. -->
             <div class="pbh"><button class="pbfold" id="pbFoldL" title="Mostrar u ocultar las partidas">⟨</button>
-             Subpartidas${locked ? "" : '<button class="btn sm" id="bAddTitle" style="margin-left:8px">+ título</button><button class="btn sm" id="bAddChap" style="margin-left:6px">+ partida</button><button class="btn sm" id="bUpload" style="margin-left:6px" title="Subir un presupuesto en Excel: crea lo que falte en el libro de precios y redacta esta versión">⬆ Excel</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
+             Subpartidas${locked ? "" : '<button class="btn sm" id="bAddTitle" style="margin-left:8px">+ título</button><button class="btn sm" id="bAddChap" style="margin-left:6px">+ partida</button><button class="btn sm" id="bUpload" style="margin-left:6px" title="Subir un presupuesto en Excel: crea lo que falte en el libro de precios y redacta esta versión">⬆ Excel</button><button class="btn sm" id="bFromVer" style="margin-left:6px" title="Recuperar títulos, partidas y subpartidas de una versión anterior de este presupuesto">↩ De una versión</button>'}<span style="flex:1"></span><span class="tag" id="bGridTag"></span>
              <button class="pbfold" id="pbFoldR" title="Mostrar u ocultar los totales">⟩</button></div>
             <!-- Column order and names come from Package 1 slide 9, and they are the
                  order the work is actually done in: say what it is, in what unit, what
@@ -17730,6 +17910,11 @@
                  the operator just read said the same numbers. */
               onDone: () => render(),
             });
+        /* Recovering from an earlier version. `newVersion` clones FORWARD on
+           its own, so the direction with no route is backwards. Editable
+           versions only — the same guard `⬆ Excel` has. */
+        const verBtn = $("#bFromVer");
+        if (verBtn) verBtn.onclick = () => versionRecoverDrawer(id);
         const addChap = $("#bAddChap");
         {
           /* Package 1, slide 8 (client's words, old vocabulary): "los Capítulos

@@ -105,6 +105,23 @@ window.CANEI_DICT = {
     ["Elegir archivo", "Choose a file"],
     ["No se pudo leer", "Could not be read"],
     ["No se pudo cargar", "Could not be loaded"],
+    ["↩ De una versión", "↩ From a version"],
+    [
+      "Recuperar títulos, partidas y subpartidas de una versión anterior de este presupuesto",
+      "Recover sections, line items and sub-line items from an earlier version of this quote",
+    ],
+    ["Recuperar de una versión anterior", "Recover from an earlier version"],
+    ["Este presupuesto no tiene ninguna versión anterior.", "This quote has no earlier version."],
+    [
+      "Elija una versión y marque lo que quiera traer. Lo que ya está en la versión actual se muestra pero no se vuelve a crear.",
+      "Choose a version and tick what to bring back. Anything already in the current version is shown but not created again.",
+    ],
+    ["Partidas de esa versión", "Line items in that version"],
+    ["en amarillo, lo que falta aquí", "in yellow, what is missing here"],
+    ["Recuperar", "Recover"],
+    ["ya está", "already here"],
+    ["⚠ No hay nada marcado", "⚠ Nothing is ticked"],
+    ["Recuperado de la versión anterior", "Recovered from the earlier version"],
     [
       "Recargue la página para actualizar la aplicación.",
       "Reload the page to update the application.",

@@ -302,6 +302,20 @@ window.CANEI_DICT.ca = {
   "Elegir archivo": "Triar fitxer",
   "No se pudo leer": "No s'ha pogut llegir",
   "No se pudo cargar": "No s'ha pogut carregar",
+  "↩ De una versión": "↩ D'una versió",
+  "Recuperar títulos, partidas y subpartidas de una versión anterior de este presupuesto":
+    "Recupera títols, partides i subpartides d'una versió anterior d'aquest pressupost",
+  "Recuperar de una versión anterior": "Recupera d'una versió anterior",
+  "Este presupuesto no tiene ninguna versión anterior.":
+    "Aquest pressupost no té cap versió anterior.",
+  "Elija una versión y marque lo que quiera traer. Lo que ya está en la versión actual se muestra pero no se vuelve a crear.":
+    "Trieu una versió i marqueu què voleu recuperar. El que ja és a la versió actual es mostra però no es torna a crear.",
+  "Partidas de esa versión": "Partides d'aquella versió",
+  "en amarillo, lo que falta aquí": "en groc, el que falta aquí",
+  Recuperar: "Recupera",
+  "ya está": "ja hi és",
+  "⚠ No hay nada marcado": "⚠ No hi ha res marcat",
+  "Recuperado de la versión anterior": "Recuperat de la versió anterior",
   "Recargue la página para actualizar la aplicación.":
     "Recarregueu la pàgina per actualitzar l'aplicació.",
   "Se actualizarán": "S'actualitzaran",

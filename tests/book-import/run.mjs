@@ -526,6 +526,159 @@ function bookErp() {
   );
 }
 
+/* ---------- 6 · recovering from an earlier version ---------- */
+{
+  /* Asked for on 1 Oct. `newVersion` already clones FORWARD, so the thing with
+     no route is backwards: a partida deleted in a later version still sits in
+     the earlier one and can only be retyped off a frozen document. */
+  const erp = bookErp();
+  const cli = erp.addParty(
+    {
+      name: "Cliente Versión",
+      partyType: "individual",
+      roles: ["customer"],
+      email: "v@example.invalid",
+    },
+    "t",
+  );
+  const b = erp.createBudget({ partyId: cli.id }, "t");
+
+  // v1.0: two partidas, three lines.
+  B.applyBudget(
+    erp,
+    b.id,
+    B.planBudget(erp, [
+      {
+        row: 2,
+        title: "Reforma de baño",
+        chapter: "Fontanería",
+        item: "Punto de agua empotrado",
+        unit: "ud",
+        qty: "3",
+        price: "85",
+        cost: "42",
+      },
+      {
+        row: 3,
+        title: "",
+        chapter: "",
+        item: "Bajante nueva",
+        unit: "ml",
+        qty: "4,5",
+        price: "54",
+        cost: "26",
+      },
+      {
+        row: 4,
+        title: "Reforma de baño",
+        chapter: "Alicatado",
+        item: "Alicatado 30x60",
+        unit: "m2",
+        qty: "24",
+        price: "39",
+        cost: "19",
+      },
+    ]),
+    "t",
+    { fileName: "v1.xlsx" },
+  );
+  const v1 = erp.currentVersion(b.id);
+  const v1Lines = v1.chapters.reduce((a, c) => a + c.lines.length, 0);
+  is(
+    v1.chapters.length === 2 && v1Lines === 3,
+    "v1.0 holds two partidas and three líneas",
+    `${v1.chapters.length}/${v1Lines}`,
+  );
+
+  // v1.1 clones it, and somebody deletes a whole partida plus one line.
+  erp.newVersion(b.id, { reason: "recorte", author: "t" });
+  const v2 = erp.currentVersion(b.id);
+  const ali = v2.chapters.find((c) => c.name === "Alicatado");
+  erp.removeChapter
+    ? erp.removeChapter(b.id, ali.id, "t")
+    : v2.chapters.splice(v2.chapters.indexOf(ali), 1);
+  const fon = erp.currentVersion(b.id).chapters.find((c) => c.name === "Fontanería");
+  erp.removeLine(b.id, fon.id, fon.lines.find((l) => l.desc === "Bajante nueva").id, "t");
+
+  const after = erp.currentVersion(b.id);
+  is(
+    after.chapters.length === 1 && after.chapters[0].lines.length === 1,
+    "v1.1 is left with one partida and one línea",
+    JSON.stringify(after.chapters.map((c) => c.name + ":" + c.lines.length)),
+  );
+
+  // ── what can be recovered, and from where ──
+  const vers = B.recoverableVersions(erp, b.id);
+  is(
+    vers.length === 1 && vers[0].vNumber === "1.0",
+    "the current version is not offered as a source",
+    JSON.stringify(vers.map((v) => v.vNumber)),
+  );
+  const src = vers[0];
+  is(
+    src.missing === 2,
+    "it reports two líneas the current version no longer has",
+    JSON.stringify({ missing: src.missing, lines: src.lines }),
+  );
+  const gone = src.chapters.find((c) => c.name === "Alicatado");
+  const kept = src.chapters.find((c) => c.name === "Fontanería");
+  is(gone && !gone.present, "a partida deleted outright is marked missing", JSON.stringify(gone));
+  is(
+    kept && kept.present,
+    "…and one still in the budget is marked present",
+    JSON.stringify({ present: kept.present }),
+  );
+  is(
+    kept.lines.find((l) => l.desc === "Punto de agua empotrado").present &&
+      !kept.lines.find((l) => l.desc === "Bajante nueva").present,
+    "within a partida that stayed, the deleted línea is the one marked missing",
+    JSON.stringify(kept.lines.map((l) => [l.desc, l.present])),
+  );
+
+  // ── bring back ONLY the deleted partida ──
+  const picked = B.versionRows(src, [gone.id]);
+  is(
+    picked.length === 1 && picked[0].item === "Alicatado 30x60",
+    "picking one partida yields only its rows",
+    JSON.stringify(picked),
+  );
+  B.applyBudget(erp, b.id, B.planBudget(erp, picked), "t", { fileName: "v1.0" });
+  const back = erp.currentVersion(b.id);
+  is(
+    back.chapters.length === 2 && !!back.chapters.find((c) => c.name === "Alicatado"),
+    "the deleted partida is back, and nothing else was touched",
+    JSON.stringify(back.chapters.map((c) => c.name + ":" + c.lines.length)),
+  );
+  const ali2 = back.chapters.find((c) => c.name === "Alicatado");
+  is(
+    ali2.lines.length === 1 &&
+      ali2.lines[0].qtyMilli === 24000 &&
+      ali2.lines[0].priceCents === 3900,
+    "…with its quantity and price intact through the round trip",
+    JSON.stringify(ali2.lines.map((l) => [l.qtyMilli, l.priceCents])),
+  );
+
+  // ── and doing it again changes nothing: the 25/09 fault cannot return here ──
+  B.applyBudget(erp, b.id, B.planBudget(erp, B.versionRows(src, [gone.id])), "t", {
+    fileName: "v1.0",
+  });
+  const twice = erp.currentVersion(b.id);
+  is(
+    twice.chapters.length === 2 && twice.chapters.reduce((a, c) => a + c.lines.length, 0) === 2,
+    "recovering the same partida twice adds nothing",
+    JSON.stringify(twice.chapters.map((c) => c.name + ":" + c.lines.length)),
+  );
+
+  // ── a decimal survives the version → rows → cents round trip ──
+  const allRows = B.versionRows(src);
+  const baj = allRows.find((r) => r.item === "Bajante nueva");
+  is(
+    baj && baj.qty === "4,5",
+    "«4,5» comes back out of the version as «4,5», not 4.5",
+    JSON.stringify(baj),
+  );
+}
+
 /* ---------- report ---------- */
 const failed = checks.filter((c) => !c.pass);
 console.log("\n──── uploaded workbook ────\n");
