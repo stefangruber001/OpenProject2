@@ -21,7 +21,21 @@ struct WebView: UIViewRepresentable {
         webView.scrollView.refreshControl = refresh
         context.coordinator.refreshControl = refresh
 
-        store.loadInitial()
+        // NOT `store.loadInitial()` HERE ANY MORE.
+        //
+        // Every tab's web view is built at launch — that is what makes
+        // switching instant — and each one used to fetch its page immediately.
+        // Before anybody has signed in, every one of those fetches is redirected
+        // to the sign-in screen, so the app opened as SIX TABS EACH SHOWING A
+        // LOGIN PAGE and not one of them showing what its tab is named after.
+        // "The app did not load content on any tab" is a fair description of
+        // that, and it is what App Review wrote.
+        //
+        // Loading is now driven by `AppState`: the selected tab loads, and the
+        // rest load when they are first selected or when a sign-in completes.
+        // Nothing is lost — `reloadIfShowingLogin` already loads a tab whose
+        // view has no URL yet, and that is exactly what the sign-in broadcast
+        // calls on every tab.
         return webView
     }
 

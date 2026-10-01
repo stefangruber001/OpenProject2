@@ -36,8 +36,41 @@ final class WebViewStore: NSObject, ObservableObject {
     @Published var canGoBack = false
     @Published var canGoForward = false
     @Published var hasError = false
+
+    /// WHY the load failed, in words, and in the operator's face rather than in
+    /// a log nobody can reach.
+    ///
+    /// Every failure used to draw the same screen: "You're offline". App Review
+    /// rejected 1.1 (15) with "the app did not load content on any tab" and
+    /// noted, pointedly, "Internet Connection: Active" — which is what somebody
+    /// writes when an app has just told them their connection is down and they
+    /// can see that it is not. That report cost a review cycle and named no
+    /// cause, because the app had made every cause look identical: a refused
+    /// certificate, a name that will not resolve, a server returning nothing and
+    /// an aeroplane all produced the same four words.
+    ///
+    /// A device we cannot reach has to be able to describe itself. This is not
+    /// diagnostics for developers — it is the difference between a rejection
+    /// that says nothing and a screenshot that says what broke.
+    @Published var errorDetail: LoadFailure?
+
+    struct LoadFailure: Equatable {
+        /// What to tell whoever is holding the device.
+        let headline: String
+        let detail: String
+        /// The underlying identifiers, shown small. A reviewer photographs the
+        /// screen; these are what make that photograph worth something.
+        let code: String
+        /// True only when the device genuinely reports no route to the network.
+        /// Everything else is a server or transport problem wearing the same
+        /// mask, and saying "you're offline" to somebody who is not is how a
+        /// real fault gets dismissed as the user's wifi.
+        let isOffline: Bool
+    }
     @Published var pageTitle = ""
     @Published var didFinishFirstLoad = false
+    /// Guards the single automatic retry — see `showErrorIfNeeded`.
+    private var didRetryFirstLoad = false
 
     let tab: WebTab
     let webView: WKWebView
@@ -193,6 +226,7 @@ final class WebViewStore: NSObject, ObservableObject {
 
     func load(_ url: URL) {
         hasError = false
+        errorDetail = nil
         var request = URLRequest(url: url)
         request.cachePolicy = .useProtocolCachePolicy
         webView.load(request)
@@ -200,6 +234,7 @@ final class WebViewStore: NSObject, ObservableObject {
 
     func reload() {
         hasError = false
+        errorDetail = nil
         if webView.url == nil {
             load(tab.url)
         } else {
@@ -326,6 +361,7 @@ extension WebViewStore: WKNavigationDelegate {
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         hasError = false
+        errorDetail = nil
         if !didFinishFirstLoad {
             didFinishFirstLoad = true
             Haptics.soft()
@@ -442,8 +478,95 @@ extension WebViewStore: WKNavigationDelegate {
         let ns = error as NSError
         // -999 = request cancelled (e.g. rapid reload) — not a real failure.
         guard ns.code != NSURLErrorCancelled else { return }
+        // -102 = frame load interrupted, which is what a download that began as
+        // a navigation looks like. The file is arriving; nothing is wrong.
+        guard !(ns.domain == "WebKitErrorDomain" && ns.code == 102) else { return }
+        // ONE SILENT RETRY BEFORE GIVING UP, ON THE FIRST LOAD ONLY.
+        //
+        // The shell opens six web views at once on a cold launch — that is what
+        // makes switching tabs instant — so six TLS handshakes and six DNS
+        // lookups happen in the same instant, on a device that may have joined
+        // the network seconds earlier. A single transient failure there is
+        // ordinary, and it currently becomes a permanent error screen that the
+        // operator has to tap out of on every tab, because nothing retries
+        // until the network monitor sees a change that never comes.
+        //
+        // Bounded to one attempt per tab, and only before that tab has ever
+        // loaded anything: a retry loop against a server that is genuinely
+        // refusing is a worse failure than the screen it was hiding.
+        if !didFinishFirstLoad && !didRetryFirstLoad {
+            didRetryFirstLoad = true
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                guard let self, !self.didFinishFirstLoad else { return }
+                self.load(self.tab.url)
+            }
+            return
+        }
+
+        errorDetail = Self.describe(ns)
         hasError = true
         Haptics.warning()
+    }
+
+    /// Turn an NSError into something a person can act on and a reviewer can
+    /// photograph.
+    ///
+    /// THE CASES ARE SEPARATED BECAUSE THEY HAVE DIFFERENT ANSWERS. "Turn your
+    /// wifi on" is useless advice to somebody whose wifi is on and whose device
+    /// has refused our certificate; and a certificate refusal is invisible from
+    /// the outside — it passes every check a server can run on itself, because
+    /// the judgement is made in the trust store of a device we do not have.
+    static func describe(_ ns: NSError) -> LoadFailure {
+        let code = "\(ns.domain) \(ns.code)"
+        switch (ns.domain, ns.code) {
+        case (NSURLErrorDomain, NSURLErrorNotConnectedToInternet),
+             (NSURLErrorDomain, NSURLErrorNetworkConnectionLost):
+            return LoadFailure(
+                headline: "No connection",
+                detail: "This device reports no route to the network. Reconnect and try again.",
+                code: code, isOffline: true
+            )
+        case (NSURLErrorDomain, NSURLErrorCannotFindHost),
+             (NSURLErrorDomain, NSURLErrorDNSLookupFailed):
+            return LoadFailure(
+                headline: "Address not found",
+                detail: "The workspace address could not be resolved on this network. "
+                    + "The connection is working; the name is not answering.",
+                code: code, isOffline: false
+            )
+        case (NSURLErrorDomain, NSURLErrorSecureConnectionFailed),
+             (NSURLErrorDomain, NSURLErrorServerCertificateUntrusted),
+             (NSURLErrorDomain, NSURLErrorServerCertificateHasBadDate),
+             (NSURLErrorDomain, NSURLErrorServerCertificateHasUnknownRoot),
+             (NSURLErrorDomain, NSURLErrorServerCertificateNotYetValid),
+             (NSURLErrorDomain, NSURLErrorClientCertificateRejected),
+             (NSURLErrorDomain, NSURLErrorAppTransportSecurityRequiresSecureConnection):
+            return LoadFailure(
+                headline: "Secure connection refused",
+                detail: "This device did not accept the workspace's security certificate. "
+                    + "The connection is working and the server answered.",
+                code: code, isOffline: false
+            )
+        case (NSURLErrorDomain, NSURLErrorTimedOut):
+            return LoadFailure(
+                headline: "The server did not answer",
+                detail: "The address was reached but nothing came back in time.",
+                code: code, isOffline: false
+            )
+        case (NSURLErrorDomain, NSURLErrorCannotConnectToHost):
+            return LoadFailure(
+                headline: "Server unreachable",
+                detail: "The address resolved, but the server refused the connection.",
+                code: code, isOffline: false
+            )
+        default:
+            return LoadFailure(
+                headline: "The workspace did not load",
+                detail: ns.localizedDescription,
+                code: code, isOffline: false
+            )
+        }
     }
 
     // If the web content process is jettisoned under memory pressure, reload so

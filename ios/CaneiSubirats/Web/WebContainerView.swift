@@ -32,7 +32,7 @@ struct WebContainerView: View {
                 .opacity(store.hasError ? 0 : 1)
 
             if store.hasError {
-                OfflineView { store.reload() }
+                OfflineView(failure: store.errorDetail) { store.reload() }
                     .transition(.opacity)
             }
         }

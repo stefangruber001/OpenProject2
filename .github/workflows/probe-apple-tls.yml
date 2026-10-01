@@ -1,0 +1,161 @@
+name: Probe · does Apple trust our certificate
+
+# THE ONE QUESTION LINUX CANNOT ANSWER.
+#
+# App Review rejected 1.1 (15) with "did not load content on any tab" and noted
+# the connection was active. Everything this repository can run says the server
+# is healthy: curl verifies the chain, WebKit and Chromium both render every
+# screen, the database answers. All of that runs against a Linux trust store.
+#
+# iOS does not use a Linux trust store. It uses Apple's, and it applies App
+# Transport Security on top — and the certificate here chains four deep through
+# a Let's Encrypt hierarchy whose root was created in May 2026:
+#
+#   leaf → Let's Encrypt YE1 → ISRG Root YE → ISRG Root X2 → ISRG Root X1
+#
+# Whether Apple's evaluation walks that chain is not a thing that can be argued
+# about; it is a thing that can be measured, on a machine that has Apple's trust
+# store. A macOS runner has exactly that, and shares both the trust store and
+# the CFNetwork stack with iOS. So: ask Apple.
+#
+# Read-only. It fetches a URL and reports what happened.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "URL to fetch with Apple's networking stack"
+        required: false
+        default: "https://178-105-10-156.sslip.io/api/health"
+
+permissions:
+  contents: read
+
+jobs:
+  ask-apple:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    env:
+      TARGET: ${{ inputs.url || 'https://178-105-10-156.sslip.io/api/health' }}
+    steps:
+      - name: What this machine is
+        run: sw_vers && echo "---" && swift --version
+
+      - name: Fetch it through URLSession — the stack WKWebView sits on
+        run: |
+          cat > /tmp/probe.swift <<'SWIFT'
+          import Foundation
+
+          let target = ProcessInfo.processInfo.environment["TARGET"]!
+          let url = URL(string: target)!
+          let sem = DispatchSemaphore(value: 0)
+          var exitCode: Int32 = 0
+
+          // The app's own user agent, so the server sees what it would see.
+          var req = URLRequest(url: url)
+          req.setValue(
+            "Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 "
+              + "(KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1 "
+              + "CaneiApp/1.1 (iOS; native-shell)",
+            forHTTPHeaderField: "User-Agent")
+          req.timeoutInterval = 30
+
+          print("→ \(target)")
+          URLSession.shared.dataTask(with: req) { data, response, error in
+            defer { sem.signal() }
+            if let e = error as NSError? {
+              // THIS is the line the whole workflow exists for. If Apple refuses
+              // the certificate it says so here, with the same domain and code
+              // the app would show on its error screen.
+              print("✗ FAILED")
+              print("  domain      : \(e.domain)")
+              print("  code        : \(e.code)")
+              print("  description : \(e.localizedDescription)")
+              for (k, v) in e.userInfo where k != "NSErrorPeerCertificateChainKey" {
+                print("  \(k): \(v)")
+              }
+              exitCode = 1
+              return
+            }
+            if let http = response as? HTTPURLResponse {
+              print("✓ HTTP \(http.statusCode)")
+              if let d = data, let s = String(data: d, encoding: .utf8) {
+                print("  body: \(s.prefix(200))")
+              }
+            }
+          }.resume()
+
+          _ = sem.wait(timeout: .now() + 60)
+          exit(exitCode)
+          SWIFT
+          swift /tmp/probe.swift
+
+      - name: And the same question asked of the trust store directly
+        if: always()
+        run: |
+          # `security verify-cert` evaluates against the SYSTEM trust store with
+          # Apple's own policy engine — no OpenSSL anywhere in the answer.
+          echo | openssl s_client -servername "$(echo "$TARGET" | sed -E 's#https://([^/]+).*#\1#')" \
+            -connect "$(echo "$TARGET" | sed -E 's#https://([^/]+).*#\1#'):443" -showcerts 2>/dev/null \
+            > /tmp/chain.txt || true
+          awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' /tmp/chain.txt \
+            | csplit -z -f /tmp/c- -b '%d.pem' - '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1 || true
+          ls -1 /tmp/c-*.pem || true
+          echo "--- Apple's verdict on the leaf, using the chain the server sent ---"
+          security verify-cert -c /tmp/c-0.pem $(for f in /tmp/c-1.pem /tmp/c-2.pem /tmp/c-3.pem; do [ -e "$f" ] && echo -n "-c $f "; done) -p ssl 2>&1 || true
+
+      - name: Load it in a real WKWebView, which is what the app does
+        if: always()
+        run: |
+          cat > /tmp/webview.swift <<'SWIFT'
+          import Foundation
+          import WebKit
+
+          // A WKWebView on macOS is the same engine, the same trust evaluation
+          // and the same navigation delegate callbacks as the one in the app.
+          // If the app's tabs fail, this fails the same way and names the error.
+          final class D: NSObject, WKNavigationDelegate {
+            let sem: DispatchSemaphore
+            var code: Int32 = 0
+            init(_ s: DispatchSemaphore) { sem = s }
+
+            func webView(_ w: WKWebView, didFinish n: WKNavigation!) {
+              print("✓ WKWebView loaded: \(w.url?.absoluteString ?? "")")
+              w.evaluateJavaScript("document.body.innerText.length") { r, _ in
+                print("  painted characters: \(r ?? "?")")
+                self.sem.signal()
+              }
+            }
+            func webView(_ w: WKWebView, didFailProvisionalNavigation n: WKNavigation!, withError e: Error) {
+              let ns = e as NSError
+              print("✗ WKWebView provisional failure")
+              print("  domain: \(ns.domain)  code: \(ns.code)")
+              print("  \(ns.localizedDescription)")
+              code = 1
+              sem.signal()
+            }
+            func webView(_ w: WKWebView, didFail n: WKNavigation!, withError e: Error) {
+              let ns = e as NSError
+              print("✗ WKWebView failure  domain: \(ns.domain)  code: \(ns.code)")
+              code = 1
+              sem.signal()
+            }
+          }
+
+          let target = ProcessInfo.processInfo.environment["TARGET"]!
+          let sem = DispatchSemaphore(value: 0)
+          let d = D(sem)
+          let web = WKWebView(frame: .init(x: 0, y: 0, width: 820, height: 1180))
+          web.navigationDelegate = d
+          web.customUserAgent = "CaneiApp/1.1 (iOS; native-shell)"
+          print("→ \(target)")
+          web.load(URLRequest(url: URL(string: target)!))
+
+          // Spin the runloop; WebKit needs one.
+          let deadline = Date().addingTimeInterval(45)
+          while sem.wait(timeout: .now() + 0.1) == .timedOut, Date() < deadline {
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.1))
+          }
+          exit(d.code)
+          SWIFT
+          TARGET="$(echo "$TARGET" | sed -E 's#(https://[^/]+).*#\1#')/workspace/erp.html" swift /tmp/webview.swift

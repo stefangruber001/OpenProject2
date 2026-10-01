@@ -4193,3 +4193,57 @@ Gates: site E2E 872/872 (was 863, +9) · book 43/43 (new) · simulations 860 · 
 sync 30 · pdf 44 · band · docx 124 · doc-i18n 13 · codes 38 · links 29 ·
 mailbox 55 · i18n 158/158 en+ca · workspace-audit 0 en+ca · dictionary complete ·
 site scripts 31 · boundaries · lint · check-types · test.
+
+## S34 · El rechazo de App Review, y la causa que describía su propia frase (2026-09-30)
+
+Apple rechazó la 1.1 (15) por la **2.1(a)** desde un iPad Air: «The app did not
+load content on any tab», anotando «Internet Connection: Active».
+
+**Lo que se descartó midiendo, no razonando.** El servidor está sano (TLS 1.2 y
+1.3, secreto hacia adelante, base de datos conectada). La página se pinta en
+WebKit y en Chromium al tamaño del iPad, con el user-agent del envoltorio y la
+sesión iniciada. Y lo más importante: **Apple confía en el certificado**. Un
+`WKWebView` de verdad, en un runner de macOS —que comparte almacén de confianza
+y pila de red con iOS— carga la URL de la app sin quejarse. La cadena de cuatro
+niveles con raíz de Let's Encrypt de mayo de 2026 parecía culpable y no lo era;
+estuve a un paso de cambiar el emisor de certificados de producción para
+arreglar algo que no estaba roto.
+
+**La causa.** Cada pestaña construye su vista web al arrancar y cada una pedía
+su página de inmediato. Sin sesión, las seis peticiones se redirigen a la
+pantalla de acceso — así que la app abría con un login en las seis pestañas y su
+contenido en ninguna. La frase de quien revisó no era vaga: era exacta. Y
+explica por qué ninguna prueba lo vio: todas entraban primero, que es justo lo
+que quien revisó todavía no había hecho.
+
+**Arreglado:** carga sólo la pestaña seleccionada; las demás al seleccionarlas o
+al completarse el acceso. Los fallos dicen cuál son, con dominio, código y
+servidor en letra pequeña, y «offline» queda para cuando el aparato informa de
+verdad de que no hay ruta. Un reintento silencioso en la primera carga. Y las
+notas de revisión dejan de mandar a una pantalla vacía.
+
+**Lo que queda dicho en voz alta:** todo esto cuelga de `sslip.io`, un servicio
+DNS comodín gratuito, sólo IPv4, con un nombre con forma de dirección IP. El
+propio Caddyfile ya lo señala como punto único de fallo. Un dominio de verdad
+quita ese riesgo, permite un registro AAAA para la red IPv6 de Apple y deja
+elegir la cadena de certificados.
+
+## S35 · Reenviado con la 1.1 (16) (2026-09-30)
+
+Build 16 en TestFlight y procesado, ficha al día, las treinta capturas, las
+notas de revisión reescritas, y **enviado**: «Successfully submitted the app for
+review», build 1.1 (16) seleccionado.
+
+Hizo falta un rodeo que conviene dejar escrito: un envío rechazado **no se
+cierra solo**. Se queda abierto en «Developer Action Needed» y mientras esté ahí
+Apple rechaza de plano el siguiente con «A review submission is already in
+progress» — o sea que el arreglo de un rechazo no se puede mandar hasta cancelar
+el rechazo. El carril tiene ahora `cancel_existing`, apagado por defecto porque
+cancelar un envío que está avanzando en revisión tira el puesto en la cola.
+
+**Lo que no se cambió, y por qué importa:** el emisor de certificados de
+producción. La cadena de cuatro niveles con raíz de Let's Encrypt de mayo de
+2026 parecía la culpable perfecta —explicaba que funcionara en España y en los
+runners y fallara en un iPad— y estuve a un paso de tocarla. Un `WKWebView` de
+verdad en un runner de macOS dijo que no: Apple confía en ese certificado. Se
+descartó midiendo.

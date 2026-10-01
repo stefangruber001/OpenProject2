@@ -11,13 +11,24 @@ company's own server in the European Union. Staff use it to run renovation jobs
 end to end: enquiry, site visit, quote, contract, the work itself, purchases,
 hours worked, invoicing and collection.
 
+SIGNING IN
+The app opens on the sign-in screen. Use the demo account above. One sign-in
+covers the whole app; the other tabs fill in behind it.
+
 WHAT TO LOOK AT AFTER SIGNING IN
 1. Torre de control — the owner's dashboard: pipeline, cash, margins, alerts.
-2. Proyectos > Recorrido del cliente — pick any job; thirteen stages show where
-   it stands, and each stage carries the real customer document.
-3. Proyectos > Obras — open a job for its Gantt chart and physical progress.
-4. Administración > Horas — the site/office split: a day sheet for the crew, a
-   review step for the office, and a summary.
+2. Maestros > Clientes — the customer register, 57 records, with search,
+   filtering and export.
+3. Comercial > Leads — the sales pipeline, and any row opens the full customer
+   journey: thirteen stages, each carrying the real document.
+4. Administración > Ingresos — invoicing, ageing and collection.
+5. Configuración > Empresa — the company's own settings and legal identity.
+
+A NOTE ON EMPTY SCREENS
+This is a live business account, not a demo database, so some screens are empty
+because that work has not happened yet — «Obras» (site works) currently has no
+open projects and says so. That is the real state of the company's books, not a
+failure to load. The screens listed above all carry data.
 
 LANGUAGE
 The interface opens in Spanish. To read it in English: the profile button in the

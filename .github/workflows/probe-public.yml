@@ -1,0 +1,162 @@
+name: Probe · is the public site reachable
+
+# WHAT APPLE SEES, FROM SOMEWHERE THAT IS NOT THE OFFICE.
+#
+# App Review rejected 1.1 (15) under guideline 2.1(a) — "the app did not load
+# content on any tab" — from an iPad in California, with the internet working.
+# The operator had opened the same address in a browser in Spain six days
+# earlier and it answered. Both of those can be true at once, and that is the
+# whole reason this exists: the only checks this repository had were `smoke`,
+# which runs the image against a throwaway database inside the CI job and never
+# touches the server, and `verify`, which has never passed because APP_URL was
+# never set. Nothing has ever looked at the live address from outside.
+#
+# This creates nothing, changes nothing and needs no secret. It resolves the
+# name, inspects the certificate, and asks for the four paths the product
+# actually depends on — including the one the iOS app loads, which is NOT the
+# one a person types into a browser:
+#
+#   /                      what the operator checks
+#   /api/health            what the deploy pipeline checks
+#   /workspace/            the app's base
+#   /workspace/erp.html    WHAT EVERY TAB IN THE APP LOADS
+#
+# A server that answers the first two and not the last is exactly a server that
+# looks healthy to everyone who has been looking, and blank to a reviewer.
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Hostname to probe"
+        required: false
+        default: "178-105-10-156.sslip.io"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HOST: ${{ inputs.host || '178-105-10-156.sslip.io' }}
+    steps:
+      - name: Does the name resolve at all?
+        run: |
+          echo "### DNS for $HOST" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # sslip.io is a third-party wildcard DNS service and the Caddyfile
+          # names it as a known single point of failure. If A comes back empty
+          # the address is simply gone, whatever the server is doing.
+          { echo "A    : $(dig +short A "$HOST" | tr '\n' ' ')"; } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          { echo "AAAA : $(dig +short AAAA "$HOST" | tr '\n' ' ')"; } 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The certificate chain, which is what App Transport Security judges
+        continue-on-error: true
+        run: |
+          # THE ONE LAYER NOTHING HERE HAS EVER CHECKED.
+          #
+          # iOS applies App Transport Security to every WKWebView load, and it is
+          # stricter than curl and than a desktop browser: TLS 1.2 or better,
+          # forward secrecy, and a chain that completes to a root the DEVICE
+          # trusts. A server that satisfies Ubuntu's trust store and not iOS's
+          # fails ONLY on the phone — silently, as a navigation error, which this
+          # app draws as "You're offline". That is a rejection that reads exactly
+          # like "did not load content on any tab" with the connection working.
+          echo "### TLS chain" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo | openssl s_client -servername "$HOST" -connect "$HOST:443" -showcerts 2>/dev/null \
+            > /tmp/chain.txt || true
+          # Every certificate the server actually SENDS. A chain missing its
+          # intermediate works wherever that intermediate is already cached and
+          # fails on a device meeting the server for the first time.
+          awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' /tmp/chain.txt \
+            | csplit -z -f /tmp/cert- -b '%d.pem' - '/-----BEGIN CERTIFICATE-----/' '{*}' >/dev/null 2>&1 || true
+          n=0
+          for c in /tmp/cert-*.pem; do
+            [ -e "$c" ] || continue
+            n=$((n+1))
+            echo "--- certificate $n (sent by the server) ---" | tee -a "$GITHUB_STEP_SUMMARY"
+            openssl x509 -in "$c" -noout -subject -issuer -dates 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          echo "certificates sent: $n  (1 alone means the intermediate is MISSING)" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "verify result:" | tee -a "$GITHUB_STEP_SUMMARY"
+          grep -E "Verify return code|Verification" /tmp/chain.txt | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The protocol versions and ciphers ATS insists on
+        continue-on-error: true
+        run: |
+          echo "### TLS versions" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for v in tls1_2 tls1_3; do
+            if echo | openssl s_client -"$v" -servername "$HOST" -connect "$HOST:443" >/dev/null 2>&1; then
+              r=OK
+            else
+              r="not offered"
+            fi
+            printf '%-8s %s\n' "$v" "$r" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          # ATS requires forward secrecy — an ECDHE key exchange.
+          echo | openssl s_client -servername "$HOST" -connect "$HOST:443" 2>/dev/null \
+            | grep -E "^(New|Server Temp Key|Protocol|Cipher)" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Would this work on an IPv6-only network?
+        continue-on-error: true
+        run: |
+          # Apple reviews on IPv6-only networks behind NAT64/DNS64 and has
+          # required apps to work there since 2016. A host with no AAAA depends
+          # entirely on the reviewer's network synthesising one; nothing here
+          # can make that guarantee for them, so the absence is reported plainly
+          # rather than reasoned away.
+          echo "### IPv6" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          aaaa="$(dig +short AAAA "$HOST" | tr '\n' ' ')"
+          if [ -z "$aaaa" ]; then
+            echo "NO AAAA RECORD — IPv4 only." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "On an IPv6-only network this reaches the server only if that" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "network runs DNS64/NAT64. That is Apple's setup, but it is" | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "their infrastructure doing us a favour, not a property of ours." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "AAAA: $aaaa" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The four paths
+        run: |
+          echo "### HTTP" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          for p in / /api/health /workspace/ /workspace/erp.html; do
+            out="$(curl -sS -o /tmp/body -w '%{http_code} %{size_download}B %{time_total}s' \
+                    --max-time 25 "https://$HOST$p" 2>&1 || echo 'REQUEST FAILED')"
+            printf '%-24s %s\n' "$p" "$out" | tee -a "$GITHUB_STEP_SUMMARY"
+            # The first line of the body says more than the status often does:
+            # a Next.js 404 page and the real workspace shell are both 200-ish
+            # shaped to a status check and completely different to a web view.
+            head -c 160 /tmp/body | tr -d '\n' | sed 's/^/    ↳ /' | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The assets that page pulls in
+        continue-on-error: true
+        run: |
+          # A shell that loads and then draws nothing is a shell whose scripts
+          # 404. The reviewer would report both the same way.
+          echo "### Assets referenced by erp.html" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          curl -sS --max-time 25 "https://$HOST/workspace/erp.html" -o /tmp/erp.html || true
+          grep -oE '(src|href)="[^"]+\.(js|css)"' /tmp/erp.html 2>/dev/null \
+            | sed -E 's/.*"(.*)"/\1/' | sort -u | head -20 > /tmp/assets || true
+          while read -r a; do
+            [ -z "$a" ] && continue
+            case "$a" in http*) u="$a" ;; /*) u="https://$HOST$a" ;; *) u="https://$HOST/workspace/$a" ;; esac
+            printf '%-40s %s\n' "$a" "$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$u" || echo FAIL)" \
+              | tee -a "$GITHUB_STEP_SUMMARY"
+          done < /tmp/assets
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
