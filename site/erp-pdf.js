@@ -339,16 +339,74 @@
 
   /* =========================================================== the design */
 
-  /** The house mark: a simple line-drawn house, the same silhouette the brand
-   *  uses. Vector rather than an image so it stays crisp at any size and adds
-   *  no bytes worth counting. */
+  /**
+   * THE HOUSE MARK — the company's own outline, not a drawing of it.
+   *
+   * This used to hand-draw a house: a rectangle for the walls and a detached
+   * chevron for the roof, under a comment claiming it was "the same silhouette
+   * the brand uses". It was not. The real mark is a single closed outline whose
+   * roof meets the walls flush, carrying the post-and-angle shape inside it, and
+   * none of that survives being re-drawn from memory in eight lines of code. The
+   * client reported it from the documents themselves (1 Oct): the papers were
+   * going out under a logo that was not theirs.
+   *
+   * The outline below is the one the rest of the system already uses — the
+   * seventeen templates in site/documentos, the sheet writer, and the PNG that
+   * scripts/email-logo.mjs bakes for messages. Same coordinates, same 118.391 ×
+   * 137.002 box. There is now ONE drawing of this mark in the product and this
+   * is a transcription of it, not a second opinion about what it looks like.
+   *
+   * Two subpaths under the nonzero rule: the silhouette, then the interior,
+   * wound so that it is carved back out rather than painted over. Filled rather
+   * than stroked, because the outline IS the shape — stroking it would give a
+   * line around a line.
+   */
+  const MARK_W = 118.391,
+    MARK_H = 137.002;
+  const MARK_PATH = [
+    [
+      [60.449, 0],
+      [0, 38.374],
+      [0, 137.002],
+      [118.391, 137.002],
+      [118.391, 38.445],
+    ],
+    [
+      [107.462, 126.073],
+      [71.48, 126.073],
+      [56.137, 122.671],
+      [56.137, 71.986],
+      [82.416, 65.524],
+      [45.953, 65.524],
+      [45.953, 126.073],
+      [10.929, 126.073],
+      [10.929, 44.382],
+      [60.318, 13.028],
+      [107.462, 44.311],
+    ],
+  ];
+
+  /** Drawn `s` tall, at its own proportions, with (x, y) its bottom-left.
+   *  The source box counts down the page and a PDF counts up it, so the y of
+   *  every point is mirrored through the height of the box. */
   Doc.prototype.mark = function (x, y, s) {
-    const g = C.green;
-    this.c += `${g} RG ${(s * 0.09).toFixed(2)} w\n`;
-    // body of the house
-    this.c += `${(x + s * 0.1).toFixed(2)} ${(y + s * 0.06).toFixed(2)} ${(s * 0.8).toFixed(2)} ${(s * 0.55).toFixed(2)} re S\n`;
-    // roof
-    this.c += `${(x + s * 0.02).toFixed(2)} ${(y + s * 0.6).toFixed(2)} m ${(x + s * 0.5).toFixed(2)} ${(y + s * 0.95).toFixed(2)} l ${(x + s * 0.98).toFixed(2)} ${(y + s * 0.6).toFixed(2)} l S\n`;
+    const k = s / MARK_H;
+    this.c += `${C.green} rg\n`;
+    for (const sub of MARK_PATH) {
+      sub.forEach((pt, i) => {
+        const px = (x + pt[0] * k).toFixed(2);
+        const py = (y + (MARK_H - pt[1]) * k).toFixed(2);
+        this.c += `${px} ${py} ${i ? "l" : "m"}\n`;
+      });
+      this.c += "h\n";
+    }
+    this.c += "f\n";
+  };
+
+  /** How wide the mark comes out when drawn `s` tall — so a caller can set the
+   *  wordmark beside it rather than guessing at a gap. */
+  Doc.prototype.markWidth = function (s) {
+    return (s * MARK_W) / MARK_H;
   };
 
   Doc.prototype.header = function () {

@@ -215,7 +215,7 @@
           {
             w: halfW,
             xml:
-              p(b.wordmark || "Canei Subirats", {
+              p(b.wordmark || "CaneiSubirats", {
                 font: SERIF,
                 size: 15,
                 color: C.ink,

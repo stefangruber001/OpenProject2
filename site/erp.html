@@ -30008,7 +30008,13 @@
           const brand = {
             wordmark: iss.tradeName,
             legal: iss.legalName,
-            slogan: "",
+            /* The line under the wordmark. It was hardcoded empty here and in the
+               message path, so «Reformes senzillament complexes» never reached a
+               single document the client sent — while both document gates passed a
+               slogan of their own and rendered it happily. The company record has
+               carried `tagline` all along; this threw it away. Reported by the
+               client, through the paper, on 1 Oct. */
+            slogan: iss.tagline || "",
             cif: iss.taxId,
             address: iss.address,
             phone: iss.phone,
@@ -30368,7 +30374,13 @@
         return {
           wordmark: iss.tradeName,
           legal: iss.legalName,
-          slogan: "",
+          /* The line under the wordmark. It was hardcoded empty here and in the
+             message path, so «Reformes senzillament complexes» never reached a
+             single document the client sent — while both document gates passed a
+             slogan of their own and rendered it happily. The company record has
+             carried `tagline` all along; this threw it away. Reported by the
+             client, through the paper, on 1 Oct. */
+          slogan: iss.tagline || "",
           cif: iss.taxId,
           address: iss.address,
           phone: iss.phone,
