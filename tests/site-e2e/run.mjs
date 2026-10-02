@@ -124,6 +124,7 @@ async function main() {
     testChapterTitles,
     testPriceBookLinks,
     testBookImport,
+    testClientFeedback,
     testNotes,
     testJourney,
   ];
@@ -11269,7 +11270,14 @@ async function testProcurement(browser, base) {
     } else {
       await needBtn.click();
       await pg.waitForTimeout(300);
-      await pg.selectOption("#p_sup", { index: 1 });
+      /* BY NAME, NOT BY POSITION. This read `{ index: 1 }`, which was the first
+         supplier in CREATION order — and on 1 Oct the pickers were sorted
+         alphabetically, because the client could not find anybody in a dropdown
+         ordered by when each record was typed. That moved index 1 to a fuel
+         supplier and the rest of this flow diverged quietly. The order has to
+         go to the materials supplier for the receive-and-invoice chain below to
+         mean anything, so it is now named. */
+      await pg.selectOption("#p_sup", { label: "Materiales Vallès S.A." });
       await pg.fill("#p_desc", "Material E2E");
       await pg.fill("#p_qty", "10");
       await pg.fill("#p_price", "5");
@@ -19360,6 +19368,119 @@ async function testBookImport(browser, base) {
  * plus one partida with no título at all, sitting immediately after a titled
  * run — which is the only position in which the second fault appears.
  */
+/**
+ * Two things the client reported on 1 Oct, each checked where they look.
+ *
+ * 1. «Ordenar alfabéticamente los clientes en el dropdown list de
+ *    oportunidades» — every picker in the app mapped straight out of
+ *    `erp.state.parties`, which is CREATION order. Checked by seeding names
+ *    that are alphabetically the reverse of the order they are written in, so
+ *    an unsorted list and a sorted one cannot look the same.
+ *
+ * 2. «Opciones de IVA en el presupuesto, aún cuando herede el % que viene de la
+ *    configuración» — the rate was inherited and then unreachable. Checked
+ *    through the control itself, and on the half that matters: that an issued
+ *    version does NOT offer it, because the engine refuses the write and a
+ *    control that is drawn and then rejected is worse than no control.
+ */
+async function testClientFeedback(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#leads`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    // ── 1 · the customer dropdown, alphabetical ─────────────────────────────
+    const sorted = await pg.evaluate(async () => {
+      // Written deliberately out of order, and with an accent, so that a list
+      // left in creation order reads Zubiri→Álvarez and a sorted one reads
+      // Álvarez→Bosch→Zubiri. Raw code-unit sorting would put «Álvarez» last.
+      ["Zzz E2E Orden", "\u00c1aa E2E Orden", "Mmm E2E Orden"].forEach((name, i) =>
+        erp.addParty(
+          { name, partyType: "individual", roles: ["customer"], email: `c${i}@example.invalid` },
+          "e2e",
+        ),
+      );
+      const html = customerOptions(null);
+      const d = document.createElement("div");
+      d.innerHTML = "<select>" + html + "</select>";
+      const names = [...d.querySelectorAll("option")]
+        .map((o) => o.textContent)
+        .filter((x) => /E2E Orden/.test(x))
+        .map((x) => x.replace(/\s*\(.*$/, ""));
+      return { names };
+    });
+    const alpha =
+      JSON.stringify(sorted.names) ===
+      JSON.stringify(["Áaa E2E Orden", "Mmm E2E Orden", "Zzz E2E Orden"]);
+    if (alpha) ok("clientes: the dropdown is alphabetical, with «Á» beside «A» and not after «Z»");
+    else bad("clientes: alphabetical order", JSON.stringify(sorted));
+
+    // ── 2 · the IVA selector on a budget ────────────────────────────────────
+    const vat = await pg.evaluate(async () => {
+      const party = erp.state.parties.find((p) => p.roles.includes("customer"));
+      const b = erp.createBudget({ partyId: party.id }, "e2e");
+      const inherited = erp.budget(b.id).vatBp;
+      go("quotes", b.id);
+      await new Promise((r) => setTimeout(r, 1300));
+      const sel = document.querySelector("#bVat");
+      if (!sel) return { fail: "no #bVat on an editable version", inherited };
+      const offered = [...sel.options].map((o) => +o.value);
+      const preselected = +sel.value;
+      // Choose a different rate and let the screen write it.
+      const other = offered.find((x) => x !== preselected);
+      sel.value = String(other);
+      sel.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 900));
+      return {
+        inherited,
+        offered,
+        preselected,
+        chose: other,
+        stored: erp.budget(b.id).vatBp,
+        budgetId: b.id,
+      };
+    });
+    const chooses =
+      vat.preselected === vat.inherited && vat.stored === vat.chose && vat.offered.length >= 3;
+    if (chooses)
+      ok(
+        `IVA: the budget offers ${vat.offered.length} rates, preselects the inherited ${vat.inherited / 100}% and stores the chosen ${vat.chose / 100}%`,
+      );
+    else bad("IVA: selector on the budget", JSON.stringify(vat));
+
+    // The half that matters: an issued version must not offer it.
+    const frozen = await pg.evaluate(async (budgetId) => {
+      const v = erp.currentVersion(budgetId);
+      v.issued = true;
+      v.frozen = true;
+      persist();
+      render();
+      await new Promise((r) => setTimeout(r, 1100));
+      let refused = false;
+      try {
+        erp.updateBudget(budgetId, { vatBp: 0 }, "e2e");
+      } catch (e) {
+        refused = true;
+      }
+      return { control: !!document.querySelector("#bVat"), refused };
+    }, vat.budgetId);
+    if (!frozen.control && frozen.refused)
+      ok("IVA: an issued version neither offers the control nor accepts the write");
+    else bad("IVA: issued version guard", JSON.stringify(frozen));
+
+    if (!errors.length) ok("feedback: no console errors");
+    else bad("feedback: console", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("feedback: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
 async function testChapterTitles(browser, base) {
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
   const pg = await ctx.newPage();

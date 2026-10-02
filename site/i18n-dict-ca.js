@@ -302,6 +302,7 @@ window.CANEI_DICT.ca = {
   "Elegir archivo": "Triar fitxer",
   "No se pudo leer": "No s'ha pogut llegir",
   "No se pudo cargar": "No s'ha pogut carregar",
+  "IVA actualizado": "IVA actualitzat",
   "↩ De una versión": "↩ D'una versió",
   "Recuperar títulos, partidas y subpartidas de una versión anterior de este presupuesto":
     "Recupera títols, partides i subpartides d'una versió anterior d'aquest pressupost",

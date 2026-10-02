@@ -105,6 +105,7 @@ window.CANEI_DICT = {
     ["Elegir archivo", "Choose a file"],
     ["No se pudo leer", "Could not be read"],
     ["No se pudo cargar", "Could not be loaded"],
+    ["IVA actualizado", "Tax rate updated"],
     ["↩ De una versión", "↩ From a version"],
     [
       "Recuperar títulos, partidas y subpartidas de una versión anterior de este presupuesto",

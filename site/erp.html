@@ -9009,9 +9009,30 @@
         rejected: ["Rechazada", "r"],
         cancelled: ["Anulada", "r"],
       };
+      /**
+       * ALPHABETICAL, because a dropdown is read, not queried.
+       *
+       * Every picker in this file filtered and mapped straight out of
+       * `erp.state.parties`, which is INSERTION order — so the list was a
+       * history of when each record was created, which is of no use to somebody
+       * looking for «Roca Puig» among two hundred. Reported by the client on
+       * 1 Oct against Oportunidades; the same fault was in all four pickers,
+       * so it is fixed once, here.
+       *
+       * `localeCompare` with no locale argument on purpose: the host decides,
+       * and naming one would both pin Spanish into a file served to Catalan and
+       * English readers and put a locale literal where the boundary linter
+       * rightly objects to it. The default collation already sorts «Álvarez»
+       * next to «Alvarez» rather than after «Zurita», which is the whole point
+       * of not comparing raw code units.
+       */
+      const byName = (key) => (a, b) =>
+        String(a[key] || "").localeCompare(String(b[key] || ""));
+
       function supplierOptions(sel) {
         return erp.state.parties
           .filter((p) => p.active && p.roles.some((r) => SUPPLIER_ROLES.includes(r)))
+          .sort(byName("name"))
           .map(
             (s) =>
               `<option value="${s.id}"${s.id === sel ? " selected" : ""}>${esc(s.name)}</option>`,
@@ -19162,6 +19183,63 @@
             () => erp.setAnnexOptions(id, { imagesPerPage: +e.target.value }),
             "Anexo actualizado",
           );
+        const vatSel = $("#bVat");
+        if (vatSel)
+          vatSel.onchange = (e) =>
+            mutate(() => erp.updateBudget(id, { vatBp: +e.target.value }, "backoffice"), "IVA actualizado");
+      }
+
+      /**
+       * THE TAX RATE, CHOSEN RATHER THAN INHERITED IN SILENCE.
+       *
+       * A budget is born with `vatBp: cfg.defaultVatBp` and, until now, nothing
+       * could change it: every screen printed «IVA 10%» as text. An INVOICE has
+       * had an editable rate all along, so a presupuesto was the odd one out.
+       * Asked for by the client on 1 Oct — «opciones de IVA en el presupuesto,
+       * aún cuando herede el % que viene de la configuración».
+       *
+       * The inherited value stays the one selected; this only makes it visible
+       * and changeable. `updateBudget` already accepts `vatBp` and already
+       * refuses once a version is issued or accepted, so the rule that a
+       * customer's paper cannot be rewritten is the engine's, not this panel's —
+       * which is why the control is simply not drawn on a version that is no
+       * longer editable, rather than drawn and then rejected.
+       *
+       * The rates come from `ErpEngine.LISTS.vatRates`, the list the engine
+       * already holds, so there is no second opinion here about which rates
+       * exist. A budget already carrying a rate outside that list keeps it as an
+       * option of its own: dropping it would turn opening this panel into a
+       * silent change of somebody's tax.
+       */
+      const VAT_ROW_O = '<div class="row"><span>IVA ';
+      const VAT_SEL_O = '<select id="bVat" style="margin-left:4px">';
+      const VAT_SEL_C = "</select>";
+      const VAT_MID = "</span><b>";
+      const VAT_ROW_C = "</b></div>";
+      const VAT_PCT = "%";
+      const VAT_OPT_O = '<option value="';
+      const VAT_OPT_SEL = '" selected>';
+      const VAT_OPT_M = '">';
+      const VAT_OPT_C = "</option>";
+
+      function vatRow(b, id, vsel, t) {
+        const v = erp.version(id, vsel) || {};
+        const editable =
+          vsel === b.currentVersionId && !v.frozen && !v.issued && b.acceptedVersionId !== v.id;
+        if (!editable)
+          return VAT_ROW_O + t.vatBp / 100 + VAT_PCT + VAT_MID + eur(t.vatCents) + VAT_ROW_C;
+        const rates = (ErpEngine.LISTS.vatRates || []).slice();
+        if (rates.indexOf(t.vatBp) < 0) rates.push(t.vatBp);
+        rates.sort((x, y) => y - x);
+        const opts = rates
+          .map(
+            (bp) =>
+              VAT_OPT_O + bp + (bp === t.vatBp ? VAT_OPT_SEL : VAT_OPT_M) + bp / 100 + VAT_PCT + VAT_OPT_C,
+          )
+          .join("");
+        return (
+          VAT_ROW_O + VAT_SEL_O + opts + VAT_SEL_C + VAT_MID + eur(t.vatCents) + VAT_ROW_C
+        );
       }
 
       function builderTotalsPanel(b, id, vsel, t) {
@@ -19187,7 +19265,7 @@
             .join("")}
           ${t.discountCents ? `<div class="row"><span>Descuento</span><b>−${eur(t.discountCents)}</b></div>` : ""}
           <div class="row"><span>Base imponible</span><b>${eur(t.taxableCents)}</b></div>
-          <div class="row"><span>IVA ${t.vatBp / 100}%</span><b>${eur(t.vatCents)}</b></div>
+          ${vatRow(b, id, vsel, t)}
           ${t.irpfCents ? `<div class="row"><span>Retención ${t.irpfBp / 100}%</span><b>−${eur(t.irpfCents)}</b></div>` : ""}
           <div class="row big"><span>Total</span><b>${eur(t.grandCents)}</b></div>
           <div class="row"><span>Coste</span><b>${eur(t.costBaseCents)}</b></div>
@@ -28435,6 +28513,7 @@
       function partyOptions(filter) {
         return erp.state.parties
           .filter((p) => p.active && filter(p))
+          .sort(byName("name"))
           .map((p) => `<option value="${p.id}">${esc(p.name)} (${p.code})</option>`)
           .join("");
       }
@@ -28589,7 +28668,9 @@
        * places you can be standing when you create it.
        */
       function customerOptions(selected) {
-        const rows = erp.state.parties.filter((p) => p.active && p.roles.includes("customer"));
+        const rows = erp.state.parties
+          .filter((p) => p.active && p.roles.includes("customer"))
+          .sort(byName("name"));
         // With nothing on file the sentinel would be the option the select
         // already shows, and a <select> fires no change event for that — the
         // operator would click "＋ Nuevo cliente…" and nothing would happen.
@@ -28612,7 +28693,9 @@
           The sentinel only appears once a client is chosen — a property with no
           owner to attach it to is not a thing this screen can create. */
       function propertyOptions(partyId, selected) {
-        const props = erp.state.properties.filter((p) => p.partyId === partyId);
+        const props = erp.state.properties
+          .filter((p) => p.partyId === partyId)
+          .sort(byName("street"));
         const rows = props
           .map(
             (p) =>
