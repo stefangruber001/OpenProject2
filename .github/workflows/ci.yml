@@ -144,6 +144,12 @@ jobs:
         if: always()
         run: node tests/book-import/run.mjs
 
+      # ORG-04 with the company's own convention: a business already on invoice
+      # 56 cannot have a book that restarts at 1.
+      - name: Document numbering (shape, starting point, year rule)
+        if: always()
+        run: node tests/numbering/run.mjs
+
       # `ops/` is not a build directory: it is what somebody runs, from a
       # browser, to repair the client's production server. A syntax error in one
       # of those is found at the moment it is needed, by a person already

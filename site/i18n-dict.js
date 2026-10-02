@@ -105,6 +105,15 @@ window.CANEI_DICT = {
     ["Elegir archivo", "Choose a file"],
     ["No se pudo leer", "Could not be read"],
     ["No se pudo cargar", "Could not be loaded"],
+    ["Numeración de documentos", "Document numbering"],
+    ["sólo antes de emitir el primero", "only before the first one is issued"],
+    ["Numeración guardada", "Numbering saved"],
+    ["ya emitida", "already issued"],
+    ["reinicia cada año", "restarts each year"],
+    [
+      "Use {n} para el número y {year} para el año. Ejemplo: {n}/{year} da 57/2026. Si desmarca «reinicia cada año», la cuenta sigue sin cortarse y sólo cambia el año.",
+      "Use {n} for the number and {year} for the year. Example: {n}/{year} gives 57/2026. Unticking «restarts each year» keeps one unbroken count, with only the year changing.",
+    ],
     ["IVA actualizado", "Tax rate updated"],
     ["↩ De una versión", "↩ From a version"],
     [

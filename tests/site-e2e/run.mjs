@@ -125,6 +125,7 @@ async function main() {
     testPriceBookLinks,
     testBookImport,
     testClientFeedback,
+    testNumbering,
     testNotes,
     testJourney,
   ];
@@ -19476,6 +19477,127 @@ async function testClientFeedback(browser, base) {
     else bad("feedback: console", errors.slice(0, 3).join(" | "));
   } catch (e) {
     bad("feedback: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * DOCUMENT NUMBERING, through the screen the operator sets it on.
+ *
+ * Asked for on 2 Oct: the company is already on invoice 56 and their gestoría
+ * will not accept a book that restarts at 1. The engine suite proves the
+ * counter; what can only fail HERE is that the card writes what it shows, that
+ * the preview tells the truth before anything is saved, and — the half that
+ * matters — that a series which has already issued a document is locked rather
+ * than quietly accepting a change the engine would refuse.
+ */
+async function testNumbering(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 } });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#company`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(1000);
+
+    const card = await pg.evaluate(() => ({
+      rows: document.querySelectorAll("[data-numpat]").length,
+      invoice: !!document.querySelector('[data-numpat="invoice"]'),
+      credit: !!document.querySelector('[data-numpat="creditNote"]'),
+      budget: !!document.querySelector('[data-numpat="budget"]'),
+    }));
+    if (card.rows === 3 && card.invoice && card.credit && card.budget)
+      ok("numeración: the card offers facturas, rectificativas and presupuestos");
+    else bad("numeración: card", JSON.stringify(card));
+
+    /* THE DEMO WORKSPACE HAS ALREADY ISSUED TWENTY-SIX INVOICES, so its invoice
+       row is correctly locked — which is not the situation being tested. A
+       company arriving with its own history has issued NOTHING from this system
+       yet; that is the only moment numbering can be set, and the only moment
+       worth checking. So the series is put back to never-used first, and the
+       locking is checked at the end, after this test issues one itself. */
+    await pg.evaluate(async () => {
+      const s = erp.ensureSeries("invoice");
+      s.issued = [];
+      s.byYear = {};
+      s.next = 1;
+      persist();
+      render();
+      await new Promise((r) => setTimeout(r, 700));
+    });
+
+    // The preview must answer before anything is written — that is what makes
+    // it safe to type a pattern at all.
+    const preview = await pg.evaluate(async () => {
+      const pat = document.querySelector('[data-numpat="invoice"]');
+      const nxt = document.querySelector('[data-numnext="invoice"]');
+      pat.value = "{n}/{year}";
+      pat.dispatchEvent(new Event("input"));
+      nxt.value = "57";
+      nxt.dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 200));
+      return {
+        shown: document.querySelector('[data-numprev="invoice"]').textContent,
+        storedYet: erp.ensureSeries("invoice").pattern,
+      };
+    });
+    const year = new Date().getFullYear();
+    if (preview.shown === `57/${year}` || /^57\/\d{4}$/.test(preview.shown))
+      ok(`numeración: the preview reads «${preview.shown}» before anything is saved`);
+    else bad("numeración: preview", JSON.stringify(preview));
+
+    // Now commit it, and check the engine actually issues that number.
+    const saved = await pg.evaluate(async () => {
+      const pat = document.querySelector('[data-numpat="invoice"]');
+      const nxt = document.querySelector('[data-numnext="invoice"]');
+      const rst = document.querySelector('[data-numreset="invoice"]');
+      rst.checked = false;
+      pat.value = "{n}/{year}";
+      pat.dispatchEvent(new Event("change"));
+      nxt.value = "57";
+      nxt.dispatchEvent(new Event("change"));
+      rst.dispatchEvent(new Event("change"));
+      await new Promise((r) => setTimeout(r, 600));
+      const s = erp.ensureSeries("invoice");
+      return {
+        pattern: s.pattern,
+        next: s.next,
+        resetYearly: s.resetYearly,
+        issues: erp.nextNumber("invoice"),
+      };
+    });
+    if (
+      saved.pattern === "{n}/{year}" &&
+      saved.resetYearly === false &&
+      /^57\/\d{4}$/.test(saved.issues)
+    )
+      ok(`numeración: saved, and the next invoice issues as «${saved.issues}»`);
+    else bad("numeración: saved", JSON.stringify(saved));
+
+    // Having issued one, the row must lock: the engine refuses, and the screen
+    // must not invite a change it cannot keep.
+    const locked = await pg.evaluate(async () => {
+      render();
+      await new Promise((r) => setTimeout(r, 700));
+      const pat = document.querySelector('[data-numpat="invoice"]');
+      let refused = false;
+      try {
+        erp.configureSeries("invoice", { next: 1 }, "e2e");
+      } catch (e) {
+        refused = true;
+      }
+      return { disabled: !!(pat && pat.disabled), refused };
+    });
+    if (locked.disabled && locked.refused)
+      ok("numeración: once a document is issued the row is locked and the engine refuses");
+    else bad("numeración: lock after issue", JSON.stringify(locked));
+
+    if (!errors.length) ok("numeración: no console errors");
+    else bad("numeración: console", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("numeración: suite", e.message);
   } finally {
     await ctx.close();
   }

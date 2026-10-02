@@ -302,6 +302,13 @@ window.CANEI_DICT.ca = {
   "Elegir archivo": "Triar fitxer",
   "No se pudo leer": "No s'ha pogut llegir",
   "No se pudo cargar": "No s'ha pogut carregar",
+  "Numeración de documentos": "Numeració de documents",
+  "sólo antes de emitir el primero": "només abans d'emetre el primer",
+  "Numeración guardada": "Numeració desada",
+  "ya emitida": "ja emesa",
+  "reinicia cada año": "es reinicia cada any",
+  "Use {n} para el número y {year} para el año. Ejemplo: {n}/{year} da 57/2026. Si desmarca «reinicia cada año», la cuenta sigue sin cortarse y sólo cambia el año.":
+    "Feu servir {n} per al número i {year} per a l'any. Exemple: {n}/{year} dóna 57/2026. Si desmarqueu «es reinicia cada any», el compte segueix sense tallar-se i només canvia l'any.",
   "IVA actualizado": "IVA actualitzat",
   "↩ De una versión": "↩ D'una versió",
   "Recuperar títulos, partidas y subpartidas de una versión anterior de este presupuesto":

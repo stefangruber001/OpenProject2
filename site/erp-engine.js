@@ -2296,35 +2296,151 @@
       if (!prefix) throw new Error("Unknown series: " + type);
       if (!this.state.series) this.state.series = {};
       if (!this.state.series[type]) {
-        this.state.series[type] = { prefix, next: 1, issued: [] };
+        this.state.series[type] = {
+          prefix,
+          pattern: prefix + "{year}-{n}",
+          pad: 4,
+          resetYearly: true,
+          next: 1,
+          issued: [],
+        };
       }
-      return this.state.series[type];
+      const s = this.state.series[type];
+      /* A series written before numbering was configurable keeps exactly the
+         shape it had. The defaults below ARE the old hardcoded behaviour, so
+         reading an old document store changes nothing about what it issues. */
+      if (!s.pattern) s.pattern = (s.prefix || prefix) + "{year}-{n}";
+      if (s.pad == null) s.pad = 4;
+      if (s.resetYearly == null) s.resetYearly = true;
+      return s;
+    }
+
+    /**
+     * THE SHAPE AND THE STARTING POINT OF A DOCUMENT SERIES.
+     *
+     * Asked for on 2 Oct, and it is the one setting a company cannot be talked
+     * out of: they are already on invoice 56 and their gestoría will not accept
+     * a book that restarts at 1. Numbering had been hardcoded —
+     * `FAC-{year}-{0000}` — so a company arriving with its own history had no
+     * way in at all.
+     *
+     * `pattern` holds `{n}` and `{year}`; `pad` zero-fills the number; `next`
+     * is the number the NEXT document takes. `resetYearly` says whether the
+     * count restarts each January: true is the common Spanish practice and the
+     * behaviour every existing store keeps, false is a single run that never
+     * restarts and simply carries the current year — which is what this client
+     * asked for («57/2026 el 21/12, y el 2 de enero la 58/2027»).
+     *
+     * REFUSES ONCE THE SERIES HAS ISSUED SOMETHING. A number that has been on a
+     * document is in the register and in somebody's books; moving the counter
+     * backwards over it, or changing the shape under it, is how a sequence gets
+     * two documents with one number. Set it before the first issue — which is
+     * exactly when a company migrating its history does it.
+     */
+    configureSeries(type, opts, user) {
+      const s = this.ensureSeries(type);
+      const o = opts || {};
+      if ((s.issued || []).length)
+        throw new Error("Series already used — numbering cannot be changed after the first issue");
+      if (o.pattern != null) {
+        const pat = String(o.pattern);
+        if (pat.indexOf("{n}") < 0) throw new Error("A numbering pattern must contain {n}");
+        s.pattern = pat;
+      }
+      if (o.pad != null) s.pad = Math.max(0, Math.min(8, Math.round(+o.pad) || 0));
+      if (o.resetYearly != null) s.resetYearly = !!o.resetYearly;
+      if (o.next != null) {
+        const n = Math.round(+o.next);
+        if (!(n >= 1)) throw new Error("The next number must be 1 or more");
+        s.next = n;
+        // A per-year series takes the same starting point for the year it is
+        // being configured in; otherwise the value would be accepted and then
+        // quietly ignored on the first issue.
+        s.byYear = s.byYear || {};
+        s.byYear[this.state.today.slice(0, 4)] = n;
+      }
+      this._log(user || "backoffice", "configureSeries", type);
+      return s;
+    }
+
+    /** `{n}` and `{year}` filled in; everything else in the pattern is literal. */
+    formatNumber(series, n, year) {
+      const num = series.pad ? String(n).padStart(series.pad, "0") : String(n);
+      return String(series.pattern).split("{n}").join(num).split("{year}").join(year);
+    }
+
+    /**
+     * The pattern as something that can READ a number back.
+     *
+     * `seriesGaps` used to pull the year and the count out by slicing fixed
+     * character positions, which only worked while every series looked like
+     * `FAC-2026-0001`. With the shape configurable that arithmetic is wrong for
+     * anybody who changed it, so the pattern itself says where the parts are.
+     */
+    seriesRegex(series) {
+      const parts = String(series.pattern).split(/(\{n\}|\{year\})/);
+      let re = "^",
+        order = [];
+      for (const part of parts) {
+        if (part === "{n}") {
+          re += "(\\d+)";
+          order.push("n");
+        } else if (part === "{year}") {
+          re += "(\\d{4})";
+          order.push("year");
+        } else re += part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+      return { re: new RegExp(re + "$"), order };
     }
 
     nextNumber(type) {
       // ORG-04: controlled, gap-free, no manual overwriting.
-      // Series restart at 0001 each fiscal year (FAC-2027-0001 after FAC-2026-nnnn).
       // Created on demand: see ensureSeries. A missing series is a setup step
       // nobody performed, not a reason to refuse the operator's work.
       const s = this.ensureSeries(type);
       const year = this.state.today.slice(0, 4);
-      s.byYear = s.byYear || {};
-      if (s.byYear[year] == null)
-        s.byYear[year] = s.issued.filter((n) => n.startsWith(s.prefix + year + "-")).length + 1;
-      const num = `${s.prefix}${year}-${String(s.byYear[year]).padStart(4, "0")}`;
-      s.byYear[year]++;
-      s.next++;
+      let n;
+      if (s.resetYearly) {
+        // The default, and what every store written before this did: the count
+        // restarts each January, so 2027 opens at 0001 again.
+        s.byYear = s.byYear || {};
+        if (s.byYear[year] == null) {
+          const { re, order } = this.seriesRegex(s);
+          const mine = (s.issued || []).filter((num) => {
+            const m = re.exec(num);
+            return m && m[order.indexOf("year") + 1] === year;
+          });
+          s.byYear[year] = mine.length + 1;
+        }
+        n = s.byYear[year];
+        s.byYear[year]++;
+      } else {
+        // ONE RUN THAT NEVER RESTARTS, carrying whatever year it is issued in.
+        // Asked for on 2 Oct: «57/2026 emitida el 21/12, y el 2 de enero
+        // emitimos una factura, debería poner 58/2027».
+        n = s.next;
+      }
+      s.next = (s.resetYearly ? s.next : n) + 1;
+      const num = this.formatNumber(s, n, year);
       s.issued.push(num);
       return num;
     }
     seriesGaps(type) {
-      // GES-07: gap check, per fiscal year
+      // GES-07: gap check, per fiscal year.
+      // Reads the parts out THROUGH THE PATTERN. This used to slice fixed
+      // character positions, which silently stopped being true the moment a
+      // company could choose its own shape.
       const s = this.state.series[type];
       if (!s) return [];
+      const { re, order } = this.seriesRegex(this.ensureSeries(type));
+      const yi = order.indexOf("year"),
+        ni = order.indexOf("n");
       const byYear = {};
-      for (const n of s.issued) {
-        const y = n.slice(s.prefix.length, s.prefix.length + 4);
-        (byYear[y] = byYear[y] || []).push(+n.slice(-4));
+      for (const num of s.issued) {
+        const m = re.exec(num);
+        if (!m) continue;
+        const y = yi >= 0 ? m[yi + 1] : "";
+        (byYear[y] = byYear[y] || []).push(+m[ni + 1]);
       }
       const gaps = [];
       for (const y of Object.keys(byYear).sort()) {

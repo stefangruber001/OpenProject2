@@ -25783,8 +25783,11 @@
             <input id="co_legalFooter" value="${esc(c.legalFooter || "")}" placeholder="Opcional — protección de datos, condiciones generales…"></div>
           </div></div>
 
+         ${numberingCard()}
+
          <div style="margin:12px 0 24px"><button class="btn primary" id="co_save">Guardar</button></div>`;
 
+        wireNumbering();
         $("#co_accNew").onclick = () => newAccountDrawer();
         v.querySelectorAll("[data-accoff]").forEach(
           (b) =>
@@ -25887,6 +25890,150 @@
           }, "Datos de la empresa guardados");
         };
       };
+
+      /* ============ numeración de documentos ================================
+         Asked for on 2 Oct: a company already on invoice 56 cannot start again
+         at 1, and their gestoría would reject the book if it did. Numbering was
+         hardcoded as «FAC-2026-0057»; theirs reads «57/2026».
+
+         Only the three series a company actually negotiates with its gestoría
+         are offered. The rest — órdenes de compra, albaranes, recibos — are
+         internal paperwork nobody outside the company numbers, and putting
+         seven rows here would bury the three that matter.
+
+         A series that has ALREADY ISSUED something is shown and locked, not
+         hidden: «you cannot change this, and here is the number that is in the
+         register» is the answer to the question somebody opens this card with.
+         The engine refuses the write regardless — this only stops the operator
+         typing into a field that was never going to be saved. */
+      /* No zero-filling for a shape the company typed here: they asked for
+         «57/2026», not «0057/2026». The four-digit padding stays the default
+         for any series nobody touches, so an untouched store keeps
+         «FAC-2026-0001» exactly. Named because the preview and the save must
+         use the SAME value — they did not, and the preview lied. */
+      const NUM_CARD_PAD = 0;
+      const NUM_SERIES = [
+        ["invoice", "Facturas"],
+        ["creditNote", "Rectificativas"],
+        ["budget", "Presupuestos"],
+      ];
+      const NUM_LOCKED = '<span class="pill y">ya emitida</span>';
+      const NUM_CARD_O =
+        '<div class="card"><div class="ch"><h3>Numeración de documentos</h3><span class="tag">sólo antes de emitir el primero</span></div><div class="daylist">';
+      const NUM_CARD_C = "</div></div>";
+      const NUM_NOTE =
+        '<div class="it"><span style="flex:1;color:var(--muted)">Use {n} para el número y {year} para el año. Ejemplo: {n}/{year} da 57/2026. Si desmarca «reinicia cada año», la cuenta sigue sin cortarse y sólo cambia el año.</span></div>';
+      const NUM_ROW_O = '<div class="it" style="gap:8px;flex-wrap:wrap">';
+      const NUM_ROW_C = "</div>";
+      const NUM_LBL_O = '<span style="min-width:120px">';
+      const NUM_LBL_C = "</span>";
+      const NUM_PAT_O = '<input style="width:150px" data-numpat="';
+      const NUM_NEXT_O = '<input type="number" min="1" step="1" style="width:92px" data-numnext="';
+      const NUM_RESET_O = '<label class="opt" style="margin:0"><input type="checkbox" data-numreset="';
+      const NUM_RESET_C = "> reinicia cada año</label>";
+      const NUM_VAL = '" value="';
+      const NUM_END = '">';
+      const NUM_CHECKED = '" checked>';
+      const NUM_PREV_O = '<span class="tag" data-numprev="';
+      const NUM_PREV_C = "</span>";
+      const NUM_DIS = " disabled";
+
+      /** What the next document would be called, given what is typed. */
+      function numPreview(pattern, next, pad) {
+        const n = pad ? String(next).padStart(pad, "0") : String(next);
+        return String(pattern || "")
+          .split("{n}")
+          .join(n)
+          .split("{year}")
+          .join(String(erp.state.today).slice(0, 4));
+      }
+
+      function numberingCard() {
+        const rows = NUM_SERIES.map(([type, label]) => {
+          const s = erp.ensureSeries(type);
+          const used = (s.issued || []).length > 0;
+          const off = used ? NUM_DIS : "";
+          return (
+            NUM_ROW_O +
+            NUM_LBL_O +
+            esc(label) +
+            NUM_LBL_C +
+            NUM_PAT_O +
+            type +
+            NUM_VAL +
+            esc(s.pattern || "") +
+            (used ? '" disabled>' : NUM_END) +
+            NUM_NEXT_O +
+            type +
+            NUM_VAL +
+            (s.resetYearly ? (s.byYear || {})[String(erp.state.today).slice(0, 4)] || s.next : s.next) +
+            (used ? '" disabled>' : NUM_END) +
+            NUM_RESET_O +
+            type +
+            (s.resetYearly ? NUM_CHECKED : NUM_END) +
+            NUM_RESET_C +
+            (used ? NUM_LOCKED : "") +
+            NUM_PREV_O +
+            type +
+            NUM_END +
+            esc(numPreview(s.pattern, s.next, s.pad)) +
+            NUM_PREV_C +
+            NUM_ROW_C
+          );
+        }).join("");
+        return NUM_CARD_O + NUM_NOTE + rows + NUM_CARD_C;
+      }
+
+      /** Saved per row, as it is changed: this card is not part of «Guardar»,
+          which writes the company document and has nothing to do with series. */
+      function wireNumbering() {
+        const live = (type) => {
+          const pat = document.querySelector(`[data-numpat="${type}"]`);
+          const nxt = document.querySelector(`[data-numnext="${type}"]`);
+          const prev = document.querySelector(`[data-numprev="${type}"]`);
+          if (!pat || !nxt || !prev) return;
+          /* NUM_CARD_PAD, not the stored padding. The preview showed
+             «0057/2026» — the four-digit default still on the series — while
+             the save below writes no padding at all, so the operator was shown
+             one number and would have got another. A preview that disagrees
+             with the thing it previews is worse than no preview. */
+          prev.textContent = numPreview(pat.value, +nxt.value || 1, NUM_CARD_PAD);
+        };
+        const save = (type) => {
+          const pat = document.querySelector(`[data-numpat="${type}"]`);
+          const nxt = document.querySelector(`[data-numnext="${type}"]`);
+          const rst = document.querySelector(`[data-numreset="${type}"]`);
+          if (!pat || pat.disabled) return;
+          mutate(
+            () =>
+              erp.configureSeries(
+                type,
+                {
+                  pattern: pat.value.trim(),
+                  pad: NUM_CARD_PAD,
+                  next: +nxt.value || 1,
+                  resetYearly: !!(rst && rst.checked),
+                },
+                "backoffice",
+              ),
+            "Numeración guardada",
+          );
+        };
+        NUM_SERIES.forEach(([type]) => {
+          const pat = document.querySelector(`[data-numpat="${type}"]`);
+          const nxt = document.querySelector(`[data-numnext="${type}"]`);
+          const rst = document.querySelector(`[data-numreset="${type}"]`);
+          if (pat) {
+            pat.oninput = () => live(type);
+            pat.onchange = () => save(type);
+          }
+          if (nxt) {
+            nxt.oninput = () => live(type);
+            nxt.onchange = () => save(type);
+          }
+          if (rst) rst.onchange = () => save(type);
+        });
+      }
 
       /**
        * The mailbox half of Configuración › Empresa.
@@ -30238,31 +30385,36 @@
           let kind = null,
             refs = null,
             lang = "es";
-          if (/^PRE-/.test(q.subjectRef || "")) {
-            const b = erp.state.budgets.find((x) => x.number === q.subjectRef);
-            if (!b) return null;
+          /* LOOKED UP, NOT PARSED. This used to decide what a queued message was
+             about by matching the number against /^PRE-/, /^(FAC|ABO)-/ and
+             /^CTR-/. Those prefixes stopped being the only possible shape on
+             2 Oct, when numbering became the company's to choose — a client
+             whose invoices read «57/2026» would have matched none of them, and
+             the failure is silent: the branch falls through, `kind` stays null
+             and the message goes out with no document attached. So the record
+             is found by its number and IT says what it is. */
+          const ref = q.subjectRef || "";
+          const budget = erp.state.budgets.find((x) => x.number === ref);
+          const invoice = erp.state.invoices.find((x) => x.number === ref);
+          const contract = erp.state.contracts.find(
+            (x) => x.number === ref && x.origin !== "external",
+          );
+          if (budget) {
+            const b = budget;
             // THE SAME FILE THE CUSTOMER WOULD DOWNLOAD, built by the same
             // function: annex plates resolved, line text rendered in the
             // document's own language. Anything else is a second document
             // pretending to be this one.
             const built = await budgetPdfString(b.id, b.acceptedVersionId || b.currentVersionId);
             return { name: q.subjectRef + ".pdf", b64: btoa(built.pdf) };
-          } else if (/^(FAC|ABO)-/.test(q.subjectRef || "")) {
-            const inv = erp.state.invoices.find((x) => x.number === q.subjectRef);
-            if (inv) {
-              kind = inv.kind === "creditNote" ? "rectificativa" : "factura";
-              refs = { invoiceId: inv.id };
-              lang = inv.language || "es";
-            }
-          } else if (/^CTR-/.test(q.subjectRef || "")) {
-            const c = erp.state.contracts.find(
-              (x) => x.number === q.subjectRef && x.origin !== "external",
-            );
-            if (c) {
-              kind = "contrato";
-              refs = { contractId: c.id };
-              lang = c.language || "es";
-            }
+          } else if (invoice) {
+            kind = invoice.kind === "creditNote" ? "rectificativa" : "factura";
+            refs = { invoiceId: invoice.id };
+            lang = invoice.language || "es";
+          } else if (contract) {
+            kind = "contrato";
+            refs = { contractId: contract.id };
+            lang = contract.language || "es";
           }
           if (!kind) return null;
           const doc = CaneiErpFacts.docFor(
