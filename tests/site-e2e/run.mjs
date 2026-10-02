@@ -19512,21 +19512,11 @@ async function testNumbering(browser, base) {
       ok("numeración: the card offers facturas, rectificativas and presupuestos");
     else bad("numeración: card", JSON.stringify(card));
 
-    /* THE DEMO WORKSPACE HAS ALREADY ISSUED TWENTY-SIX INVOICES, so its invoice
-       row is correctly locked — which is not the situation being tested. A
-       company arriving with its own history has issued NOTHING from this system
-       yet; that is the only moment numbering can be set, and the only moment
-       worth checking. So the series is put back to never-used first, and the
-       locking is checked at the end, after this test issues one itself. */
-    await pg.evaluate(async () => {
-      const s = erp.ensureSeries("invoice");
-      s.issued = [];
-      s.byYear = {};
-      s.next = 1;
-      persist();
-      render();
-      await new Promise((r) => setTimeout(r, 700));
-    });
+    /* THE DEMO WORKSPACE HAS ALREADY ISSUED INVOICES, and that is the point:
+       the client's did too (a FAC-2026-0007 was in hand when they reported this
+       «did not work»), and the first version of this card went read-only on
+       exactly that. It is left as it is, so the test runs against the awkward
+       case rather than a clean one. */
 
     // The preview must answer before anything is written — that is what makes
     // it safe to type a pattern at all.
@@ -19576,23 +19566,38 @@ async function testNumbering(browser, base) {
       ok(`numeración: saved, and the next invoice issues as «${saved.issues}»`);
     else bad("numeración: saved", JSON.stringify(saved));
 
-    // Having issued one, the row must lock: the engine refuses, and the screen
-    // must not invite a change it cannot keep.
-    const locked = await pg.evaluate(async () => {
+    /* The row stays editable — but the engine must refuse the one setting that
+       would print a number twice. Both halves, because either alone is wrong:
+       a locked row helps nobody, and an open row that accepts a duplicate is
+       worse than a locked one. */
+    const guard = await pg.evaluate(async () => {
       render();
       await new Promise((r) => setTimeout(r, 700));
       const pat = document.querySelector('[data-numpat="invoice"]');
-      let refused = false;
+      const highest = erp
+        .ensureSeries("invoice")
+        .issued.map((n) => +String(n).split("/")[0])
+        .filter((n) => n > 0);
+      const top = Math.max(...highest);
+      let reissue = false;
       try {
-        erp.configureSeries("invoice", { next: 1 }, "e2e");
+        erp.configureSeries("invoice", { next: top }, "e2e");
       } catch (e) {
-        refused = true;
+        reissue = true;
       }
-      return { disabled: !!(pat && pat.disabled), refused };
+      let onwards = true;
+      try {
+        erp.configureSeries("invoice", { next: top + 1 }, "e2e");
+      } catch (e) {
+        onwards = false;
+      }
+      return { editable: !!(pat && !pat.disabled), reissue, onwards, top };
     });
-    if (locked.disabled && locked.refused)
-      ok("numeración: once a document is issued the row is locked and the engine refuses");
-    else bad("numeración: lock after issue", JSON.stringify(locked));
+    if (guard.editable && guard.reissue && guard.onwards)
+      ok(
+        `numeración: the row stays editable, reissuing ${guard.top} is refused and continuing past it is allowed`,
+      );
+    else bad("numeración: duplicate guard", JSON.stringify(guard));
 
     if (!errors.length) ok("numeración: no console errors");
     else bad("numeración: console", errors.slice(0, 3).join(" | "));

@@ -119,15 +119,63 @@ function erpAt(day) {
 
 /* ---------- 5 · what the setting refuses ---------- */
 {
+  /* THE RULE IS ABOUT A NUMBER USED TWICE, not about having been used at all.
+     It first refused outright the moment a series had issued anything, which
+     locked out the one company that needed it: their workspace held seven test
+     invoices, so «FAC-2026-0007» was in the register and the numbering card was
+     disabled. Reported from dev on 2 Oct as «did not work». */
   const erp = erpAt("2026-10-02");
-  erp.nextNumber("invoice"); // one document is now in the register
-  let refused = false;
+  for (let i = 0; i < 7; i++) erp.nextNumber("invoice"); // FAC-2026-0001 … 0007
+  erp.configureSeries(
+    "invoice",
+    { pattern: "{n}/{year}", pad: 0, resetYearly: false, next: 57 },
+    "t",
+  );
+  is(
+    erp.nextNumber("invoice") === "57/2026",
+    "a workspace with test documents in it can still adopt its real numbering",
+    JSON.stringify(erp.state.series.invoice.issued),
+  );
+
+  // …and the narrow thing that must still be refused.
+  const clash = erpAt("2026-10-02");
+  clash.configureSeries(
+    "invoice",
+    { pattern: "{n}/{year}", pad: 0, resetYearly: false, next: 57 },
+    "t",
+  );
+  clash.nextNumber("invoice"); // 57/2026 is now printed
+  clash.nextNumber("invoice"); // 58/2026
+  let reissued = false;
   try {
-    erp.configureSeries("invoice", { next: 57 }, "t");
+    clash.configureSeries("invoice", { next: 58 }, "t");
   } catch (e) {
-    refused = true;
+    reissued = true;
   }
-  is(refused, "a series that has already issued something refuses to be renumbered", "");
+  is(reissued, "…but a setting that would reissue 58/2026 is refused", "");
+  let above = true;
+  try {
+    clash.configureSeries("invoice", { next: 59 }, "t");
+  } catch (e) {
+    above = false;
+  }
+  is(above, "…while continuing above the highest already printed is allowed", "");
+
+  /* A number in the OLD shape cannot collide with what the new shape produces,
+     so it must not constrain the new one. This is what lets a company leave
+     «FAC-2026-0007» behind and start at 1/2026 if that is their sequence. */
+  const shapes = erpAt("2026-10-02");
+  for (let i = 0; i < 7; i++) shapes.nextNumber("invoice");
+  shapes.configureSeries(
+    "invoice",
+    { pattern: "{n}/{year}", pad: 0, resetYearly: false, next: 1 },
+    "t",
+  );
+  is(
+    shapes.nextNumber("invoice") === "1/2026",
+    "a number in the old shape does not block the new shape",
+    JSON.stringify(shapes.state.series.invoice.issued),
+  );
 
   const fresh = erpAt("2026-10-02");
   let noN = false;

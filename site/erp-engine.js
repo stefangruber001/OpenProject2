@@ -2340,18 +2340,53 @@
     configureSeries(type, opts, user) {
       const s = this.ensureSeries(type);
       const o = opts || {};
-      if ((s.issued || []).length)
-        throw new Error("Series already used — numbering cannot be changed after the first issue");
-      if (o.pattern != null) {
-        const pat = String(o.pattern);
-        if (pat.indexOf("{n}") < 0) throw new Error("A numbering pattern must contain {n}");
-        s.pattern = pat;
+      /* WHAT THIS REFUSES IS A NUMBER USED TWICE, not a change of shape.
+         It first refused outright as soon as a series had issued anything,
+         which sounded prudent and was useless: the client's workspace had
+         seven test invoices in it, so the one company that needed to set its
+         numbering was the one company locked out of setting it. Reported from
+         dev on 2 Oct — «did not work» — with a FAC-2026-0007 in hand.
+         Changing the shape for documents still to come takes nothing away from
+         the ones already issued; they keep their numbers, and nobody is asked
+         to pretend otherwise. The danger is narrower and real: a configuration
+         that would hand out a number this series has already printed. So that,
+         and only that, is what is checked — below, once the new settings are
+         known, because whether a number collides depends on all of them. */
+      const draft = {
+        pattern: o.pattern != null ? String(o.pattern) : s.pattern,
+        pad: o.pad != null ? Math.max(0, Math.min(8, Math.round(+o.pad) || 0)) : s.pad,
+        resetYearly: o.resetYearly != null ? !!o.resetYearly : s.resetYearly,
+        next: o.next != null ? Math.round(+o.next) : s.next,
+      };
+      if (draft.pattern.indexOf("{n}") < 0) throw new Error("A numbering pattern must contain {n}");
+      if (!(draft.next >= 1)) throw new Error("The next number must be 1 or more");
+
+      /* Read every number this series has already printed THROUGH THE NEW
+         pattern. One written in a different shape cannot collide with what the
+         new one produces, so it does not constrain anything. */
+      const probe = { pattern: draft.pattern, pad: draft.pad };
+      const { re, order } = this.seriesRegex(probe);
+      const year = this.state.today.slice(0, 4);
+      const yi = order.indexOf("year"),
+        ni = order.indexOf("n");
+      let highest = 0;
+      for (const num of s.issued || []) {
+        const m = re.exec(num);
+        if (!m) continue;
+        if (yi >= 0 && draft.resetYearly && m[yi + 1] !== year) continue;
+        highest = Math.max(highest, +m[ni + 1]);
       }
-      if (o.pad != null) s.pad = Math.max(0, Math.min(8, Math.round(+o.pad) || 0));
-      if (o.resetYearly != null) s.resetYearly = !!o.resetYearly;
+      if (highest && draft.next <= highest)
+        throw new Error(
+          "That would reissue a number this series has already used — the next must be above " +
+            highest,
+        );
+
+      s.pattern = draft.pattern;
+      s.pad = draft.pad;
+      s.resetYearly = draft.resetYearly;
       if (o.next != null) {
-        const n = Math.round(+o.next);
-        if (!(n >= 1)) throw new Error("The next number must be 1 or more");
+        const n = draft.next;
         s.next = n;
         // A per-year series takes the same starting point for the year it is
         // being configured in; otherwise the value would be accepted and then

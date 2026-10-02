@@ -25901,11 +25901,11 @@
          internal paperwork nobody outside the company numbers, and putting
          seven rows here would bury the three that matter.
 
-         A series that has ALREADY ISSUED something is shown and locked, not
-         hidden: «you cannot change this, and here is the number that is in the
-         register» is the answer to the question somebody opens this card with.
-         The engine refuses the write regardless — this only stops the operator
-         typing into a field that was never going to be saved. */
+         A series that has already issued documents shows HOW MANY, and stays
+         editable: those documents keep their numbers and the change applies to
+         the ones still to come. The engine refuses only the narrow thing that
+         is actually dangerous — a setting that would hand out a number this
+         series has already printed. */
       /* No zero-filling for a shape the company typed here: they asked for
          «57/2026», not «0057/2026». The four-digit padding stays the default
          for any series nobody touches, so an untouched store keeps
@@ -25917,7 +25917,8 @@
         ["creditNote", "Rectificativas"],
         ["budget", "Presupuestos"],
       ];
-      const NUM_LOCKED = '<span class="pill y">ya emitida</span>';
+      const NUM_USED_O = '<span class="pill b" title="Documentos ya emitidos en esta serie. Conservan su número; el cambio sólo afecta a los siguientes.">';
+      const NUM_USED_C = " emitidas</span>";
       const NUM_CARD_O =
         '<div class="card"><div class="ch"><h3>Numeración de documentos</h3><span class="tag">sólo antes de emitir el primero</span></div><div class="daylist">';
       const NUM_CARD_C = "</div></div>";
@@ -25936,7 +25937,6 @@
       const NUM_CHECKED = '" checked>';
       const NUM_PREV_O = '<span class="tag" data-numprev="';
       const NUM_PREV_C = "</span>";
-      const NUM_DIS = " disabled";
 
       /** What the next document would be called, given what is typed. */
       function numPreview(pattern, next, pad) {
@@ -25949,10 +25949,19 @@
       }
 
       function numberingCard() {
+        /* NOT DISABLED WHEN THE SERIES HAS BEEN USED. The row used to lock the
+           moment anything had been issued, which locked out the only company
+           that ever needs this: theirs had seven test invoices in it, so the
+           card was read-only exactly when it mattered. What is shown instead is
+           HOW MANY documents the series has already printed, because that is
+           the fact somebody needs in order to choose a starting number — and
+           the engine refuses a setting that would reissue one of them. */
         const rows = NUM_SERIES.map(([type, label]) => {
           const s = erp.ensureSeries(type);
-          const used = (s.issued || []).length > 0;
-          const off = used ? NUM_DIS : "";
+          const used = (s.issued || []).length;
+          const shown = s.resetYearly
+            ? (s.byYear || {})[String(erp.state.today).slice(0, 4)] || s.next
+            : s.next;
           return (
             NUM_ROW_O +
             NUM_LBL_O +
@@ -25962,21 +25971,21 @@
             type +
             NUM_VAL +
             esc(s.pattern || "") +
-            (used ? '" disabled>' : NUM_END) +
+            NUM_END +
             NUM_NEXT_O +
             type +
             NUM_VAL +
-            (s.resetYearly ? (s.byYear || {})[String(erp.state.today).slice(0, 4)] || s.next : s.next) +
-            (used ? '" disabled>' : NUM_END) +
+            shown +
+            NUM_END +
             NUM_RESET_O +
             type +
             (s.resetYearly ? NUM_CHECKED : NUM_END) +
             NUM_RESET_C +
-            (used ? NUM_LOCKED : "") +
+            (used ? NUM_USED_O + used + NUM_USED_C : "") +
             NUM_PREV_O +
             type +
             NUM_END +
-            esc(numPreview(s.pattern, s.next, s.pad)) +
+            esc(numPreview(s.pattern, shown, NUM_CARD_PAD)) +
             NUM_PREV_C +
             NUM_ROW_C
           );
@@ -26003,7 +26012,7 @@
           const pat = document.querySelector(`[data-numpat="${type}"]`);
           const nxt = document.querySelector(`[data-numnext="${type}"]`);
           const rst = document.querySelector(`[data-numreset="${type}"]`);
-          if (!pat || pat.disabled) return;
+          if (!pat) return;
           mutate(
             () =>
               erp.configureSeries(
