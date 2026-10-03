@@ -218,11 +218,41 @@ const RECORDS = new Set([
   "commsTemplates",
 ]);
 
+/**
+ * HOW DEEP THE WALK HAS TO GO, which is deeper than it looks.
+ *
+ * The limit used to be 6, and it was quietly deciding the report. A budget line
+ * keeps its description at
+ * `budgets[].versions[].chapters[].lines[].desc` — depth NINE — so not one of
+ * the twenty line descriptions in the workspace ever reached the data set, and
+ * every row built out of one was reported as untranslated:
+ *
+ *     1.1 Tabiquería nueva
+ *     2.2 Alicatado gres porcelánico
+ *     D1 · 1.1 · Demolición de tabiques y retirada de escombro
+ *
+ * `composedOfData` is written to excuse exactly those — "1.1 Nivelación y
+ * pavimento cerámico salón" is in its doc-string as the shape it exists for —
+ * and it could not, because the value it needed to subtract was never read.
+ * The rule was right and the input was short.
+ *
+ * Worse than wrong: UNSTABLE. The count then moved with how many of those rows
+ * the crawl happened to reach, and the seed is built relative to today, so the
+ * same commit measured 37 one day and 58 the next with nothing changed. A
+ * ratchet that drifts with the wall clock is not a ratchet.
+ *
+ * The deepest string in the workspace sits at eleven (`budgets`, and only
+ * `budgets`). Twelve is that plus headroom. The limit is here to make the walk
+ * terminate, not to decide what counts as data — if the state ever nests
+ * deeper, raise it; do not let it silently truncate the evidence again.
+ */
+const MAX_DEPTH = 12;
+
 const DATA_VALUES = `() => {
   const out = [];
   const seen = new Set();
   const visit = (v, depth, top) => {
-    if (depth > 6 || v == null) return;
+    if (depth > ${MAX_DEPTH} || v == null) return;
     if (typeof v === "string") {
       const s = v.trim();
       if (s && !seen.has(top + "\\u0000" + s)) { seen.add(top + "\\u0000" + s); out.push([top, s]); }
@@ -245,6 +275,96 @@ const DATA_VALUES = `() => {
   } catch (e) {}
   return out;
 }`;
+
+/**
+ * Whitespace, squeezed exactly the way `site/i18n.js` squeezes it.
+ *
+ * It records a miss as `collapsed || trimmed` (i18n.js:442), so this is the
+ * form every comparison here has to be made in. Kept as one function rather
+ * than two `.replace()` calls so the two files cannot drift apart again.
+ */
+const collapse = (s) => String(s).trim().replace(/\s+/g, " ");
+
+/**
+ * A stored template, with its {{placeholders}} filled in.
+ *
+ * `commsTemplates` is excused as a record collection — the company writes its
+ * own emails and translates them through the template's own language columns,
+ * which is why a dictionary entry for one would be a bug. But the messaging
+ * screen PREVIEWS a template against a real record, so what is painted is the
+ * stored string with `{{number}}` replaced by `PRE-2024-0002`. Equality then
+ * fails, and thirteen previews were reported — in Spanish, Catalan AND English,
+ * the English ones proving the point: a string cannot become reportable by
+ * being translated. The price book has the same note under `catalogue`.
+ *
+ * So the placeholders become wildcards and nothing else does. Every literal
+ * character between them is escaped, which is what keeps this tight: it can
+ * only match a string that IS a stored template except where a placeholder
+ * stood. An unrelated Spanish sentence cannot match one.
+ *
+ * ANCHORED AT BOTH ENDS, which is the whole of the safety argument. A trailing
+ * wildcard with nothing after it would match any string sharing a prefix, and
+ * `^Su presupuesto [\s\S]*?` would then excuse every sentence that happens to
+ * begin that way. With `$` on the end the wildcards are bounded by the literal
+ * that follows them, so a match means the miss IS that template and differs
+ * from it only where a placeholder stood.
+ *
+ * A MINIMUM OF LITERAL TEXT, because a template that is mostly placeholders —
+ * "{{cliente}} · {{number}}" — carries no evidence, and a pattern built from it
+ * would be a wildcard wearing a disguise. Whitespace does not count towards it.
+ */
+function templatePatterns(data, minLiteral) {
+  const out = [];
+  for (const v of data) {
+    if (v.indexOf("{{") < 0) continue;
+    // Collapsed ONCE, over the whole value, and the pieces are not touched
+    // again. Trimming each piece separately is what a first cut did, and it
+    // quietly widened every pattern: the space in "Presupuesto aceptado
+    // {{number}}" belongs to the literal, and dropping it let the wildcard
+    // match nothing at all, so the pattern excused the bare interface label
+    // "Presupuesto aceptado" — which has a dictionary entry and is exactly the
+    // kind of string this must never swallow.
+    const lits = collapse(v).split(/\{\{[^}]*\}\}/);
+    if (lits.join("").replace(/\s+/g, "").length < minLiteral) continue;
+    const body = lits.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s\\S]*?");
+    try {
+      out.push(new RegExp("^" + body + "$", "u"));
+    } catch (e) {}
+  }
+  return out;
+}
+
+/**
+ * Is this string a rendered template — or the two the preview paints together?
+ *
+ * The preview is `render(subject) + "\n\n" + render(body)` and the ledger
+ * collapses that newline away, so the pair arrives as one string with no mark
+ * where it was joined. Every space is therefore tried as the seam, and BOTH
+ * sides must match a stored template in full. Two full matches is a much
+ * stronger claim than one prefix match, so splitting costs no tightness.
+ *
+ * WHY THE SEAM GETS A LOWER BAR. Subjects are short — "Su presupuesto
+ * {{number}}" is thirteen characters of literal text, "Factura {{number}}"
+ * seven — and some carry no placeholder at all ("¿Todo correcto tras la
+ * obra?"), which makes them plain stored values. Holding the left half to the
+ * sixteen a string must clear to be excused ON ITS OWN would throw away every
+ * subject and with it every preview. So the left half only has to be data: a
+ * stored value outright, or a short template rendered. It is never enough by
+ * itself — the right half must still match a full-length body — so slipping
+ * through would mean being a stored subject AND being followed by a rendered
+ * template. Nothing is excused on the strength of a short pattern alone.
+ */
+function renderedFromTemplates(text, pats, data) {
+  if (!pats.strong.length) return false;
+  const s = collapse(text);
+  const hit = (set, x) => set.some((re) => re.test(x));
+  if (hit(pats.strong, s)) return true;
+  for (let i = s.indexOf(" "); i > 0; i = s.indexOf(" ", i + 1)) {
+    const left = s.slice(0, i);
+    if ((data.has(left) || hit(pats.weak, left)) && hit(pats.strong, s.slice(i + 1))) return true;
+  }
+  return false;
+}
 
 /**
  * A rendered string that is mostly a data value with no prose around it.
@@ -479,8 +599,16 @@ async function crawl(browser, base, lang, viewport) {
       booted++;
       absorb(first, `${file}${hash}`);
       for (const [top, v] of await page.evaluate(`(${DATA_VALUES})()`)) {
-        if (RECORDS.has(top)) data.add(v);
-        else vocabulary.add(`${top} · ${v}`);
+        // BOTH SIDES NORMALISE THE SAME WAY, or the comparison is a coin toss.
+        // `i18n.js` records a miss as `collapsed || trimmed` — runs of
+        // whitespace squeezed to one space — while this read the value raw. So
+        // every stored string containing a newline was unmatchable BY
+        // CONSTRUCTION: the twelve multi-line email templates were in the data
+        // set and still reported, nineteen of them across the preview and the
+        // editor, each one asking for a dictionary entry for an email the
+        // company wrote itself.
+        if (RECORDS.has(top)) data.add(collapse(v));
+        else vocabulary.add(`${top} · ${collapse(v)}`);
       }
 
       const labels = await page.evaluate(`(${CONTROLS})()`);
@@ -609,12 +737,19 @@ if (result.data.size < 20) {
 
 let asData = 0;
 const excused = [];
+/* Built once: one regex per stored string that carries a placeholder. `weak`
+   admits the short ones, and only the seam in `renderedFromTemplates` uses it. */
+const TEMPLATES = {
+  strong: templatePatterns(result.data, 16),
+  weak: templatePatterns(result.data, 6),
+};
 const all = [...result.found.values()]
   .filter((m) => {
     if (
       result.data.has(m.text) ||
       builtAroundData(m.text, result.data) ||
-      composedOfData(m.text, result.data, result.data)
+      composedOfData(m.text, result.data, result.data) ||
+      renderedFromTemplates(m.text, TEMPLATES, result.data)
     ) {
       asData++;
       excused.push(m.text);
