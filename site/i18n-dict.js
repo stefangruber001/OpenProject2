@@ -105,6 +105,8 @@ window.CANEI_DICT = {
     ["Elegir archivo", "Choose a file"],
     ["No se pudo leer", "Could not be read"],
     ["No se pudo cargar", "Could not be loaded"],
+    ["emitidas", "issued"],
+    ["Rectificativas", "Credit notes"],
     ["Numeración de documentos", "Document numbering"],
     ["sólo antes de emitir el primero", "only before the first one is issued"],
     ["Numeración guardada", "Numbering saved"],

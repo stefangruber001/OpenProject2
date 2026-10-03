@@ -302,6 +302,8 @@ window.CANEI_DICT.ca = {
   "Elegir archivo": "Triar fitxer",
   "No se pudo leer": "No s'ha pogut llegir",
   "No se pudo cargar": "No s'ha pogut carregar",
+  emitidas: "emeses",
+  Rectificativas: "Rectificatives",
   "Numeración de documentos": "Numeració de documents",
   "sólo antes de emitir el primero": "només abans d'emetre el primer",
   "Numeración guardada": "Numeració desada",

@@ -25917,8 +25917,16 @@
         ["creditNote", "Rectificativas"],
         ["budget", "Presupuestos"],
       ];
-      const NUM_USED_O = '<span class="pill b" title="Documentos ya emitidos en esta serie. Conservan su número; el cambio sólo afecta a los siguientes.">';
-      const NUM_USED_C = " emitidas</span>";
+      /* A NUMBER, NOT A SENTENCE BUILT AROUND ONE. This read `count + " emitidas"`,
+         which is a phrase no dictionary can hold — the translator sees «20
+         emitidas» and «26 emitidas» as two strings it has never been given, and
+         the miss ledger counts both. The import drawer already carries a comment
+         saying exactly this and I did it anyway. The count stands alone; the
+         word that explains it lives in the label beside the row, where it is one
+         string in the dictionary. */
+      const NUM_USED_O = '<span class="pill b">';
+      const NUM_USED_C = "</span>";
+      const NUM_USED_LBL = '<span class="tag">emitidas</span>';
       const NUM_CARD_O =
         '<div class="card"><div class="ch"><h3>Numeración de documentos</h3><span class="tag">sólo antes de emitir el primero</span></div><div class="daylist">';
       const NUM_CARD_C = "</div></div>";
@@ -25981,7 +25989,7 @@
             type +
             (s.resetYearly ? NUM_CHECKED : NUM_END) +
             NUM_RESET_C +
-            (used ? NUM_USED_O + used + NUM_USED_C : "") +
+            (used ? NUM_USED_LBL + NUM_USED_O + used + NUM_USED_C : "") +
             NUM_PREV_O +
             type +
             NUM_END +
