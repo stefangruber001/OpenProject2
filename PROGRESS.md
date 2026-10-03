@@ -4247,3 +4247,74 @@ producción. La cadena de cuatro niveles con raíz de Let's Encrypt de mayo de
 runners y fallara en un iPad— y estuve a un paso de tocarla. Un `WKWebView` de
 verdad en un runner de macOS dijo que no: Apple confía en ese certificado. Se
 descartó midiendo.
+
+## S43 · El libro que llega en Excel, el logo de verdad y la numeración que es suya (2026-10-03)
+
+Sesión larga y con cliente delante. Cinco cosas pedidas, una encontrada.
+
+**El libro de precios y el presupuesto, subidos en Excel.** Títulos, partidas y
+subpartidas desde la hoja que la empresa ya tenía, y el presupuesto completo
+detrás. Tres fallos salieron DESPUÉS de publicarlo, y los tres conviene que
+queden escritos porque son el mismo error de fondo —dar por hecho que la hoja
+dice lo que una pantalla diría—: el título no se arrastraba hacia abajo cuando
+la hoja lo escribe una sola vez y deja las filas siguientes en blanco; la
+importación volvía antes de que la escritura hubiera terminado, así que la
+pantalla se pintaba con el estado anterior; y repetir la misma subida duplicaba
+en vez de reconocer lo ya importado.
+
+**El logo.** El cliente avisó de que los documentos no salían con su logo. No
+era un fichero mal puesto: `erp-pdf.js` DIBUJABA una marca a mano —trazos
+aproximados— en vez de usar el contorno real. Ahora lleva el perfil de verdad
+(`MARK_PATH`, 118,391 × 137,002, con la Y espejada al sistema del PDF) y el
+lema del emisor viaja en `brandBlock()` y en el adjunto del borrador, donde
+antes iba una cadena vacía.
+
+**Importar los títulos y partidas de una versión anterior del mismo
+presupuesto.** `recoverableVersions()` y `versionRows()` en
+`erp-book-import.js`, con su cajón y su botón «↩ De una versión».
+
+**Dos cosas que pidió el cliente y eran de un rato:** los clientes del
+desplegable de oportunidades en orden alfabético —cuatro selectores, un
+comparador compartido, y siempre ordenando la COPIA que devuelve `.filter()`,
+nunca el estado— y poder elegir el IVA en el presupuesto aunque herede el de la
+ficha del cliente.
+
+**LA NUMERACIÓN ES DE LA EMPRESA, NO NUESTRA.** «La próxima sería la número
+57/2026 … si no es correlativo la gestora me pegará la cabeza.» Estaba clavada
+en el código (`FAC-2026-0057`) y empezaba siempre en 1, así que una empresa que
+llega con su propio historial no tenía por dónde entrar. Ahora cada serie lleva
+patrón (`{n}`, `{year}`), número de inicio y si reinicia en enero; para este
+cliente, facturas `{n}/{year}` desde la 57, rectificativas `R-{n}/{year}` y
+presupuestos desde la 102. **La regla del año es suya y no es la habitual** —una
+sola cuenta que no se corta, 57/2026 el 21 de diciembre y 58/2027 el 2 de
+enero—, y por eso queda en `LEGAL_REVIEW.md` §10 pendiente de su gestoría.
+
+Lo que habría roto en silencio: el código que adjunta el documento a un correo
+decidía de qué hablaba el mensaje con `/^PRE-/`, `/^(FAC|ABO)-/` y `/^CTR-/`
+contra el número. Con «57/2026» no casa ninguno, `kind` se queda en null y el
+correo sale SIN adjunto y sin error. Ahora busca el registro por su número y es
+el registro el que dice qué es. La auditoría de huecos tenía el mismo vicio
+—troceaba posiciones fijas— y ahora lee a través del patrón.
+
+**Y lo que no pidió nadie: el gate de traducción llevaba rojo desde el día 2 y
+no era culpa de ningún cambio.** Medido en un worktree aparte, el último commit
+que CI dio por verde con techo 37 medía 58 ESE MISMO DÍA. Dos fallos, los dos
+demostrados: el recorrido del estado paraba en profundidad 6 y la descripción de
+una línea de presupuesto vive en la nueve, así que ninguna de las veinte entraba
+en el conjunto de datos y cada fila construida con una («1.1 Tabiquería nueva»)
+se reportaba como sin traducir; y los dos lados normalizaban distinto —`i18n.js`
+registra el fallo con los blancos colapsados y la auditoría leía el valor en
+crudo—, lo que hacía inigualable POR CONSTRUCCIÓN toda cadena con un salto de
+línea, o sea las doce plantillas de correo. Lo peor no era el número sino que se
+movía con el día, porque el seed se construye relativo a hoy: un trinquete que
+deriva con el reloj no sirve de trinquete.
+
+Arreglado sin tocar el techo, y comprobado antes de creérselo: **0 fugas sobre
+las 4.453 claves españolas del diccionario**, los 13 hallazgos reales siguen
+reportándose, 24/24 vistas previas perdonadas. De 65 a 37, y con ocho entradas
+nuevas de diccionario por debajo.
+
+**Lo que hice mal y conviene que conste:** dije «890/890 todo verde» dos veces
+sin haber ejecutado nunca este gate de ~18 minutos, y dije que avisaría de
+cualquier rojo y no miré. El gate estaba roto, pero eso no lo sabía cuando lo
+dije.

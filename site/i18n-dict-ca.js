@@ -5206,6 +5206,16 @@ window.CANEI_DICT.ca = {
   "Una nota necesita decir cómo debería estar": "Una nota ha de dir com hauria d'estar",
   "Qué falla, qué debería hacer y por qué. Cada nota apunta a una pantalla real y se cierra con una decisión.":
     "Què falla, què hauria de fer i per què. Cada nota apunta a una pantalla real i es tanca amb una decisió.",
+  "Efectivo retirado": "Efectiu retirat",
+  Cuadra: "Quadra",
+  Columnas: "Columnes",
+  Contractual: "Contractual",
+  Título: "Títol",
+  subpartidas: "subpartides",
+  "Bloquea el trimestre; exige que todo en él esté asignado":
+    "Bloqueja el trimestre; exigeix que tot el que hi ha estigui assignat",
+  "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.":
+    "Altes, baixes i permisos. Al crear un compte es prepara un correu amb la pàgina d'accés i una contrasenya temporal, i queda a Esborranys perquè l'enviïs tu.",
 };
 window.CANEI_DICT.rxEs2Ca = [
   /* See the note on the English side. Origen and Alta are the Catalan words

@@ -198,3 +198,45 @@ review than a template.
   permits an invoice the regulation would not. Narrow in practice for a reformas
   SME billing local work, and worth closing before any intra-EU B2B invoicing.
   **legally_verified: false.**
+
+## 10. Una numeración de facturas que no reinicia cada ejercicio (session 80)
+
+- **What the client instructed (relayed by the operator, 2 Oct), in their own
+  words:** «cada año se tendría que poner el año en curso por ejemplo factura
+  57/2026 emitida el día 21/12/2026 y el día 2 de enero emitimos una factura
+  debería poner por ejemplo 58/2027». That is **one unbroken counter** whose
+  `{year}` is simply the year of issue — not a per-year series. They also asked
+  for the next invoice to be **57/2026**, with no prefix, and for
+  rectificativas to run their own correlative series (`R-01/2026`).
+- **Why this is flagged rather than simply implemented as the default.** The
+  ordinary Spanish practice is the opposite — the count restarts at 1 each
+  ejercicio — and that is what this product did before. The shape the client
+  described is unusual enough to need confirming.
+- **NOT VERIFIED HERE, and that is the point of this entry.** No source was read
+  for this finding in the session that implemented it: what follows is the
+  shape of the question, not an answer to it. The requirement everyone cites is
+  that invoice numbering be **correlative and without gaps within its series**
+  (RD 1619/2012, art. 6), which a single continuous counter carrying the issue
+  year as a label arguably satisfies — but «arguably» is not the standard for
+  somebody else's books, and nobody here has checked whether an annual restart
+  is required, merely customary. Unlike §9 above, this entry cites no sources
+  because none were consulted.
+- **The specific question for the gestoría**, so it can be answered in one
+  reply: _is a single continuous invoice counter acceptable when the printed
+  number carries the year of issue (…57/2026, then 58/2027), or must the count
+  restart at 1 each ejercicio?_ The answer changes one setting
+  (`resetYearly`), not any code.
+- **Implementation.** `configureSeries` / `nextNumber` in `site/erp-engine.js`.
+  Each series carries a pattern (`{n}`, `{year}`), a starting number and a
+  `resetYearly` flag; for this tenant `resetYearly` is **false**, which is what
+  produces 58/2027 after 57/2026. Two locks: a series refuses a next number at
+  or below one it has already issued (that is how two documents end up sharing
+  a number), and any workspace written before this keeps the numbering it
+  already had, because a change to how documents are numbered must never reach
+  a book retroactively. Covered by `tests/numbering/run.mjs` (16/16), including
+  the December→January case.
+- **What is NOT at risk here:** no invoice has been issued yet — the client held
+  off precisely because the numbering was unclear — so there is no history to
+  reconcile and no renumbering of existing documents. The setting can be
+  changed before the first invoice at no cost.
+  **legally_verified: false.**

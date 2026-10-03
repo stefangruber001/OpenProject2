@@ -6589,6 +6589,28 @@ window.CANEI_DICT = {
       "Qué falla, qué debería hacer y por qué. Cada nota apunta a una pantalla real y se cierra con una decisión.",
       "What is wrong, what it should do and why. Every note points at a real screen and is closed with a decision.",
     ],
+    /* Found by the translator miss ledger once it stopped hiding them behind a
+       depth limit: standalone labels and pills on the English workspace that
+       had no entry at all. Nothing composed is in here — a row that glues a
+       line code to a word ("A1 · tabique de placa") cannot be fixed from the
+       dictionary, because half of it is the company's data. */
+    ["Efectivo retirado", "Cash withdrawn"],
+    ["Cuadra", "Balances"],
+    ["Columnas", "Columns"],
+    ["Contractual", "Contractual"],
+    /* `título` → section, `subpartida` → sub-line item: the house glossary in
+       CLAUDE.md, so the English workspace says what the rest of the English
+       says. The Spanish and Catalan screens keep the domain word. */
+    ["Título", "Section"],
+    ["subpartidas", "sub-line items"],
+    [
+      "Bloquea el trimestre; exige que todo en él esté asignado",
+      "Locks the quarter; requires everything in it to be assigned",
+    ],
+    [
+      "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.",
+      "Joiners, leavers and permissions. Creating an account prepares an email with the sign-in page and a temporary password, and leaves it in Drafts for you to send.",
+    ],
   ],
   rxEs2En: [
     /* The customer and lead cards put the source and the date into ONE text

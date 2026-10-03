@@ -11586,3 +11586,86 @@ es un sitio razonable donde tener esto. De los dos tamaños que Apple acepta par
 la ranura de 13 pulgadas se usa **2048 × 2732**, el que `deliver` lleva años
 mapeando; una ficha no es el sitio donde averiguar cuál de dos números igual de
 válidos conoce la versión de fastlane que toque.
+
+## S146 · El año de la numeración es un ajuste, no una suposición (2026-10-03)
+
+El cliente describió una numeración que no reinicia en enero (57/2026 → 58/2027)
+y lo normal en España es reiniciar. Dos salidas: implementar lo que pidió como
+comportamiento fijo, o hacerlo configurable.
+
+**Decisión: un ajuste, `resetYearly`, y los valores por defecto SON el
+comportamiento antiguo.** Hacer de la regla de un cliente la regla del producto
+es exactamente lo que esta arquitectura existe para evitar, y además la duda es
+legal y no técnica: queda en `LEGAL_REVIEW.md` §10 con la pregunta ya redactada
+para su gestoría. Si contestan que debe reiniciar, cambia una casilla y ningún
+código.
+
+Reversible al coste cero mientras no se emita la primera factura, y no se ha
+emitido ninguna.
+
+## S147 · Un trinquete roto se arregla, no se sube (2026-10-03)
+
+El gate de traducción llevaba rojo desde el 2 de octubre con 65 cadenas contra
+un techo de 37. Tres salidas: subir el techo, meter en el diccionario las
+cadenas reportadas, o averiguar por qué el número se movía.
+
+**Decisión: arreglar la medición.** Medido en un worktree aparte, el último
+commit que CI dio por verde medía 58 el mismo día con el mismo techo, así que el
+rojo no lo había traído ningún cambio — y subir el techo habría enterrado eso
+para siempre. El fichero lo dice de su propia mano: «never lower the ceiling to
+fit». Los dos fallos (profundidad 6 contra un dato en la nueve; un lado
+colapsando los blancos y el otro no) eran reglas que no se aplicaban, no reglas
+demasiado estrictas, así que corregirlos no afloja nada.
+
+**El riesgo de este arreglo es perdonar de más y que el informe se calle, así que
+se midió antes de confiar en él:** 0 fugas sobre las 4.453 claves españolas del
+diccionario —una cadena con entrada de diccionario es texto de interfaz por
+definición—, los 13 hallazgos reales que debían seguir apareciendo siguen
+apareciendo, y un primer intento que SÍ tenía una fuga («Presupuesto aceptado»,
+por recortar cada trozo literal del patrón por separado) se encontró con esa
+misma medición y se corrigió.
+
+Reversible: son tres funciones en `tests/i18n/miss-crawl.mjs` y un límite de
+profundidad. Nada de esto toca el producto.
+
+## S148 · Lo que se deja sin arreglar, dicho en voz alta (2026-10-03)
+
+Dos falsos positivos del gate quedan EN PIE a propósito, porque arreglarlos es
+tocar producto y no hacía falta para poner el trunk en verde:
+
+- **Los rótulos de los pictogramas** (`A1 · tabique de placa`, seis cadenas).
+  Pegan un código de línea —dato de la empresa— a un rótulo que sí viaja con el
+  producto y sí hay que traducir. Una entrada de diccionario para la cadena
+  entera metería el código de la empresa en el diccionario, que es peor que el
+  problema; lo correcto es traducir el rótulo ANTES de componer, en
+  `erp-pictograms.js`.
+- **El repliegue de puntuación de `i18n.js`** se come el punto final: para
+  «— Apunta sus propias horas … del ERP.» busca la frase SIN el punto, y la
+  entrada del diccionario lo lleva, así que no casa aunque esté traducida en los
+  dos idiomas. Es un `[^\p{L}\p{N}]*$` codicioso al final del patrón.
+
+Ninguno de los dos es dato perdido ni cuenta mal nada: son cadenas que el
+informe nombra y que un humano puede leer. Se dejan medidas y escritas en vez de
+arregladas a las nueve de la noche en la misma sesión que un release.
+
+## S149 · El techo se queda en 37, y no es pereza (2026-10-03)
+
+El propio `miss-crawl.mjs` termina diciendo «↓ Down to 37. Lower --max in the CI
+step so it cannot drift back up», y el fichero es tajante en otro sitio: los
+techos SON la medición, no un presupuesto, y la holgura es justo lo que un
+trinquete no debe tener.
+
+**Decisión: no se sube —eso nunca— y tampoco se baja todavía.** Bajarlo exige
+que la medición sea REPETIBLE, y acabo de demostrar que no lo es: el seed se
+construye relativo a hoy, así que el mismo commit da números distintos en días
+distintos. Clavar el techo en la lectura de una tarde es exactamente el
+disparador que ha tenido el trunk rojo desde el día 2, y volver a armarlo
+sabiéndolo sería repetir el fallo con más información.
+
+37 sigue cumpliendo su función: atrapaba los 58–65 con los que estaba fallando.
+
+**El paso siguiente, nombrado para que no se pierda:** fijar la fecha del seed en
+el recorrido (el reloj se puede clavar desde Playwright antes de cargar la
+página), y UNA VEZ que dos ejecuciones en días distintos den el mismo número,
+bajar el techo a ese número. En ese orden; bajarlo antes es ponerle una trampa al
+que venga.
