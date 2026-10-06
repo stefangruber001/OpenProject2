@@ -31028,6 +31028,13 @@
          handlers below are rebound against the new selection instead of
          keeping the one this closure opened with.
 
+         THE PLACEMENT IS NOW THE ONLY THING THAT SAYS SO. A line of help under
+         the buttons used to spell out that the version on screen is the one
+         that downloads; the operator asked for it gone, and they are right that
+         three labelled buttons under a highlighted row do not need a sentence.
+         It does mean the row cannot be moved out of this card without taking
+         the explanation with it.
+
          ONE FLAT LITERAL, not a concatenation and nothing spliced between one
          tag and the next. The source audit reads the gap between a closing
          angle bracket and the next opening one as a sentence awaiting
@@ -31035,7 +31042,7 @@
          added three findings to a ratchet standing at its exact limit, every
          one of them from the prose around the code rather than the code. */
       const BD_DL_ROW =
-        '<div class="it" style="gap:8px;flex-wrap:wrap"><span>Se descarga la versión que está viendo.</span><span style="flex:1"></span><button class="btn sm" id="bdPdf">⤓ Descargar PDF</button><button class="btn sm" id="bdWord">⤓ Word</button><button class="btn sm" id="bdXlsx">⤓ Excel</button></div>';
+        '<div class="it" style="gap:8px;flex-wrap:wrap"><button class="btn sm" id="bdPdf">⤓ Descargar PDF</button><button class="btn sm" id="bdWord">⤓ Word</button><button class="btn sm" id="bdXlsx">⤓ Excel</button></div>';
       function budgetDrawer(id, versionId) {
         const b = erp.budget(id);
         const vsel = versionId || b.acceptedVersionId || b.currentVersionId;

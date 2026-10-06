@@ -5216,7 +5216,6 @@ window.CANEI_DICT.ca = {
     "Bloqueja el trimestre; exigeix que tot el que hi ha estigui assignat",
   "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.":
     "Altes, baixes i permisos. Al crear un compte es prepara un correu amb la pàgina d'accés i una contrasenya temporal, i queda a Esborranys perquè l'enviïs tu.",
-  "Se descarga la versión que está viendo.": "Es descarrega la versió que està veient.",
 };
 window.CANEI_DICT.rxEs2Ca = [
   /* See the note on the English side. Origen and Alta are the Catalan words
