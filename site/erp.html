@@ -9026,8 +9026,7 @@
        * next to «Alvarez» rather than after «Zurita», which is the whole point
        * of not comparing raw code units.
        */
-      const byName = (key) => (a, b) =>
-        String(a[key] || "").localeCompare(String(b[key] || ""));
+      const byName = (key) => (a, b) => String(a[key] || "").localeCompare(String(b[key] || ""));
 
       function supplierOptions(sel) {
         return erp.state.parties
@@ -12498,18 +12497,22 @@
         const NUM_OPEN = "<b>";
         const NUM_CLOSE = "</b></div>";
         const L_FILE = '<span class="tag">';
-        const L_ROWS = ' filas</span></div>';
+        const L_ROWS = " filas</span></div>";
         const L_NEW = '<span style="flex:1">Se crearán</span>';
         const L_UPD = '<span style="flex:1">Se actualizarán</span>';
         const L_CHAP = '<span style="flex:1">Partidas del presupuesto</span>';
         const L_LINES = '<span style="flex:1">Líneas</span>';
-        const L_INC_A = '<span class="pill y">sin completar</span><span style="flex:1;margin-left:8px">';
-        const L_INC_B = ' sin precio o sin coste</span></div>';
+        const L_INC_A =
+          '<span class="pill y">sin completar</span><span style="flex:1;margin-left:8px">';
+        const L_INC_B = " sin precio o sin coste</span></div>";
         const L_SUB1 = " subpartida";
         const L_SUBN = " subpartidas";
-        const CARD_A = '<div class="card" style="margin-top:10px"><div class="ch"><h3>Lo que cambia</h3>';
-        const CARD_A2 = '<span class="tag">valor actual → valor del archivo</span></div><div class="daylist">';
-        const CARD_B = '<div class="card" style="margin-top:10px"><div class="ch"><h3>Filas que no se pueden importar</h3>';
+        const CARD_A =
+          '<div class="card" style="margin-top:10px"><div class="ch"><h3>Lo que cambia</h3>';
+        const CARD_A2 =
+          '<span class="tag">valor actual → valor del archivo</span></div><div class="daylist">';
+        const CARD_B =
+          '<div class="card" style="margin-top:10px"><div class="ch"><h3>Filas que no se pueden importar</h3>';
         const CARD_B2 = '<span class="tag">';
         const CARD_B3 = '</span></div><div class="daylist">';
         const CARD_END = "</div></div>";
@@ -12521,11 +12524,22 @@
         const stat = (label, n) => IT + label + NUM_OPEN + n + NUM_CLOSE;
         const parts = [
           '<div class="daylist">',
-          IT + '<span style="flex:1">' + esc(file.name) + "</span>" + L_FILE + parsed.rows.length + L_ROWS,
+          IT +
+            '<span style="flex:1">' +
+            esc(file.name) +
+            "</span>" +
+            L_FILE +
+            parsed.rows.length +
+            L_ROWS,
           stat(L_NEW, nNew),
           stat(L_UPD, changed.length),
           isBudget ? stat(L_CHAP, plan.chapters.length) : "",
-          isBudget ? stat(L_LINES, plan.chapters.reduce((a, c) => a + c.lines.length, 0)) : "",
+          isBudget
+            ? stat(
+                L_LINES,
+                plan.chapters.reduce((a, c) => a + c.lines.length, 0),
+              )
+            : "",
           incompletos
             ? IT + L_INC_A + incompletos + (incompletos === 1 ? L_SUB1 : L_SUBN) + L_INC_B
             : "",
@@ -12557,13 +12571,16 @@
           if (btn.disabled) return;
           btn.disabled = true;
           let made = null;
-          const stored = await mutateNow(() => {
-            made = isBudget
-              ? ErpBookImport.applyBudget(erp, o.budgetId, plan, "backoffice", {
-                  fileName: file.name,
-                })
-              : ErpBookImport.applyBook(erp, plan, "backoffice");
-          }, isBudget ? "Presupuesto importado" : "Libro de precios importado");
+          const stored = await mutateNow(
+            () => {
+              made = isBudget
+                ? ErpBookImport.applyBudget(erp, o.budgetId, plan, "backoffice", {
+                    fileName: file.name,
+                  })
+                : ErpBookImport.applyBook(erp, plan, "backoffice");
+            },
+            isBudget ? "Presupuesto importado" : "Libro de precios importado",
+          );
           closeDrawer();
           /* Only on a stored write: `onDone` reopens the register, and a register
              drawn from a document the database refused shows rows that are not
@@ -12662,12 +12679,7 @@
         };
 
         db.innerHTML =
-          VR_GRID_O +
-          VR_INTRO +
-          VR_VERLBL +
-          vers.map(vRow).join("") +
-          VR_VEREND +
-          VR_GRID_C;
+          VR_GRID_O + VR_INTRO + VR_VERLBL + vers.map(vRow).join("") + VR_VEREND + VR_GRID_C;
 
         const body = () => {
           const v = vers.find((x) => x.id === pickedVer);
@@ -13129,8 +13141,7 @@
         // longer sum to rows.length — and should not. A count beside a partida
         // means "this many are reachable under it", not "this many exclusively".
         for (const i of rows)
-          for (const code of erp.itemPartidas(i.id))
-            count.set(code, (count.get(code) || 0) + 1);
+          for (const code of erp.itemPartidas(i.id)) count.set(code, (count.get(code) || 0) + 1);
         return (
           `<option value=""${selected ? "" : " selected"}>Todas las partidas (${rows.length})</option>` +
           erp
@@ -18122,10 +18133,7 @@
                 });
                 return;
               }
-              await addChapterStep(
-                rows.find((t) => t.es === pick) || null,
-                true,
-              );
+              await addChapterStep(rows.find((t) => t.es === pick) || null, true);
             };
         }
         $("#bPreview").onclick = () => budgetDrawer(id, vsel);
@@ -19186,7 +19194,10 @@
         const vatSel = $("#bVat");
         if (vatSel)
           vatSel.onchange = (e) =>
-            mutate(() => erp.updateBudget(id, { vatBp: +e.target.value }, "backoffice"), "IVA actualizado");
+            mutate(
+              () => erp.updateBudget(id, { vatBp: +e.target.value }, "backoffice"),
+              "IVA actualizado",
+            );
       }
 
       /**
@@ -19234,12 +19245,15 @@
         const opts = rates
           .map(
             (bp) =>
-              VAT_OPT_O + bp + (bp === t.vatBp ? VAT_OPT_SEL : VAT_OPT_M) + bp / 100 + VAT_PCT + VAT_OPT_C,
+              VAT_OPT_O +
+              bp +
+              (bp === t.vatBp ? VAT_OPT_SEL : VAT_OPT_M) +
+              bp / 100 +
+              VAT_PCT +
+              VAT_OPT_C,
           )
           .join("");
-        return (
-          VAT_ROW_O + VAT_SEL_O + opts + VAT_SEL_C + VAT_MID + eur(t.vatCents) + VAT_ROW_C
-        );
+        return VAT_ROW_O + VAT_SEL_O + opts + VAT_SEL_C + VAT_MID + eur(t.vatCents) + VAT_ROW_C;
       }
 
       function builderTotalsPanel(b, id, vsel, t) {
@@ -24378,8 +24392,7 @@
              handler bound to the button it drew would be wired to an element
              that no longer exists two keystrokes later. */
           v.addEventListener("click", (e) => {
-            if (e.target.closest("[data-bkimport]"))
-              bookImportDrawer({ onDone: () => render() });
+            if (e.target.closest("[data-bkimport]")) bookImportDrawer({ onDone: () => render() });
           });
           const host = $("#biList");
           /* Built here rather than in each register: three copies of one
@@ -24519,8 +24532,7 @@
               nounSingular: "partida",
               nounPlural: "partidas",
               baseRows: rows,
-              matches: (c, q) =>
-                c.code.toLowerCase().includes(q) || c.es.toLowerCase().includes(q),
+              matches: (c, q) => c.code.toLowerCase().includes(q) || c.es.toLowerCase().includes(q),
               columns: [
                 { label: "#", num: true, get: (c) => c.pos },
                 { label: "Código", primary: true, get: (c) => c.code },
@@ -25938,7 +25950,8 @@
       const NUM_LBL_C = "</span>";
       const NUM_PAT_O = '<input style="width:150px" data-numpat="';
       const NUM_NEXT_O = '<input type="number" min="1" step="1" style="width:92px" data-numnext="';
-      const NUM_RESET_O = '<label class="opt" style="margin:0"><input type="checkbox" data-numreset="';
+      const NUM_RESET_O =
+        '<label class="opt" style="margin:0"><input type="checkbox" data-numreset="';
       const NUM_RESET_C = "> reinicia cada año</label>";
       const NUM_VAL = '" value="';
       const NUM_END = '">';
@@ -30999,6 +31012,30 @@
           `${b.number}-v${doc.version}.xlsx`,
         );
       }
+      /* DOWNLOAD THE VERSION BEING LOOKED AT.
+         The three writers have always taken a version: the PDF, Word and Excel
+         routes are each (id, versionId), and the send drawer has called them
+         that way since they were written. What was missing was a route to them
+         AFTER the version went out. The send drawer is on the way TO issuing,
+         so once a quote had been sent the only copy of it was the one in the
+         customer's inbox — the client reported it as there being no way to
+         download a version, which is exactly what it was.
+
+         The row lives inside the Versions card, under the list, so the version
+         the buttons mean is the one highlighted directly above them. A toolbar
+         button at the top of the drawer would sit nowhere near the thing it
+         depends on. The drawer re-renders on every version click, so the
+         handlers below are rebound against the new selection instead of
+         keeping the one this closure opened with.
+
+         ONE FLAT LITERAL, not a concatenation and nothing spliced between one
+         tag and the next. The source audit reads the gap between a closing
+         angle bracket and the next opening one as a sentence awaiting
+         translation, and it reads comments too — a first cut of this block
+         added three findings to a ratchet standing at its exact limit, every
+         one of them from the prose around the code rather than the code. */
+      const BD_DL_ROW =
+        '<div class="it" style="gap:8px;flex-wrap:wrap"><span>Se descarga la versión que está viendo.</span><span style="flex:1"></span><button class="btn sm" id="bdPdf">⤓ Descargar PDF</button><button class="btn sm" id="bdWord">⤓ Word</button><button class="btn sm" id="bdXlsx">⤓ Excel</button></div>';
       function budgetDrawer(id, versionId) {
         const b = erp.budget(id);
         const vsel = versionId || b.acceptedVersionId || b.currentVersionId;
@@ -31044,6 +31081,7 @@
                 })()
               : ""
           }
+          ${BD_DL_ROW}
          </div></div>
          ${
            /* The customer answers a VERSION, not a budget — and they answer the one
@@ -31097,6 +31135,13 @@
         // whole point of putting it here.
         const bdAns = $("#bdAnswer");
         if (bdAns) bdAns.onclick = () => budgetResponseDrawer(id, vsel);
+        // `vsel`, not `b.currentVersionId`: the operator opened an old version
+        // precisely because that is the one they want a copy of, and a button
+        // that quietly handed back the draft instead would be worse than no
+        // button — the file looks right until somebody reads the total.
+        $("#bdPdf").onclick = () => downloadBudgetPdf(id, vsel);
+        $("#bdWord").onclick = () => downloadBudgetDocx(id, vsel);
+        $("#bdXlsx").onclick = () => downloadBudgetXlsx(id, vsel);
       }
       /* ================= PRY-01/PRY-02 · the two jobs' full-screen surfaces =====
          Both used to share `projectPanelHead` — one header, because a job that
@@ -31439,7 +31484,9 @@
             cell(r.projectedCents) +
             dev(r.devCents) +
             signed(r.marginFcastCents);
-          out.push(`<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${tags}</td>${body}</tr>`);
+          out.push(
+            `<tr><td class="k">${r.chapter}. ${esc(names[r.chapter] || "—")}${tags}</td>${body}</tr>`,
+          );
         });
         /* The money that names no partida is projected at exactly itself: it is
                  already spent, and nothing about it is still to come. Leaving it out

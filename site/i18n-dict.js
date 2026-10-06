@@ -6611,6 +6611,10 @@ window.CANEI_DICT = {
       "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.",
       "Joiners, leavers and permissions. Creating an account prepares an email with the sign-in page and a temporary password, and leaves it in Drafts for you to send.",
     ],
+    [
+      "Se descarga la versión que está viendo.",
+      "The version you are looking at is the one downloaded.",
+    ],
   ],
   rxEs2En: [
     /* The customer and lead cards put the source and the date into ONE text

@@ -15402,6 +15402,68 @@ async function testSendAndVersions(browser, base) {
         if (/PRE-/.test(after.title) && after.activeMarked)
           ok("versions: the version list inside Vista previa is itself clickable");
         else bad("versions: in-drawer version jump", JSON.stringify(after));
+
+        // ---- the version on screen is the version that downloads ----------
+        //
+        // Reported by the client: a quote that had already been sent could be
+        // looked at and not saved. The send drawer has had the three download
+        // buttons all along, but it is on the way TO issuing — after the send
+        // there was no route back to the file.
+        //
+        // THE ASSERTION IS THE FILENAME, NOT THE BUTTON. That the buttons
+        // render proves nothing worth proving; a download that quietly handed
+        // back the current draft instead of the version on screen would look
+        // right until somebody opened it and read a total that was never sent
+        // to anybody. So both versions are downloaded and the two files have to
+        // differ, which is the only way to catch a handler that closed over the
+        // wrong one.
+        const titleVer = async () => {
+          const t = await pg.evaluate(() => document.querySelector("#dttl")?.textContent || "");
+          const m = /^(\S+)\s*·\s*v([0-9.]+)/.exec(t.trim());
+          return m ? { number: m[1], v: m[2], want: `${m[1]}-v${m[2]}.pdf` } : null;
+        };
+        const grabPdf = async () => {
+          const dl = pg.waitForEvent("download", { timeout: 30000 }).catch(() => null);
+          await pg.click("#bdPdf");
+          const f = await dl;
+          return f ? f.suggestedFilename() : null;
+        };
+        const first = await titleVer();
+        if (!first) {
+          bad("versions: the drawer title names its version", "unparseable");
+        } else {
+          const got = await grabPdf();
+          if (got === first.want)
+            ok(`versions: Vista previa downloads the version on screen (${got})`);
+          else
+            bad("versions: downloaded file names the selected version", `${got} ≠ ${first.want}`);
+
+          // Now jump to another version and download again: a different
+          // version has to produce a different file.
+          const jumped = await pg.evaluate(() => {
+            const n = document.querySelector("[data-goverid]");
+            if (!n) return false;
+            n.click();
+            return true;
+          });
+          await pg.waitForTimeout(700);
+          const second = await titleVer();
+          if (!jumped || !second || second.v === first.v) {
+            bad(
+              "versions: a second version to download",
+              JSON.stringify({ jumped, first: first.v, second: second && second.v }),
+            );
+          } else {
+            const got2 = await grabPdf();
+            if (got2 === second.want && got2 !== got)
+              ok(`versions: switching version switches the file (${got} → ${got2})`);
+            else
+              bad(
+                "versions: the other version downloads as itself",
+                `${got2} ≠ ${second.want} (first was ${got})`,
+              );
+          }
+        }
       } else bad("versions: clickable rows in the Versiones card", rows);
     }
 
