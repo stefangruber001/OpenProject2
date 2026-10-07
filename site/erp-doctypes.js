@@ -46,8 +46,27 @@
   }
   const pct = (n) => (Math.round((Number(n) || 0) * 10) / 10).toFixed(0) + " %";
 
-  /** Every descriptor gets the same party pair unless it says otherwise. */
-  function parties(f, rightLabel) {
+  /**
+   * Every descriptor gets the same party pair unless it says otherwise.
+   *
+   * `fiscal` DROPS THE CONTACT PERSON, and only that line. On an invoice the
+   * right-hand block is not "who to ring about this", it is the recipient of
+   * record — and a name like "Ainhoa / Ivan" sitting between the NIF and the
+   * address reads as part of the fiscal identity when it is nothing of the
+   * kind. Reported by the client against their first real invoice: «no puede
+   * aparecer el nombre de contacto en los datos de facturación del cliente».
+   * Everything else of theirs stays, which is what they asked for when the
+   * question was put back to them — «si del cliente todo pero no puede poner lo
+   * de persona de contacto».
+   *
+   * A FLAG RATHER THAN READING `rightLabel`. Both fiscal documents happen to
+   * label the block "Destinatario", so the label would work as the test today
+   * — and would quietly stop working the day somebody translates it or reuses
+   * the word, which is how a rule written against display text fails. The
+   * caller says what the block IS; the label only says what it is called.
+   */
+  function parties(f, rightLabel, opts) {
+    const fiscal = !!(opts && opts.fiscal);
     return [
       {
         label: "Contratista",
@@ -61,10 +80,11 @@
            the document up should be able to ring the customer from it rather
            than looking them up on another screen. Falsy entries are dropped
            downstream, so a customer with no mobile simply has one line
-           fewer — nothing prints an empty row. */
+           fewer — nothing prints an empty row, and that is also what carries
+           the empty string below. */
         lines: [
           f.customer.nif,
-          f.customer.contact,
+          fiscal ? "" : f.customer.contact,
           f.customer.address,
           f.customer.phone,
           f.customer.email,
@@ -522,7 +542,7 @@
             ["Impuesto", f.taxRate + " %"],
             ["Vencimiento", f.dates.due],
           ],
-          parties: parties(f, "Destinatario"),
+          parties: parties(f, "Destinatario", { fiscal: true }),
           groups: chapterGroups(f),
           sections: [{ type: "table", label: "Detalle de la obra" }, { type: "totals" }],
           totals: t.rows,
@@ -563,7 +583,7 @@
             ["Factura original", f.numbers.invoice],
             ["Fecha original", f.dates.originalInvoice],
           ],
-          parties: parties(f, "Destinatario"),
+          parties: parties(f, "Destinatario", { fiscal: true }),
           intro:
             "Esta factura rectifica la factura " +
             f.numbers.invoice +

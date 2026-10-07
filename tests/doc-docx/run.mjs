@@ -270,6 +270,46 @@ try {
   check("an unknown section type is refused, not skipped", /unknown section type/.test(e.message));
 }
 
+/* ---- the contact person belongs on a quote, never on a fiscal document ----
+ *
+ * Reported by the client against their first real invoice: the recipient block
+ * printed «Ainhoa / Ivan» between the NIF and the address, and on an invoice
+ * that block is the recipient of RECORD — a contact name sitting inside it
+ * reads as part of the fiscal identity when it is nothing of the kind.
+ *
+ * Checked on BOTH sides, because only one side is a regression anybody would
+ * notice. Dropping the line everywhere would also pass a test that merely
+ * asserted its absence from the invoice, and it would silently undo the
+ * Package 8 change that put it on the quote so somebody could ring the
+ * customer back without opening another screen. The pair is the specification.
+ */
+{
+  const contact = facts.customer.contact;
+  const recipientLines = (kind) => {
+    const d = DT.build(kind, facts);
+    const blk = (d.parties || []).find((p) => p && p.name === facts.customer.name);
+    return blk ? blk.lines || [] : null;
+  };
+  for (const kind of ["factura", "rectificativa"]) {
+    const lines = recipientLines(kind);
+    check(
+      `${kind}: the recipient block carries no contact person`,
+      !!lines && !lines.includes(contact),
+      lines ? lines.filter(Boolean).join(" · ") : "(no recipient block)",
+    );
+    // …and loses nothing else: the fiscal identity is still whole.
+    check(
+      `${kind}: the recipient still carries NIF and address`,
+      !!lines && lines.includes(facts.customer.nif) && lines.includes(facts.customer.address),
+      lines ? lines.filter(Boolean).join(" · ") : "(no recipient block)",
+    );
+  }
+  for (const kind of ["presupuesto", "contrato"]) {
+    const lines = recipientLines(kind);
+    check(`${kind}: the contact person is still printed`, !!lines && lines.includes(contact));
+  }
+}
+
 const failed = results.filter((r) => !r.pass);
 for (const r of results) console.log(`${r.pass ? "✓" : "✗"} ${r.n}${r.d ? "  → " + r.d : ""}`);
 console.log(`\n${DT.KINDS.length} documents · ${mirrored} mirror the descriptor completely`);

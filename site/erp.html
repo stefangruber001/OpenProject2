@@ -32531,9 +32531,29 @@
         );
       }
 
+      /* WITHDRAWING AN INVOICE THAT NEVER LEFT, and saying so when it cannot.
+         The row appears only on the NEWEST invoice: on any older one the answer
+         is always the rectificativa, and a button permanently greyed out on
+         every historic document is noise rather than information. When it is
+         the newest and something else stands in the way, the reason is printed
+         beside it — the same courtesy `billUnregisterDrawer` extends, because a
+         disabled button that does not say why is a wall.
+         Flat declarations: the source audit reads a gap between one tag and the
+         next as a sentence, and these are assembled around values. */
+      const INV_UNDO_BTN = '<button class="btn sm danger" id="iv_undo">Retirar la factura</button>';
+      const INV_UNDO_WHY_O = '<div class="sub" style="margin-top:8px">';
+      const INV_UNDO_WHY_C = "</div>";
+      const INV_UNDO_BLOCK = {
+        collected: "Tiene un cobro aplicado. Deshaga primero el cobro en Conciliación.",
+        sent: "Ya se ha enviado al cliente. Emita una rectificativa en su lugar.",
+        rectified: "Ya tiene una rectificativa que la referencia.",
+        "quarter-sent":
+          "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.",
+      };
       function invoiceDrawer(number) {
         const inv = erp.state.invoices.find((i) => i.number === number);
         if (!inv) return;
+        const undoBlock = erp.invoiceUndoBlock(inv.id);
         const out = erp.invoiceOutstandingCents(inv.id);
         const row = erp.invoiceRegister().find((r) => r.number === number) || { daysOverdue: 0 };
         const p = erp.project(inv.projectId);
@@ -32589,7 +32609,9 @@
           <button class="btn sm" id="iv_pdf">⤓ Descargar PDF</button>
           <button class="btn sm" id="iv_word">⤓ Word</button>
           ${inv.kind !== "creditNote" ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
-         </div>`;
+          ${undoBlock === "not-last" ? "" : INV_UNDO_BTN}
+         </div>
+         ${undoBlock && undoBlock !== "not-last" ? INV_UNDO_WHY_O + esc(INV_UNDO_BLOCK[undoBlock] || undoBlock) + INV_UNDO_WHY_C : ""}`;
         $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
         $("#iv_word").onclick = () => {
           const d = erp.renderInvoiceDoc(inv.number);
@@ -32624,6 +32646,26 @@
           bank.onclick = () => {
             closeDrawer();
             goTab("banking", "_reconcile");
+          };
+        /* The reason is asked for and kept. The invoice goes, its number comes
+           back, and the only trace left is the audit line — so that line has to
+           say why, or the book has a number that was minted and withdrawn with
+           nothing to explain it. */
+        const undo = $("#iv_undo");
+        if (undo && !undoBlock)
+          undo.onclick = async () => {
+            const reason = await askText("Retirar la factura", {
+              label: "Motivo",
+              body: "El número vuelve a la serie y la factura desaparece del libro. Sólo se puede porque no ha salido de aquí. No se puede deshacer.",
+              required: true,
+              okLabel: "Retirar",
+              danger: true,
+            });
+            if (reason === null) return;
+            await mutateNow(() => {
+              erp.undoLastInvoice(inv.id, "backoffice", reason);
+              closeDrawer();
+            }, "Factura retirada");
           };
       }
 

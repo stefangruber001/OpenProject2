@@ -6611,6 +6611,28 @@ window.CANEI_DICT = {
       "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.",
       "Joiners, leavers and permissions. Creating an account prepares an email with the sign-in page and a temporary password, and leaves it in Drafts for you to send.",
     ],
+    /* Withdrawing an invoice that never left the building — the client's
+       first invoice carried a number the numbering had not been set up to
+       give, and had not been sent to anybody. */
+    ["Retirar la factura", "Withdraw the invoice"],
+    ["Factura retirada", "Invoice withdrawn"],
+    [
+      "El número vuelve a la serie y la factura desaparece del libro. Sólo se puede porque no ha salido de aquí. No se puede deshacer.",
+      "The number goes back to the series and the invoice leaves the book. This is only possible because it never left here. It cannot be undone.",
+    ],
+    [
+      "Tiene un cobro aplicado. Deshaga primero el cobro en Conciliación.",
+      "A payment has been applied to it. Undo that payment in Reconciliation first.",
+    ],
+    [
+      "Ya se ha enviado al cliente. Emita una rectificativa en su lugar.",
+      "It has already gone to the customer. Issue a credit note instead.",
+    ],
+    ["Ya tiene una rectificativa que la referencia.", "A credit note already references it."],
+    [
+      "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.",
+      "Its quarter has already gone to the accountant. Issue a credit note instead.",
+    ],
   ],
   rxEs2En: [
     /* The customer and lead cards put the source and the date into ONE text

@@ -219,6 +219,107 @@ function erpAt(day) {
   );
 }
 
+/* ---------- 9 · taking back a number that never left the building ----------
+
+   The client's first invoice came out FAC-2026-0001 because the numbering had
+   not been set up yet. It was never sent. Rectifying it would put two
+   documents in the book to cancel a sale that never happened, so the number
+   has to be returnable — and returnable ONLY while nothing has happened to it.
+
+   The guards are the test. A withdrawal that works is worth little next to a
+   withdrawal that refuses when it should, because the failure mode here is
+   silently removing a document somebody else already has. */
+{
+  const erp = erpAt("2026-10-07");
+  erp.configureSeries(
+    "invoice",
+    { pattern: "{n}/{year}", pad: 0, resetYearly: false, next: 57 },
+    "t",
+  );
+  // Two invoices, minted the way issueInvoice mints them, with the chained
+  // event each one writes.
+  const mint = (id) => {
+    const number = erp.nextNumber("invoice");
+    erp.state.invoices.push({ id, number, date: "2026-10-07", kind: "progress", totalCents: 100 });
+    erp.state.invoiceEvents.push({ number, date: "2026-10-07", totalCents: 100 });
+    return number;
+  };
+  const first = mint("inv_a");
+  const second = mint("inv_b");
+  is(first === "57/2026" && second === "58/2026", "two issued", first + " " + second);
+
+  is(erp.invoiceUndoBlock("inv_a") === "not-last", "the earlier one cannot be withdrawn");
+
+  const returned = erp.undoLastInvoice("inv_b", "t", "numeración mal configurada");
+  is(returned === "58/2026", "the last one is withdrawn", returned);
+  is(
+    erp.state.series.invoice.issued.join(",") === "57/2026",
+    "…and its number leaves the series",
+    erp.state.series.invoice.issued.join(","),
+  );
+  is(
+    erp.state.invoices.length === 1 && erp.state.invoiceEvents.length === 1,
+    "…with its chained event, so the chain still verifies",
+  );
+  // The point of the whole exercise: the number is genuinely free again.
+  is(erp.nextNumber("invoice") === "58/2026", "…and the next invoice takes 58 again");
+}
+
+/* Each guard, one at a time, against an invoice that IS the last one — so the
+   only thing refusing is the guard under test. */
+{
+  const setup = () => {
+    const erp = erpAt("2026-10-07");
+    erp.configureSeries(
+      "invoice",
+      { pattern: "{n}/{year}", pad: 0, resetYearly: false, next: 57 },
+      "t",
+    );
+    const number = erp.nextNumber("invoice");
+    erp.state.invoices.push({ id: "inv_x", number, date: "2026-10-07", kind: "progress" });
+    erp.state.invoiceEvents.push({ number, date: "2026-10-07", totalCents: 100 });
+    return { erp, number };
+  };
+  const clean = setup();
+  is(clean.erp.invoiceUndoBlock("inv_x") === null, "nothing has happened to it: no block");
+
+  const paid = setup();
+  paid.erp.state.collections.push({ allocations: [{ invoiceId: "inv_x", amountCents: 100 }] });
+  is(paid.erp.invoiceUndoBlock("inv_x") === "collected", "money against it blocks the withdrawal");
+
+  const sent = setup();
+  sent.erp.state.commsQueue.push({ subjectRef: sent.number, status: "sent" });
+  is(sent.erp.invoiceUndoBlock("inv_x") === "sent", "a message that went out blocks it");
+
+  // …but a draft that never went out does not.
+  const draft = setup();
+  draft.erp.state.commsQueue.push({ subjectRef: draft.number, status: "draft" });
+  is(draft.erp.invoiceUndoBlock("inv_x") === null, "a prepared-but-unsent message does not");
+
+  const fixed = setup();
+  fixed.erp.state.invoices.push({ id: "inv_r", number: "R-1/2026", rectifies: "inv_x" });
+  is(fixed.erp.invoiceUndoBlock("inv_x") === "rectified", "an existing rectificativa blocks it");
+
+  const filed = setup();
+  filed.erp.state.packagesSent.push({ quarter: "2026-Q4" });
+  is(
+    filed.erp.invoiceUndoBlock("inv_x") === "quarter-sent",
+    "a quarter already filed with the gestoría blocks it",
+  );
+
+  // And a blocked withdrawal REFUSES rather than half-doing it.
+  let threw = false;
+  try {
+    paid.erp.undoLastInvoice("inv_x", "t");
+  } catch (e) {
+    threw = true;
+  }
+  is(
+    threw && paid.erp.state.invoices.length === 1,
+    "a blocked withdrawal throws and changes nothing",
+  );
+}
+
 /* ---------- report ---------- */
 const failed = checks.filter((c) => !c.pass);
 console.log("\n──── document numbering ────\n");

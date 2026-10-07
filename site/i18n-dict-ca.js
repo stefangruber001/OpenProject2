@@ -5216,6 +5216,17 @@ window.CANEI_DICT.ca = {
     "Bloqueja el trimestre; exigeix que tot el que hi ha estigui assignat",
   "Altas, bajas y permisos. Al crear una cuenta se prepara un correo con la página de acceso y una contraseña temporal, y queda en Borradores para que lo envíes tú.":
     "Altes, baixes i permisos. Al crear un compte es prepara un correu amb la pàgina d'accés i una contrasenya temporal, i queda a Esborranys perquè l'enviïs tu.",
+  "Retirar la factura": "Retirar la factura",
+  "Factura retirada": "Factura retirada",
+  "El número vuelve a la serie y la factura desaparece del libro. Sólo se puede porque no ha salido de aquí. No se puede deshacer.":
+    "El número torna a la sèrie i la factura desapareix del llibre. Només es pot perquè no ha sortit d'aquí. No es pot desfer.",
+  "Tiene un cobro aplicado. Deshaga primero el cobro en Conciliación.":
+    "Té un cobrament aplicat. Desfeu primer el cobrament a Conciliació.",
+  "Ya se ha enviado al cliente. Emita una rectificativa en su lugar.":
+    "Ja s'ha enviat al client. Emeteu una rectificativa al seu lloc.",
+  "Ya tiene una rectificativa que la referencia.": "Ja té una rectificativa que la referencia.",
+  "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.":
+    "El seu trimestre ja s'ha enviat a l'assessor. Emeteu una rectificativa al seu lloc.",
 };
 window.CANEI_DICT.rxEs2Ca = [
   /* See the note on the English side. Origen and Alta are the Catalan words

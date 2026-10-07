@@ -7927,6 +7927,111 @@
       this._log(user, "recordCollection", rec.amountCents + "c");
       return rec;
     }
+    /**
+     * WHAT STANDS IN THE WAY OF WITHDRAWING AN INVOICE THAT NEVER LEFT.
+     *
+     * The document says of itself that it is immutable and that corrections go
+     * out as a rectificativa, and that stays true of every invoice that has
+     * reached anybody. This covers the one case that is not a correction at
+     * all: a number minted, looked at, and never sent — which is where a
+     * company that has just started lands when its numbering was not set up
+     * first. Rectifying that leaves two documents in the book to cancel a
+     * sale nobody ever made.
+     *
+     * ONLY THE LAST ONE, AND THAT IS NOT A CONVENIENCE. `invoiceEvents` is a
+     * chain: each entry hashes the one before it (VFU-01). Removing an entry
+     * from the middle invalidates every hash after it, and a ledger that can
+     * no longer be re-checked is worse than one carrying a cancelled invoice.
+     * The last entry is the only one nothing has been built on yet, so it is
+     * the only one that can leave without taking the chain's evidence with it.
+     * The same goes for the series: taking back any number but the highest
+     * would open the gap that gapless numbering exists to prevent.
+     *
+     * Every other code below asks what `billDeleteBlock` asks on the supplier
+     * side — has anybody outside this screen acted on it yet? Once they have,
+     * it is their record too, and the remedy is the rectificativa the document
+     * itself names.
+     */
+    invoiceUndoBlock(id) {
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (!inv) throw new Error("Invoice not found");
+      const ev = this.state.invoiceEvents || [];
+      const last = ev.length ? ev[ev.length - 1] : null;
+      if (!last || last.number !== inv.number) return "not-last";
+      const series = (this.state.series || {})[
+        inv.kind === "creditNote" ? "creditNote" : "invoice"
+      ];
+      const issued = (series && series.issued) || [];
+      if (issued[issued.length - 1] !== inv.number) return "not-last";
+      if (this.state.invoices.some((x) => x.rectifies === inv.id)) return "rectified";
+      const collected = (this.state.collections || []).some((c) =>
+        (c.allocations || []).some((a) => a.invoiceId === inv.id && a.amountCents > 0),
+      );
+      if (collected) return "collected";
+      /* SENT IS NOT A FLAG ON THE INVOICE — there is no such field, and adding
+         one would be a second account of something the queue already records.
+         A message whose subject is this number and whose status is `sent` IS
+         the evidence that it left. A draft or an approved-but-unsent message
+         is not: those are preparations, and a preparation is allowed to be
+         thrown away with the thing it was preparing. */
+      const wentOut = (this.state.commsQueue || []).some(
+        (q) => q.subjectRef === inv.number && q.status === "sent",
+      );
+      if (wentOut) return "sent";
+      if ((this.state.packagesSent || []).some((p) => p.quarter === quarterOf(inv.date)))
+        return "quarter-sent";
+      return null;
+    }
+
+    /**
+     * Withdraw that invoice and give its number back to the series.
+     *
+     * The exact inverse of what `issueInvoice` did, in the reverse order, so
+     * nothing is left pointing at a record that no longer exists: the chained
+     * event, the series counter, the change marked billed and the contract
+     * instalment marked invoiced all go back to what they were. The audit log
+     * is the one thing that does NOT go back — a number was minted and
+     * withdrawn, and that is a fact about the book which has to remain
+     * readable afterwards, or this becomes a way to make history quietly.
+     */
+    undoLastInvoice(id, user, reason) {
+      const block = this.invoiceUndoBlock(id);
+      if (block) throw new Error("This invoice cannot be withdrawn: " + block);
+      const inv = this.state.invoices.find((x) => x.id === id);
+      const type = inv.kind === "creditNote" ? "creditNote" : "invoice";
+      const s = this.ensureSeries(type);
+      /* The year the number was MINTED in, read off the invoice rather than
+         re-parsed out of the string: `nextNumber` used `today`, which is this
+         invoice's own date, and a pattern edited since would make the string
+         unreadable while the date stays true. */
+      const year = String(inv.date).slice(0, 4);
+      s.issued.pop();
+      // `nextNumber` always advanced `next` by one, and `byYear` as well when
+      // the series restarts each January. Both come back by one.
+      if (s.resetYearly && s.byYear && s.byYear[year] != null) s.byYear[year] -= 1;
+      s.next = Math.max(1, (s.next || 1) - 1);
+      this.state.invoiceEvents.pop();
+      if (inv.changeId) {
+        const ch = this.state.changes.find((x) => x.id === inv.changeId);
+        if (ch && ch.invoiceId === inv.id) {
+          ch.status = "approved";
+          ch.invoiceId = null;
+        }
+      }
+      if (inv.installmentIdx != null) {
+        for (const c of this.state.contracts || []) {
+          const i = (c.installments || [])[inv.installmentIdx];
+          if (i && i.invoicedInvoiceId === inv.id) {
+            i.status = "pending";
+            i.invoicedInvoiceId = null;
+          }
+        }
+      }
+      this.state.invoices = this.state.invoices.filter((x) => x.id !== inv.id);
+      this._log(user, "undoLastInvoice", inv.number + " " + (reason || ""));
+      return inv.number;
+    }
+
     invoiceOutstandingCents(invId) {
       // AR-08
       const inv = this.state.invoices.find((i) => i.id === invId);
