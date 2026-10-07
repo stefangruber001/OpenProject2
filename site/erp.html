@@ -19224,6 +19224,7 @@
        */
       const VAT_ROW_O = '<div class="row"><span>IVA ';
       const VAT_SEL_O = '<select id="bVat" style="margin-left:4px">';
+      const INV_VAT_SEL_O = '<select id="inv_vat">';
       const VAT_SEL_C = "</select>";
       const VAT_MID = "</span><b>";
       const VAT_ROW_C = "</b></div>";
@@ -19233,27 +19234,54 @@
       const VAT_OPT_M = '">';
       const VAT_OPT_C = "</option>";
 
+      /**
+       * The legal rates, as options, in basis points.
+       *
+       * ONE LIST, TWO SCREENS. The quote picked from `LISTS.vatRates` and the
+       * invoice did not — it had a free number field, and `Math.round(value *
+       * 100)` wrote whatever was typed. That is how a real invoice went out at
+       * 21.01 %: base 365,00 and IVA 76,69, where 21 % of 365,00 is 76,65. Four
+       * cents, a tax rate that does not exist in Spain, and a document the
+       * gestoría would send straight back. Nothing in the product said no.
+       *
+       * WHATEVER IS STORED STAYS SELECTABLE, even when it is not a legal rate.
+       * A document already carrying 21.01 % must still render as itself — the
+       * picker is here to stop the NEXT wrong rate being chosen, not to rewrite
+       * a figure somebody already printed and may have to explain. The same
+       * courtesy the quote's selector has extended since it shipped.
+       */
+      function vatOptions(bp) {
+        const rates = (ErpEngine.LISTS.vatRates || []).slice();
+        /* Only a real number earns a place beside the legal ones. A missing
+           rate used to render as NaN in a text box, which looked broken and was
+           harmless; as an option it would be a selectable `undefined` that the
+           next change writes onto an invoice. A tax field is the last place to
+           carry a value nobody chose. */
+        if (Number.isFinite(bp) && rates.indexOf(bp) < 0) rates.push(bp);
+        rates.sort((x, y) => y - x);
+        return rates
+          .map(
+            (r) =>
+              VAT_OPT_O + r + (r === bp ? VAT_OPT_SEL : VAT_OPT_M) + r / 100 + VAT_PCT + VAT_OPT_C,
+          )
+          .join("");
+      }
+
       function vatRow(b, id, vsel, t) {
         const v = erp.version(id, vsel) || {};
         const editable =
           vsel === b.currentVersionId && !v.frozen && !v.issued && b.acceptedVersionId !== v.id;
         if (!editable)
           return VAT_ROW_O + t.vatBp / 100 + VAT_PCT + VAT_MID + eur(t.vatCents) + VAT_ROW_C;
-        const rates = (ErpEngine.LISTS.vatRates || []).slice();
-        if (rates.indexOf(t.vatBp) < 0) rates.push(t.vatBp);
-        rates.sort((x, y) => y - x);
-        const opts = rates
-          .map(
-            (bp) =>
-              VAT_OPT_O +
-              bp +
-              (bp === t.vatBp ? VAT_OPT_SEL : VAT_OPT_M) +
-              bp / 100 +
-              VAT_PCT +
-              VAT_OPT_C,
-          )
-          .join("");
-        return VAT_ROW_O + VAT_SEL_O + opts + VAT_SEL_C + VAT_MID + eur(t.vatCents) + VAT_ROW_C;
+        return (
+          VAT_ROW_O +
+          VAT_SEL_O +
+          vatOptions(t.vatBp) +
+          VAT_SEL_C +
+          VAT_MID +
+          eur(t.vatCents) +
+          VAT_ROW_C
+        );
       }
 
       function builderTotalsPanel(b, id, vsel, t) {
@@ -32299,7 +32327,7 @@
            <div class="field"><label>Tipo</label><select id="inv_kind"${w.basis === "credit" ? " disabled" : ""}>
             ${INV_KINDS.map(([k, l]) => `<option value="${k}"${w.kind === k ? " selected" : ""}>${l}</option>`).join("")}
            </select></div>
-           <div class="field"><label>IVA (%)</label><input id="inv_vat" type="number" step="0.1" value="${((w.vatBp != null ? w.vatBp : p.vatBp) / 100).toFixed(1)}"></div>
+           <div class="field"><label>IVA (%)</label>${INV_VAT_SEL_O}${vatOptions(w.vatBp != null ? w.vatBp : p.vatBp)}${VAT_SEL_C}</div>
            <div class="field"><label>Retención IRPF (%)</label><input id="inv_irpf" type="number" step="0.1" value="${(w.irpfBp / 100).toFixed(1)}"></div>
            <div class="field"><label>Idioma del documento</label><select id="inv_lang">
             ${[
@@ -32378,8 +32406,10 @@
           w.kind = e.target.value;
           invSync();
         };
-        $("#inv_vat").oninput = (e) => {
-          w.vatBp = Math.round(+e.target.value * 100) || 0;
+        // A picker carries basis points already — the old field held a
+        // percentage and multiplied by a hundred, which is where 21.01 came in.
+        $("#inv_vat").onchange = (e) => {
+          w.vatBp = +e.target.value;
           invSync();
         };
         $("#inv_irpf").oninput = (e) => {

@@ -9290,6 +9290,36 @@ async function testInvoiceGenerator(browser, base) {
       );
     else bad("ADM-01: generator screen", JSON.stringify(screen));
 
+    /* ---- the IVA field offers the legal rates and nothing else -------------
+     *
+     * A real invoice went out at 21.01 % — base 365,00, IVA 76,69, where 21 %
+     * of 365,00 is 76,65 — because this field was a free number box and
+     * `Math.round(value * 100)` wrote whatever was typed. Four cents, and a tax
+     * rate that does not exist in Spain, on a document the gestoría reads.
+     *
+     * The assertion is the TAG as much as the values: a select that happens to
+     * list the right rates today would still be a text box tomorrow if somebody
+     * changed it back, and the failure would be invisible until an invoice went
+     * out wrong again. */
+    const vatField = await pg.evaluate(() => {
+      const el = document.querySelector("#inv_vat");
+      if (!el) return null;
+      return {
+        tag: el.tagName,
+        values: [...(el.options || [])].map((o) => o.value),
+        selected: el.value,
+      };
+    });
+    const LEGAL = ["2100", "1000", "500", "0"];
+    if (
+      vatField &&
+      vatField.tag === "SELECT" &&
+      vatField.values.length &&
+      vatField.values.every((v) => LEGAL.includes(v))
+    )
+      ok(`the IVA field offers only the legal rates (${vatField.values.join(", ")} bp)`);
+    else bad("the IVA field is a picker of legal rates", JSON.stringify(vatField));
+
     /* Certification: the shape a certificación has on paper — executed by
        chapter, LESS what was already certified. The subtraction is a visible
        line, not a quietly reduced total.
