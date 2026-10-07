@@ -240,3 +240,38 @@ review than a template.
   reconcile and no renumbering of existing documents. The setting can be
   changed before the first invoice at no cost.
   **legally_verified: false.**
+
+## 11. Withdrawing an invoice that was issued and never sent (session 82)
+
+- **What happened.** The client issued their first real invoice before the
+  numbering had been configured, so it came out `FAC-2026-0001` when their book
+  continues at 57. They did not send it — «no la mandes porfavor» — and asked
+  whether they could go back, set the correlativo, and issue it again.
+- **What the product said until now.** Nothing could be undone. An issued
+  invoice is immutable and prints that claim on its own face: «las correcciones
+  se emiten como factura rectificativa; esta factura es inmutable». The only
+  remedy was a rectificativa, which for a document that reached nobody puts two
+  entries in the book to cancel a sale that never happened.
+- **What was built, and how narrow it is.** `undoLastInvoice` withdraws an
+  invoice and returns its number to the series. It refuses unless the invoice
+  is the MOST RECENT one — `invoiceEvents` is a hash chain (VFU-01) and only
+  the last entry can be removed while leaving every remaining hash verifiable,
+  and only the highest number can be returned without opening a gap in a
+  gapless series. It refuses besides if a collection is applied, if a
+  rectificativa references it, if a message carrying its number is recorded as
+  **sent**, or if its quarter has already gone to the gestoría. The audit log
+  entry — with the operator's stated reason — is deliberately NOT undone.
+- **NOT VERIFIED HERE.** No source was read on whether an invoice that was
+  generated but never delivered counts as _expedida_ for the purposes of
+  art. 6 RD 1619/2012 and the duty to preserve it. The argument for allowing
+  this is that nothing was issued to anybody and nothing entered the VAT books;
+  the argument against is that the number was minted and the document existed.
+  This entry does not settle that, and like §10 it cites no sources because
+  none were consulted.
+- **The question for the gestoría**, in one line: _is withdrawing an invoice
+  that was never sent acceptable as a normal correction, or only as a one-off
+  for this first mis-numbered document — and in the latter case should the
+  feature be removed once used?_
+- **What is NOT at stake:** anything already sent, collected, rectified or
+  filed is refused by name, so the hole cannot reach a document anybody else
+  holds. **legally_verified: false.**

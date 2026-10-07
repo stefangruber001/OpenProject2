@@ -4318,3 +4318,43 @@ nuevas de diccionario por debajo.
 sin haber ejecutado nunca este gate de ~18 minutos, y dije que avisaría de
 cualquier rojo y no miré. El gate estaba roto, pero eso no lo sabía cuando lo
 dije.
+
+## S44 · La primera factura real, y las cuatro cosas que enseñó (2026-10-07)
+
+El cliente emitió su primera factura de verdad y mandó cuatro comentarios por
+WhatsApp. Tres eran suyos; el cuarto lo encontró el PDF.
+
+**Salió FAC-2026-0001 cuando su libro va por la 57.** La numeración conserva el
+comportamiento antiguo hasta que alguien la configura — eso es deliberado, un
+cambio en cómo se numera no puede alcanzar un libro hacia atrás— pero EL
+PRODUCTO NO PIDIÓ NADA. Lo avisé dos veces por chat y el aviso no estaba donde
+tenía que estar, que es la pantalla. Eso es el defecto, no el despiste.
+
+**El nombre de contacto entre el NIF y la dirección.** «Ainhoa / Ivan» en el
+bloque del destinatario de una factura se lee como parte de la identidad fiscal.
+`parties()` reparte el mismo par de bloques a los veinte documentos, así que
+estaba en todos; ahora los dos fiscales lo piden sin él y el presupuesto y el
+contrato lo conservan, que es para lo que se pidió el 28/08.
+
+**Un proveedor que además es cliente.** No hacía falta tocar el modelo: `roles`
+siempre ha sido una lista y la pantalla de edición del tercero ya tiene sus
+casillas. Lo que falla es que no se encuentra: el selector de cliente no enseña
+nada y tampoco explica por qué. Queda pendiente ofrecer todos los terceros
+cuando ninguno encaja y conceder el rol ahí mismo.
+
+**Y el que no venía en la lista: IVA 21.01 %.** Base 365,00 → 76,69, cuando el
+21 % de 365,00 son 76,65. No es un adorno de impresión: `vatCents` sale de
+`base × vatBp / 10000`, así que el tipo guardado era de verdad 2101. El campo
+«IVA (%)» es un número libre y nada lo contrasta con los tipos legales. El
+cliente ya ha puesto el 21 % por defecto, pero el campo sigue aceptando
+cualquier cosa — pendiente.
+
+**Y lo que pidieron al final: volver atrás con una factura que no se envió.**
+Hasta ahora no se podía, y el documento lo dice de sí mismo. Se puede desde hoy,
+sólo con la MÁS RECIENTE y sólo mientras no le haya pasado nada, porque
+`invoiceEvents` es una cadena y la última entrada es la única que puede irse
+dejando el libro verificable. El registro de auditoría no se deshace. Pendiente
+de la gestoría en LEGAL_REVIEW §11.
+
+Puertas: numeración 29/29 (eran 16) · doc-docx 130/130 (eran 124) · CI y suite
+completa de navegador verdes sobre b3b4d14.

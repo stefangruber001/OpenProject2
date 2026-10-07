@@ -11669,3 +11669,43 @@ el recorrido (el reloj se puede clavar desde Playwright antes de cargar la
 página), y UNA VEZ que dos ejecuciones en días distintos den el mismo número,
 bajar el techo a ese número. En ese orden; bajarlo antes es ponerle una trampa al
 que venga.
+
+## S150 · Sólo la última factura, y la cadena lo decide por nosotros (2026-10-07)
+
+Al cliente le hacía falta deshacer una factura mal numerada que no se había
+enviado. Tres salidas: no permitirlo nunca (rectificativa, dos documentos para
+anular una venta que no existió), permitirlo con un aviso, o permitirlo sólo
+donde se pueda demostrar que no se rompe nada.
+
+**Decisión: la tercera, y el límite no lo puse yo.** `invoiceEvents` encadena
+cada entrada con el resumen de la anterior; quitar una del medio invalida todas
+las posteriores. La última es la única sobre la que no se ha construido nada
+todavía, así que es la única que puede irse dejando el libro verificable. La
+serie dice lo mismo por su lado: devolver cualquier número que no sea el más
+alto abre el hueco que la numeración correlativa existe para impedir. Dos
+estructuras independientes señalan el mismo sitio, y ahí está el candado.
+
+Los demás candados son de otra naturaleza —cobro aplicado, rectificativa que la
+referencia, mensaje ENVIADO, trimestre ya remitido al asesor— y todos preguntan
+lo mismo: ¿la tiene alguien más? Un borrador preparado y no enviado no cuenta,
+porque una preparación se tira con lo que preparaba.
+
+**Lo que NO se deshace: el registro de auditoría.** Un número acuñado y retirado
+tiene que seguir siendo explicable, con el motivo que tecleó quien lo hizo. Sin
+esa línea esto sería una forma de reescribir el libro sin que se note, que es
+exactamente lo que la inmutabilidad existe para evitar.
+
+Reversible: son dos métodos y un botón. Si la gestoría dice que no (LEGAL_REVIEW
+§11), se quitan sin tocar nada más — ningún dato cambia de forma por existir.
+
+## S151 · El indicador, no el rótulo (2026-10-07)
+
+La línea de persona de contacto sale de la factura y de la rectificativa, y se
+queda en el presupuesto y el contrato. Los dos documentos fiscales rotulan ese
+bloque «Destinatario», así que leer el rótulo habría bastado como prueba.
+
+**Decisión: un indicador explícito en la llamada.** El rótulo es texto que se
+muestra, y se traduce; una regla escrita contra texto que se muestra funciona
+hasta el día que alguien lo cambia, y entonces falla en silencio y en la única
+parte del producto donde un fallo silencioso es una factura mal emitida. Quien
+pide el bloque dice lo que ES; el rótulo sólo dice cómo se llama.
