@@ -1298,6 +1298,60 @@ throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws
   );
 }
 
+/* ---------------- v26 · the customers' payment terms ----------------
+ *
+ * «A 30 DÍAS NO TRABAJAMOS» (8 Oct). Thirty was never chosen: no screen showed
+ * a customer's payment terms until the commit that carries migration 26, so a
+ * thirty in a stored blob could only be the one `addParty` stamped.
+ *
+ * The checks that matter are the ones about what it LEAVES ALONE. The same
+ * field decides when the company OWES money (AP-05 dates a supplier's bill by
+ * it), so pulling a supplier to three days would move every payable and every
+ * cash-flow figure — from a request that was only ever about money coming in.
+ */
+{
+  const blob = () => ({
+    schemaVersion: 25,
+    config: { paymentTermsDays: 3 },
+    parties: [
+      { id: "a", roles: ["customer"], paymentTermsDays: 30 },
+      { id: "b", roles: ["customer"], paymentTermsDays: 60 },
+      { id: "c", roles: ["supplier"], paymentTermsDays: 30 },
+      { id: "d", roles: ["customer", "supplier"], paymentTermsDays: 30 },
+      { id: "e", roles: ["subcontractor"], paymentTermsDays: 30 },
+    ],
+  });
+  const by = (st) => Object.fromEntries(st.parties.map((p) => [p.id, p.paymentTermsDays]));
+  const once = M.migrate(blob());
+  const t = by(once.state);
+  assert(t.a === 3, "v26: a customer on the old thirty follows the company", t.a);
+  assert(t.b === 60, "v26: a customer with terms of their own keeps them", t.b);
+  assert(t.c === 30, "v26: a supplier is not touched — it is when WE pay", t.c);
+  assert(t.d === 30, "v26: somebody filed as both keeps what they have", t.d);
+  assert(t.e === 30, "v26: a subcontractor is not touched either", t.e);
+
+  const twice = by(M.migrate(once.state).state);
+  assert(
+    JSON.stringify(twice) === JSON.stringify(t),
+    "v26: running it twice equals running it once",
+  );
+
+  // A company that really does work at thirty must come out unchanged.
+  const stays = blob();
+  stays.config.paymentTermsDays = 30;
+  assert(
+    by(M.migrate(stays).state).a === 30,
+    "v26: no-op when the company default is itself thirty",
+  );
+  // And with no company figure at all there is nothing to follow.
+  const noCfg = blob();
+  delete noCfg.config;
+  assert(
+    by(M.migrate(noCfg).state).a === 30,
+    "v26: a blob with no company default is left exactly as it is",
+  );
+}
+
 /* ---------------- report ---------------- */
 const failed = checks.filter((c) => !c.pass);
 console.log(`\n──── schema migration simulation ────`);
