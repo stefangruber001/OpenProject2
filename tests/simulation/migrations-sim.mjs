@@ -1327,7 +1327,12 @@ throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws
   assert(t.a === 3, "v26: a customer on the old thirty follows the company", t.a);
   assert(t.b === 60, "v26: a customer with terms of their own keeps them", t.b);
   assert(t.c === 30, "v26: a supplier is not touched — it is when WE pay", t.c);
-  assert(t.d === 30, "v26: somebody filed as both keeps what they have", t.d);
+  /* v26 ALONE leaves somebody filed as both untouched — it had no way to move
+     one direction without moving the other. The ladder does not stop at 26
+     though, and v27 separates the two figures and then finishes the job, so
+     what a full climb produces here is the customer side on three. The buy
+     side, which is the one that mattered, is asserted in the v27 block. */
+  assert(t.d === 3, "v26+v27: somebody filed as both ends up on the company's three", t.d);
   assert(t.e === 30, "v26: a subcontractor is not touched either", t.e);
 
   const twice = by(M.migrate(once.state).state);
@@ -1349,6 +1354,58 @@ throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws
   assert(
     by(M.migrate(noCfg).state).a === 30,
     "v26: a blob with no company default is left exactly as it is",
+  );
+}
+
+/* ---------------- v27 · the two payment terms come apart ----------------
+ *
+ * One field answered two questions: how long a CUSTOMER has to pay us, and how
+ * long a SUPPLIER gives us to pay them. v26 had to step around the collision —
+ * anybody filed as both was left alone, because either direction came out
+ * wrong. This step separates them, and the ORDER is the safety argument: the
+ * purchase side is frozen from today's value first, so every existing bill
+ * keeps the due date it already had, and only then may the customer side move.
+ */
+{
+  const mk = () => ({
+    schemaVersion: 25,
+    config: { paymentTermsDays: 3 },
+    parties: [
+      { id: "a", roles: ["customer"], paymentTermsDays: 30 },
+      { id: "b", roles: ["customer"], paymentTermsDays: 60 },
+      { id: "c", roles: ["supplier"], paymentTermsDays: 30 },
+      { id: "d", roles: ["customer", "supplier"], paymentTermsDays: 30 },
+      { id: "e", roles: ["supplier"], paymentTermsDays: 60 },
+      { id: "f", roles: ["subcontractor"], paymentTermsDays: 45 },
+    ],
+  });
+  const got = M.migrate(mk()).state;
+  const sale = Object.fromEntries(got.parties.map((p) => [p.id, p.paymentTermsDays]));
+  const buy = Object.fromEntries(got.parties.map((p) => [p.id, p.supplierTermsDays]));
+
+  // The case v26 could not touch, now answered in both directions at once.
+  assert(sale.d === 3, "v27: a customer-and-supplier pays US on the company's three", sale.d);
+  assert(buy.d === 30, "v27: …while WE still pay THEM at thirty", buy.d);
+
+  // Every supplier keeps the terms their bills are already dated by.
+  assert(
+    buy.c === 30 && buy.e === 60 && buy.f === 45,
+    "v27: suppliers keep their own terms",
+    JSON.stringify(buy),
+  );
+  // A customer who never sells to us starts a hypothetical supplier life on the
+  // ordinary thirty, NOT on the three days they were just migrated to.
+  assert(
+    buy.a === 30 && buy.b === 30,
+    "v27: a non-supplier is not armed with three-day terms",
+    JSON.stringify([buy.a, buy.b]),
+  );
+  assert(sale.b === 60, "v27: a customer with terms of their own still keeps them", sale.b);
+
+  const twice = M.migrate(got).state;
+  assert(
+    JSON.stringify(twice.parties) === JSON.stringify(got.parties),
+    "v27: running it twice equals running it once",
   );
 }
 

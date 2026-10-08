@@ -5227,6 +5227,8 @@ window.CANEI_DICT.ca = {
   "Ya tiene una rectificativa que la referencia.": "Ja té una rectificativa que la referencia.",
   "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.":
     "El seu trimestre ja s'ha enviat a l'assessor. Emeteu una rectificativa al seu lloc.",
+  "Plazo de pago del cliente (días)": "Termini de pagament del client (dies)",
+  "Plazo que nos da el proveedor (días)": "Termini que ens dóna el proveïdor (dies)",
 };
 window.CANEI_DICT.rxEs2Ca = [
   /* See the note on the English side. Origen and Alta are the Catalan words

@@ -65,6 +65,17 @@
   };
   const quarterOf = (isoDate) =>
     isoDate.slice(0, 4) + "-Q" + (Math.floor((+isoDate.slice(5, 7) - 1) / 3) + 1);
+  /**
+   * How long THIS supplier gives US to pay — the purchase side, never the sale.
+   *
+   * Falls back to the old shared field and then to thirty, so a blob that has
+   * not climbed to v27 yet dates its bills exactly as it did before. One
+   * function because two readers ask the same question — the bill's due date
+   * and the purchase order's printed terms — and two copies of a fallback
+   * chain is how they come to disagree.
+   */
+  const supplierTermsOf = (p) =>
+    (p && (p.supplierTermsDays != null ? p.supplierTermsDays : p.paymentTermsDays)) || 30;
   // First day of the calendar month containing dateIso, and the month after it.
   // The forecast grid buckets by month as well as by week, and a month is the
   // one bucket whose length is not a constant.
@@ -2531,13 +2542,22 @@
           // only way to re-match it against a future re-upload (gap 4)
           createdAt: this.state.today, // MDM-01: when this record entered the file
           paymentMethod: "transfer",
-          /* The company default, repeated here rather than left blank: every
-             reader does `payer || party || config`, so a party carrying nothing
-             would fall through to the company setting — which is right — but
+          /* TWO DIRECTIONS, TWO FIGURES, and they are not the same question.
+             `paymentTermsDays` is what WE give THEM — how long a customer has
+             to pay us — and the client works at three days. `supplierTermsDays`
+             is what THEY give US, which is their commercial decision and
+             normally thirty; shortening it would only make the company's own
+             payables fall due sooner and move every cash-flow figure.
+
+             One field served both until the day a party filed as customer AND
+             supplier made the ambiguity impossible to ignore: whichever way you
+             moved it, one of the two directions was wrong.
+
+             Both stay NUMBERS rather than a blank meaning «follow the company»:
              `erp-history` does arithmetic straight off the party, and a null
-             there silently becomes a due date of today. A number keeps every
-             path honest; the customer's own figure overrides it. */
+             there silently becomes a due date of today. */
           paymentTermsDays: 3,
+          supplierTermsDays: 30,
           vatRegime: "standard",
           irpfApplies: false,
           irpfRateBp: 0, // MDM-07
@@ -8194,8 +8214,7 @@
           supplierId: b.supplierId,
           number: b.number,
           date: b.date || this.state.today,
-          dueDate:
-            b.dueDate || addDays(b.date || this.state.today, supplier.paymentTermsDays || 30), // AP-05
+          dueDate: b.dueDate || addDays(b.date || this.state.today, supplierTermsOf(supplier)), // AP-05
           baseCents,
           vatBp: b.vatBp != null ? b.vatBp : 2100,
           vatCents,

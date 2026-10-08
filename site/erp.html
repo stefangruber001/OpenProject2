@@ -28504,7 +28504,8 @@
            )
            .join("")}</select></div>
          <div class="field"><label>IRPF % (si aplica) <span class="pill y">A revisar</span></label><input id="e_irpfr" type="number" min="0" max="47" step="0.5" value="${(p.irpfRateBp || 0) / 100}"></div>
-         <div class="field"><label>Plazo de pago (días)</label><input id="e_terms" type="number" min="0" max="180" step="1" value="${p.paymentTermsDays != null ? p.paymentTermsDays : erp.companyProfile().paymentTermsDays}"></div>
+         <div class="field"><label>Plazo de pago del cliente (días)</label><input id="e_terms" type="number" min="0" max="180" step="1" value="${p.paymentTermsDays != null ? p.paymentTermsDays : erp.companyProfile().paymentTermsDays}"></div>
+         <div class="field"><label>Plazo que nos da el proveedor (días)</label><input id="e_supterms" type="number" min="0" max="180" step="1" value="${p.supplierTermsDays != null ? p.supplierTermsDays : 30}"></div>
          <div class="field full" style="font-size:11.5px;color:var(--muted);margin-top:-2px">
            La retención de IRPF depende del perfil del tercero (profesional, empresarial o módulos) y no está confirmada.
            Se conserva tal cual hasta que la gestoría la revise — ver <b>LEGAL_REVIEW.md §3</b>.</div>
@@ -28599,6 +28600,14 @@
                 $("#e_terms").value.trim() === "" || !($("#e_terms").value >= 0)
                   ? erp.companyProfile().paymentTermsDays
                   : Math.round(+$("#e_terms").value),
+              /* The other direction, and a different number: what this supplier
+                 gives US. Blank falls back to thirty rather than to the company
+                 figure — the company's three days is what we GRANT, and reading
+                 it here would shorten our own payables by four weeks. */
+              supplierTermsDays:
+                $("#e_supterms").value.trim() === "" || !($("#e_supterms").value >= 0)
+                  ? 30
+                  : Math.round(+$("#e_supterms").value),
               notes: $("#e_notes").value.trim(),
             };
             // No #e_iban element exists when the field was masked — nothing to read,

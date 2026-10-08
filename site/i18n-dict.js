@@ -6633,6 +6633,8 @@ window.CANEI_DICT = {
       "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.",
       "Its quarter has already gone to the accountant. Issue a credit note instead.",
     ],
+    ["Plazo de pago del cliente (días)", "Customer payment terms (days)"],
+    ["Plazo que nos da el proveedor (días)", "Terms this supplier gives us (days)"],
   ],
   rxEs2En: [
     /* The customer and lead cards put the source and the date into ONE text

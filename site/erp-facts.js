@@ -514,6 +514,14 @@
       f.dates.issued = dmy(pu.date);
       f.taxRate = (pu.vatBp || 0) / 100;
       const supplier = erp.party(pu.supplierId);
+      // Mirrors the engine's own resolution so an unmigrated blob prints what
+      // its bills are actually dated by.
+      const supplierTerms =
+        (supplier &&
+          (supplier.supplierTermsDays != null
+            ? supplier.supplierTermsDays
+            : supplier.paymentTermsDays)) ||
+        0;
       f.purchase = {
         rows: [
           {
@@ -525,7 +533,12 @@
           },
         ],
         deliveryDate: dmy(pu.deliveredDate || pu.expectedArrival),
-        terms: supplier && supplier.paymentTermsDays ? supplier.paymentTermsDays + " dias" : "—",
+        /* The PURCHASE side: how long this supplier gives us. Same resolution
+           the bill's due date uses, and for the same reason — a purchase order
+           that prints terms the ledger does not date by is worse than one that
+           prints nothing. The customer-side `paymentTermsDays` is a different
+           number and does not belong on a document we send a supplier. */
+        terms: supplierTerms ? supplierTerms + " dias" : "—",
         window: "—",
         siteContact: "—",
       };
