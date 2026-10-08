@@ -9697,6 +9697,35 @@ async function testSmallFixes(browser, base) {
       ok("A9: drawer actions live in a pinned footer that never leaks between drawers");
     else bad("A9: drawer footer", JSON.stringify(a9));
 
+    /* ---- the customer's own payment terms reach the invoice ----------------
+     *
+     * «Normalmente dejamos un plazo de 3 días no más — a 30 días no
+     * trabajamos» (8 Oct). The engine has resolved `payer || party || config`
+     * since it was written, so the per-customer figure was always live — and
+     * no screen ever set it, so every customer sat on the thirty days
+     * `addParty` stamped on them.
+     *
+     * This covers the SCREEN half — that the box exists and what it saves
+     * reaches the customer record. That the saved figure then drives an
+     * invoice's due date is the engine's half, asserted in
+     * tests/numbering/run.mjs where an invoice can actually be issued. */
+    const terms = await pg.evaluate(async () => {
+      const pty = erp.state.parties.find((x) => x.roles.includes("customer"));
+      editPartyDrawer(pty.id);
+      const box = document.querySelector("#e_terms");
+      const before = box ? box.value : null;
+      if (box) {
+        box.value = "3";
+        document.querySelector("#dfoot #e_save").click();
+      }
+      await new Promise((r) => setTimeout(r, 400));
+      closeDrawer();
+      return { hadField: !!box, before, after: erp.party(pty.id).paymentTermsDays };
+    });
+    if (terms.hadField && terms.after === 3)
+      ok(`the customer carries their own payment terms (was ${terms.before}, saved 3)`);
+    else bad("per-customer payment terms save", JSON.stringify(terms));
+
     // A6 · a filtered builder announces the filter and clears it in one click
     const a6open = await pg.evaluate(() => {
       const b = erp.state.budgets.find((x) => erp.budgetStage(x) === "draft");

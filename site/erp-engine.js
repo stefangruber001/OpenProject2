@@ -959,7 +959,13 @@
          did before this record grew. --- */
       defaultVatBp: 1000,
       defaultIrpfBp: 0,
-      paymentTermsDays: 30,
+      /* THREE DAYS, not thirty. Asked for on 8 Oct, by the company that gets
+         paid: «normalmente dejamos un plazo de 3 días no más — a 30 días no
+         trabajamos». Thirty was this file's own invention and nobody had ever
+         chosen it. The number stays a SETTING, per company and per customer,
+         because a reformas SME billing a private client and one billing a
+         contractor do not work on the same terms. */
+      paymentTermsDays: 3,
       quoteValidityDays: 30,
       defaultLanguage: "es",
       latePaymentInterestPctYear: 8,
@@ -2525,7 +2531,13 @@
           // only way to re-match it against a future re-upload (gap 4)
           createdAt: this.state.today, // MDM-01: when this record entered the file
           paymentMethod: "transfer",
-          paymentTermsDays: 30,
+          /* The company default, repeated here rather than left blank: every
+             reader does `payer || party || config`, so a party carrying nothing
+             would fall through to the company setting — which is right — but
+             `erp-history` does arithmetic straight off the party, and a null
+             there silently becomes a due date of today. A number keeps every
+             path honest; the customer's own figure overrides it. */
+          paymentTermsDays: 3,
           vatRegime: "standard",
           irpfApplies: false,
           irpfRateBp: 0, // MDM-07

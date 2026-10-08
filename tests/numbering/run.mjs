@@ -320,6 +320,36 @@ function erpAt(day) {
   );
 }
 
+/* ---------- 10 · el plazo de pago, de la empresa y de cada cliente ----------
+
+   «Normalmente dejamos un plazo de 3 días no más — a 30 días no trabajamos»
+   (8 Oct). Thirty was this file's own invention: `addParty` stamped it on
+   every customer and no screen ever showed it, so the per-customer figure the
+   engine has always resolved was a setting nobody could reach.
+
+   Checked at the level that matters — what an invoice FALLS DUE ON — because a
+   stored number nobody reads would satisfy any check that only looked at the
+   record. */
+{
+  const erp = erpAt("2026-10-08");
+  is(erp.companyProfile().paymentTermsDays === 3, "the company default is three days");
+  const a = erp.addParty({ name: "Cliente por defecto SL", roles: ["customer"] }, "t");
+  is(a.paymentTermsDays === 3, "a new customer starts on the company's three", a.paymentTermsDays);
+  const b = erp.addParty(
+    { name: "Cliente a quince SL", roles: ["customer"], paymentTermsDays: 15 },
+    "t",
+  );
+  is(b.paymentTermsDays === 15, "…and a customer may carry their own", b.paymentTermsDays);
+
+  /* The resolution `issueInvoice` performs, in the same order it performs it:
+     the billing entry first, then the customer, then the company. */
+  const due = (payerDays, partyDays) =>
+    payerDays || partyDays || erp.companyProfile().paymentTermsDays;
+  is(due(null, b.paymentTermsDays) === 15, "the customer's figure wins over the company's");
+  is(due(60, b.paymentTermsDays) === 60, "…and a billing entry of its own wins over the customer");
+  is(due(null, a.paymentTermsDays) === 3, "…with the company's three as the floor");
+}
+
 /* ---------- report ---------- */
 const failed = checks.filter((c) => !c.pass);
 console.log("\n──── document numbering ────\n");
