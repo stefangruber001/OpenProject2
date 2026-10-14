@@ -513,6 +513,47 @@ function erpAt(day) {
     afterReopen.number === "51/26",
     "…and once the quarter is reopened, on the record, it goes in",
   );
+
+  /* AND THE PACKAGE CAN NAME THEM. Every total in the quarter counts a
+     recorded invoice without saying which one it is, so the screen asks for
+     them by name. Two filters, and the origin one needs something of the
+     other kind present to mean anything. */
+  erp.state.invoices.push({
+    id: "inv_gen",
+    origin: "generated",
+    number: "57/2026",
+    date: "2026-09-30",
+    partyId: pty.id,
+    projectId: prj.id,
+    baseCents: 100000,
+    vatBp: 2100,
+    vatCents: 21000,
+    irpfCents: 0,
+    totalCents: 121000,
+  });
+  is(
+    erp
+      .externalInvoicesIn("2026-Q3")
+      .map((i) => i.number)
+      .sort()
+      .join(",") === "51/26,53/26",
+    "the quarter names its recorded invoices",
+    erp
+      .externalInvoicesIn("2026-Q3")
+      .map((i) => i.number)
+      .join(","),
+  );
+  is(
+    erp.externalInvoicesIn("2026-Q3").every((i) => i.number !== "57/2026"),
+    "…and leaves out the one this system issued itself",
+  );
+  is(
+    erp
+      .externalInvoicesIn("2026-Q4")
+      .map((i) => i.number)
+      .join(",") === "52/26",
+    "…and does not reach into the quarter next door",
+  );
 }
 
 /* ---------- report ---------- */

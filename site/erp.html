@@ -25230,6 +25230,7 @@
             late = erp.lateDocuments(q),
             assets = erp.fixedAssetRegister(q);
           const sent = erp.state.packagesSent.filter((s) => s.quarter === q);
+          const extQ = erp.externalInvoicesIn(q);
           const queries = (erp.state.gestoriaQueries || []).filter((x) => x.quarter === q);
           const ready = open.length === 0;
           if (gesStep === 3 && !ready) gesStep = 2;
@@ -25267,6 +25268,7 @@
           <div class="counter"><div class="lab">IRPF retenido (111)</div><div class="val">${eur0(irpf.retainedCents)}</div><div class="sub">a autónomos y profesionales</div></div>
           <div class="counter${open.length ? " warn" : ""}" id="cExc"><div class="lab">Excepciones abiertas</div><div class="val">${open.length}</div><div class="sub">${exs.length - open.length} justificadas</div></div>
          </div>
+         ${extQ.length ? GES_EXT_O + extQ.map((i) => esc(i.number)).join(", ") + GES_EXT_C : ""}
          <div class="card"><div class="ch"><h3>Completitud del paquete</h3><span class="tag">${blocks.filter((b) => b.sev === "g").length}/${blocks.length} bloques en verde</span></div>
           <div style="padding:12px 14px"><div class="blocks">
           ${blocks
@@ -32687,6 +32689,16 @@
       const INV_WORD_BTN = '<button class="btn sm" id="iv_word">⤓ Word</button>';
       const INV_EXT_DEL =
         '<button class="btn sm danger" id="iv_extdel">Quitar el registro</button>';
+      /* The package counters fold a recorded invoice into the same figure as
+         the ones this system issued, so a quarter that contains one says so by
+         name. Split open/closed around the numbers for the same reason as the
+         pair below: the source audit reads the gap between one tag and the next
+         as a sentence, and each static phrase has to stay its own text node to
+         be a dictionary key. */
+      const GES_EXT_O =
+        '<div class="note" style="margin-bottom:12px"><b>Facturas anteriores a la plataforma en este trimestre</b><span style="margin:0 6px">';
+      const GES_EXT_C =
+        '</span><span>La gestoría puede tenerlas ya por otra vía: conviene preguntarle si deben ir en el paquete.</span></div>';
       const INV_EXT_WHY =
         '<div class="sub" style="margin-top:8px">Factura anterior a la plataforma: aquí queda registrada para que la obra tenga su historial, pero el documento es el que ya se emitió y no se reimprime desde aquí.</div>';
       const INV_UNDO_WHY_O = '<div class="sub" style="margin-top:8px">';

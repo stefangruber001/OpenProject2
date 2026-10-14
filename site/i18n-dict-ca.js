@@ -5236,6 +5236,10 @@ window.CANEI_DICT.ca = {
   "La factura deja de constar en la obra. El documento original no se toca: sigue emitido y en manos del cliente. No se puede deshacer.":
     "La factura deixa de constar a l'obra. El document original no es toca: segueix emès i en mans del client. No es pot desfer.",
   "Facturas anteriores a la plataforma": "Factures anteriors a la plataforma",
+  "Facturas anteriores a la plataforma en este trimestre":
+    "Factures anteriors a la plataforma en aquest trimestre",
+  "La gestoría puede tenerlas ya por otra vía: conviene preguntarle si deben ir en el paquete.":
+    "La gestoria pot tenir-les ja per una altra via: convé preguntar-li si han d'anar al paquet.",
   "Registrar factura anterior": "Registrar factura anterior",
   "Factura anterior registrada": "Factura anterior registrada",
   "Número, tal cual está en el papel": "Número, tal com surt al paper",

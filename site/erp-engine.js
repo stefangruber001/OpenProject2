@@ -11603,6 +11603,22 @@
       return { quarter, retainedCents: retained, sufferedCents: suffered };
     }
     /**
+     * The quarter's recorded invoices — the ones issued before this system.
+     *
+     * Every total in the package counts them without saying which they are.
+     * The itemised export does carry their numbers, so a reader working
+     * through the detail can recognise a paper they already hold; a reader
+     * working from the counters sees one figure and no way to tell that part
+     * of it came from somewhere else. Naming them decides nothing about
+     * whether they belong in the package, which is a question for the adviser
+     * rather than for code. It only stops the question being invisible.
+     */
+    externalInvoicesIn(quarter) {
+      return this.state.invoices.filter(
+        (i) => i.origin === "external" && quarterOf(i.date) === quarter,
+      );
+    }
+    /**
      * The quarter's deliberately-unbacked movements, WITH their reasons.
      *
      * Not an exception — an exception is something wrong, and these are the

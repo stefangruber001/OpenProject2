@@ -11758,3 +11758,30 @@ niega y nombra `reopenQuarter`, que deja el motivo en el registro. Lo
 que NO se ha decidido aquí es si el registro debe salir en el paquete
 del trimestre; ésa es la pregunta de LEGAL_REVIEW §12 y no se contesta
 con código.
+
+## S153 · Nombrar no es decidir, y un gate que varía solo (2026-10-14)
+
+**Decisión: la pantalla del paquete nombra las facturas anteriores a la
+plataforma, y no las excluye de nada.** Excluirlas del resumen de IVA
+habría sido elegir una respuesta a la pregunta de LEGAL_REVIEW §12 —si
+una factura emitida fuera del sistema debe viajar en el paquete— y
+elegirla en el lado peligroso: una venta real desaparecida de una
+declaración es peor que una venta contada dos veces, porque la segunda se
+ve y la primera no. Nombrarlas sirva la respuesta que sea.
+
+Reversible: un método de lectura y una fila en una pantalla. Si la
+gestoría dice que no deben ir en el paquete, el sitio donde filtrarlas ya
+está localizado y nombrado.
+
+**Y la medición del miss-crawl, por si vuelve a hacer caer el trunk.** El
+mismo gate, en inglés, dio 23 y 24 y 37 y 39 sobre árboles cuya única
+diferencia no la mira el crawler. La causa está a la vista en su propio
+diseño: pulsa controles y recorre rutas, así que lo que alcanza cambia de
+una pasada a otra, y el recuento con él. El techo de CI es 37.
+
+**Lo que NO se ha hecho con eso: subir el techo.** Un techo más alto
+esconde la deriva que el gate existe para ver, y el problema no es el
+número sino que no es reproducible. Atribuir un fallo suyo es posible y
+cuesta poco —`--json` vuelca la lista entera y se compara por nombre, que
+es como se descartó el 39 de hoy—, así que queda escrito aquí en vez de
+convertirse otra vez en una tarde de buscar a quién culpar.

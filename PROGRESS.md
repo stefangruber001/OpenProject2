@@ -4407,3 +4407,35 @@ migraciones 149/149 · year-sim 149/149 · manejabilidad 521/521 ·
 source-audit 158/158 en+ca · workspace-audit 0/0 · e2e del generador
 12/12 sin errores de consola · CI y suite completa de navegador verdes
 sobre f656c70.
+
+## S46 · El paquete dice cuáles son anteriores a la plataforma (2026-10-14)
+
+La factura registrada entra en el resumen de IVA del trimestre porque
+`vatSummary` selecciona por fecha y nada más. Eso es defendible —la venta
+existió y el IVA se debe lo imprimiera quien lo imprimiera— pero hasta
+hoy no se veía: el contador «Facturas emitidas» daba un número y un
+importe, sin modo de saber que parte venía de otro sitio.
+
+Lo que sí se comprobó antes de escribirlo: el detalle del paquete lleva
+`invoiceNumber`, así que la 53/26 aparece por su nombre y quien lea la
+lista puede reconocer un papel que ya tiene; y `docRef` va en null donde
+toda factura emitida por el sistema lleva uno. Lo que no iba etiquetado
+eran los totales. Así que `externalInvoicesIn(trimestre)` las nombra y la
+pantalla del paquete las lista cuando las hay, diciendo lo único que
+importa: la gestoría puede tenerlas ya por otra vía.
+
+**No decide nada.** Si esas facturas deben o no ir en el paquete es la
+pregunta de LEGAL_REVIEW §12, y no se contesta con código. Nombrarlas
+sólo impide que la pregunta sea invisible, que es lo que era esta mañana.
+
+**Y una medición que conviene tener escrita.** El miss-crawl en inglés
+dio 23, 24, 37 y 39 sobre árboles que no se diferencian en nada que el
+crawler mire —el techo de CI es 37—, así que ese gate puede ponerse rojo
+sin que nadie haya cambiado nada. El 39 de hoy se atribuyó volcando la
+lista completa con `--json`: ninguna de las 24 cadenas era de este
+cambio. Detalle en ASSUMPTIONS S153.
+
+Puertas: numeración 53/53 (eran 50) · suite completa de navegador
+**895/895 sin fallos** · boundaries OK · year-sim 149/149 ·
+migraciones 149/149 · manejabilidad 521/521 · source-audit 158/158 en+ca ·
+workspace-audit 0/0 en+ca · diccionario 4486 completo en tres idiomas.

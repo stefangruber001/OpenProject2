@@ -6648,6 +6648,14 @@ window.CANEI_DICT = {
     ],
     /* Recording an invoice issued before this system existed. */
     ["Facturas anteriores a la plataforma", "Invoices issued before this system"],
+    [
+      "Facturas anteriores a la plataforma en este trimestre",
+      "Invoices from before this system in this quarter",
+    ],
+    [
+      "La gestoría puede tenerlas ya por otra vía: conviene preguntarle si deben ir en el paquete.",
+      "The adviser may already hold them by another route: worth asking whether they belong in the package.",
+    ],
     ["Registrar factura anterior", "Record an earlier invoice"],
     ["Factura anterior registrada", "Earlier invoice recorded"],
     ["Número, tal cual está en el papel", "Number, exactly as the paper has it"],
