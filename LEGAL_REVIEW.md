@@ -322,9 +322,11 @@ review than a template.
   not check the period lock. An invoice dated inside a quarter already
   sent to the gestoría is accepted and changes that quarter's VAT
   summary with no warning, while withdrawing an issued invoice and both
-  purchase-side guards refuse the same quarter by name. This is being
-  fixed in the next unit; it is recorded here because the fix changes
-  what the gestoría could already have received.
+  purchase-side guards refuse the same quarter by name. This was closed
+  immediately after: recording now refuses and names `reopenQuarter`,
+  which leaves the reason on the record. It stays written down because
+  the window existed, and because reopening a filed quarter is itself a
+  thing the gestoría may want to hear about rather than discover.
 - **The questions for the gestoría**, in two lines: _does an invoice
   issued outside this system belong in this system's register at all,
   and if so must it be excluded from the quarterly VAT package you are

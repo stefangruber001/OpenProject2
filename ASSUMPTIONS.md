@@ -11752,5 +11752,9 @@ eso está; ningún dato de los demás cambia de forma por que esto exista.
 cierre del período. Una fecha de un trimestre ya remitido al asesor
 entra igual y le cambia el resumen de IVA sin avisar, cuando los demás
 candados de ese trimestre —deshacer una emitida, las dos del lado de
-compras— se niegan por nombre. Es inconsistencia del alta, no de la
-decisión de arriba, y se arregla en la siguiente unidad.
+compras— se niegan por nombre. Era inconsistencia del alta, no de la
+decisión de arriba, y quedó resuelta en el commit siguiente: el alta se
+niega y nombra `reopenQuarter`, que deja el motivo en el registro. Lo
+que NO se ha decidido aquí es si el registro debe salir en el paquete
+del trimestre; ésa es la pregunta de LEGAL_REVIEW §12 y no se contesta
+con código.

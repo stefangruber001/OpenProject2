@@ -4397,7 +4397,10 @@ el cierre del período. `invoiceUndoBlock` se niega con `quarter-sent` y
 los dos candados del lado de compras también, pero el registro no mira:
 una factura con fecha de un trimestre ya remitido al asesor le cambia el
 `vatSummary` sin avisar. Es la clase de defecto que el resto del código
-ya vigila, y es lo siguiente.
+ya vigila, y se cerró acto seguido: el alta se niega nombrando el
+trimestre, el que nadie ha presentado sigue aceptando, y `reopenQuarter`
+—que ya existía— es el remedio que la negativa nombra. Tres
+comprobaciones más, numeración 50/50.
 
 Puertas: numeración 47/47 (eran 35) · doc-docx 130/130 · doc-pdf 44/44 ·
 migraciones 149/149 · year-sim 149/149 · manejabilidad 521/521 ·
