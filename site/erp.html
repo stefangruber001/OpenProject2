@@ -24755,10 +24755,13 @@
           ).join("")}
          </div>
          <div id="invList"></div>
+         ${EXT_INV_ROW}
          <div class="card"><div class="ch"><h3>Recibos emitidos</h3><span class="tag">${erp.state.receipts.length}</span></div><div class="scroll"><table><tbody>
          ${erp.state.receipts.map((r) => `<tr><td class="k">${r.number}</td><td>${esc(erp.party(r.partyId).name)}</td><td class="num">${eur(r.amountCents)}</td><td>${r.method === "cash" ? "Efectivo" : "Transferencia"}</td><td>${fmtD(r.date)}</td></tr>`).join("") || '<tr><td><div class="empty">Sin recibos.</div></td></tr>'}
          </tbody></table></div></div>`;
 
+          const extAdd = $("#invExtAdd");
+          if (extAdd) extAdd.onclick = () => externalInvoiceDrawer();
           renderMasterList($("#invList"), {
             // PK6-A: this list was `noNew: true` — a register of invoices with
             // no way to write one. The engine could all along.
@@ -32135,6 +32138,84 @@
        * abono, are both things that happen after a job closes, and a register
        * that refuses to bill a closed job just sends somebody to reopen it.
        */
+      /* RECORDING A PRE-PLATFORM INVOICE — an entry point of its own, kept
+         well away from «＋ Nueva factura». The two look alike and do opposite
+         things: one mints a number and produces a document, the other records
+         a document that already exists and must never produce a second. Sharing
+         a screen between them is how somebody ends up issuing 59/2026 when they
+         meant to file 53/26.
+         Flat declarations: the source audit reads the gap between one tag and
+         the next as a sentence. */
+      const EXT_INV_ROW =
+        '<div class="card"><div class="ch"><h3>Facturas anteriores a la plataforma</h3></div><div class="daylist"><div class="it"><span>Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.</span><span style="flex:1"></span><button class="btn sm" id="invExtAdd">Registrar factura anterior</button></div></div></div>';
+
+      function externalInvoiceDrawer() {
+        const parties = erp.state.parties
+          .filter((x) => x.active && (x.roles || []).includes("customer"))
+          .slice()
+          .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        const projects = erp.state.projects
+          .slice()
+          .sort((a, b) => String(a.code || "").localeCompare(String(b.code || "")));
+        const db = openDrawer("Registrar factura anterior");
+        db.innerHTML = `
+         <div class="card"><div class="daylist"><div class="it"><span>El documento original no se toca: aquí sólo se anota lo que ya se emitió, con su número y su fecha.</span></div></div></div>
+         <div class="card"><div class="fgrid" style="padding:10px 12px 12px">
+          <div class="field"><label>Número, tal cual está en el papel</label><input id="xi_num" placeholder="53/26"></div>
+          <div class="field"><label>Fecha de emisión</label><input id="xi_date" type="date" max="${esc(erp.today)}"></div>
+          <div class="field"><label>Vencimiento</label><input id="xi_due" type="date"></div>
+          <div class="field full"><label>Cliente</label><select id="xi_party">${parties.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("")}</select></div>
+          <div class="field full"><label>Obra</label><select id="xi_proj">${projects.map((x) => `<option value="${esc(x.id)}">${esc(x.code)} · ${esc(x.name || "")}</option>`).join("")}</select></div>
+          <div class="field full"><label>Concepto</label><input id="xi_desc"></div>
+          <div class="field"><label>Base imponible (€)</label><input id="xi_base" type="number" step="0.01" min="0"></div>
+          <div class="field"><label>IVA (%)</label>${INV_VAT_SEL_O}${vatOptions(1000)}${VAT_SEL_C}</div>
+          <div class="field"><label>Cuota de IVA (€)</label><input id="xi_vat" type="number" step="0.01" min="0"></div>
+          <div class="field"><label>Retención IRPF (€)</label><input id="xi_irpf" type="number" step="0.01" min="0" value="0"></div>
+          <div class="field"><label>Total (€)</label><input id="xi_total" type="number" step="0.01" min="0"></div>
+          <div class="field full"><label>IBAN donde se cobró</label><input id="xi_iban" placeholder="ES.."></div>
+         </div></div>
+         <div class="card"><div class="daylist"><div class="it" id="xi_warn"><span></span></div></div></div>`;
+        drawerFoot('<button class="btn primary" id="xi_save">Registrar</button>');
+        /* The figures are SUGGESTED here and CHECKED by the engine. Typing the
+           base and picking the rate fills the cuota and the total, but both
+           stay editable: the paper is the authority, and a cent of rounding
+           somewhere else is not something this screen gets to overrule. */
+        const num = (id) => Math.round((+$(id).value || 0) * 100);
+        const recalc = () => {
+          const base = num("#xi_base");
+          const bp = +$("#inv_vat").value || 0;
+          $("#xi_vat").value = (Math.round((base * bp) / 10000) / 100).toFixed(2);
+          $("#xi_total").value = ((base + num("#xi_vat") - num("#xi_irpf")) / 100).toFixed(2);
+        };
+        $("#xi_base").oninput = recalc;
+        $("#inv_vat").onchange = recalc;
+        $("#xi_irpf").oninput = recalc;
+        $("#xi_save").onclick = async () => {
+          await mutateNow(() => {
+            erp.registerExternalInvoice(
+              {
+                number: $("#xi_num").value.trim(),
+                date: $("#xi_date").value,
+                dueDate: $("#xi_due").value || $("#xi_date").value,
+                partyId: $("#xi_party").value,
+                projectId: $("#xi_proj").value,
+                baseCents: num("#xi_base"),
+                vatBp: +$("#inv_vat").value || 0,
+                vatCents: num("#xi_vat"),
+                irpfCents: num("#xi_irpf"),
+                totalCents: num("#xi_total"),
+                iban: $("#xi_iban").value.trim(),
+                lines: $("#xi_desc").value.trim()
+                  ? [{ concept: $("#xi_desc").value.trim(), amountCents: num("#xi_base") }]
+                  : [],
+              },
+              "backoffice",
+            );
+            closeDrawer();
+          }, "Factura anterior registrada");
+        };
+      }
+
       function newInvoiceDrawer(preselect) {
         const projects = erp.state.projects
           .slice()
@@ -32594,6 +32675,20 @@
          Flat declarations: the source audit reads a gap between one tag and the
          next as a sentence, and these are assembled around values. */
       const INV_UNDO_BTN = '<button class="btn sm danger" id="iv_undo">Retirar la factura</button>';
+      /* A RECORDED INVOICE OFFERS NO DOCUMENT, and that is the single most
+         important thing on this screen. The customer is holding the original
+         and the gestoría has it; a second paper printed from here would carry
+         the layout of today, the IBAN of today and a number written another
+         way, and the two would disagree about one sale. So the buttons are not
+         disabled — they are not built.
+         (No apostrophes above: the source audit pairs them as quotes, which is
+         how a comment becomes a string it then asks somebody to translate.) */
+      const INV_PDF_BTN = '<button class="btn sm" id="iv_pdf">⤓ Descargar PDF</button>';
+      const INV_WORD_BTN = '<button class="btn sm" id="iv_word">⤓ Word</button>';
+      const INV_EXT_DEL =
+        '<button class="btn sm danger" id="iv_extdel">Quitar el registro</button>';
+      const INV_EXT_WHY =
+        '<div class="sub" style="margin-top:8px">Factura anterior a la plataforma: aquí queda registrada para que la obra tenga su historial, pero el documento es el que ya se emitió y no se reimprime desde aquí.</div>';
       const INV_UNDO_WHY_O = '<div class="sub" style="margin-top:8px">';
       const INV_UNDO_WHY_C = "</div>";
       const INV_UNDO_BLOCK = {
@@ -32606,10 +32701,15 @@
       function invoiceDrawer(number) {
         const inv = erp.state.invoices.find((i) => i.number === number);
         if (!inv) return;
-        const undoBlock = erp.invoiceUndoBlock(inv.id);
+        const isExt = inv.origin === "external";
+        const undoBlock = isExt ? null : erp.invoiceUndoBlock(inv.id);
         const out = erp.invoiceOutstandingCents(inv.id);
         const row = erp.invoiceRegister().find((r) => r.number === number) || { daysOverdue: 0 };
-        const p = erp.project(inv.projectId);
+        /* An invoice need not belong to a job, and until a recorded one could
+           be filed with none, nothing ever reached this line with a null — so
+           `project(null)` threw and took the whole drawer with it. A missing
+           job is a dash on one row, not a screen that will not open. */
+        const p = inv.projectId ? erp.project(inv.projectId) : null;
         const db = openDrawer(inv.number);
         db.innerHTML = `
          <div class="card"><div class="ch"><h3>${esc(erp.party(inv.partyId).name)}</h3>
@@ -32621,7 +32721,7 @@
                  : '<span class="pill y">Pendiente</span>'
            }</div>
           <div class="daylist">
-           <div class="it"><span>Obra</span><span style="flex:1"></span><b>${esc(p.code)}</b></div>
+           <div class="it"><span>Obra</span><span style="flex:1"></span><b>${p ? esc(p.code) : "—"}</b></div>
            <div class="it"><span>Fecha</span><span style="flex:1"></span><b>${fmtD(inv.date)}</b></div>
            <div class="it"><span>Vencimiento</span><span style="flex:1"></span><b>${fmtD(inv.dueDate)}</b></div>
            ${
@@ -32659,22 +32759,23 @@
              : ""
          }
          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn sm" id="iv_pdf">⤓ Descargar PDF</button>
-          <button class="btn sm" id="iv_word">⤓ Word</button>
-          ${inv.kind !== "creditNote" ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
-          ${undoBlock === "not-last" ? "" : INV_UNDO_BTN}
+          ${isExt ? "" : INV_PDF_BTN + INV_WORD_BTN}
+          ${inv.kind !== "creditNote" && !isExt ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
+          ${isExt ? INV_EXT_DEL : undoBlock === "not-last" ? "" : INV_UNDO_BTN}
          </div>
-         ${undoBlock && undoBlock !== "not-last" ? INV_UNDO_WHY_O + esc(INV_UNDO_BLOCK[undoBlock] || undoBlock) + INV_UNDO_WHY_C : ""}`;
-        $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
-        $("#iv_word").onclick = () => {
-          const d = erp.renderInvoiceDoc(inv.number);
-          downloadDocx(
-            d.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
-            { invoiceId: inv.number },
-            d.language,
-            inv.number + ".docx",
-          );
-        };
+         ${isExt ? INV_EXT_WHY : ""}
+         ${!isExt && undoBlock && undoBlock !== "not-last" ? INV_UNDO_WHY_O + esc(INV_UNDO_BLOCK[undoBlock] || undoBlock) + INV_UNDO_WHY_C : ""}`;
+        if (!isExt) $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
+        if (!isExt)
+          $("#iv_word").onclick = () => {
+            const d = erp.renderInvoiceDoc(inv.number);
+            downloadDocx(
+              d.docType === "FACTURA RECTIFICATIVA" ? "rectificativa" : "factura",
+              { invoiceId: inv.number },
+              d.language,
+              inv.number + ".docx",
+            );
+          };
 
         /* Part 2 · item 16 — the rectificativa was unfindable. The whole flow
            existed and `invOpen` even took a `rectifies` option, but NOTHING passed
@@ -32704,6 +32805,20 @@
            back, and the only trace left is the audit line — so that line has to
            say why, or the book has a number that was minted and withdrawn with
            nothing to explain it. */
+        const extDel = $("#iv_extdel");
+        if (extDel)
+          extDel.onclick = async () => {
+            const yes = await askConfirm("Quitar el registro", {
+              body: "La factura deja de constar en la obra. El documento original no se toca: sigue emitido y en manos del cliente. No se puede deshacer.",
+              okLabel: "Quitar",
+              danger: true,
+            });
+            if (!yes) return;
+            await mutateNow(() => {
+              erp.removeExternalInvoice(inv.id, "backoffice");
+              closeDrawer();
+            }, "Registro quitado");
+          };
         const undo = $("#iv_undo");
         if (undo && !undoBlock)
           undo.onclick = async () => {

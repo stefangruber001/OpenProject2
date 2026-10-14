@@ -350,6 +350,135 @@ function erpAt(day) {
   is(due(null, a.paymentTermsDays) === 3, "…with the company's three as the floor");
 }
 
+/* ---------- 11 · una factura anterior a la plataforma ----------
+
+   «El proyecto empezó antes de la plataforma» — la 53/26 de Isabel Margarit,
+   emitida el 14/09 desde la herramienta anterior. Se REGISTRA, no se emite: el
+   cliente ya tiene el papel y la gestoría lo tiene en sus libros.
+
+   Las comprobaciones que importan son las de lo que NO toca. Un número que se
+   cuela en la serie rompe el correlativo y hace que la auditoría reclame la
+   54, la 55 y la 56, que no faltan: viven donde vivía la 53 hasta hoy. */
+{
+  const erp = erpAt("2026-10-14");
+  erp.configureSeries(
+    "invoice",
+    { pattern: "{n}/{year}", pad: 0, resetYearly: false, next: 57 },
+    "t",
+  );
+  const mine = [erp.nextNumber("invoice"), erp.nextNumber("invoice")];
+  const pty = erp.addParty(
+    {
+      name: "Isabel Margarit Pelaez",
+      roles: ["customer"],
+      taxId: "37733490N",
+      billStreet: "Carrer de Rossello 340",
+      billPostalCode: "08025",
+      billCity: "Barcelona",
+      mobile: "600000000",
+      email: "i@example.invalid",
+    },
+    "t",
+  );
+  /* A job to hang it on. Pushed straight into state rather than built through
+     budget → contract → project: what is under test is the recording rules,
+     and the full chain would say nothing extra about them. */
+  const prj = { id: "prj_hist", code: "P-2026-0001", name: "Obra anterior", partyId: pty.id };
+  erp.state.projects.push(prj);
+  const ext = {
+    number: "53/26",
+    date: "2026-09-14",
+    dueDate: "2026-09-15",
+    partyId: pty.id,
+    projectId: prj.id,
+    baseCents: 842526,
+    vatBp: 1000,
+    vatCents: 84253,
+    irpfCents: 0,
+    totalCents: 926779,
+  };
+  const rec = erp.registerExternalInvoice(ext, "t");
+  is(rec.number === "53/26", "the number on the paper is the number kept", rec.number);
+  is(rec.date === "2026-09-14" && rec.dueDate === "2026-09-15", "…and so are its dates");
+  is(rec.origin === "external", "…marked as what it is");
+  is(rec.docRef === null, "…and it carries no document to print");
+
+  is(
+    erp.state.series.invoice.issued.join(",") === mine.join(","),
+    "the series is untouched — nothing was minted",
+    erp.state.series.invoice.issued.join(","),
+  );
+  is(
+    erp.seriesGaps("invoice").length === 0,
+    "…so the correlative audit reports no false gap at 54-56",
+    JSON.stringify(erp.seriesGaps("invoice")),
+  );
+  is(
+    (erp.state.invoiceEvents || []).every((e) => e.number !== "53/26"),
+    "…and it never joins the chain that attests what THIS system issued",
+  );
+
+  // The figures are checked, never recomputed: the paper is already in a book.
+  let threw = false;
+  try {
+    erp.registerExternalInvoice(
+      Object.assign({}, ext, { number: "54/26", totalCents: 900000 }),
+      "t",
+    );
+  } catch (e) {
+    threw = /do not add up/.test(e.message);
+  }
+  is(threw, "figures that do not add up are refused, not silently corrected");
+
+  // The same number twice would be two documents for one sale.
+  let dup = false;
+  try {
+    erp.registerExternalInvoice(ext, "t");
+  } catch (e) {
+    dup = /already in the register/.test(e.message);
+  }
+  is(dup, "the same number cannot be recorded twice");
+
+  let future = false;
+  try {
+    erp.registerExternalInvoice(
+      Object.assign({}, ext, { number: "55/26", date: "2026-12-01" }),
+      "t",
+    );
+  } catch (e) {
+    future = /future/.test(e.message);
+  }
+  is(future, "an invoice cannot be recorded with a date still to come");
+
+  // Recording one is done SO THAT a job has its history — so it names one.
+  let noJob = false;
+  try {
+    const bare = Object.assign({}, ext, { number: "56/26" });
+    delete bare.projectId;
+    erp.registerExternalInvoice(bare, "t");
+  } catch (e) {
+    noJob = /job/.test(e.message);
+  }
+  is(noJob, "a recorded invoice must name the job it belongs to");
+
+  // A mis-typed record can be taken out; one with money against it cannot.
+  erp.recordCollection(
+    {
+      amountCents: 926779,
+      date: "2026-09-20",
+      allocations: [{ invoiceId: rec.id, amountCents: 926779 }],
+    },
+    "t",
+  );
+  let held = false;
+  try {
+    erp.removeExternalInvoice(rec.id, "t");
+  } catch (e) {
+    held = /collection/.test(e.message);
+  }
+  is(held, "a recorded invoice with a collection against it will not be removed");
+}
+
 /* ---------- report ---------- */
 const failed = checks.filter((c) => !c.pass);
 console.log("\n──── document numbering ────\n");

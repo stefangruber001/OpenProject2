@@ -6635,6 +6635,34 @@ window.CANEI_DICT = {
     ],
     ["Plazo de pago del cliente (días)", "Customer payment terms (days)"],
     ["Plazo que nos da el proveedor (días)", "Terms this supplier gives us (days)"],
+    /* Recording an invoice this company issued before it had this system. */
+    ["Quitar el registro", "Remove the record"],
+    ["Registro quitado", "Record removed"],
+    [
+      "Factura anterior a la plataforma: aquí queda registrada para que la obra tenga su historial, pero el documento es el que ya se emitió y no se reimprime desde aquí.",
+      "Invoice issued before this system: it is recorded here so the job has its history, but the document is the one already issued and is not reprinted from here.",
+    ],
+    [
+      "La factura deja de constar en la obra. El documento original no se toca: sigue emitido y en manos del cliente. No se puede deshacer.",
+      "The invoice stops counting towards the job. The original document is untouched: it remains issued and in the customer's hands. This cannot be undone.",
+    ],
+    /* Recording an invoice issued before this system existed. */
+    ["Facturas anteriores a la plataforma", "Invoices issued before this system"],
+    ["Registrar factura anterior", "Record an earlier invoice"],
+    ["Factura anterior registrada", "Earlier invoice recorded"],
+    ["Número, tal cual está en el papel", "Number, exactly as the paper has it"],
+    ["Fecha de emisión", "Date of issue"],
+    ["Cuota de IVA (€)", "VAT amount (€)"],
+    ["Retención IRPF (€)", "Withholding (€)"],
+    ["IBAN donde se cobró", "Account it was collected into"],
+    [
+      "El documento original no se toca: aquí sólo se anota lo que ya se emitió, con su número y su fecha.",
+      "The original document is untouched: this only records what was already issued, with its own number and date.",
+    ],
+    [
+      "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.",
+      "Jobs that started earlier: an invoice already issued is recorded here so the job has its full history. It is neither reissued nor reprinted.",
+    ],
   ],
   rxEs2En: [
     /* The customer and lead cards put the source and the date into ONE text

@@ -9471,6 +9471,86 @@ async function testInvoiceGenerator(browser, base) {
       bad("ADM-01: milestone origin", "the seed offers no pending contract milestone");
     }
 
+    /* ---- recording an invoice issued before the platform ------------------
+     *
+     * A job that started before the system has its paperwork elsewhere, and a
+     * project reading zero invoiced is a project nobody can read. The real one:
+     * 53/26, 14/09/2026, base 8.425,26 + 10% = 9.267,79 €.
+     *
+     * TWO THINGS ARE ASSERTED AND THE SECOND IS THE IMPORTANT ONE: that the
+     * record lands, and that the screen offers NO WAY TO PRINT IT. The customer
+     * holds the original; a second paper from here would carry another layout
+     * and another IBAN, and one sale would have two documents that disagree. */
+    const ext = await pg.evaluate(async () => {
+      // The generator is a FULL SCREEN and this suite left it open; `go` alone
+      // does not dismiss it, so the register never renders behind it.
+      const back = document.querySelector("#invBack");
+      if (back) back.click();
+      await new Promise((r) => setTimeout(r, 400));
+      go("invoicing");
+      await new Promise((r) => setTimeout(r, 600));
+      const btn = document.querySelector("#invExtAdd");
+      if (!btn)
+        return {
+          entry: false,
+          hasList: !!document.querySelector("#invList"),
+          viewHtml: (document.querySelector("#view") || { innerHTML: "" }).innerHTML.slice(0, 180),
+        };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 400));
+      const set = (id, v) => {
+        const el = document.querySelector(id);
+        if (el) el.value = v;
+      };
+      const pty = erp.state.parties.find((x) => x.active && x.roles.includes("customer"));
+      const prj = erp.state.projects[0];
+      set("#xi_proj", prj.id);
+      set("#xi_num", "53/26");
+      set("#xi_date", "2026-09-14");
+      set("#xi_due", "2026-09-15");
+      set("#xi_party", pty.id);
+      set("#xi_base", "8425.26");
+      document.querySelector("#inv_vat").value = "1000";
+      document.querySelector("#xi_base").dispatchEvent(new Event("input"));
+      await new Promise((r) => setTimeout(r, 200));
+      const shownTotal = document.querySelector("#xi_total").value;
+      document.querySelector("#xi_save").click();
+      await new Promise((r) => setTimeout(r, 700));
+      const rec = erp.state.invoices.find((i) => i.number === "53/26");
+      if (!rec) return { entry: true, saved: false, shownTotal };
+      // Now open it and look for any way to produce a document.
+      invoiceDrawer("53/26");
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        entry: true,
+        saved: true,
+        shownTotal,
+        total: rec.totalCents,
+        origin: rec.origin,
+        date: rec.date,
+        docRef: rec.docRef,
+        pdfBtn: !!document.querySelector("#iv_pdf"),
+        wordBtn: !!document.querySelector("#iv_word"),
+        inSeries: (erp.state.series.invoice.issued || []).includes("53/26"),
+        gaps: erp.seriesGaps("invoice").length,
+      };
+    });
+    if (
+      ext.entry &&
+      ext.saved &&
+      ext.total === 926779 &&
+      ext.origin === "external" &&
+      ext.date === "2026-09-14" &&
+      !ext.pdfBtn &&
+      !ext.wordBtn &&
+      !ext.inSeries &&
+      ext.gaps === 0
+    )
+      ok(
+        `an invoice from before the platform is recorded (53/26, ${ext.shownTotal} €) and cannot be printed`,
+      );
+    else bad("recording a pre-platform invoice", JSON.stringify(ext));
+
     if (!errs.length) ok("ADM-01: the generator raises no console error");
     else bad("ADM-01: console", errs.slice(0, 2).join(" | ").slice(0, 160));
   } catch (e) {

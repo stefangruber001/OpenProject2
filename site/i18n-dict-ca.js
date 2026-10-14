@@ -5229,6 +5229,24 @@ window.CANEI_DICT.ca = {
     "El seu trimestre ja s'ha enviat a l'assessor. Emeteu una rectificativa al seu lloc.",
   "Plazo de pago del cliente (días)": "Termini de pagament del client (dies)",
   "Plazo que nos da el proveedor (días)": "Termini que ens dóna el proveïdor (dies)",
+  "Quitar el registro": "Treure el registre",
+  "Registro quitado": "Registre tret",
+  "Factura anterior a la plataforma: aquí queda registrada para que la obra tenga su historial, pero el documento es el que ya se emitió y no se reimprime desde aquí.":
+    "Factura anterior a la plataforma: aquí queda registrada perquè l'obra tingui el seu historial, però el document és el que ja es va emetre i no es reimprimeix des d'aquí.",
+  "La factura deja de constar en la obra. El documento original no se toca: sigue emitido y en manos del cliente. No se puede deshacer.":
+    "La factura deixa de constar a l'obra. El document original no es toca: segueix emès i en mans del client. No es pot desfer.",
+  "Facturas anteriores a la plataforma": "Factures anteriors a la plataforma",
+  "Registrar factura anterior": "Registrar factura anterior",
+  "Factura anterior registrada": "Factura anterior registrada",
+  "Número, tal cual está en el papel": "Número, tal com surt al paper",
+  "Fecha de emisión": "Data d'emissió",
+  "Cuota de IVA (€)": "Quota d'IVA (€)",
+  "Retención IRPF (€)": "Retenció IRPF (€)",
+  "IBAN donde se cobró": "IBAN on es va cobrar",
+  "El documento original no se toca: aquí sólo se anota lo que ya se emitió, con su número y su fecha.":
+    "El document original no es toca: aquí només s'anota el que ja es va emetre, amb el seu número i la seva data.",
+  "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.":
+    "Obres que van començar abans: la factura ja emesa es registra aquí perquè l'obra tingui el seu historial complet. No es torna a emetre ni es reimprimeix.",
 };
 window.CANEI_DICT.rxEs2Ca = [
   /* See the note on the English side. Origen and Alta are the Catalan words

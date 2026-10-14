@@ -7900,6 +7900,147 @@
       this._log(user, "issueInvoice", rec.number + " " + rec.totalCents);
       return rec;
     }
+
+    /**
+     * An invoice this company issued BEFORE it had this system — recorded, not
+     * issued.
+     *
+     * A job that started before the platform has its paperwork somewhere else,
+     * and a project whose economics read zero invoiced is a project nobody can
+     * read. So the fact is recorded. What it must never become is a second
+     * document for the same sale: the customer is holding the original, the
+     * gestoría has it in their books, and a freshly printed one carrying a
+     * different IBAN and a different layout is how one sale ends up with two
+     * papers that disagree.
+     *
+     * FOUR THINGS IT DOES NOT DO, and each is the point rather than a
+     * limitation:
+     *
+     *   · IT DOES NOT MINT A NUMBER. The number is the one on the paper —
+     *     "53/26", written the way their old tool wrote it. `nextNumber` is
+     *     never called and `series.issued` never grows, so this cannot collide
+     *     with the run this system is keeping and cannot make the gap audit
+     *     report 54, 55 and 56 as missing. They are not missing; they simply
+     *     live where 53 lived until today.
+     *   · IT DOES NOT JOIN THE CHAIN. `invoiceEvents` attests to what THIS
+     *     system issued, each entry hashing the one before. Putting a document
+     *     somebody else produced into that chain would be a claim about
+     *     provenance that is not true.
+     *   · IT CANNOT BE PRINTED. `docRef` stays null and the drawer offers no
+     *     document, because there already is one.
+     *   · IT DOES NOT PICK ITS OWN DATES. The issue date and the due date are
+     *     read off the paper, not from today's clock.
+     *
+     * Same shape as the issued record otherwise, so every reader — the
+     * project's economics, the collections, the customer's file — counts it
+     * without knowing it is special.
+     */
+    registerExternalInvoice(d, user) {
+      const data = d || {};
+      const number = String(data.number || "").trim();
+      if (!number) throw new Error("A recorded invoice needs the number it was issued under");
+      if (this.state.invoices.some((x) => x.number === number))
+        throw new Error("That invoice number is already in the register: " + number);
+      if (!data.partyId) throw new Error("A recorded invoice needs a customer");
+      /* AND ITS JOB. Every invoice this system issues carries one — `issueInvoice`
+         reads the project it is billing — so nothing downstream was ever written
+         to cope with a null, and the register crashed on the first one: its own
+         search maps `project(r.projectId).code`. Recording one is done SO THAT a
+         job has its history, which makes the job the point rather than an extra
+         field. Requiring it keeps the invariant the whole screen already assumes
+         instead of making five call sites tolerate a case nobody asked for. */
+      if (!data.projectId) throw new Error("A recorded invoice needs the job it belongs to");
+      // Existence, not just presence: an id that resolves to nothing crashes
+      // the register exactly as a null did. `project()` throws by name.
+      this.project(data.projectId);
+      if (!data.date) throw new Error("A recorded invoice needs the date it was issued");
+      if (data.date > this.state.today) throw new Error("An invoice cannot be dated in the future");
+      this._requireComplete(data.partyId, "invoice");
+      const baseCents = cents(data.baseCents);
+      if (!(baseCents > 0)) throw new Error("A recorded invoice needs its taxable base");
+      const vatCents = cents(data.vatCents);
+      const irpfCents = cents(data.irpfCents);
+      const totalCents = cents(data.totalCents);
+      /* THE TOTAL IS CHECKED, NOT COMPUTED. Recomputing it would silently
+         "correct" a paper that is already in somebody's books — and the figure
+         being typed in is the one the customer was asked to pay. If the three
+         do not add up, the typing is wrong and saying so is the whole value. */
+      if (baseCents + vatCents - irpfCents !== totalCents)
+        throw new Error(
+          "The figures do not add up: " +
+            baseCents +
+            "c + " +
+            vatCents +
+            "c − " +
+            irpfCents +
+            "c is not " +
+            totalCents +
+            "c",
+        );
+      const rec = {
+        id: this._id("inv"),
+        origin: "external", // the one field every reader can tell it by
+        number,
+        kind: data.kind === "creditNote" ? "creditNote" : "progress",
+        date: data.date,
+        partyId: data.partyId,
+        taxTreatment: data.taxTreatment || "standard",
+        taxJustification: data.taxJustification || "",
+        projectId: data.projectId,
+        budgetNumber: data.budgetNumber || null,
+        worksAddress: data.worksAddress || "",
+        lines: Array.isArray(data.lines) && data.lines.length ? clone(data.lines) : [],
+        baseCents,
+        vatBp: data.vatBp != null ? data.vatBp : 0,
+        vatCents,
+        irpfBp: data.irpfBp != null ? data.irpfBp : 0,
+        irpfCents,
+        totalCents,
+        dueDate: data.dueDate || data.date,
+        paymentMethod: data.paymentMethod || "transfer",
+        /* The account THIS invoice was collected into, as printed on it —
+           which is not necessarily the one the company uses today. */
+        iban: data.iban || "",
+        language: data.language || null,
+        rectifies: null,
+        rectifyReason: null,
+        installmentIdx: null,
+        changeId: null,
+        immutable: true,
+        docRef: null,
+        note: data.note || "",
+      };
+      this.state.invoices.push(rec);
+      this._log(user, "registerExternalInvoice", rec.number + " " + rec.totalCents);
+      return rec;
+    }
+
+    /**
+     * Undo a recorded invoice that was typed wrong.
+     *
+     * Deliberately NOT `undoLastInvoice`: that one is about withdrawing a
+     * number this system minted, and its whole safety argument is the chain it
+     * removes the last link of. An external record is in no chain and owns no
+     * number, so «the last one» means nothing here — any of them can go, as
+     * long as nothing has been hung on it. Nothing is unwound in the series
+     * because nothing was ever taken from it.
+     */
+    removeExternalInvoice(id, user) {
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (!inv) throw new Error("Invoice not found");
+      if (inv.origin !== "external")
+        throw new Error("Only a recorded invoice can be removed this way");
+      const collected = (this.state.collections || []).some((c) =>
+        (c.allocations || []).some((a) => a.invoiceId === inv.id && a.amountCents > 0),
+      );
+      if (collected) throw new Error("It has a collection against it — undo that first");
+      if (this.state.invoices.some((x) => x.rectifies === inv.id))
+        throw new Error("A credit note references it");
+      this.state.invoices = this.state.invoices.filter((x) => x.id !== inv.id);
+      this._log(user, "removeExternalInvoice", inv.number);
+      return inv.number;
+    }
+
     issueReceipt(r, user) {
       // AR-05: numbered receipt for on-account/cash
       const rec = Object.assign(
