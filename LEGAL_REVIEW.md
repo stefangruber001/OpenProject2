@@ -275,3 +275,63 @@ review than a template.
 - **What is NOT at stake:** anything already sent, collected, rectified or
   filed is refused by name, so the hole cannot reach a document anybody else
   holds. **legally_verified: false.**
+
+## 12. Recording an invoice this company issued before it had this system (session 83)
+
+- **What happened.** A job started before the platform existed, so its
+  first invoice — `53/26`, dated 14/09/2026, base 8.425,26 € + 10 % =
+  9.267,79 € — was issued by the client's previous tool and is already in
+  the customer's hands and in the gestoría's books. The client asked
+  whether it could be added by hand so the job's history in the platform
+  is complete.
+- **What was built, and how narrow it is.** `registerExternalInvoice`
+  records the fact and nothing else. It does not mint a number (the
+  number is the one on the paper, so `series.issued` does not grow and
+  the gap audit does not report 54–56 as missing), it does not join
+  `invoiceEvents` (that chain attests to what THIS system issued, and
+  claiming otherwise would be a false statement of provenance), it
+  cannot be printed (`docRef` stays null and the drawer offers no
+  document, because one already exists), and it does not pick its own
+  dates. The total is checked against base + VAT − withholding rather
+  than recomputed, so a paper already in somebody's books is never
+  silently "corrected".
+- **NOT VERIFIED HERE — two questions, neither settled.** First, whether
+  a record of a document issued outside this system belongs in the same
+  register as the documents this system issues, or whether the two must
+  be distinguishable to anybody who reads the register as a libro
+  registro de facturas expedidas. The record is distinguishable in the
+  data (`origin`), and the screen says so, but no source was read on
+  what the obligation actually requires. Second, and more concretely:
+  `vatSummary(quarter)` filters invoices by date alone, so this record
+  DOES enter that quarter's output VAT. That is arguably right — the
+  sale happened and the VAT is owed whichever tool printed the
+  document — but if the gestoría already holds the paper by another
+  route and adds the platform's package to what they have, the quarter
+  is counted twice. How visible that is was checked rather than
+  assumed: the package's itemised list carries `invoiceNumber`, so
+  «53/26» appears by name and a human reading the detail can recognise
+  a paper they already have, and `docRef` is null where every
+  platform-issued invoice has one, which is a tell for anybody who
+  knows to look for it. What is NOT labelled is the totals block
+  (`packageBlocks` reports a count and an amount only) and the
+  transaction dictionary itself, which does not carry `origin`. So the
+  risk is a reader working from totals, not a reader working from the
+  list — and whether the gestoría does one or the other has not been
+  asked.
+- **A known inconsistency, stated rather than hidden.** Recording does
+  not check the period lock. An invoice dated inside a quarter already
+  sent to the gestoría is accepted and changes that quarter's VAT
+  summary with no warning, while withdrawing an issued invoice and both
+  purchase-side guards refuse the same quarter by name. This is being
+  fixed in the next unit; it is recorded here because the fix changes
+  what the gestoría could already have received.
+- **The questions for the gestoría**, in two lines: _does an invoice
+  issued outside this system belong in this system's register at all,
+  and if so must it be excluded from the quarterly VAT package you are
+  already holding the paper for?_ And: _for 53/26 specifically, dated in
+  a quarter you may already have closed, do you want it in the package
+  or only on the job's file?_
+- **What is NOT at stake:** no document is produced, no number is taken,
+  the hash chain is untouched, and any record can be removed with
+  `removeExternalInvoice` while nothing is hung on it.
+  **legally_verified: false.**

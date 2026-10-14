@@ -4358,3 +4358,49 @@ de la gestoría en LEGAL_REVIEW §11.
 
 Puertas: numeración 29/29 (eran 16) · doc-docx 130/130 (eran 124) · CI y suite
 completa de navegador verdes sobre b3b4d14.
+
+## S45 · Una factura anterior a la plataforma se registra, no se emite (2026-10-14)
+
+El cliente preguntó si la 53/26 —emitida antes de que existiera la
+plataforma— se podía meter a mano, para que la obra tuviera su historia
+completa. Se puede desde hoy, y lo que importa es la palabra: se REGISTRA.
+
+**La diferencia no es de matiz.** Emitir acuña un número, encadena un
+asiento y produce un papel. De esas tres cosas aquí no debe pasar
+ninguna, porque las tres ya pasaron en otro sitio hace un mes. El
+cliente tiene el original en la mano, la gestoría lo tiene en sus
+libros, y un papel nuevo con el IBAN de hoy y la maqueta de hoy es
+exactamente cómo una venta acaba teniendo dos documentos que no dicen
+lo mismo. Así que `registerExternalInvoice` no llama a `nextNumber`, no
+toca `series.issued`, no entra en `invoiceEvents` y deja `docRef` en
+null — y el cajón, al ver `origin === "external"`, no ofrece ni PDF ni
+Word. No es que falten: es que ya existen.
+
+**El total se comprueba, no se calcula.** Recalcularlo «corregiría» en
+silencio un papel que ya está en los libros de otro. Si base, cuota y
+retención no suman el total, lo que está mal es lo que se teclea, y
+decirlo es todo el valor. Base 8.425,26 + 10 % = 9.267,79 €, como en el
+papel.
+
+**Pide la obra, y que exista.** Todas las facturas que este sistema
+emite llevan una, así que nada de lo que hay río abajo se escribió para
+aguantar un nulo: el propio registro hace `project(r.projectId).code` y
+se rompió con la primera. Se registra PARA que una obra tenga su
+historia, lo que convierte la obra en el motivo y no en un campo más.
+
+Verificado contra el papel de verdad: 53/26, 14/09/2026, `docRef: null`,
+la serie intacta (57/2026, 58/2026) y **ningún hueco falso** en 54–56 —
+no faltan, simplemente viven donde vivía la 53 hasta hoy.
+
+**Y lo que enseñó, que no estaba en la lista.** Registrar no comprueba
+el cierre del período. `invoiceUndoBlock` se niega con `quarter-sent` y
+los dos candados del lado de compras también, pero el registro no mira:
+una factura con fecha de un trimestre ya remitido al asesor le cambia el
+`vatSummary` sin avisar. Es la clase de defecto que el resto del código
+ya vigila, y es lo siguiente.
+
+Puertas: numeración 47/47 (eran 35) · doc-docx 130/130 · doc-pdf 44/44 ·
+migraciones 149/149 · year-sim 149/149 · manejabilidad 521/521 ·
+source-audit 158/158 en+ca · workspace-audit 0/0 · e2e del generador
+12/12 sin errores de consola · CI y suite completa de navegador verdes
+sobre f656c70.

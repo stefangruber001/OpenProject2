@@ -11709,3 +11709,48 @@ muestra, y se traduce; una regla escrita contra texto que se muestra funciona
 hasta el día que alguien lo cambia, y entonces falla en silencio y en la única
 parte del producto donde un fallo silencioso es una factura mal emitida. Quien
 pide el bloque dice lo que ES; el rótulo sólo dice cómo se llama.
+
+## S152 · Registrar no es emitir (2026-10-14)
+
+Una factura que esta empresa emitió antes de tener este sistema se puede
+meter a mano. La decisión no es si se puede: es qué clase de cosa es
+cuando entra.
+
+**Decisión: entra como un hecho, no como un documento.** Lleva
+`origin: "external"` y `docRef: null`, y ésa es toda la diferencia que
+necesita cualquier lector. La economía de la obra, los cobros y la ficha
+del cliente la cuentan sin saber que es especial —que es lo que se
+pedía, una obra con su historia completa— y en cambio nada la imprime,
+porque el original ya está impreso y lo tiene el cliente.
+
+**Por qué no entra en la cadena.** `invoiceEvents` da fe de lo que ESTE
+sistema emitió, cada asiento resumiendo el anterior. Meter en esa cadena
+un documento que produjo otro sería una afirmación sobre su procedencia
+que no es verdad. Que no esté no es una laguna de la cadena: es que la
+cadena sigue diciendo exactamente lo que siempre dijo.
+
+**Por qué no acuña número.** El número es el del papel —«53/26», escrito
+como lo escribía su herramienta anterior—, así que la serie que este
+sistema lleva no crece ni se desplaza, y la auditoría de huecos no
+denuncia la 54, la 55 y la 56. Dos series conviviendo es la realidad del
+cliente, no un defecto del modelo: una se cerró en septiembre y la otra
+empieza en la 57.
+
+**Por qué se puede quitar cualquiera, y no sólo la última.** Deshacer
+una emitida es otra cosa y su seguridad es precisamente la cadena de la
+que quita el último eslabón. Un registro externo no está en ninguna
+cadena y no es dueño de ningún número, así que «la última» no significa
+nada aquí; basta con que no le hayan colgado nada —ni cobro ni
+rectificativa—. No se devuelve nada a la serie porque nunca se tomó.
+
+Reversible: dos métodos, una fila y un cajón. Si la gestoría dice que
+registrar así no vale (LEGAL_REVIEW §12), se quita el alta y los
+registros que ya existan se borran con `removeExternalInvoice`, que para
+eso está; ningún dato de los demás cambia de forma por que esto exista.
+
+**Lo que esta decisión NO cubre, y queda apuntado.** El alta no mira el
+cierre del período. Una fecha de un trimestre ya remitido al asesor
+entra igual y le cambia el resumen de IVA sin avisar, cuando los demás
+candados de ese trimestre —deshacer una emitida, las dos del lado de
+compras— se niegan por nombre. Es inconsistencia del alta, no de la
+decisión de arriba, y se arregla en la siguiente unidad.
