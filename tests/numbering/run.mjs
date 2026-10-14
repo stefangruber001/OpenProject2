@@ -477,6 +477,42 @@ function erpAt(day) {
     held = /collection/.test(e.message);
   }
   is(held, "a recorded invoice with a collection against it will not be removed");
+
+  /* AND IT CANNOT REACH A QUARTER THE ASESOR ALREADY HAS. The whole point of
+     recording is that the paper is older than the typing, so landing in a
+     closed period is this feature's normal case rather than its edge one —
+     and `vatSummary` selects by date alone, so an accepted record restates a
+     return somebody has already filed. Every other route refuses by name;
+     this one used not to. */
+  erp.state.packagesSent.push({ quarter: "2026-Q3", date: "2026-10-05", recipient: "gestoria" });
+  let filedQ = false;
+  try {
+    erp.registerExternalInvoice(
+      Object.assign({}, ext, { number: "51/26", date: "2026-09-20", dueDate: "2026-09-20" }),
+      "t",
+    );
+  } catch (e) {
+    filedQ = /reopen 2026-Q3/.test(e.message);
+  }
+  is(filedQ, "a record dated in a quarter already sent to the adviser is refused by name");
+
+  // A quarter nobody has filed is not locked by the one next to it.
+  const openQ = erp.registerExternalInvoice(
+    Object.assign({}, ext, { number: "52/26", date: "2026-10-01", dueDate: "2026-10-01" }),
+    "t",
+  );
+  is(openQ.number === "52/26", "…while an open quarter still accepts one");
+
+  // And the refusal names a remedy that exists.
+  erp.reopenQuarter("2026-Q3", "la 53 es anterior a la plataforma", "t");
+  const afterReopen = erp.registerExternalInvoice(
+    Object.assign({}, ext, { number: "51/26", date: "2026-09-20", dueDate: "2026-09-20" }),
+    "t",
+  );
+  is(
+    afterReopen.number === "51/26",
+    "…and once the quarter is reopened, on the record, it goes in",
+  );
 }
 
 /* ---------- report ---------- */

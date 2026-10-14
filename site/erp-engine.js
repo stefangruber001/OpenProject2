@@ -7955,6 +7955,21 @@
       this.project(data.projectId);
       if (!data.date) throw new Error("A recorded invoice needs the date it was issued");
       if (data.date > this.state.today) throw new Error("An invoice cannot be dated in the future");
+      /* AND IT CANNOT LAND IN A PERIOD THE ADVISER ALREADY HAS. Every other way
+         of moving a period figure refuses once its package has gone out —
+         withdrawing an issued invoice, and both guards on the purchase side —
+         because the tax summary selects by date alone and would restate a
+         period somebody has already filed. Recording was the one door left
+         unguarded, and a document dated weeks before it gets typed is exactly
+         what walks through it: that is the normal case here, not the edge one.
+         The remedy is the one the rest of the system names, so the refusal
+         names it too and the reopening leaves its reason on the record. */
+      {
+        const q = quarterOf(data.date);
+        const sent = (this.state.packagesSent || []).filter((p) => p.quarter === q);
+        if (sent.length && !sent[sent.length - 1].reopened)
+          throw new Error("That period has already gone to the adviser: reopen " + q + " first");
+      }
       this._requireComplete(data.partyId, "invoice");
       const baseCents = cents(data.baseCents);
       if (!(baseCents > 0)) throw new Error("A recorded invoice needs its taxable base");
