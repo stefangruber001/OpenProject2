@@ -212,11 +212,30 @@ jobs:
       # both totals. It is a forwarding stub since the recorrido became
       # erp.html#journey, so it leaves this list — and what it used to hold is
       # measured by the booted-workspace audit below, which runs at zero.
+      # 91 -> 107 and 67 -> 83 on 20 Oct, and the sixteen are named rather than
+      # waved through: «Av. Barcelona 10, 3º 2ª», «C/ Aragó 331», «C/ Balmes
+      # 120» and thirteen more like them — the street of every seeded property,
+      # newly on screen because the presupuestos register gained an Inmueble
+      # column. A resort with a dozen plots filed eleven quotes under one
+      # customer name and the row said nothing about which plot.
+      #
+      # They are company DATA, which the audit's own header lists first among
+      # the residue it deliberately does not pattern away — «C/ Balmes 120» is
+      # literally one of its examples. The adjacent Cliente column has been
+      # contributing names on the same page for as long as it has existed, so
+      # counting the addresses is the consistent treatment, not an exception
+      # made for this change.
+      #
+      # Measured, not guessed: the commit before this one reports exactly 91,
+      # the ceiling it was given. The delta lands entirely on frontend.html
+      # (12 -> 28) and is zero on the other six pages, which is what a data
+      # column added to one register should look like. No string of UI copy is
+      # in it.
       - name: Translation coverage (rendered pages)
         if: always()
         run: |
-          node tests/i18n/audit.mjs --lang en --max 91
-          node tests/i18n/audit.mjs --lang ca --max 67
+          node tests/i18n/audit.mjs --lang en --max 107
+          node tests/i18n/audit.mjs --lang ca --max 83
 
       # The one above reads erp.html on a static server, where the workspace
       # shell never finishes booting — so it sees the login chrome and misses

@@ -11785,3 +11785,38 @@ número sino que no es reproducible. Atribuir un fallo suyo es posible y
 cuesta poco —`--json` vuelca la lista entera y se compara por nombre, que
 es como se descartó el 39 de hoy—, así que queda escrito aquí en vez de
 convertirse otra vez en una tarde de buscar a quién culpar.
+
+## S154 · Un techo que sube, y por qué éste sí (2026-10-20)
+
+La columna «Inmueble» puso en pantalla la calle de cada inmueble sembrado,
+y la auditoría de páginas renderizadas pasó de 91 a 107 en inglés y de 67
+a 83 en catalán. El trunk se puso rojo por eso.
+
+**Decisión: subir el techo, con las dieciséis nombradas.** No es una
+laguna de traducción: son DATOS de la empresa —«Av. Barcelona 10, 3º 2ª»,
+«C/ Aragó 331», «C/ Balmes 120» y trece más—, y la cabecera de la propia
+auditoría las lista en primer lugar entre el residuo que deliberadamente
+no filtra por patrón. «C/ Balmes 120» es literalmente uno de sus
+ejemplos. Su argumento es el que vale aquí: una regla lo bastante amplia
+para tragarse el nombre de una persona lo es para esconder una etiqueta
+de verdad, que es justo lo que ese archivo existe para impedir.
+
+**Lo que NO se hizo: marcar la celda `translate="no"`.** Habría bajado el
+número sin tocar el techo, pero la columna Cliente lleva años aportando
+nombres en esa misma página sin marcar, así que contar las direcciones es
+el trato CONSISTENTE y no una excepción hecha para este cambio. Dos
+columnas vecinas con dos reglas distintas es peor que un techo más alto
+explicado.
+
+**Medido, no supuesto.** El commit anterior da exactamente 91, el techo
+que tenía. El delta cae entero en `frontend.html` (12 → 28) y es cero en
+las otras seis páginas, que es la forma que tiene una columna de datos
+añadida a UN registro. Ninguna cadena de interfaz va dentro. Y la puerta
+sigue siendo una puerta: con el techo viejo devuelve 1, con el nuevo
+devuelve 0.
+
+**Lo que esto cuesta y hay que decirlo:** el margen vuelve a ser cero. La
+auditoría medía 91 contra un techo de 91 y ahora mide 107 contra 83+24.
+Quien añada la siguiente columna de datos a un registro va a ver rojo
+igual, y el camino es éste: medir el commit anterior, comprobar que el
+delta son datos y nombrarlos.
