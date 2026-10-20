@@ -17488,7 +17488,16 @@
           visited yet — a visit should not be a prerequisite for pricing a job
           the operator already knows enough about. */
       function newBudgetDrawer() {
-        const doneVisits = erp.state.visits.filter((x) => x.status === "done" && !x.budgetId);
+        /* NEWEST FIRST, oldest last (operator, 20 Oct). This list was not
+           sorted at all — it came out in whatever order `state.visits` holds,
+           which is insertion order and only resembles date order until a visit
+           is edited or imported out of sequence. The visit somebody wants to
+           price is almost always the one they just did, so it belongs at the
+           top rather than wherever it happened to be stored. Descending, so
+           `localeCompare` runs b against a. */
+        const doneVisits = erp.state.visits
+          .filter((x) => x.status === "done" && !x.budgetId)
+          .sort((a, b) => String(b.completedAt || "").localeCompare(String(a.completedAt || "")));
         /* Alphabetical, because this list is READ rather than scanned: the
            operator arrives knowing whose quote she is about to write and looks
            for that name. In creation order the same customer's leads land

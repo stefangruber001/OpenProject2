@@ -11337,6 +11337,18 @@ async function testBudgetCreation(browser, base) {
     if (!leadPicked) {
       bad("COM-03: an open lead exists to price from", "none in the seed");
     } else {
+      /* ORDER IS PART OF THE ASK, so it is part of the gate — and read HERE,
+         after the switch to lead mode, because `#bn_lead` does not exist until
+         then. Read before it, this returned an empty list and reported a
+         cheerful pass over nothing, which is worse than no check at all. */
+      const leadOrder = await pg.evaluate(() =>
+        [...document.querySelectorAll("#bn_lead option")].map((o) => o.textContent.trim()),
+      );
+      const leadSorted = [...leadOrder].sort((a, b) => a.localeCompare(b));
+      if (leadOrder.length > 1 && leadOrder.join("|") === leadSorted.join("|"))
+        ok(`COM-03: the open-lead list is alphabetical (${leadOrder.length} leads)`);
+      else bad("COM-03: lead list order", leadOrder.slice(0, 3).join(" / ") || "no options");
+
       const before = await pg.evaluate(() => erp.state.budgets.length);
       await pg.click("#bn_save");
       await answerRefDialog("Casa 3 Roca");
@@ -11368,6 +11380,23 @@ async function testBudgetCreation(browser, base) {
     }
     await pg.click("#bqNew");
     await pg.waitForTimeout(500);
+    /* Newest visit first — the one somebody just did is the one they price. */
+    const visitDates = await pg.evaluate(() =>
+      [...document.querySelectorAll("#bn_visit option")].map((o) =>
+        (o.textContent.trim().split("·")[0] || "").trim(),
+      ),
+    );
+    const iso = (d) => {
+      const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d);
+      return m ? m[3] + m[2] + m[1] : "";
+    };
+    const vIso = visitDates.map(iso).filter(Boolean);
+    const newestFirst = [...vIso].sort((a, b) => b.localeCompare(a));
+    if (vIso.length > 1 && vIso.join("|") === newestFirst.join("|"))
+      ok("COM-03: the completed-visit list runs newest first");
+    else if (vIso.length <= 1) ok("COM-03: too few visits to order (not a failure)");
+    else bad("COM-03: visit list order", visitDates.slice(0, 3).join(" / "));
+
     const visitPicked = await pg.evaluate(() => {
       const r = [...document.querySelectorAll('input[name="bnmode"]')].find(
         (x) => x.value === "visit",
