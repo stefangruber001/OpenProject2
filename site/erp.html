@@ -30605,7 +30605,12 @@
           );
           const iss = erp._issuerBlock();
           const brand = {
-            wordmark: iss.tradeName,
+            /* The LEGAL name when no trade name is set. The masthead prints
+               what the company trades as, which is a separate field and often
+               empty; without this it fell through to a brand name baked into
+               the writers, so a company that had never filled in «Nombre
+               comercial» published documents under somebody else's name. */
+            wordmark: iss.tradeName || iss.legalName,
             legal: iss.legalName,
             /* The line under the wordmark. It was hardcoded empty here and in the
                message path, so «Reformes senzillament complexes» never reached a
@@ -30971,7 +30976,8 @@
       function brandBlock() {
         const iss = erp._issuerBlock();
         return {
-          wordmark: iss.tradeName,
+          // As above: the trade name is optional, the legal name is not.
+          wordmark: iss.tradeName || iss.legalName,
           legal: iss.legalName,
           /* The line under the wordmark. It was hardcoded empty here and in the
              message path, so «Reformes senzillament complexes» never reached a

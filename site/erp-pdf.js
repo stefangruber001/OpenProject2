@@ -415,7 +415,11 @@
     const top = this.y;
 
     this.mark(X0, top - 26, 26);
-    this.text(X0 + 34, top - 12, 15, FONT.serif, C.ink, b.wordmark || "CaneiSubirats");
+    /* NO BAKED-IN COMPANY NAME. A caller that supplies no wordmark gets
+       none: printing one tenant's brand on another's paper is worse in every
+       way than printing nothing, and the composer above now falls back to the
+       legal name, which is the thing that is never empty. */
+    this.text(X0 + 34, top - 12, 15, FONT.serif, C.ink, b.wordmark || "");
     this.text(X0 + 34, top - 22, 7.5, FONT.serif, C.green, b.slogan);
 
     this.textRight(X1, top - 8, 8, FONT.sansB, C.green, d.docType.toUpperCase(), {

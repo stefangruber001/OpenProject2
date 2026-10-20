@@ -215,7 +215,8 @@
           {
             w: halfW,
             xml:
-              p(b.wordmark || "CaneiSubirats", {
+              // No baked-in company name here either — see erp-pdf.js.
+              p(b.wordmark || "", {
                 font: SERIF,
                 size: 15,
                 color: C.ink,

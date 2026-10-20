@@ -654,6 +654,45 @@ for (const [label, key] of [
   );
 }
 
+/* ---------- no company name is baked into the writer ----------
+ *
+ * The masthead prints what the company TRADES AS, which is an optional field.
+ * It used to fall through to a brand name written into the PDF and Word
+ * writers themselves, so a tenant who had never filled «Nombre comercial» in
+ * published documents under another company's name — and the spreadsheet,
+ * which fell back to the legal name instead, disagreed with both.
+ *
+ * Rendered here with an EMPTY wordmark, which is what a caller supplies when
+ * no trade name is set. Nothing is a correct answer; somebody else's brand is
+ * not.
+ */
+{
+  const bare = String(build(doc, { ...BRAND, wordmark: "" }, tr));
+  const full = String(build(doc, BRAND, tr));
+  /* Searched RAW, never whitespace-stripped: «Canei Subirats, S.L.» collapses
+     to «CaneiSubirats,S.L.», which contains the baked-in literal, so a
+     stripped search would fail on the legal name doing its job. */
+  check(
+    "an empty wordmark prints no company name of the writer's own",
+    bare.indexOf("CaneiSubirats") < 0,
+    bare.indexOf("CaneiSubirats") < 0 ? "none" : "the baked-in brand is back",
+  );
+  /* The control: with a wordmark supplied it IS on the page, so the check
+     above can only pass by the fallback being gone rather than by the writer
+     having stopped drawing mastheads. */
+  check(
+    "…and a wordmark that WAS supplied still reaches the page",
+    full.indexOf("CaneiSubirats") >= 0,
+    "control",
+  );
+  /* And a document whose masthead is blank still says who issued it. */
+  check(
+    "…while the legal name still reaches the page",
+    bare.indexOf("Canei Subirats") >= 0,
+    "legal block intact",
+  );
+}
+
 const failed = results.filter((r) => !r.ok);
 console.log(`\n${results.length - failed.length}/${results.length} passed → ${file}`);
 process.exit(failed.length ? 1 : 0);
