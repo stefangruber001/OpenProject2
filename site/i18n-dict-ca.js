@@ -2144,6 +2144,14 @@ window.CANEI_DICT.ca = {
   // screen in S7's two panels. The backlog is a ratchet, so closing them here
   // lowers its ceiling rather than merely holding it.
   Referencia: "Referència",
+  "Referencia del presupuesto": "Referència del pressupost",
+  "Referencia actualizada": "Referència actualitzada",
+  "Casa 3 Roca": "Casa 3 Roca",
+  "Máximo 15 caracteres.": "Màxim 15 caràcters.",
+  "Windows no admite algunos de esos caracteres en un nombre de archivo.":
+    "Windows no admet alguns d'aquests caràcters en un nom d'arxiu.",
+  "Va en el nombre del documento, detrás del número y delante de la versión. Se puede cambiar después.":
+    "Va al nom del document, darrere del número i davant de la versió. Es pot canviar després.",
   Quitar: "Treu",
   Alquiler: "Lloguer",
   Seguros: "Assegurances",

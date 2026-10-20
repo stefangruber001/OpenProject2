@@ -1409,6 +1409,48 @@ throws(() => M.migrate({ ...v1, schemaVersion: 999 }), "a far-future blob throws
   );
 }
 
+/* ---------------- v28 · the quote's own short reference ----------------
+ *
+ * The estimator files a quote under a short label and wants it in the name of
+ * the PDF. The field is new because `internalRef` is taken: a variation stores
+ * the reason it exists there, so naming a file after it would put a sentence
+ * in front of a customer. The step only fills what is absent.
+ */
+{
+  const blob = () => ({
+    schemaVersion: 27,
+    budgets: [
+      { id: "b1", number: "PRE-2026-0001" },
+      { id: "b2", number: "PRE-2026-0002", reference: "Casa 3 Roca" },
+      { id: "b3", number: "PRE-2026-0003", reference: "", internalRef: "Ampliación acordada" },
+    ],
+  });
+  const got = M.migrate(blob()).state;
+  const by = Object.fromEntries(got.budgets.map((b) => [b.id, b]));
+  assert(
+    by.b1.reference === "",
+    "v28: a quote with no reference is given an empty one",
+    by.b1.reference,
+  );
+  assert(
+    by.b2.reference === "Casa 3 Roca",
+    "v28: one that already has a reference keeps it",
+    by.b2.reference,
+  );
+  assert(
+    by.b3.internalRef === "Ampliación acordada",
+    "v28: the reason a variation carries is left alone — it is a different field",
+    by.b3.internalRef,
+  );
+  const twice = M.migrate(got).state;
+  assert(
+    JSON.stringify(twice.budgets) === JSON.stringify(got.budgets),
+    "v28: running it twice equals running it once",
+  );
+  const empty = M.migrate({ schemaVersion: 27 }).state;
+  assert(!empty.budgets || empty.budgets.length === 0, "v28: a blob with no budgets survives it");
+}
+
 /* ---------------- report ---------------- */
 const failed = checks.filter((c) => !c.pass);
 console.log(`\n──── schema migration simulation ────`);

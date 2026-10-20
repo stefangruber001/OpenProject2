@@ -1993,6 +1993,20 @@ window.CANEI_DICT = {
     ["Se aplica a", "Applies to"],
     ["Vencimiento", "Expiry"],
     ["Referencia", "Reference"],
+    /* The short reference a quote is filed under, and which its document file
+       is named after. */
+    ["Referencia del presupuesto", "Quote reference"],
+    ["Referencia actualizada", "Reference updated"],
+    ["Casa 3 Roca", "Casa 3 Roca"],
+    ["Máximo 15 caracteres.", "15 characters maximum."],
+    [
+      "Windows no admite algunos de esos caracteres en un nombre de archivo.",
+      "Windows will not accept some of those characters in a file name.",
+    ],
+    [
+      "Va en el nombre del documento, detrás del número y delante de la versión. Se puede cambiar después.",
+      "It goes in the document file name, after the number and before the version. It can be changed later.",
+    ],
     ["Clave", "Key"],
     ["Disparador", "Trigger"],
     ["Acción", "Action"],

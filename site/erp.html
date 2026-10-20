@@ -5516,6 +5516,28 @@
           /[&<>"]/g,
           (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[m],
         );
+      /* The quote reference rules, as the screen states them. Flat
+         declarations: the source audit reads the gap between one tag and the
+         next as a sentence, and these are plain strings a dictionary carries. */
+      const REF_BAD_CHARS = /[<>:"/\\|?*\u0000-\u001f]/;
+      const REF_BAD_MSG = "Windows no admite algunos de esos caracteres en un nombre de archivo.";
+      const REF_LONG_MSG = "Máximo 15 caracteres.";
+      /**
+       * Which property a record is about, in one value a reader recognises.
+       *
+       * ONE field, never two joined. A composed «street, city» is a string
+       * that exists nowhere in `erp.state`, and the audits excuse a harvested
+       * string only when it is literally a stored value — so a join reads as
+       * fifteen sentences somebody forgot to translate. The street is the part
+       * that tells one plot from the next; the city is the fallback for a
+       * record that has no street yet.
+       */
+      const propertyLabel = (rec) => {
+        if (!rec || !rec.propertyId) return "";
+        const pr = (erp.state.properties || []).find((x) => x.id === rec.propertyId);
+        if (!pr) return "";
+        return pr.street || pr.city || "";
+      };
       const eur = (c) =>
         new Intl.NumberFormat("es-ES", {
           style: "currency",
@@ -17363,6 +17385,25 @@
               get: (b) => b.number,
             },
             { label: "Cliente", get: (b) => erp.party(b.partyId).name },
+            /* WHICH PROPERTY, because the customer column stops telling them
+               apart the moment one client owns several. A resort with a dozen
+               plots filed eleven quotes under one name, and the register had
+               nothing on the row to say which plot each one was for. Read
+               through `state.properties` rather than `property()`, which
+               throws: a budget whose property was removed must still draw its
+               row. */
+            {
+              label: "Inmueble",
+              /* THE STREET ALONE, not street + city joined. A joined string is
+                 one no screen and no translator can account for: the audit
+                 excuses a harvested string only when it is LITERALLY a value in
+                 `erp.state`, and «C/ Balmes 120, Barcelona» is a sentence this
+                 cell invented out of two that are. Fifteen addresses failed the
+                 gate that way. The street is what tells one plot from the next
+                 anyway, and it fits a narrow column. */
+              get: (b) => propertyLabel(b),
+              html: (b) => esc(propertyLabel(b)) || "—",
+            },
             {
               label: "Versión",
               html: (b) => {
@@ -17448,9 +17489,24 @@
           the operator already knows enough about. */
       function newBudgetDrawer() {
         const doneVisits = erp.state.visits.filter((x) => x.status === "done" && !x.budgetId);
-        const openLeads = erp.state.opportunities.filter((o) =>
-          ["awaitingVisit", "awaitingBudget"].includes(o.status),
-        );
+        /* Alphabetical, because this list is READ rather than scanned: the
+           operator arrives knowing whose quote she is about to write and looks
+           for that name. In creation order the same customer's leads land
+           wherever they happened to be opened, which on a client with a dozen
+           plots means reading all of them every time. The visit list above
+           stays in date order on purpose — there the question is which visit
+           was done, and when is how you tell them apart. */
+        const leadLabel = (o) => {
+          let who = "";
+          try {
+            who = erp.party(o.partyId).name;
+          } catch (e) {}
+          return `${who} · ${o.requestedWork || ""}`;
+        };
+        const openLeads = erp.state.opportunities
+          .filter((o) => ["awaitingVisit", "awaitingBudget"].includes(o.status))
+          .slice()
+          .sort((a, b) => leadLabel(a).localeCompare(leadLabel(b)));
         /* THE THIRD ORIGIN: a job already under way. An adicional is not a new
                  quote for a new customer — it is a revision of the scope somebody
                  already accepted, so it starts from the job rather than from a
@@ -17493,10 +17549,7 @@
              : `<div class="card"><div class="ch"><h3>Lead</h3></div><div class="daylist" style="gap:9px">
           <div class="it"><label class="opt">Lead abierto
             <select id="bn_lead" style="margin-left:auto">${openLeads
-              .map(
-                (o) =>
-                  `<option value="${esc(o.id)}">${esc(erp.party(o.partyId).name)} · ${esc(o.requestedWork)}</option>`,
-              )
+              .map((o) => `<option value="${esc(o.id)}">${esc(leadLabel(o))}</option>`)
               .join("")}</select></label></div>
          </div></div>`
          }
@@ -17509,28 +17562,59 @@
           });
           $("#bn_save").onclick = save;
         };
-        const save = () =>
+        /* THE REFERENCE IS ASKED FOR BETWEEN THE ORIGIN AND THE EDITOR, which
+           is where the estimator asked for it: the moment to name a thing is
+           the moment it is made, and this name is what the customer's file
+           will be called. Both origins ask — a quote written from a lead is
+           sent exactly like one written from a visit.
+
+           The selections are read BEFORE the dialog opens. They are still on
+           screen behind it and would read the same, but a value taken after an
+           await is a value taken from whatever the screen became. */
+        const save = async () => {
+          const selVisit = mode === "visit" ? ($("#bn_visit") || {}).value : null;
+          const selLead = mode === "lead" ? ($("#bn_lead") || {}).value : null;
+          const ref = await askText("Referencia del presupuesto", {
+            label: "Referencia",
+            placeholder: "Casa 3 Roca",
+            body: "Va en el nombre del documento, detrás del número y delante de la versión. Se puede cambiar después.",
+            /* Caught before the dialog closes, so she shortens it herself and
+               chooses where. The engine refuses the same two things rather
+               than cutting a word in half, and this is the copy of the rule
+               that is allowed to be friendly about it. The refused characters
+               are not listed: the list is mostly angle brackets and quotes,
+               which is a sentence no dictionary can carry safely. */
+            validate: (v) => {
+              const t = String(v.v || "").trim();
+              if (REF_BAD_CHARS.test(t)) return REF_BAD_MSG;
+              return t.length > 15 ? REF_LONG_MSG : null;
+            },
+          });
+          // Cancelling the question cancels the quote. Creating one anyway
+          // would leave a draft whose name is the thing she just declined.
+          if (ref === null) return;
           mutate(() => {
             let partyId,
               propertyId,
               visit = null;
             if (mode === "visit") {
               if (!doneVisits.length) throw new Error("No hay ninguna visita disponible");
-              visit = doneVisits.find((x) => x.id === $("#bn_visit").value) || doneVisits[0];
+              visit = doneVisits.find((x) => x.id === selVisit) || doneVisits[0];
               const o = erp.state.opportunities.find((y) => y.id === visit.opportunityId);
               partyId = o.partyId;
               propertyId = o.propertyId || visit.propertyId;
             } else {
               if (!openLeads.length) throw new Error("No hay ningún lead disponible");
-              const o = openLeads.find((x) => x.id === $("#bn_lead").value) || openLeads[0];
+              const o = openLeads.find((x) => x.id === selLead) || openLeads[0];
               partyId = o.partyId;
               propertyId = o.propertyId;
             }
-            const b = erp.createBudget({ partyId, propertyId }, "backoffice");
+            const b = erp.createBudget({ partyId, propertyId, reference: ref }, "backoffice");
             if (visit) erp.validateVisit(visit.id, { budgetId: b.id }, "backoffice");
             closeDrawer();
             go("quotes", b.id);
           }, "Presupuesto creado");
+        };
         paint();
       }
 
@@ -17861,6 +17945,11 @@
                belongs to FINISHING moves behind one button. Superficie is gone
                entirely, input and figure both, at the operator's request. -->
           <div class="pbcond">
+           <!-- The short reference the document file is named after. Editable
+                here as well as asked for at creation, because the dialog that
+                asks says it can be changed later, and because a typo that can
+                never be corrected would reach the customer in a file name. -->
+           <label>Referencia <input type="text" id="bcRef" maxlength="15" placeholder="Casa 3 Roca" value="${esc(b.reference || "")}"${dis}></label>
            <!-- Part 2 · item 14: validity is POLICY now, not a choice — thirty
                 days from the day the quote is issued, stamped by issueVersion.
                 The input is hidden, not deleted (the removal rule): delete
@@ -18191,6 +18280,7 @@
             if (!el) return;
             el.onchange = () => mutate(() => erp.updateBudget(id, patch(el), "backoffice"), msg);
           };
+          hdr($("#bcRef"), (el) => ({ reference: el.value }), "Referencia actualizada");
           hdr($("#bcValid"), (el) => ({ validityDate: el.value }), "Validez actualizada");
           // Blank clears it back to «no consta» rather than storing 0: the two
           // mean different things and only one of them is safe to print.
@@ -28334,11 +28424,14 @@
             const d = await budgetDescriptor(row.budgetId, vId);
             return {
               blob: docxBlob(d.descriptor, d.lang),
-              name: `${d.number}-v${d.version}.docx`,
+              name: budgetFileBase(row.budgetId, d.number, d.version) + ".docx",
             };
           }
           const built = await budgetPdfString(row.budgetId, vId);
-          return { blob: pdfBlob(built.pdf), name: `${built.number}-v${built.version}.pdf` };
+          return {
+            blob: pdfBlob(built.pdf),
+            name: budgetFileBase(row.budgetId, built.number, built.version) + ".pdf",
+          };
         }
         const refs = {};
         let lang = "es";
@@ -30922,9 +31015,30 @@
         downloadBlob(docxBlob(descriptor, lang), filename);
       }
       /** The quote, as Word. Awaits the plates exactly as the PDF path does. */
+      /**
+       * `PRE-2026-0021-Casa 3 Roca-v1.1` — the stem every writer names a quote
+       * file with.
+       *
+       * In one place because there are FIVE of them: the two download routes,
+       * the spreadsheet, and the pair the history attaches. They were five
+       * copies of the same template string, which is four chances for a
+       * reference to reach some of the formats and not the rest, and the one
+       * that went to the customer would be whichever the send drawer used.
+       *
+       * The engine caps the reference and strips what a file name cannot
+       * carry, so nothing is re-checked here. A quote without one keeps
+       * exactly the name it had before.
+       */
+      function budgetFileBase(id, number, version) {
+        let ref = "";
+        try {
+          ref = String(erp.budget(id).reference || "").trim();
+        } catch (e) {}
+        return `${number}-${ref ? ref + "-" : ""}v${version}`;
+      }
       async function downloadBudgetDocx(id, versionId) {
         const d = await budgetDescriptor(id, versionId);
-        saveDocx(d.descriptor, d.lang, `${d.number}-v${d.version}.docx`);
+        saveDocx(d.descriptor, d.lang, budgetFileBase(id, d.number, d.version) + ".docx");
       }
       /**
        * Every other document, as Word: one call, given the kind and the same
@@ -30983,7 +31097,7 @@
       }
       async function downloadBudgetPdf(id, versionId) {
         const built = await budgetPdfString(id, versionId);
-        downloadBlob(pdfBlob(built.pdf), `${built.number}-v${built.version}.pdf`);
+        downloadBlob(pdfBlob(built.pdf), budgetFileBase(id, built.number, built.version) + ".pdf");
       }
       /**
        * The same quote as a spreadsheet.
@@ -31065,7 +31179,7 @@
           xlsxBlob(b.number, rows, {
             subtitle: `${b.number} · v${doc.version} · ${erp.party(b.partyId) ? erp.party(b.partyId).name : ""}`,
           }),
-          `${b.number}-v${doc.version}.xlsx`,
+          budgetFileBase(id, b.number, doc.version) + ".xlsx",
         );
       }
       /* DOWNLOAD THE VERSION BEING LOOKED AT.

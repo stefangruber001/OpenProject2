@@ -11300,6 +11300,19 @@ async function testBudgetCreation(browser, base) {
       ok("COM-03: the register offers «＋ Presupuesto»");
     else bad("COM-03: new-budget button exists", "no #bqNew");
 
+    /* THE REFERENCE DIALOG NOW STANDS BETWEEN «Crear presupuesto» AND THE
+       BUILDER, on both origins — it is what the document file is named after,
+       and the moment to name a thing is when it is made. Answered here the way
+       the estimator answers it, because a suite that cannot get past it would
+       report the whole creation flow broken, which is what it did the first
+       time this ran. */
+    const answerRefDialog = async (ref) => {
+      await pg.waitForSelector("#mscrim input", { timeout: 8000 });
+      await pg.fill("#mscrim input", ref);
+      await pg.click("#mscrim .btn.primary");
+      await pg.waitForTimeout(500);
+    };
+
     // ---- from an open lead, no visit required ------------------------------
     await pg.click("#bqNew");
     await pg.waitForTimeout(500);
@@ -11326,18 +11339,24 @@ async function testBudgetCreation(browser, base) {
     } else {
       const before = await pg.evaluate(() => erp.state.budgets.length);
       await pg.click("#bn_save");
-      await pg.waitForTimeout(700);
-      const after = await pg.evaluate(
-        (leadId) => ({
+      await answerRefDialog("Casa 3 Roca");
+      const after = await pg.evaluate((leadId) => {
+        const last = erp.state.budgets[erp.state.budgets.length - 1];
+        return {
           count: erp.state.budgets.length,
           onBuilder: !!document.querySelector("#bTree"),
           leadStatus: erp.state.opportunities.find((o) => o.id === leadId)?.status,
-        }),
-        leadPicked,
-      );
+          reference: last ? last.reference : null,
+        };
+      }, leadPicked);
       if (after.count === before + 1 && after.onBuilder)
         ok("COM-03: a presupuesto is created from an open lead with no visit in between");
       else bad("COM-03: budget from lead", JSON.stringify({ before, after }));
+      /* The reference typed into the dialog is what the document file will be
+         named after, so it has to be ON the quote, not just in the dialog. */
+      if (after.reference === "Casa 3 Roca")
+        ok("COM-03: the reference typed on the way in is stored on the presupuesto");
+      else bad("COM-03: reference from the dialog", JSON.stringify(after.reference));
     }
 
     // ---- from a completed visit, which must come back linked ---------------
@@ -11364,7 +11383,7 @@ async function testBudgetCreation(browser, base) {
     } else {
       const before = await pg.evaluate(() => erp.state.budgets.length);
       await pg.click("#bn_save");
-      await pg.waitForTimeout(700);
+      await answerRefDialog("Aragó 331");
       const after = await pg.evaluate((visitId) => {
         const v = erp.state.visits.find((x) => x.id === visitId);
         return {

@@ -66,6 +66,46 @@
   const quarterOf = (isoDate) =>
     isoDate.slice(0, 4) + "-Q" + (Math.floor((+isoDate.slice(5, 7) - 1) / 3) + 1);
   /**
+   * The short reference an estimator files a quote under, and which its
+   * document file is named after.
+   *
+   * REFUSED, NOT TRUNCATED, and that is the whole design. Cutting «Casa 3 Roca
+   * del Vallès» down to fifteen produces «Casa 3 Roca del» — a severed word
+   * nobody chose, printed on a file that goes to a customer. Fifteen is a
+   * ceiling the estimator writes under, not a knife the product swings: asked
+   * to shorten it she picks where, and the answer may well be eight characters
+   * rather than fifteen.
+   *
+   * Checked HERE rather than only on the field that collects it, because a
+   * value can also arrive from an import or a script, and a rule that lives in
+   * an input is a rule about typing rather than about the data.
+   *
+   * The refused characters are the ones WINDOWS will not accept in a file
+   * name — the nine reserved ones and the control codes. The document is
+   * written to the customer's disk under this name, so a reference that cannot
+   * be written is caught while somebody is still looking at it. Reserved
+   * device names (CON, PRN, LPT1…) are not a risk: this string is never the
+   * whole name, only the middle of «PRE-2026-0021-<ref>-v1.1».
+   *
+   * Runs of whitespace collapse and the ends are trimmed, silently — that
+   * changes nothing a reader would notice and no file name can carry it.
+   */
+  const BUDGET_REF_MAX = 15;
+  const BUDGET_REF_REFUSED = /[<>:"/\\|?*\u0000-\u001f]/;
+  const budgetRefOf = (v) => {
+    const t = String(v == null ? "" : v)
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!t) return "";
+    if (BUDGET_REF_REFUSED.test(t))
+      throw new Error('A reference cannot contain < > : " / \\ | ? * — it names a file');
+    if (t.length > BUDGET_REF_MAX)
+      throw new Error(
+        "A reference is at most " + BUDGET_REF_MAX + " characters, and this one is " + t.length,
+      );
+    return t;
+  };
+  /**
    * How long THIS supplier gives US to pay — the purchase side, never the sale.
    *
    * Falls back to the old shared field and then to thirty, so a blob that has
@@ -3157,6 +3197,12 @@
           number: this.nextNumber("budget"),
           date: this.state.today,
           internalRef: "",
+          /* NOT internalRef, which a variation already uses to carry the reason
+             it exists. This one is the estimator's own short label for the
+             quote, and it is what the document file is named after, so deriving
+             it from a field that sometimes holds a sentence would put that
+             sentence in front of a customer. */
+          reference: "",
           partyId: null,
           propertyId: null,
           preparedBy: user || "backoffice",
@@ -3196,6 +3242,7 @@
       );
       // N1: explicit choice > this customer's docLanguage > company default.
       rec.language = this._docLanguageFor(rec.language, null, rec.partyId);
+      rec.reference = budgetRefOf(rec.reference);
       this.state.budgets.push(rec);
       this.newVersion(rec.id, { reason: "Versión inicial", author: user }, true);
       this._log(user, "createBudget", rec.number);
@@ -13984,8 +14031,10 @@
         "exclusions",
         "assumptions",
         "executionDays",
+        "reference",
       ];
       for (const k of Object.keys(patch)) if (!allowed.includes(k)) delete patch[k];
+      if (patch.reference != null) patch.reference = budgetRefOf(patch.reference);
       // Package 3 slide 5: a validity date is how long the OFFER stands —
       // one already in the past expired before anyone read it, which is not
       // a state a presupuesto can be typed into. The `min` on the field

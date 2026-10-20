@@ -5566,6 +5566,92 @@ assert(
   );
 }
 
+/* ---------- the quote's short reference, and the file named after it ----------
+ *
+ * REFUSED, NOT TRUNCATED. Cutting «Casa 3 Roca del Vallès» to fifteen gives
+ * «Casa 3 Roca del», a severed word nobody chose, printed on a file that goes
+ * to a customer. Fifteen is a ceiling the estimator writes under, not a knife
+ * the product swings — asked to shorten it she chooses where, and may well
+ * land on eight characters rather than fifteen.
+ *
+ * Checked in the ENGINE, not only on the field that collects it: a value can
+ * also arrive from an import or a script, and a rule that lives in an input is
+ * a rule about typing rather than about the data.
+ */
+{
+  const make = (v) => erp.createBudget({ partyId: cust.id, reference: v }, "bo");
+  const refused = (v) => {
+    try {
+      make(v);
+      return null;
+    } catch (e) {
+      return e.message;
+    }
+  };
+  assert(make("Casa 3 Roca").reference === "Casa 3 Roca", "a reference that fits is kept as typed");
+  assert(make("").reference === "", "no reference stays no reference");
+  assert(
+    erp.createBudget({ partyId: cust.id }, "bo").reference === "",
+    "a quote created without one gets the empty string, never undefined",
+  );
+  assert(
+    make("Casa 3 Roca del").reference === "Casa 3 Roca del",
+    "exactly fifteen is allowed — it is a ceiling, not a target",
+  );
+  assert(
+    /at most 15/.test(refused("Casa 3 Roca del Vallès") || ""),
+    "sixteen or more is REFUSED, never silently cut to a half word",
+    refused("Casa 3 Roca del Vallès"),
+  );
+  /* A value nothing else in this block creates, so the check can only pass by
+     the refusal having left nothing behind. «Casa 3 Roca del» would not do: it
+     is a legitimate fifteen asserted three lines above. */
+  assert(
+    /at most 15/.test(refused("Reforma integral Roca") || ""),
+    "a different over-long one is refused the same way",
+    refused("Reforma integral Roca"),
+  );
+  assert(
+    erp.state.budgets.every((b) => b.reference !== "Reforma integra"),
+    "and the severed form was not stored on the way past",
+  );
+  /* The nine characters Windows will not take in a file name. The document is
+     written to the customer's disk under this name. */
+  for (const bad of ["a<b", "a>b", "a:b", 'a"b', "a/b", "a\\b", "a|b", "a?b", "a*b"])
+    assert(
+      /names a file/.test(refused(bad) || ""),
+      "refused for a file name: " + bad,
+      refused(bad),
+    );
+  assert(
+    make("  Casa 3   Roca ").reference === "Casa 3 Roca",
+    "runs of space collapse and the ends are trimmed, which no reader misses",
+  );
+  /* Editable afterwards, because the dialog that asks for it says so — and a
+     typo nobody can correct would reach the customer in a file name. */
+  const bref = erp.createBudget({ partyId: cust.id }, "bo");
+  erp.updateBudget(bref.id, { reference: "Casa 9 Roca" }, "bo");
+  assert(erp.budget(bref.id).reference === "Casa 9 Roca", "it can be corrected later");
+  let held = "";
+  try {
+    erp.updateBudget(bref.id, { reference: "Casa 9 Roca del Vallès" }, "bo");
+  } catch (e) {
+    held = e.message;
+  }
+  assert(/at most 15/.test(held), "and the refusal holds on that way in too", held);
+  assert(
+    erp.budget(bref.id).reference === "Casa 9 Roca",
+    "a refused edit leaves the stored one exactly as it was",
+    erp.budget(bref.id).reference,
+  );
+  /* The field a variation uses for its reason is a DIFFERENT one, and nothing
+     here may reach it: a file named after a reason prints a sentence. */
+  assert(
+    make("Casa 1").internalRef === "",
+    "the adicional's reason field is left alone — it is a different field",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
