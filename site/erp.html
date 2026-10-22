@@ -17958,7 +17958,10 @@
                 here as well as asked for at creation, because the dialog that
                 asks says it can be changed later, and because a typo that can
                 never be corrected would reach the customer in a file name. -->
-           <label>Referencia <input type="text" id="bcRef" maxlength="15" placeholder="Casa 3 Roca" value="${esc(b.reference || "")}"${dis}></label>
+           <!-- NOT disabled when the version is locked: see updateBudget. The
+                reference names the file, never the paper, and a quote already
+                sent is the one most likely to need finding again. -->
+           <label>Referencia <input type="text" id="bcRef" maxlength="15" placeholder="Casa 3 Roca" value="${esc(b.reference || "")}"></label>
            <!-- Part 2 · item 14: validity is POLICY now, not a choice — thirty
                 days from the day the quote is issued, stamped by issueVersion.
                 The input is hidden, not deleted (the removal rule): delete

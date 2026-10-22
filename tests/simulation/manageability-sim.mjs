@@ -5650,6 +5650,67 @@ assert(
     make("Casa 1").internalRef === "",
     "the adicional's reason field is left alone — it is a different field",
   );
+
+  /* THE FREEZE DOES NOT REACH THE REFERENCE, because the reference is not on
+     the paper — it names the file. The quote somebody needs to find again is
+     the one already sent or accepted, so a field that locks on sending is a
+     field that is never there when it is wanted. Everything the customer READ
+     stays frozen, and these checks are mostly about that half. */
+  const sent = erp.createBudget({ partyId: cust.id }, "bo");
+  const sch = erp.addChapter(sent.id, { name: "Obra" }, "bo");
+  erp.addLine(
+    sent.id,
+    sch.id,
+    { desc: "Partida", unit: "u", qtyMilli: 1000, priceCents: 10000, costCents: 5000 },
+    "bo",
+  );
+  erp.issueVersion(sent.id, {}, "bo");
+  erp.updateBudget(sent.id, { reference: "Enviado 1" }, "bo");
+  assert(
+    erp.budget(sent.id).reference === "Enviado 1",
+    "a reference can be set on a quote already SENT",
+    erp.budget(sent.id).reference,
+  );
+  const vatBefore = erp.budget(sent.id).vatBp;
+  const refuses = (id, patch) => {
+    try {
+      erp.updateBudget(id, patch, "bo");
+      return "";
+    } catch (e) {
+      return e.message;
+    }
+  };
+  assert(
+    /issued\/accepted/.test(refuses(sent.id, { vatBp: 1000 })),
+    "…while the rate the customer read is still refused",
+    refuses(sent.id, { vatBp: 1000 }),
+  );
+  assert(
+    /issued\/accepted/.test(refuses(sent.id, { reference: "X", vatBp: 1000 })),
+    "…and mixing the reference with such a field is refused, not a way in",
+    refuses(sent.id, { reference: "X", vatBp: 1000 }),
+  );
+  /* Compared against what it WAS, not against a rate this test picked: the
+     company default may already be the rate being pushed, and then a check
+     written as «is not 1000» passes or fails for reasons that have nothing to
+     do with the refusal. */
+  assert(
+    erp.budget(sent.id).reference === "Enviado 1" && erp.budget(sent.id).vatBp === vatBefore,
+    "…a refused mixed patch changes neither of the two",
+    `${erp.budget(sent.id).reference} / ${erp.budget(sent.id).vatBp} was ${vatBefore}`,
+  );
+  erp.acceptVersion(sent.id, erp.currentVersion(sent.id).id, { evidenceRef: "ok" }, "bo");
+  erp.updateBudget(sent.id, { reference: "Aceptado 1" }, "bo");
+  assert(
+    erp.budget(sent.id).reference === "Aceptado 1",
+    "a reference can be set on a quote already ACCEPTED",
+    erp.budget(sent.id).reference,
+  );
+  assert(
+    /at most 15/.test(refuses(sent.id, { reference: "Aceptado y larguísimo" })),
+    "…and the fifteen still holds on that path",
+    refuses(sent.id, { reference: "Aceptado y larguísimo" }),
+  );
 }
 
 const failed = checks.filter((c) => !c.pass);

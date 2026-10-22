@@ -14006,7 +14006,20 @@
       // header-level corrections; frozen once a version is issued or accepted
       const b = this.budget(id);
       const cur = this.currentVersion(id);
-      if (b.acceptedVersionId || (cur && cur.issued))
+      /* THE REFERENCE IS NOT PART OF THE PAPER, so the freeze does not reach
+         it. It never prints: it names the FILE the document downloads as.
+         Freezing it protects nothing and costs the field the whole reason it
+         exists — the quote somebody needs to find again months later is
+         precisely the one already sent or accepted, and on this company's
+         books that is twenty-three of forty-one. What the customer READ stays
+         frozen: a patch touching anything else is refused exactly as before,
+         and a patch that mixes the reference with such a field is refused
+         too, so this cannot be used as a way in. */
+      const onlyReference =
+        patch &&
+        Object.keys(patch).length > 0 &&
+        Object.keys(patch).every((k) => k === "reference");
+      if (!onlyReference && (b.acceptedVersionId || (cur && cur.issued)))
         throw new Error("Budget is issued/accepted — create a new version instead");
       // validityDate, not validityDays — the budget record has never held a
       // day count, so the old name silently dropped every edit to the one
