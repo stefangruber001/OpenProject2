@@ -34,7 +34,21 @@ on:
 jobs:
   journey:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 15 -> 25 on 22 Oct. The suite was not failing: it ran 15.4 minutes and
+    # GitHub reported the timeout as «cancelled», which reads like a verdict on
+    # the code and is not one — the same tree runs 898/898 locally.
+    #
+    # Fifteen was set when CLAUDE.md could still say «the full run is about
+    # twelve minutes, one of the forty-one». There are forty-nine suites now,
+    # so the budget had been eaten by growth rather than by any one change, and
+    # the margin had quietly reached zero: the run before this one finished
+    # inside the window by seconds.
+    #
+    # Raised rather than re-run, because a re-run is a coin toss that teaches
+    # nothing and a cancelled gate is indistinguishable from a red one at a
+    # glance. If this starts brushing twenty-five, the answer is to split the
+    # suite, not to keep moving the number.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
