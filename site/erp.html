@@ -832,8 +832,22 @@
         padding: 2px 8px;
         background: var(--hair);
         color: var(--body);
-        white-space: nowrap;
+        max-width: 100%;
       }
+      /* NO `white-space: nowrap` HERE ANY MORE. It is right for a badge —
+         «Banco», «Borradores» — and wrong the moment a pill carries prose,
+         which twelve of them do: the line runs past the edge of its drawer and
+         the browser clips it, so the reader gets «…no se puede comprobar que
+         e». Reported from the statement importer, where the worst case is 175
+         characters explaining why nothing was imported and two others are
+         instructions that cannot be followed half-read.
+
+         Dropped rather than overridden by a modifier class: a second class
+         would have to be remembered at every new call site, and the audit
+         counts each distinct class string as a literal of its own, so the
+         tidy-looking fix cost a point on a ratchet with no slack. A short pill
+         has nothing to wrap; a narrow one wraps instead of overflowing, which
+         is the better of the two failures. */
       .pill.g {
         background: var(--greenSoft);
         color: var(--greenDeep);
