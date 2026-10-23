@@ -43,7 +43,22 @@
   // uses. Matched globally against the WHOLE row text because the balance
   // can land on a continuation line when the concept itself is short enough
   // to leave no room for it beside the amount.
-  const MONEY_RE = /-?\d{1,3}(?:\.\d{3})*,\d{2}\s*EUR\b/gi;
+  /* ONE OR TWO DECIMALS, not two. BBVA trims a trailing zero in this export —
+     it prints «-427,5 EUR» for 427,50 and «2.311,1 EUR» for 2.311,10 — and a
+     pattern that insisted on two digits simply did not see those amounts.
+
+     The failure was silent and it moved money. With the amount unmatched, the
+     first money token on the row became the running BALANCE, so the row was
+     imported with the balance as its amount (and usually with the sign
+     flipped, a charge arriving as a credit); the balance then came out null,
+     which ALSO disabled `statementOf` — one null balance anywhere turns off
+     the opening+movements=closing check for the whole statement. So the very
+     guard that exists to catch a bad import was switched off by the same bug
+     that caused it.
+
+     Measured on a real statement of 74 rows: 10 amounts wrong, 13 balances
+     missing, and a net of +41.134,51 against the true +381,26. */
+  const MONEY_RE = /-?\d{1,3}(?:\.\d{3})*,\d{1,2}\s*EUR\b/gi;
 
   /** Every text-showing item on every page, grouped into visual lines, ONE ARRAY PER PAGE. */
   async function pdfLines(arrayBuffer, pdfjs) {

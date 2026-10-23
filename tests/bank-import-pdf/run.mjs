@@ -186,6 +186,56 @@ assert(
   JSON.stringify(groups),
 );
 
+/* ---- A TRAILING ZERO THE BANK DOES NOT PRINT -------------------------------
+ *
+ * BBVA trims it: «-427,5 EUR» is 427,50 and «2.311,1 EUR» is 2.311,10. The
+ * money pattern used to insist on two decimals, so it did not see those
+ * amounts at all — and the damage was not a missing row, it was a WRONG one.
+ * With the amount unmatched, the first money token on the line became the
+ * running BALANCE, so the movement was imported with the balance as its
+ * amount, usually sign-flipped: a charge of 2.729,40 arrived as a credit of
+ * 8.301,21. The balance then came out null, and one null balance anywhere
+ * turns off the opening+movements=closing check for the entire statement —
+ * so the guard built to catch exactly this was disabled by the same defect.
+ *
+ * Found on a real statement of 74 rows: 10 amounts wrong, 13 balances
+ * missing, net +41.134,51 against a true +381,26. Asserted here at the unit
+ * the PDF path actually uses, because the generated fixture prints every
+ * figure with two decimals and therefore could never have caught it.
+ */
+{
+  const one = parseRowGroup(["20/10/2026 20/10/2026 00326 -2.729,4 EUR 8.301,21 EUR"]);
+  assert(
+    one && one.amountCents === -272940,
+    "a one-decimal amount is the AMOUNT, not the balance standing in for it",
+    one && one.amountCents,
+  );
+  assert(
+    one && one.balanceCents === 830121,
+    "…and the balance still reads, so the statement check is not disabled",
+    one && one.balanceCents,
+  );
+  const bal = parseRowGroup(["13/10/2026 13/10/2026 00919 -16,42 EUR 1.584,3 EUR"]);
+  assert(
+    bal && bal.amountCents === -1642 && bal.balanceCents === 158430,
+    "a one-decimal BALANCE reads too — it used to come back null and switch the check off",
+    bal && `${bal.amountCents} / ${bal.balanceCents}`,
+  );
+  const two = parseRowGroup(["06/10/2026 06/10/2026 00007 2.311,1 EUR 3.030,95 EUR"]);
+  assert(
+    two && two.amountCents === 231110,
+    "a one-decimal credit keeps its sign and its size",
+    two && two.amountCents,
+  );
+  // And the two-decimal shape every other row uses is untouched.
+  const std = parseRowGroup(["22/10/2026 22/10/2026 00919 -13,79 EUR 3.728,28 EUR"]);
+  assert(
+    std && std.amountCents === -1379 && std.balanceCents === 372828,
+    "the ordinary two-decimal row is unchanged",
+    std && `${std.amountCents} / ${std.balanceCents}`,
+  );
+}
+
 // ---- the value parsers this module reuses, at their edges (shared with the .xlsx path) ------
 assert(toIsoDate("11/2/2026") === "2026-02-11", "single-digit month pads, same as the .xlsx path");
 assert(
