@@ -5711,6 +5711,26 @@ assert(
     "…and the fifteen still holds on that path",
     refuses(sent.id, { reference: "Aceptado y larguísimo" }),
   );
+
+  /* WHICH PROPERTY A QUOTE IS FOR, once it exists. The field was in the
+     allowed list from the start and no screen ever sent it: the inmueble came
+     from the lead at creation and could not be corrected afterwards, so a
+     quote opened against the wrong one printed the wrong address for ever.
+     Unlike the reference, this one IS on the customer's paper, so the freeze
+     still covers it. */
+  const otro = erp.addProperty({ partyId: cust.id, street: "C/ Otra 2", city: "BCN" }, "bo");
+  const draft = erp.createBudget({ partyId: cust.id }, "bo");
+  erp.updateBudget(draft.id, { propertyId: otro.id }, "bo");
+  assert(
+    erp.budget(draft.id).propertyId === otro.id,
+    "a draft can be moved to the right inmueble",
+    erp.budget(draft.id).propertyId,
+  );
+  assert(
+    /issued\/accepted/.test(refuses(sent.id, { propertyId: otro.id })),
+    "…but a quote already sent keeps the address the customer read",
+    refuses(sent.id, { propertyId: otro.id }),
+  );
 }
 
 const failed = checks.filter((c) => !c.pass);

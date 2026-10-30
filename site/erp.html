@@ -17976,6 +17976,16 @@
                 reference names the file, never the paper, and a quote already
                 sent is the one most likely to need finding again. -->
            <label>Referencia <input type="text" id="bcRef" maxlength="15" placeholder="Casa 3 Roca" value="${esc(b.reference || "")}"></label>
+           <!-- WHICH PROPERTY THE QUOTE IS FOR, changeable here. The engine has
+                accepted this field all along and no screen ever sent it: the
+                inmueble was inherited from the lead at creation and then frozen
+                by omission, so a quote opened against the wrong one stayed
+                wrong for ever and printed that way. Reported by the client on a
+                quote filed under one name that belongs to another.
+                Disabled once the version is locked, unlike Referencia: this one
+                IS on the paper the customer read. No backticks in this comment
+                — it sits inside a template literal, and one would end it. -->
+           <label>Inmueble <select id="bcProp"${dis}>${propertyOptions(b.partyId, b.propertyId || null)}</select></label>
            <!-- Part 2 · item 14: validity is POLICY now, not a choice — thirty
                 days from the day the quote is issued, stamped by issueVersion.
                 The input is hidden, not deleted (the removal rule): delete
@@ -18307,6 +18317,15 @@
             el.onchange = () => mutate(() => erp.updateBudget(id, patch(el), "backoffice"), msg);
           };
           hdr($("#bcRef"), (el) => ({ reference: el.value }), "Referencia actualizada");
+          /* The «＋ Nuevo inmueble…» sentinel belongs to the lead drawer, which
+             can open a creation form over itself. There is nowhere to put one
+             here, so the picker offers only what exists and the choice is
+             ignored rather than silently storing the sentinel as an id. */
+          hdr(
+            $("#bcProp"),
+            (el) => ({ propertyId: el.value === NEW_PROPERTY ? b.propertyId || "" : el.value }),
+            "Inmueble actualizado",
+          );
           hdr($("#bcValid"), (el) => ({ validityDate: el.value }), "Validez actualizada");
           // Blank clears it back to «no consta» rather than storing 0: the two
           // mean different things and only one of them is safe to print.
