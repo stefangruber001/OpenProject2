@@ -11820,3 +11820,62 @@ auditoría medía 91 contra un techo de 91 y ahora mide 107 contra 83+24.
 Quien añada la siguiente columna de datos a un registro va a ver rojo
 igual, y el camino es éste: medir el commit anterior, comprobar que el
 delta son datos y nombrarlos.
+
+## S155 · Corregir una factura es retirarla y volver a emitirla (2026-11-05)
+
+El cliente necesita cambiar todo de una factura —concepto, importe,
+tipo—, y el operador lo encuadró así: «until October next year,
+electronic invoicing is not mandatory, so for the moment this can be
+done». Se le describieron dos caminos y eligió el primero: «ok, go with 1».
+
+**Lo que NO se ha hecho: un campo editable sobre una factura emitida.**
+La factura emitida es inmutable por diseño y lo imprime en su propio pie
+—«las correcciones se emiten como factura rectificativa; esta factura es
+inmutable»—, así que cambiar un importe en su sitio dejaría el papel que
+el cliente tiene y el registro que la base de datos cree sin forma de
+distinguirse, y la cadena `invoiceEvents` (VFU-01) dejaría de verificar
+sobre un registro que ya había firmado. Un `updateInvoice` es la clase de
+método que no se puede quitar después.
+
+**Lo que se ha hecho: usar el camino que ya existía.** «Corregir la
+factura» retira el número con `undoLastInvoice` y lo vuelve a emitir con
+`issueInvoice`. Las dos mitades estaban escritas y probadas desde S150; lo
+único nuevo es la pantalla que las encadena y una negativa más. Las mismas
+razones que impiden retirar impiden corregir, porque `invoiceCorrectBlock`
+las lee de `invoiceUndoBlock`: cobrada, enviada, rectificada, trimestre ya
+en la gestoría, o no ser la última de la cadena.
+
+**Decisión reversible: la retirada se guarda ANTES de editar.** El orden
+es el punto. Con la factura todavía en el libro, el techo de AR-11 ya
+cuenta su importe, el hito sigue marcado como facturado y el adicional
+como facturado también, así que el generador refusaría el borrador por un
+dinero que pertenece al documento que se está reemplazando. Retirada
+primero, el libro cuadra y el generador, la vista previa y la puerta de
+«Emitir» funcionan sin tocarlos.
+
+**Lo que eso cuesta, y se dice en pantalla:** hay una ventana en la que la
+factura no consta en el libro —desde que se pulsa «Corregir» hasta que se
+emite—. El cartel del generador lo dice con el número delante, y salir sin
+emitir pide confirmación. La alternativa (editar primero y retirar y
+emitir en un solo acto al final) necesitaba validar el borrador contra un
+libro que todavía contiene la factura vieja, o deshacer a medias si el
+segundo paso falla; ninguna de las dos es más reversible que un número que
+vuelve a estar libre.
+
+**Una negativa nueva: el ejercicio.** `nextNumber` acuña contra el año de
+HOY, así que volver a emitir una factura de otro ejercicio devolvería un
+número distinto —la serie se reinicia cada enero, y aun sin reiniciarse el
+patrón lleva el año dentro—. Corregir una factura y recibir otra no es
+corregirla, así que `invoiceCorrectBlock` lo refusa por su nombre
+(`other-year`) y la pantalla manda a la rectificativa. Retirarla sigue
+permitido: eso sólo la quita.
+
+**La fecha se mueve a hoy, y es correcto.** `issueInvoice` fecha con
+`state.today`. En el caso normal —se emite, se ve el error, se corrige— es
+el mismo día. Cuando no lo es, la factura que finalmente sale es la de hoy
+y no se ha entregado ninguna otra; el diálogo lo dice antes de emitir.
+
+**Lo que queda abierto:** LEGAL_REVIEW §13. §11 preguntaba a la gestoría
+si retirar una factura no enviada vale como corrección NORMAL o sólo como
+excepción para la primera mal numerada. Este cambio la convierte en
+corriente, y esa pregunta sigue sin contestar.

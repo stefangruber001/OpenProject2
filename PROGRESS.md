@@ -4439,3 +4439,46 @@ Puertas: numeración 53/53 (eran 50) · suite completa de navegador
 **895/895 sin fallos** · boundaries OK · year-sim 149/149 ·
 migraciones 149/149 · manejabilidad 521/521 · source-audit 158/158 en+ca ·
 workspace-audit 0/0 en+ca · diccionario 4486 completo en tres idiomas.
+
+## S47 · Corregir una factura, sin hacerla editable (2026-11-05)
+
+El cliente pidió cambiar «all the information» de una factura. La factura
+emitida es inmutable y lo imprime en su propio pie, así que la respuesta no
+es un campo editable: «Corregir la factura» retira el número con
+`undoLastInvoice` y lo vuelve a emitir con `issueInvoice`, que es el camino
+que la serie entiende y el único que deja la cadena `invoiceEvents`
+verificable. Las dos mitades existían desde S44/S45; lo nuevo es la
+pantalla que las encadena.
+
+Tres cosas que no eran obvias hasta escribirlo:
+
+- **La retirada se guarda antes de editar.** Con la factura todavía en el
+  libro, el techo de AR-11 cuenta su importe y el hito sigue facturado, así
+  que el generador refusaría el borrador por dinero que pertenece al
+  documento que se está reemplazando. Retirada primero, todo lo demás
+  funciona sin tocarlo. El coste —una ventana en la que la factura no
+  consta— se dice en pantalla y salir sin emitir pide confirmación.
+- **El ejercicio es una negativa nueva.** `nextNumber` acuña contra el año
+  de hoy, así que corregir una factura del año pasado devolvería otro
+  número. `invoiceCorrectBlock` lo refusa por su nombre y manda a la
+  rectificativa; retirarla, que sólo la quita, sigue permitido.
+- **El botón sólo aparece cuando se puede.** Las razones que impiden
+  retirar —cobrada, enviada, rectificada, trimestre en la gestoría— las
+  lee de `invoiceUndoBlock`, y la frase que ya explicaba el bloqueo explica
+  ahora los dos.
+
+**Y lo que esto abre, dicho en voz alta:** LEGAL_REVIEW §11 preguntaba a la
+gestoría si retirar una factura no enviada vale como corrección NORMAL o
+sólo como excepción. Este cambio la vuelve corriente sin que la pregunta
+esté contestada, y además el calendario que el cliente tiene en la cabeza
+—octubre del año que viene— no coincide con ninguna de las fechas de §1:
+Verifactu obliga a las sociedades el 2027-01-01. Entrada nueva: §13, con
+la pregunta en una línea y `legally_verified: false`.
+
+Puertas: numeración 55/55 (eran 53) · manejabilidad 558/558 (eran 550) ·
+year-sim 149/149 · migraciones 154/154 · source-audit 158/158 en+ca ·
+auditoría de páginas 107/83 · workspace-audit 0/0 en+ca · diccionario 4502
+completo en tres idiomas · boundaries OK · miss-crawl en 21/37. La suite
+completa de navegador —con el caso nuevo del generador— corre en CI sobre
+la rama antes del merge, que es para lo que `claude/**` está en el
+disparador.

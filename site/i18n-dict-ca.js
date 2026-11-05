@@ -5235,6 +5235,20 @@ window.CANEI_DICT.ca = {
   "Ya tiene una rectificativa que la referencia.": "Ja té una rectificativa que la referencia.",
   "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.":
     "El seu trimestre ja s'ha enviat a l'assessor. Emeteu una rectificativa al seu lloc.",
+  "Corregir factura": "Corregir factura",
+  "Corrección de la factura": "Correcció de la factura",
+  "Factura retirada para corregirla": "Factura retirada per corregir-la",
+  "Factura corregida": "Factura corregida",
+  "Se retira la factura y se abre el generador con sus datos para que los corrija. Al emitir vuelve a salir con el mismo número y con la fecha de hoy. Sólo se puede porque no ha salido de aquí.":
+    "Es retira la factura i s'obre el generador amb les seves dades perquè les corregeixi. En emetre-la torna a sortir amb el mateix número i amb la data d'avui. Només es pot perquè no ha sortit d'aquí.",
+  "Se ha retirado para corregirla: al emitir vuelve a salir con el mismo número y con la fecha de hoy. Si sale de esta pantalla sin emitirla, la factura no constará en el libro.":
+    "S'ha retirat per corregir-la: en emetre-la torna a sortir amb el mateix número i amb la data d'avui. Si surt d'aquesta pantalla sense emetre-la, la factura no constarà al llibre.",
+  "Se emitió en otro ejercicio y la numeración se reinicia cada año: al volver a emitirla ya no sería el mismo número. Emita una rectificativa en su lugar.":
+    "Es va emetre en un altre exercici i la numeració es reinicia cada any: en tornar a emetre-la ja no seria el mateix número. Emeteu una rectificativa al seu lloc.",
+  "Salir sin emitir": "Sortir sense emetre",
+  Salir: "Sortir",
+  "La factura no se ha vuelto a emitir. Si sale ahora no constará en el libro hasta que la emita de nuevo, y su número sigue libre en la serie.":
+    "La factura no s'ha tornat a emetre. Si surt ara no constarà al llibre fins que l'emeti de nou, i el seu número segueix lliure a la sèrie.",
   "Plazo de pago del cliente (días)": "Termini de pagament del client (dies)",
   "Plazo que nos da el proveedor (días)": "Termini que ens dóna el proveïdor (dies)",
   "Quitar el registro": "Treure el registre",

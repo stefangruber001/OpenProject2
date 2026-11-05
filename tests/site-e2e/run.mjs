@@ -9551,6 +9551,124 @@ async function testInvoiceGenerator(browser, base) {
       );
     else bad("recording a pre-platform invoice", JSON.stringify(ext));
 
+    /* ---- CORRECTING A FACTURA THAT NEVER LEFT THE BUILDING ---------------
+     *
+     * Asked for in November: the client needs to change everything on a
+     * factura — concept, importe, rate. An issued factura is immutable and
+     * says so on its own paper, so the screen does not edit one: it withdraws
+     * the number and issues it again with the corrected content. The whole
+     * flow is on screen, which is why it is checked here and not only in the
+     * engine suites — the two halves that matter are that the generator opens
+     * ARMED with what was on the document, and that the number which comes
+     * back is the one that went away.
+     */
+    const prep = await pg.evaluate(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      closeDrawer();
+      await sleep(300);
+      /* Its own factura to correct, on a job that already has one: the case
+         then does not depend on what the seed happened to leave billable, and
+         CON-11 — the first invoice of a job needs the signed contract — is
+         already satisfied for that payer. */
+      const target = erp.state.projects.find((x) => {
+        const b = erp.invoiceBases(x.id);
+        return b.billedBaseCents > 0 && b.attributedCents - b.billedBaseCents > 50000;
+      });
+      if (!target) return { target: false };
+      const orig = erp.issueInvoice(
+        {
+          projectId: target.id,
+          kind: "progress",
+          lines: [{ desc: "E2E por corregir", amountCents: 20000 }],
+          vatBp: 2100,
+        },
+        "bo",
+      );
+      invoiceDrawer(orig.number);
+      await sleep(400);
+      return {
+        target: true,
+        number: orig.number,
+        block: erp.invoiceCorrectBlock(orig.id),
+        fixBtn: !!document.querySelector("#iv_fix"),
+        undoBtn: !!document.querySelector("#iv_undo"),
+      };
+    });
+    if (!prep.target) {
+      bad("ADM-01: correcting a factura", "no job in the seed has room to bill one");
+    } else if (prep.block || !prep.fixBtn || !prep.undoBtn) {
+      bad("ADM-01: «Corregir la factura» offered", JSON.stringify(prep));
+    } else {
+      ok(`ADM-01: ${prep.number} offers «Corregir la factura» beside the withdrawal`);
+      await pg.click("#iv_fix");
+      await pg.waitForSelector("#mscrim input", { timeout: 8000 });
+      await pg.fill("#mscrim input", "el concepto y el importe estaban mal");
+      await pg.click("#mscrim .btn.primary");
+      await pg.waitForTimeout(900);
+      const armed = await pg.evaluate(() => {
+        const num = invWork && invWork.correcting;
+        return {
+          correcting: num || null,
+          onGenerator: !!document.querySelector("#invDoc"),
+          // Withdrawn, and its number back in the series — committed before
+          // anything is edited, which is what gives the gates a book that adds
+          // up while the correction is being typed.
+          gone: !!num && !erp.state.invoices.some((i) => i.number === num),
+          free: !!num && !(erp.state.series.invoice.issued || []).includes(num),
+          lines: [...document.querySelectorAll("[data-invld]")].map((i) => i.value),
+          amounts: [...document.querySelectorAll("[data-invla]")].map((i) => i.value),
+          vat: (document.querySelector("#inv_vat") || {}).value,
+          banner: /Corrección de la factura/.test(
+            (document.querySelector("#invBody") || {}).innerText || "",
+          ),
+          header: ((document.querySelector(".pbbar .who b") || {}).textContent || "").trim(),
+        };
+      });
+      if (
+        armed.correcting === prep.number &&
+        armed.onGenerator &&
+        armed.gone &&
+        armed.free &&
+        armed.lines.join() === "E2E por corregir" &&
+        armed.amounts.join() === "200.00" &&
+        armed.vat === "2100" &&
+        armed.banner &&
+        /Corregir/.test(armed.header)
+      )
+        ok("ADM-01: the generator opens armed with the withdrawn factura, number freed");
+      else bad("ADM-01: correction armed", JSON.stringify(armed));
+
+      await pg.fill('[data-invld="0"]', "E2E corregido");
+      await pg.fill('[data-invla="0"]', "150");
+      await pg.waitForTimeout(400);
+      await pg.click("#invIssue");
+      await pg.waitForTimeout(400);
+      await pg.getByRole("button", { name: "Emitir", exact: true }).click();
+      await pg.waitForTimeout(1000);
+      const done = await pg.evaluate((n) => {
+        const same = erp.state.invoices.filter((i) => i.number === n);
+        const inv = same[0];
+        return {
+          copies: same.length,
+          desc: inv ? inv.lines[0].desc : null,
+          base: inv ? inv.baseCents : null,
+          gaps: erp.seriesGaps("invoice").length,
+          fullScreen: document.body.classList.contains("fs"),
+          withdrawals: erp.state.audit.filter((a) => a.action === "undoLastInvoice").length,
+        };
+      }, prep.number);
+      if (
+        done.copies === 1 &&
+        done.desc === "E2E corregido" &&
+        done.base === 15000 &&
+        done.gaps === 0 &&
+        !done.fullScreen &&
+        done.withdrawals >= 1
+      )
+        ok(`ADM-01: ${prep.number} comes back corrected, once, with no gap in the series`);
+      else bad("ADM-01: correction issued", JSON.stringify(done));
+    }
+
     if (!errs.length) ok("ADM-01: the generator raises no console error");
     else bad("ADM-01: console", errs.slice(0, 2).join(" | ").slice(0, 160));
   } catch (e) {

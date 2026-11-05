@@ -337,3 +337,42 @@ review than a template.
   the hash chain is untouched, and any record can be removed with
   `removeExternalInvoice` while nothing is hung on it.
   **legally_verified: false.**
+
+## 13. Correcting an issued invoice by withdrawing and re-issuing it (2026-11-05)
+
+- **What was asked.** The client needs to change everything on an invoice —
+  concept, amount, rate. The operator's framing: _«until October next year,
+  electronic invoicing is not mandatory, so for the momment this can be done»_,
+  and then, of the two routes offered, _«ok, go with 1»_: surface the existing
+  withdrawal as a correction rather than make an issued invoice editable.
+- **What was built.** «Corregir la factura» chains `undoLastInvoice` and
+  `issueInvoice`: the number is withdrawn, the generator opens armed with what
+  the document said, and the corrected invoice is issued under the same number.
+  No field on an issued invoice is editable, and every refusal §11 lists still
+  applies — `invoiceCorrectBlock` reads them from `invoiceUndoBlock` and adds
+  one of its own, the year boundary.
+- **THE ESCALATION WORTH NAMING.** §11 asked the gestoría whether withdrawing
+  an invoice that was never sent is acceptable _as a normal correction, or only
+  as a one-off for this first mis-numbered document_. That question is still
+  open, and this change answers it in the product: it is now a routine,
+  operator-facing path with a button on every correctable invoice. If the
+  answer comes back «one-off», what has to be removed is this screen, not just
+  the engine method.
+- **TWO TIMETABLES ARE BEING CONFLATED, and neither was verified here.** The
+  client's «October next year» matches neither date this file already holds.
+  §1 (verified 2026-07-16) puts Verifactu's software duties at **2027-01-01 for
+  IS taxpayers** and 2027-07-01 for the rest; a S.L. is an IS taxpayer, so on
+  that reading the window for a withdrawal-and-reissue closes in **under two
+  months**, not in eleven. The October date is more likely the B2B mandatory
+  e-invoicing calendar (Ley 18/2022 «Crea y Crece»), whose reglamento was still
+  unpublished at the last check and which is a different obligation with a
+  different clock. No source was read today for either; §1's own sources are
+  from 2026-07-16 and this entry adds none.
+- **The question for the gestoría**, in one line: _from which date must this
+  company's invoicing software stop allowing an issued invoice to be withdrawn
+  and re-issued — 2027-01-01 (Verifactu, IS taxpayers), 2027-07-01, or the
+  later B2B e-invoicing date the client has in mind?_
+- **What is NOT at stake:** nothing sent, collected, rectified or filed can be
+  corrected — each is refused by name — and nothing from another financial year.
+  The withdrawal and its stated reason stay in the audit log. **legally_verified:
+  false.**

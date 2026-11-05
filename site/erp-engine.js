@@ -8219,6 +8219,28 @@
     }
 
     /**
+     * Can that invoice be corrected — withdrawn and issued again under the
+     * same number?
+     *
+     * Everything `invoiceUndoBlock` refuses, for the same reasons: a document
+     * somebody outside this screen has acted on is their record too. And then
+     * one more, which belongs to correcting rather than to withdrawing: the
+     * number is minted against the CURRENT year. Withdrawing one issued last
+     * year is fine — it only disappears — but re-issuing it would read the
+     * series for this year and hand back a different number, so the operator
+     * would have asked to correct a document and been given a new one. That is
+     * the rectificativa case, and this says so instead of doing it quietly.
+     */
+    invoiceCorrectBlock(id) {
+      const block = this.invoiceUndoBlock(id);
+      if (block) return block;
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (String(inv.date).slice(0, 4) !== String(this.state.today).slice(0, 4))
+        return "other-year";
+      return null;
+    }
+
+    /**
      * Withdraw that invoice and give its number back to the series.
      *
      * The exact inverse of what `issueInvoice` did, in the reverse order, so

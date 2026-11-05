@@ -6647,6 +6647,31 @@ window.CANEI_DICT = {
       "Su trimestre ya se ha enviado al asesor. Emita una rectificativa en su lugar.",
       "Its quarter has already gone to the accountant. Issue a credit note instead.",
     ],
+    /* Correcting one instead of withdrawing it: the same act, carried
+       through to the re-issue. Until electronic invoicing is mandatory an
+       invoice nobody has yet been given can still be changed this way. */
+    ["Corregir factura", "Correct invoice"],
+    ["Corrección de la factura", "Invoice correction"],
+    ["Factura retirada para corregirla", "Invoice withdrawn for correction"],
+    ["Factura corregida", "Invoice corrected"],
+    [
+      "Se retira la factura y se abre el generador con sus datos para que los corrija. Al emitir vuelve a salir con el mismo número y con la fecha de hoy. Sólo se puede porque no ha salido de aquí.",
+      "The invoice is withdrawn and the generator opens with its data for you to correct. On issuing, it comes back out under the same number and with today's date. This is only possible because it never left here.",
+    ],
+    [
+      "Se ha retirado para corregirla: al emitir vuelve a salir con el mismo número y con la fecha de hoy. Si sale de esta pantalla sin emitirla, la factura no constará en el libro.",
+      "It has been withdrawn so that it can be corrected: on issuing, it comes back out under the same number and with today's date. If you leave this screen without issuing it, the invoice will not be in the book.",
+    ],
+    [
+      "Se emitió en otro ejercicio y la numeración se reinicia cada año: al volver a emitirla ya no sería el mismo número. Emita una rectificativa en su lugar.",
+      "It was issued in another financial year and numbering restarts every year: re-issuing it would no longer give the same number. Issue a credit note instead.",
+    ],
+    ["Salir sin emitir", "Leave without issuing"],
+    ["Salir", "Leave"],
+    [
+      "La factura no se ha vuelto a emitir. Si sale ahora no constará en el libro hasta que la emita de nuevo, y su número sigue libre en la serie.",
+      "The invoice has not been issued again. If you leave now it will not be in the book until you issue it again, and its number stays free in the series.",
+    ],
     ["Plazo de pago del cliente (días)", "Customer payment terms (days)"],
     ["Plazo que nos da el proveedor (días)", "Terms this supplier gives us (days)"],
     /* Recording an invoice this company issued before it had this system. */

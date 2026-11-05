@@ -5733,6 +5733,132 @@ assert(
   );
 }
 
+/* ============ CORRECTING AN ISSUED FACTURA, END TO END (Nov) ==============
+
+   The client needs to change everything on a factura — concept, amount, rate.
+   An issued factura is immutable by design and says so on its own paper, so
+   the correction is not an edit: the number is withdrawn and issued again with
+   the corrected content behind it. Electronic invoicing will close this path
+   when it becomes mandatory; until then it is the honest version of what she
+   is asking for, and it is only offered on a document nobody has yet been
+   given — `invoiceCorrectBlock` is what decides that.
+
+   What this block proves is the only part worth proving: that the number which
+   comes back is the SAME number, that the book and the hash chain still agree
+   afterwards, and that a correction across a year boundary is refused rather
+   than silently renumbered.
+   ========================================================================== */
+{
+  const e = new ERP("2026-11-05");
+  e.configureEntity(
+    {
+      legalName: "Canei Subirats, S.L.",
+      taxId: "B12345674",
+      street: "C/ X 1",
+      postalCode: "08960",
+      city: "Sant Just",
+      iban: "ES9121000418450200051332",
+    },
+    "bo",
+  );
+  const cust = e.addParty(
+    {
+      roles: ["customer"],
+      name: "Propietaria de la reforma",
+      taxId: "12345678Z",
+      billStreet: "C/ Y 2",
+      billPostalCode: "08001",
+      billCity: "BCN",
+      billProvince: "Barcelona",
+      mobile: "600000001",
+      email: "x@y.example",
+      leadSource: "referral",
+    },
+    "bo",
+  );
+  const bud = e.createBudget({ partyId: cust.id }, "bo");
+  const ch = e.addChapter(bud.id, { name: "Baño" }, "bo");
+  e.addLine(
+    bud.id,
+    ch.id,
+    { desc: "Alicatado", unit: "m2", qtyMilli: 1000, priceCents: 400000, costCents: 200000 },
+    "bo",
+  );
+  e.issueVersion(bud.id, {}, "bo");
+  e.acceptVersion(bud.id, e.currentVersion(bud.id).id, { evidenceRef: "ok" }, "bo");
+  const prj = e.createProjectFromAcceptance(bud.id, "bo");
+  e.startWorks(prj.id, "bo");
+
+  const wrong = e.issueInvoice(
+    {
+      projectId: prj.id,
+      kind: "progress",
+      lines: [{ desc: "Certificacion 1", amountCents: 50000 }],
+      vatBp: 2100,
+    },
+    "bo",
+  );
+  assert(
+    e.invoiceCorrectBlock(wrong.id) === null,
+    "a factura nobody has been given can be corrected",
+    String(e.invoiceCorrectBlock(wrong.id)),
+  );
+  const number = e.undoLastInvoice(wrong.id, "bo", "el concepto y el importe estaban mal");
+  const right = e.issueInvoice(
+    {
+      projectId: prj.id,
+      kind: "progress",
+      lines: [{ desc: "Certificacion 1 — bano completo", amountCents: 42000 }],
+      vatBp: 1000,
+    },
+    "bo",
+  );
+  assert(
+    right.number === number,
+    "the corrected factura comes back under the same number",
+    right.number + " vs " + number,
+  );
+  assert(
+    e.state.invoices.length === 1,
+    "one factura in the book, not two",
+    e.state.invoices.length,
+  );
+  assert(
+    e.state.invoiceEvents.length === e.state.invoices.length,
+    "one chained event per factura, so the chain still verifies",
+    e.state.invoiceEvents.length + " events",
+  );
+  assert(
+    right.lines[0].desc === "Certificacion 1 — bano completo" &&
+      right.baseCents === 42000 &&
+      right.vatBp === 1000,
+    "with everything the operator changed: concept, importe and rate",
+    JSON.stringify({ d: right.lines[0].desc, b: right.baseCents, v: right.vatBp }),
+  );
+  /* THE WITHDRAWAL STAYS IN THE AUDIT. The document is gone and the number is
+     back, and the only readable trace that it ever happened is this line —
+     which is why the screen asks for a reason before it starts. */
+  const withdrawn = e.state.audit.filter((a) => a.action === "undoLastInvoice");
+  assert(
+    withdrawn.length === 1 && /concepto y el importe/.test(withdrawn[0].ref),
+    "the withdrawal and its reason stay in the audit",
+    JSON.stringify(withdrawn),
+  );
+
+  // And the one refusal that belongs to correcting rather than to withdrawing.
+  e.setToday("2027-01-07");
+  assert(
+    e.invoiceUndoBlock(right.id) === null,
+    "withdrawing last year's factura is still only a removal",
+    String(e.invoiceUndoBlock(right.id)),
+  );
+  assert(
+    e.invoiceCorrectBlock(right.id) === "other-year",
+    "but correcting it is refused: the number would come back different",
+    String(e.invoiceCorrectBlock(right.id)),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

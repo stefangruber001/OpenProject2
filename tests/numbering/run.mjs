@@ -307,6 +307,36 @@ function erpAt(day) {
     "a quarter already filed with the gestoría blocks it",
   );
 
+  /* AND A CORRECTION IS OFFERED ON THE SAME EVIDENCE. «Corregir la factura» is
+     a withdrawal followed by a re-issue under the number that just came back,
+     so every reason a withdrawal is refused refuses the correction too: it
+     reads them through `invoiceUndoBlock` and adds one of its own, the year
+     boundary, which only the re-issue can trip over. Checked here because the
+     button in the drawer appears on this answer — a correction offered where
+     the withdrawal is refused is a promise the engine then breaks. */
+  is(
+    clean.erp.invoiceCorrectBlock("inv_x") === null &&
+      paid.erp.invoiceCorrectBlock("inv_x") === "collected" &&
+      sent.erp.invoiceCorrectBlock("inv_x") === "sent" &&
+      fixed.erp.invoiceCorrectBlock("inv_x") === "rectified" &&
+      filed.erp.invoiceCorrectBlock("inv_x") === "quarter-sent",
+    "every reason that refuses a withdrawal refuses a correction",
+    [clean, paid, sent, fixed, filed].map((x) => x.erp.invoiceCorrectBlock("inv_x")).join(","),
+  );
+  /* The year rule, measured where it bites: the same invoice, read from the
+     next January. The withdrawal is still only a removal and stays allowed;
+     the correction is refused, because `nextNumber` mints against TODAY and
+     the number coming back would not be the one that went away. */
+  const nextYear = setup();
+  nextYear.erp.configureSeries("invoice", { resetYearly: true }, "t");
+  nextYear.erp.setToday("2027-01-07");
+  is(
+    nextYear.erp.invoiceUndoBlock("inv_x") === null &&
+      nextYear.erp.invoiceCorrectBlock("inv_x") === "other-year",
+    "a factura from another year can be withdrawn but not corrected",
+    nextYear.erp.invoiceUndoBlock("inv_x") + " / " + nextYear.erp.invoiceCorrectBlock("inv_x"),
+  );
+
   // And a blocked withdrawal REFUSES rather than half-doing it.
   let threw = false;
   try {
