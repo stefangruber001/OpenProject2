@@ -34,20 +34,19 @@ on:
 jobs:
   journey:
     runs-on: ubuntu-latest
-    # 15 -> 25 on 22 Oct. The suite was not failing: it ran 15.4 minutes and
-    # GitHub reported the timeout as «cancelled», which reads like a verdict on
-    # the code and is not one — the same tree runs 898/898 locally.
+    # 15 -> 25 on 22 Oct, and the reason written here then was WRONG. It said
+    # the budget had been eaten by the suite growing to forty-nine suites. It
+    # had not: on 5 Nov the same tree was measured twice, and the suite took
+    # 12m53s and 12m59s while the browser DOWNLOAD took 22 seconds once and
+    # 11m23s the other time. Growth was never the variable; fetching Chromium
+    # over the network was, and it had already failed once that way in ci.yml
+    # on 45483f6. The fix is the cache step below, not a bigger number here and
+    # not splitting a suite that takes thirteen predictable minutes.
     #
-    # Fifteen was set when CLAUDE.md could still say «the full run is about
-    # twelve minutes, one of the forty-one». There are forty-nine suites now,
-    # so the budget had been eaten by growth rather than by any one change, and
-    # the margin had quietly reached zero: the run before this one finished
-    # inside the window by seconds.
-    #
-    # Raised rather than re-run, because a re-run is a coin toss that teaches
-    # nothing and a cancelled gate is indistinguishable from a red one at a
-    # glance. If this starts brushing twenty-five, the answer is to split the
-    # suite, not to keep moving the number.
+    # Twenty-five stays, because a cancelled gate is indistinguishable from a
+    # red one at a glance and the suite needs half of it. If this brushes
+    # twenty-five again WITH the cache warm, then the suite really has grown
+    # and splitting it is the answer.
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -61,6 +60,24 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # THE BROWSER DOWNLOAD IS THE VARIABLE, not the suite. Measured on one
+      # tree, 8d90844, in two runs an hour apart: this step took 22 SECONDS on
+      # the branch and 11 MINUTES 23 SECONDS on main, while the suite itself
+      # took 12m53s and 12m59s. The second run was cancelled at the 25-minute
+      # wall thirteen seconds after everything in it had passed — 905/905 and
+      # 30/30, both printed in the log above the cancellation.
+      #
+      # So the cache goes in front of it. Keyed on the lockfile, which is where
+      # the Playwright version lives, so a version bump misses the cache and
+      # downloads once. `--with-deps` still runs on a hit: the apt packages are
+      # outside ~/.cache/ms-playwright and take seconds. What it stops being is
+      # an eleven-minute coin toss inside a twenty-five-minute budget.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Chromium (matching Playwright version)
         # playwright is declared in apps/web, so the bin lives there, not at the root

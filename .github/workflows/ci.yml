@@ -73,6 +73,16 @@ jobs:
       # fails and holds the machine while it does nothing. Eight minutes is
       # three times the healthy duration: slow still passes, hung fails fast
       # and says so.
+      # Same reason as site-e2e.yml's: the download is the variable. This step
+      # has its own eight-minute cap and has already hit it once, on 45483f6,
+      # while the identical command succeeded in another job on the same commit.
+      - name: Cache the Playwright browser
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Playwright browser (document + translation gates render pages)
         if: always()
         timeout-minutes: 8
@@ -587,6 +597,15 @@ jobs:
       # is read back. Each suite proves its stage; this proves they CHAIN.
       # This job had no browser until here — the scenario is the one gate in
       # it that drives a page instead of the engine.
+      # Same reason as site-e2e.yml's: the download is the variable. This step
+      # has its own eight-minute cap and has already hit it once, on 45483f6,
+      # while the identical command succeeded in another job on the same commit.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Install Playwright browser (the scenario drives a real page)
         timeout-minutes: 8 # see the note on the first install step
         run: pnpm --filter web exec playwright install --with-deps chromium
@@ -677,6 +696,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      # Same reason as site-e2e.yml's: the download is the variable. This step
+      # has its own eight-minute cap and has already hit it once, on 45483f6,
+      # while the identical command succeeded in another job on the same commit.
+      - name: Cache the Playwright browser
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install Playwright browser
         timeout-minutes: 8 # see the note on the first install step
