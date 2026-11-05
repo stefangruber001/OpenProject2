@@ -6667,6 +6667,36 @@ window.CANEI_DICT = {
       "It was issued in another financial year and numbering restarts every year: re-issuing it would no longer give the same number. Issue a credit note instead.",
     ],
     ["Salir sin emitir", "Leave without issuing"],
+    /* The administradora de fincas case: the quote is theirs, the factura is
+       the flat owner's. One client invoicing under another. */
+    ["＋ Nuevo cliente de facturación", "＋ New invoicing client"],
+    [
+      "El presupuesto y la obra siguen a nombre del cliente de la obra. La factura lleva el nombre, el NIF y la dirección de quien se elija aquí.",
+      "The quote and the job stay in the job client's name. The invoice carries the name, the tax number and the address of whoever is chosen here.",
+    ],
+    ["Facturar a otro cliente", "Invoice another client"],
+    ["Cliente de la factura", "Client on the invoice"],
+    ["Cliente de la factura cambiado", "Invoice client changed"],
+    ["Cambiar el cliente", "Change the client"],
+    [
+      "Esta obra no tiene todavía ningún otro cliente al que facturar.",
+      "This job has no other client to invoice yet.",
+    ],
+    [
+      "La factura todavía no ha salido de aquí, así que se retira y se vuelve a emitir con el mismo número a nombre del cliente que elija. La fecha será la de hoy.",
+      "The invoice has not left here yet, so it is withdrawn and issued again under the same number in the name of the client you choose. The date will be today's.",
+    ],
+    [
+      "La factura ya ha salido, así que no se puede cambiar: se emite un abono a nombre del cliente actual y una factura nueva, por el mismo importe, a nombre del que elija.",
+      "The invoice has already gone out, so it cannot be changed: a credit note is issued in the current client's name and a new invoice, for the same amount, in the name of the one you choose.",
+    ],
+    ["Factura bajo", "Invoices under"],
+    ["— nadie: factura a su propio nombre —", "— nobody: invoices in its own name —"],
+    [
+      "Para administradoras de fincas y gestores: el presupuesto y la obra van a su nombre y la factura al del cliente final que ellos indiquen.",
+      "For property managers and agents: the quote and the job go in their name and the invoice in that of the end client they name.",
+    ],
+    ["Clientes que facturan bajo este", "Clients that invoice under this one"],
     ["Salir", "Leave"],
     [
       "La factura no se ha vuelto a emitir. Si sale ahora no constará en el libro hasta que la emita de nuevo, y su número sigue libre en la serie.",

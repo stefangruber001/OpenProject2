@@ -9669,6 +9669,155 @@ async function testInvoiceGenerator(browser, base) {
       else bad("ADM-01: correction issued", JSON.stringify(done));
     }
 
+    /* ---- A FACTURA ADDRESSED TO ANOTHER LEGAL PERSON ---------------------
+     *
+     * The administradora de fincas case: the quote and the obra are in the
+     * manager's name, and at invoicing time they hand over the owner of the
+     * flat. Two screens are checked here because the engine side has its own
+     * suite: that the generator offers «Facturar a» and the document follows
+     * the choice, and that an already-issued factura can be moved to another
+     * name from its own drawer.
+     */
+    const bill = await pg.evaluate(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      closeDrawer();
+      await sleep(300);
+      const target = erp.state.projects.find((x) => {
+        const b = erp.invoiceBases(x.id);
+        return b.billedBaseCents > 0 && b.attributedCents - b.billedBaseCents > 30000;
+      });
+      if (!target) return { target: false };
+      // A valid, unused NIF, computed rather than guessed: MDM-03 validates the
+      // control letter and refuses a duplicate, and a hardcoded one would
+      // collide the day the seed grows another party.
+      const L = "TRWAGMYFPDXBNJZSQVHLCKE";
+      let nif = null;
+      for (let n = 44000000; n < 44000200 && !nif; n++) {
+        const c = String(n) + L[n % 23];
+        if (!erp.state.parties.some((x) => String(x.taxId || "").toUpperCase() === c)) nif = c;
+      }
+      const owner = erp.addParty(
+        {
+          roles: ["customer"],
+          name: "E2E propietario del piso",
+          taxId: nif,
+          billStreet: "C/ Piso 1",
+          billPostalCode: "08001",
+          billCity: "BCN",
+          billProvince: "Barcelona",
+          mobile: "600000002",
+          email: "piso@y.example",
+          leadSource: "referral",
+          billingParentId: erp.project(target.id).partyId,
+        },
+        "e2e",
+      );
+      invOpen(target.id);
+      await sleep(600);
+      const sel = document.querySelector("#inv_to");
+      return {
+        target: true,
+        projectId: target.id,
+        ownerId: owner.id,
+        picker: !!sel,
+        names: sel ? [...sel.options].map((o) => o.textContent.trim()) : [],
+        customer: erp.party(erp.project(target.id).partyId).name,
+      };
+    });
+    if (!bill.target) {
+      bad("AR: billing another legal person", "no job in the seed has room to bill one");
+    } else if (!bill.picker || !bill.names.includes("E2E propietario del piso")) {
+      bad("AR: «Facturar a» offers the invoicing client", JSON.stringify(bill));
+    } else {
+      ok(`AR: the generator offers «Facturar a» (${bill.names.length}: ${bill.names.join(" · ")})`);
+      const addressed = await pg.evaluate(async (o) => {
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const sel = document.querySelector("#inv_to");
+        sel.value = o.ownerId;
+        sel.dispatchEvent(new Event("change"));
+        await sleep(300);
+        /* Free lines, and exactly one of them. The origin chip keeps whatever
+           lines were already on the draft, and a leftover certification line
+           would push this past what the obra has left to bill — AR-11 would
+           disable «Emitir» and the failure would look like the recipient. */
+        document.querySelector('[data-invbasis="manual"]').click();
+        await sleep(300);
+        invWork.lines = [{ desc: "E2E piso del propietario", amountCents: 25000 }];
+        invPaint();
+        await sleep(400);
+        return {
+          sheet: /E2E propietario del piso/.test(document.querySelector("#invDoc").innerText),
+          disabled: document.querySelector("#invIssue").disabled,
+        };
+      }, bill);
+      if (addressed.sheet && !addressed.disabled)
+        ok("AR: the document being drafted carries the invoicing client, not the obra's");
+      else bad("AR: draft addressed", JSON.stringify(addressed));
+
+      await pg.click("#invIssue");
+      await pg.waitForTimeout(400);
+      await pg.getByRole("button", { name: "Emitir", exact: true }).click();
+      await pg.waitForTimeout(1000);
+      const issued = await pg.evaluate((o) => {
+        const inv = erp.state.invoices[erp.state.invoices.length - 1];
+        const doc = erp.renderInvoiceDoc(inv.number);
+        return {
+          number: inv.number,
+          toOwner: inv.partyId === o.ownerId,
+          docName: doc.customer.name,
+          jobStillTheirs: erp.party(erp.project(inv.projectId).partyId).name,
+          // The fold: what the owner was billed counts against the manager.
+          billed: erp.invoiceBases(o.projectId, erp.project(o.projectId).partyId).billedBaseCents,
+          readdress: erp.invoiceReaddressMode(inv.id),
+          btn: !!document.querySelector("#iv_to"),
+        };
+      }, bill);
+      if (
+        issued.toOwner &&
+        issued.docName === "E2E propietario del piso" &&
+        issued.jobStillTheirs === bill.customer &&
+        issued.readdress === "reissue" &&
+        issued.btn
+      )
+        ok(
+          `AR: ${issued.number} is issued to the invoicing client while the obra stays with ${issued.jobStillTheirs}`,
+        );
+      else bad("AR: issued to another legal person", JSON.stringify(issued));
+
+      // ---- and moving an issued factura to another name --------------------
+      await pg.click("#iv_to");
+      await pg.waitForTimeout(500);
+      const moved = await pg.evaluate(() => {
+        const sel = document.querySelector("#rd_to");
+        return {
+          drawer: !!sel,
+          options: sel ? [...sel.options].map((o) => o.textContent.trim()) : [],
+          go: !!document.querySelector("#rd_go"),
+        };
+      });
+      if (!moved.drawer || !moved.go) {
+        bad("AR: re-addressing drawer", JSON.stringify(moved));
+      } else {
+        await pg.click("#rd_go");
+        await pg.waitForSelector("#mscrim input", { timeout: 8000 });
+        await pg.fill("#mscrim input", "la administradora mando otro titular");
+        await pg.click("#mscrim .btn.primary");
+        await pg.waitForTimeout(1100);
+        const after = await pg.evaluate((n) => {
+          const same = erp.state.invoices.filter((i) => i.number === n);
+          return {
+            copies: same.length,
+            to: same[0] ? erp.party(same[0].partyId).name : null,
+            gaps: erp.seriesGaps("invoice").length,
+            events: erp.state.invoiceEvents.length === erp.state.invoices.length,
+          };
+        }, issued.number);
+        if (after.copies === 1 && after.to !== "E2E propietario del piso" && after.gaps === 0)
+          ok(`AR: ${issued.number} moves to ${after.to} under the same number, no gap`);
+        else bad("AR: re-addressed", JSON.stringify(after));
+      }
+    }
+
     if (!errs.length) ok("ADM-01: the generator raises no console error");
     else bad("ADM-01: console", errs.slice(0, 2).join(" | ").slice(0, 160));
   } catch (e) {

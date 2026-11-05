@@ -4482,3 +4482,35 @@ completo en tres idiomas · boundaries OK · miss-crawl en 21/37. La suite
 completa de navegador —con el caso nuevo del generador— corre en CI sobre
 la rama antes del merge, que es para lo que `claude/**` está en el
 disparador.
+
+## S48 · La factura a nombre de otro, y el alcance que no se duplica (2026-11-05)
+
+La administradora de fincas pide el presupuesto a su nombre y pasa el
+propietario del piso cuando hay que facturar. El motor ya sabía emitir a un
+tercero —`issueInvoice` acepta `billToPartyId` desde que existe el reparto
+entre pagadores— y ninguna pantalla lo había enviado nunca: cero referencias
+en toda la interfaz. Lo que faltaba era el concepto reutilizable y las dos
+puertas que lo dejaban pasar mal.
+
+- **El enlace está en el cliente**, un nivel: el propietario factura bajo la
+  administradora, y la lista crece en su ficha en vez de repetirse en cada
+  obra.
+- **Un solo alcance.** Lo facturado al propietario cuenta contra el techo de
+  la administradora, así que la misma partida no puede salir dos veces, una a
+  cada nombre. Ese pliegue hubo que llevarlo también a CON-11, que si no
+  dejaba de bloquear el contrato sin firmar en cuanto la factura iba al
+  propietario.
+- **Cambiar el destinatario después.** Mientras nadie la tiene, mismo número;
+  una vez ha salido, abono y factura nueva. La pantalla dice cuál de las dos va
+  a ocurrir antes de tocar nada.
+
+**Y la pregunta que esto abre, en LEGAL_REVIEW §14:** quién es el adquirente
+cuando firma una administradora, y si el 10% del §2 sobrevive al cambio de
+destinatario. El tipo no se deduce en ningún sitio: lo elige la operadora en
+la pantalla, factura a factura.
+
+Puertas: manejabilidad 578/578 (eran 558) · numeración 55/55 · year-sim
+149/149 · migraciones 154/154 hasta v29 · source-audit 158/158 en+ca ·
+auditoría de páginas 107/83 · workspace-audit 0/0 en+ca · diccionario 4515
+completo en tres idiomas · boundaries OK · ownership guard OK · doc-pdf 47/47.
+La suite completa de navegador corre en CI sobre la rama antes del merge.

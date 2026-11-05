@@ -376,3 +376,40 @@ review than a template.
   corrected — each is refused by name — and nothing from another financial year.
   The withdrawal and its stated reason stay in the audit log. **legally_verified:
   false.**
+
+## 14. A factura addressed to someone other than the client who signed (2026-11-05)
+
+- **What happens in the business.** A property manager asks for the quote in
+  their own name, manages dozens of flats, and at invoicing time hands over the
+  owner of the one that was worked on: _«los presupuestos se los hacemos a su
+  nombre y luego ellos nos pasan los datos del cliente para la factura»_.
+- **What was built.** A client can invoice under another: the quote, the
+  contract and the job stay with the manager, and the factura carries the
+  owner's name, NIF and address. One scope, so the same work cannot be billed
+  to both. An issued factura can be moved to another name by the two routes
+  described in §13's sibling logic — withdrawn and re-issued while nobody holds
+  it, abono plus replacement once it has gone out.
+- **THE QUESTION THIS DOES NOT ANSWER.** Whether the manager contracts **in
+  their own name** — in which case the sale is to the manager, and they
+  re-invoice the owner — or **as agent for the owner**, in which case the
+  factura must name the owner. Art. 6 RD 1619/2012 requires the acquirer's name
+  and NIF; it does not tell us who the acquirer is when an administrador de
+  fincas signs. What the client describes is the agency pattern and it is
+  completely standard practice; the quote being in the manager's name is weak
+  evidence of it, and no source was read today either way.
+- **AND WHAT IT MOVES, which is not only a name.** §2's reduced 10% on dwelling
+  renovation depends on who the recipient is and what the dwelling is used for.
+  A factura to an administradora (a company, managing flats it does not live
+  in) and the same work to the resident owner are not obviously the same
+  transaction for that purpose. The rate is NOT inferred from the recipient
+  anywhere in this change: the operator chooses it on the invoice screen, per
+  invoice, which is where a human decision belongs — but somebody has to tell
+  her what the right answer is.
+- **The questions for the gestoría**, in one line each: _when La Roca Golf asks
+  for the quote and names the flat owner for the factura, who is the acquirer?_
+  And: _does the 10% survive the change of recipient, or does billing the
+  manager put it at 21%?_
+- **What is NOT at stake:** nothing can be billed twice — one job has one scope
+  however many legal persons receive paper for it — and an entity cannot be
+  moved underneath a client that already has issued invoices.
+  **legally_verified: false.**

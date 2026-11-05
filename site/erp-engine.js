@@ -2569,6 +2569,19 @@
           // "follow the company default" — an explicit choice, not a gap.
           docLanguage: "",
           leadSource: "",
+          /* WHO THIS PARTY INVOICES UNDER — the administradora de fincas case.
+             A property manager asks for the quote in their own name, manages
+             dozens of flats, and at invoicing time hands over the OWNER of the
+             one that was worked on: «los presupuestos se los hacemos a su
+             nombre y luego ellos nos pasan los datos del cliente para la
+             factura». The quote, the contract and the job stay theirs; the
+             factura has to name the owner, because the factura names whoever
+             acquired the service.
+             So this points from the owner TO the manager, one level, never a
+             chain: `billingEntitiesOf` lists them and `_billingScopeOwner`
+             folds them back, which is what keeps the over-billing ceiling
+             honest across every legal person who invoices under one job. */
+          billingParentId: null,
           // No activityLine here on purpose. A "línea de actividad" belongs to
           // the WORK, not to the person paying for it — the same customer can
           // have a bathroom, a damp survey and a shop fit-out — so it lives on
@@ -2610,6 +2623,20 @@
         p,
       );
       rec.accountingCode = rec.accountingCode || "43" + rec.code.replace(/\D/g, ""); // MDM-09 aligned pair
+      /* Validated BEFORE the record is pushed, and with the roles this call
+         asked for: a client created from the invoice screen arrives already
+         linked to the manager who sent its data over, so the link cannot be a
+         second step somebody forgets. `_assertBillingParent` reads the child
+         through `party()`, which is why the check runs against `rec` here. */
+      if (rec.billingParentId) {
+        const parent = this.party(rec.billingParentId);
+        if (!(parent.roles || []).includes("customer"))
+          throw new Error("Only a customer can have clients invoicing under it: " + parent.name);
+        if (parent.billingParentId)
+          throw new Error("That client already invoices under another one: " + parent.name);
+        if (!(rec.roles || []).includes("customer"))
+          throw new Error("Only a customer can invoice under another: " + rec.name);
+      }
       if (rec.taxId && !validTaxId(rec.taxId))
         throw new Error("NIF/CIF no válido — " + taxIdReason(rec.taxId)); // MDM-03
       this._assertTaxIdFree(rec.taxId, rec.id); // MDM-03, hard rule
@@ -2680,10 +2707,82 @@
       if (patch.bank && patch.bank.iban && !validIban(patch.bank.iban))
         throw new Error("Invalid IBAN");
       if (patch.bank) this._log(user, "partyBankChange", p.code); // MDM-08 change-logged
+      /* The link has rules and a refusal of its own, so it does not ride in on
+         a generic patch: `setBillingParent` owns it and this routes there. */
+      if ("billingParentId" in patch) {
+        this.setBillingParent(p.id, patch.billingParentId || null, user);
+        delete patch.billingParentId;
+      }
       Object.assign(p, patch);
       this._log(user, "updateParty", p.code);
       return p;
     }
+    /**
+     * May `childId` invoice under `parentId`?
+     *
+     * One level, and only between customers. The depth limit is not timidity:
+     * the ceiling arithmetic folds an entity back to exactly one scope owner,
+     * so a chain would make «what has this job billed» depend on how far up
+     * somebody walked. Refused, by name, rather than flattened silently.
+     */
+    _assertBillingParent(childId, parentId) {
+      if (!parentId) return null;
+      const child = this.party(childId);
+      const parent = this.party(parentId); // throws on an unknown party
+      if (parent.id === child.id) throw new Error("A client cannot invoice under itself");
+      if (!(parent.roles || []).includes("customer"))
+        throw new Error("Only a customer can have clients invoicing under it: " + parent.name);
+      if (!(child.roles || []).includes("customer"))
+        throw new Error("Only a customer can invoice under another: " + child.name);
+      if (parent.billingParentId)
+        throw new Error("That client already invoices under another one: " + parent.name);
+      if (this.state.parties.some((x) => x.billingParentId === child.id))
+        throw new Error("Other clients already invoice under " + child.name);
+      return parent;
+    }
+
+    /**
+     * Link or unlink one client as an invoicing entity of another.
+     *
+     * Refused once the child has been invoiced, and that is the whole guard:
+     * the ceiling reads the link LIVE, so moving an entity that already has
+     * documents would change what its job counts as billed — and raise a cap
+     * that exists to stop somebody being charged twice for one scope. Before
+     * the first factura this is arrangement; after it, it is history.
+     */
+    setBillingParent(partyId, parentPartyId, user) {
+      const child = this.party(partyId);
+      const wanted = parentPartyId || null;
+      if ((child.billingParentId || null) === wanted) return child;
+      if (this.state.invoices.some((i) => i.partyId === child.id))
+        throw new Error(
+          "That client already has issued invoices — the link cannot move underneath them",
+        );
+      this._assertBillingParent(child.id, wanted);
+      child.billingParentId = wanted;
+      this._log(user, "setBillingParent", child.code + " " + (wanted || "—"));
+      return child;
+    }
+
+    /** The clients that invoice under this one, newest last. Never itself. */
+    billingEntitiesOf(partyId) {
+      return this.state.parties.filter((x) => x.billingParentId === partyId);
+    }
+
+    /**
+     * Whose scope a factura to this party counts against.
+     *
+     * An invoicing entity bills against the scope of the client it invoices
+     * under, because there is only one job and one set of work: the manager and
+     * the owner are two legal persons receiving paper for the same thing, not
+     * two payers each owed a part. Everything that asks «how much of this job
+     * has been billed» asks it through here.
+     */
+    _billingScopeOwner(partyId) {
+      const p = this.state.parties.find((x) => x.id === partyId);
+      return (p && p.billingParentId) || partyId;
+    }
+
     deactivateParty(id, user) {
       this.party(id).active = false;
       this._log(user, "deactivateParty", id);
@@ -2715,6 +2814,13 @@
         "factura",
         S.invoices.filter((i) => i.partyId === id),
         (i) => i.number,
+      );
+      // And the clients that invoice under it: deleting the manager would
+      // leave them pointing at a record that no longer exists.
+      add(
+        "cliente de facturación",
+        S.parties.filter((x) => x.billingParentId === id),
+        (x) => x.name,
       );
       add(
         "recibo",
@@ -7307,7 +7413,11 @@
       /* WHO IS BEING BILLED — the payer named on the draft, not the project's
          own customer. A job with one payer answers the same as it always did. */
       const billTo = draft.billToPartyId || p.partyId;
-      const payer = this._billingFor(p, billTo);
+      /* `_payerFor`, so a client invoicing under the job's customer passes
+         AR-12 on the strength of the customer's own row. The completeness
+         check below still reads the RECIPIENT, which is the point: the owner
+         needs their own NIF and address before their factura can exist. */
+      const payer = this._payerFor(p, billTo);
       if (!payer)
         out.push({
           code: "AR-12",
@@ -7369,12 +7479,22 @@
          the project would have let one payer's invoice quietly unlock the
          other's. */
       const contractParty = contract ? contract.partyId || p.partyId : null;
+      /* Folded to the scope owner, both sides. A manager who signs the
+         contract and then has the factura addressed to the flat's owner must
+         not walk out of this gate: compared on the named party alone, the
+         first factura of the job would be issued to somebody the contract does
+         not name, the equality would read false, and an unsigned contract
+         would stop blocking anything. */
+      const billToScope = this._billingScopeOwner(billTo);
       const firstForPayer = !this.state.invoices.some(
-        (i) => i.projectId === p.id && i.partyId === billTo && i.kind !== "creditNote",
+        (i) =>
+          i.projectId === p.id &&
+          this._billingScopeOwner(i.partyId) === billToScope &&
+          i.kind !== "creditNote",
       );
       if (
         contract &&
-        contractParty === billTo &&
+        contractParty === billToScope &&
         firstForPayer &&
         !contract.signature.customerSignedAt
       ) {
@@ -7447,6 +7567,41 @@
           : defaultBilling(p.partyId, p.vatBp);
       const wanted = billToPartyId || p.partyId;
       return rows.find((r) => r.partyId === wanted) || null;
+    }
+
+    /**
+     * The payer row an INVOICE resolves through — `_billingFor`, and then the
+     * client the named one invoices under.
+     *
+     * Deliberately not folded into `_billingFor`: that one answers «is this
+     * party a payer on this project», which is what `addProjectPayer`,
+     * `updateProjectPayer` and `assignChapterPayer` ask, and an invoicing
+     * entity is NOT a payer — it is a second legal person receiving the
+     * manager's paper. Folding the two would have let `updateProjectPayer`
+     * edit the manager's terms while naming the owner.
+     */
+    _payerFor(p, billToPartyId) {
+      const direct = this._billingFor(p, billToPartyId);
+      if (direct || !billToPartyId) return direct;
+      return this._billingFor(p, this._billingScopeOwner(billToPartyId));
+    }
+
+    /**
+     * Who the document is addressed to, and whose terms it carries.
+     *
+     * One helper for both `previewInvoice` and `issueInvoice`, because their
+     * own docstrings promise the preview cannot say one thing and the emitted
+     * document another — and the recipient is now one of the things that could
+     * differ. The payer row supplies the tax arrangement of the job; the
+     * recipient supplies the name, the NIF, the address, the payment method
+     * and the language, because those are facts about whoever is holding the
+     * paper.
+     */
+    _invoiceRecipient(p, draft) {
+      const payer = this._payerFor(p, draft.billToPartyId) || defaultBilling(p.partyId, p.vatBp)[0];
+      const id = draft.billToPartyId || payer.partyId;
+      const known = this.state.parties.some((x) => x.id === id);
+      return { payer, recipient: this.party(known ? id : payer.partyId) };
     }
 
     /**
@@ -7590,9 +7745,15 @@
          asks what this payer may still be billed, the economics screens ask what
          the whole job has billed. Keeping one function answering both is what
          stops the two drifting into different definitions of "billed". */
-      const forParty = billToPartyId || null;
+      /* Folded to the scope owner: a client invoicing under another is asking
+         the same question about the same job. Without this, a factura issued to
+         the flat's owner would not count against the manager's ceiling and the
+         same work could be billed twice over — once to each legal person — on
+         two sealed documents in a gapless series. */
+      const forParty = billToPartyId ? this._billingScopeOwner(billToPartyId) : null;
       const invs = this.state.invoices.filter(
-        (i) => i.projectId === p.id && (!forParty || i.partyId === forParty),
+        (i) =>
+          i.projectId === p.id && (!forParty || this._billingScopeOwner(i.partyId) === forParty),
       );
       // Already billed, as BASE and net of abonos — the figure a certification
       // has to subtract. Totals would be the wrong number: VAT is not revenue.
@@ -7712,9 +7873,7 @@
       // this method's docstring makes ("a preview cannot show one figure and
       // the emitted document another") is only kept if the payer, the rate and
       // the terms are worked out in one place rather than twice.
-      const payer =
-        this._billingFor(p, draft.billToPartyId) || defaultBilling(p.partyId, p.vatBp)[0];
-      const party = this.party(payer.partyId);
+      const { payer, recipient: party } = this._invoiceRecipient(p, draft);
       const baseCents = this._invoiceBase(draft);
       const vatBp = draft.vatBp != null ? draft.vatBp : payer.vatBp != null ? payer.vatBp : p.vatBp;
       const vatCents = pctOf(baseCents, vatBp);
@@ -7725,7 +7884,7 @@
         number: null, // minted at issue, never before — see nextNumber
         kind: draft.kind || "progress",
         date: this.state.today,
-        partyId: payer.partyId,
+        partyId: party.id,
         taxTreatment: payer.taxTreatment || "standard",
         taxJustification: payer.taxJustification || "",
         projectId: p.id,
@@ -7754,7 +7913,7 @@
         iban: (this.state.config && this.state.config.iban) || "",
         // N1: the language the issued document will speak, resolved the same
         // way the issuing path resolves it — a preview must not lie.
-        language: this._docLanguageFor(draft.language, p.id, payer.partyId),
+        language: this._docLanguageFor(draft.language, p.id, party.id),
         rectifies: draft.rectifies || null,
         rectifyReason: draft.rectifyReason || null,
       };
@@ -7863,8 +8022,7 @@
          unreachable in practice — it is there so a project whose billing array
          is somehow absent still issues on its own customer rather than throwing
          after the blocks have passed. */
-      const payer = this._billingFor(p, inv.billToPartyId) || defaultBilling(p.partyId, p.vatBp)[0];
-      const party = this.party(payer.partyId);
+      const { payer, recipient: party } = this._invoiceRecipient(p, inv);
       const baseCents = this._invoiceBase(inv);
       const vatBp = inv.vatBp != null ? inv.vatBp : payer.vatBp != null ? payer.vatBp : p.vatBp;
       const vatCents = pctOf(baseCents, vatBp);
@@ -7876,7 +8034,13 @@
         number: this.nextNumber(isCredit ? "creditNote" : "invoice"),
         kind: inv.kind || "progress",
         date: this.state.today,
-        partyId: payer.partyId,
+        /* THE RECIPIENT, which is no longer always the payer row. A client
+           invoicing under the job's customer receives the paper in its own
+           name, with its own NIF and address — that is the whole point of the
+           arrangement — while the payer row still supplies the job's tax
+           treatment below. Everything downstream reads this field as «the
+           customer»: the document, the register, the ledger, the dunning. */
+        partyId: party.id,
         /* The tax decision AND its justification, on the artifact.
            This system records why a rate was applied rather than leaving the
            document to be re-derived years later from a rule that may since have
@@ -7906,7 +8070,7 @@
         paymentMethod: party.paymentMethod,
         iban: this._requireConfig(inv.kind === "creditNote" ? "a credit note" : "an invoice").iban, // AR-02
         // N1: chosen at creation, frozen at issue with the rest of the record.
-        language: this._docLanguageFor(inv.language, p.id, payer.partyId),
+        language: this._docLanguageFor(inv.language, p.id, party.id),
         rectifies: inv.rectifies || null,
         rectifyReason: inv.rectifyReason || null, // VFU-02
         installmentIdx: inv.installmentIdx != null ? inv.installmentIdx : null,
@@ -8287,6 +8451,144 @@
       this.state.invoices = this.state.invoices.filter((x) => x.id !== inv.id);
       this._log(user, "undoLastInvoice", inv.number + " " + (reason || ""));
       return inv.number;
+    }
+
+    /**
+     * Which of the two routes a re-addressing would take, or why neither can.
+     *
+     * Returns "reissue" while the factura can still be withdrawn — nobody has
+     * been given it, so the number comes back and ONE document comes out, in
+     * the new client's name. Returns "rectify" once it has left: then the only
+     * lawful remedy is the pair, an abono to whoever was named and a
+     * replacement to whoever should have been. Returns a REASON string when
+     * even that is impossible, so a screen can say which it is.
+     */
+    invoiceReaddressMode(id) {
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (!inv) throw new Error("Invoice not found");
+      if (inv.origin === "external") return "external";
+      if (inv.kind === "creditNote") return "credit-note";
+      if (this.state.invoices.some((x) => x.rectifies === inv.id)) return "rectified";
+      return this.invoiceCorrectBlock(id) === null ? "reissue" : "rectify";
+    }
+
+    /**
+     * Address an issued factura to a different client, by the only two routes
+     * that exist.
+     *
+     * THE CASE. A property manager asks for the quote in their own name and
+     * hands over the flat owner afterwards — «luego ellos nos pasan los datos
+     * del cliente para la factura». Sometimes afterwards means after the
+     * factura is already in the book, and sometimes after it has been sent.
+     *
+     * So: while the document can still be withdrawn, it is withdrawn and
+     * issued again under the SAME number to the new client, which is the
+     * correction path and leaves one document. Once it has left, it cannot be
+     * unsaid: an abono goes back to the client who was named and a replacement
+     * goes to the one who should have been, which is the remedy the factura
+     * itself names and what a gapless series allows.
+     *
+     * IT IS A SUBSTITUTION, NOT AN EDIT. The replacement carries the same
+     * lines, the same base and the same rate, so the ceiling cannot move: the
+     * abono gives the scope back exactly what the replacement takes. Changing
+     * the figures as well is the correction path, afterwards, on a factura
+     * nobody has been given yet.
+     *
+     * Every refusal fires before a number is minted, including the new
+     * client's own fiscal data — a half-done re-addressing would leave an
+     * abono against nothing.
+     */
+    reassignInvoiceRecipient(id, newPartyId, reason, user) {
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (!inv) throw new Error("Invoice not found");
+      const mode = this.invoiceReaddressMode(id);
+      if (mode === "external")
+        throw new Error(
+          "That invoice was recorded, not issued here — correct it where it was made",
+        );
+      if (mode === "credit-note")
+        throw new Error("An abono is not re-addressed: it follows the factura it corrects");
+      if (mode === "rectified")
+        throw new Error("It already has a rectificativa — re-address that one instead");
+      if (!String(reason || "").trim())
+        throw new Error("Re-addressing a factura needs its reason: it is what the book will say");
+      const p = this.project(inv.projectId);
+      const target = this.party(newPartyId); // throws on an unknown party
+      if (target.id === inv.partyId) throw new Error("That is already the client on this factura");
+      if (!this._payerFor(p, target.id))
+        throw new Error(
+          "That client neither pays this job nor invoices under the one that does: " + target.name,
+        );
+      this._requireComplete(target.id, "a factura"); // MDM-10, before anything is minted
+      const same = (inv.lines || []).map((l) => ({ desc: l.desc, amountCents: l.amountCents }));
+      /* `language: null` on the replacement, deliberately: the document speaks
+         the NEW client's language, which is a fact about them and not a
+         property of the paper being replaced. */
+      const draft = {
+        projectId: p.id,
+        kind: inv.kind || "progress",
+        billToPartyId: target.id,
+        lines: same,
+        vatBp: inv.vatBp,
+        irpfBp: inv.irpfBp || 0,
+        installmentIdx: inv.installmentIdx != null ? inv.installmentIdx : null,
+        changeId: inv.changeId || null,
+        worksAddress: inv.worksAddress || "",
+        language: null,
+      };
+      if (mode === "reissue") {
+        const number = this.undoLastInvoice(inv.id, user, reason);
+        const replacement = this.issueInvoice(draft, user);
+        this._log(
+          user,
+          "reassignInvoiceRecipient",
+          number + " → " + target.name + " (reissue) " + reason,
+        );
+        return { mode, credit: null, replacement };
+      }
+      /* The abono first, and the order is the arithmetic: it hands the job's
+         scope back what the original took, which is what lets the replacement
+         through the over-billing guard with the same base. */
+      const credit = this.issueInvoice(
+        {
+          projectId: p.id,
+          kind: "creditNote",
+          billToPartyId: inv.partyId,
+          lines: same,
+          vatBp: inv.vatBp,
+          irpfBp: inv.irpfBp || 0,
+          language: inv.language || null,
+          rectifies: inv.id,
+          rectifyReason: reason,
+        },
+        user,
+      );
+      /* The milestone and the adicional go back to billable, exactly as
+         `undoLastInvoice` returns them: the same work is about to be billed
+         again, to somebody else, and an adicional still marked «facturado»
+         would be refused by CHG-04 on the way out. */
+      if (inv.changeId) {
+        const ch = this.state.changes.find((x) => x.id === inv.changeId);
+        if (ch && ch.invoiceId === inv.id) {
+          ch.status = "approved";
+          ch.invoiceId = null;
+        }
+      }
+      if (inv.installmentIdx != null)
+        for (const c of this.state.contracts || []) {
+          const i = (c.installments || [])[inv.installmentIdx];
+          if (i && i.invoicedInvoiceId === inv.id) {
+            i.status = "pending";
+            i.invoicedInvoiceId = null;
+          }
+        }
+      const replacement = this.issueInvoice(draft, user);
+      this._log(
+        user,
+        "reassignInvoiceRecipient",
+        inv.number + " → " + credit.number + " + " + replacement.number + " " + reason,
+      );
+      return { mode, credit, replacement };
     }
 
     invoiceOutstandingCents(invId) {

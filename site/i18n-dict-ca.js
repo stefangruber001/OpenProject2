@@ -5246,6 +5246,24 @@ window.CANEI_DICT.ca = {
   "Se emitió en otro ejercicio y la numeración se reinicia cada año: al volver a emitirla ya no sería el mismo número. Emita una rectificativa en su lugar.":
     "Es va emetre en un altre exercici i la numeració es reinicia cada any: en tornar a emetre-la ja no seria el mateix número. Emeteu una rectificativa al seu lloc.",
   "Salir sin emitir": "Sortir sense emetre",
+  "＋ Nuevo cliente de facturación": "＋ Nou client de facturació",
+  "El presupuesto y la obra siguen a nombre del cliente de la obra. La factura lleva el nombre, el NIF y la dirección de quien se elija aquí.":
+    "El pressupost i l'obra segueixen a nom del client de l'obra. La factura porta el nom, el NIF i l'adreça de qui es triï aquí.",
+  "Facturar a otro cliente": "Facturar a un altre client",
+  "Cliente de la factura": "Client de la factura",
+  "Cliente de la factura cambiado": "Client de la factura canviat",
+  "Cambiar el cliente": "Canviar el client",
+  "Esta obra no tiene todavía ningún otro cliente al que facturar.":
+    "Aquesta obra encara no té cap altre client a qui facturar.",
+  "La factura todavía no ha salido de aquí, así que se retira y se vuelve a emitir con el mismo número a nombre del cliente que elija. La fecha será la de hoy.":
+    "La factura encara no ha sortit d'aquí, així que es retira i es torna a emetre amb el mateix número a nom del client que triï. La data serà la d'avui.",
+  "La factura ya ha salido, así que no se puede cambiar: se emite un abono a nombre del cliente actual y una factura nueva, por el mismo importe, a nombre del que elija.":
+    "La factura ja ha sortit, així que no es pot canviar: s'emet un abonament a nom del client actual i una factura nova, pel mateix import, a nom del que triï.",
+  "Factura bajo": "Factura sota",
+  "— nadie: factura a su propio nombre —": "— ningú: factura en nom propi —",
+  "Para administradoras de fincas y gestores: el presupuesto y la obra van a su nombre y la factura al del cliente final que ellos indiquen.":
+    "Per a administradores de finques i gestors: el pressupost i l'obra van al seu nom i la factura al del client final que ells indiquin.",
+  "Clientes que facturan bajo este": "Clients que facturen sota aquest",
   Salir: "Sortir",
   "La factura no se ha vuelto a emitir. Si sale ahora no constará en el libro hasta que la emita de nuevo, y su número sigue libre en la serie.":
     "La factura no s'ha tornat a emetre. Si surt ara no constarà al llibre fins que l'emeti de nou, i el seu número segueix lliure a la sèrie.",

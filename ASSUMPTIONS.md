@@ -11879,3 +11879,46 @@ y no se ha entregado ninguna otra; el diálogo lo dice antes de emitir.
 si retirar una factura no enviada vale como corrección NORMAL o sólo como
 excepción para la primera mal numerada. Este cambio la convierte en
 corriente, y esa pregunta sigue sin contestar.
+
+## S156 · Un cliente que factura bajo otro (2026-11-05)
+
+«Son administradora de muchos pisos y los presupuestos se los hacemos a su
+nombre y luego ellos nos pasan los datos del cliente para la factura»
+(cliente, 5 nov). El operador lo encuadró y eligió el camino: «1».
+
+**La forma elegida: el enlace vive en el cliente, no en la obra.** El
+propietario apunta a la administradora —un nivel, nunca una cadena— y se
+reutiliza en todas sus obras, que es exactamente la queja: pasa mucho. La
+alternativa era un segundo pagador por obra, que el motor ya tenía: resuelve
+el caso y no el problema, porque habría que repetir el alta en cada trabajo.
+
+**Lo que NO se ha hecho: cambiar el cliente de la obra.** El presupuesto y el
+contrato los firmó la administradora, y reescribir ese nombre haría que los
+documentos que ya leyó empezaran a decir otra cosa.
+
+**La decisión que hace esto pequeño: el alcance es del cliente de la obra, y
+sus entidades de facturación facturan contra ese mismo alcance.** Así AR-11
+sigue significando algo —no se puede facturar más de lo que vale el trabajo,
+lo firme quien lo firme— y no hay que reasignar partidas entre pagadores, que
+además está prohibido en cuanto hay una factura. Sin ese pliegue, la misma
+obra se podía facturar dos veces, una a cada nombre, en dos documentos
+sellados de una serie sin huecos.
+
+**Dos puertas que había que mover con él.** AR-12 resuelve por
+`_payerFor`, así que una entidad pasa por la fila del pagador; y CON-11 —la
+primera factura de la obra necesita el contrato firmado— se compara contra el
+dueño del alcance, porque si no, bastaba facturar al propietario para que un
+contrato sin firmar dejara de bloquear nada. MDM-10 sigue leyendo al
+DESTINATARIO: el propietario necesita su propio NIF y su dirección antes de
+que su factura exista, que es lo correcto.
+
+**Cambiar el destinatario de una factura ya emitida: dos rutas, porque la ley
+da dos.** Mientras nadie la tiene, se retira y se vuelve a emitir con el mismo
+número (un documento). Una vez ha salido, no se puede deshacer: abono al
+nombre que figuraba y factura nueva al que debía figurar (dos documentos). El
+motor decide cuál, la pantalla lo dice ANTES de emitir, y el importe no se
+toca en esa pantalla: una sustitución que además cambiara las cifras serían
+dos cambios con un solo motivo.
+
+**Lo que queda abierto:** LEGAL_REVIEW §14 — quién es el adquirente cuando
+contrata una administradora, y qué le hace eso al tipo de IVA del §2.

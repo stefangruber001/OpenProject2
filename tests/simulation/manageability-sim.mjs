@@ -5859,6 +5859,212 @@ assert(
   );
 }
 
+/* ====== ONE CLIENT INVOICING UNDER ANOTHER (Nov) ==========================
+
+   «Son administradora de muchos pisos y los presupuestos se los hacemos a su
+   nombre y luego ellos nos pasan los datos del cliente para la factura.»
+
+   So the quote, the contract and the job belong to the manager, and the
+   factura has to name the flat owner — a different legal person, with their
+   own NIF and their own address, because a factura names whoever acquired the
+   service. The link lives on the owner, one level, and everything that asks
+   «how much of this job has been billed» folds it back to the manager: that
+   fold is the only reason the same work cannot be billed twice, once to each.
+
+   What is checked here is the whole of it — the link and its refusals, the
+   document, the shared ceiling, and both routes for moving an already-issued
+   factura to another name.
+   ========================================================================== */
+{
+  const e = new ERP("2026-11-05");
+  e.configureEntity(
+    {
+      legalName: "Canei Subirats, S.L.",
+      taxId: "B12345674",
+      street: "C/ X 1",
+      postalCode: "08960",
+      city: "Sant Just",
+      iban: "ES9121000418450200051332",
+    },
+    "bo",
+  );
+  const mk = (name, taxId, extra) =>
+    e.addParty(
+      Object.assign(
+        {
+          roles: ["customer"],
+          name,
+          taxId,
+          billStreet: "C/ Y 2",
+          billPostalCode: "08001",
+          billCity: "BCN",
+          billProvince: "Barcelona",
+          mobile: "600000001",
+          email: "x@y.example",
+          leadSource: "referral",
+        },
+        extra || {},
+      ),
+      "bo",
+    );
+  const admin = mk("Administradora de Fincas SL", "A58818501");
+  const owner = mk("Propietario del piso", "12345678Z", { billingParentId: admin.id });
+  const owner2 = mk("Otra propietaria", "87654321X");
+  e.setBillingParent(owner2.id, admin.id, "bo");
+  assert(
+    owner.billingParentId === admin.id && e.billingEntitiesOf(admin.id).length === 2,
+    "a client can be created invoicing under another, or linked afterwards",
+    JSON.stringify(e.billingEntitiesOf(admin.id).map((x) => x.name)),
+  );
+  throws(() => e.setBillingParent(admin.id, admin.id, "bo"), "invoicing under itself is refused");
+  throws(() => e.setBillingParent(admin.id, owner.id, "bo"), "a chain of two levels is refused");
+
+  // The job, in the manager's name, exactly as they asked for it.
+  const bud = e.createBudget({ partyId: admin.id }, "bo");
+  const ch = e.addChapter(bud.id, { name: "Baño" }, "bo");
+  e.addLine(
+    bud.id,
+    ch.id,
+    { desc: "Alicatado", unit: "m2", qtyMilli: 1000, priceCents: 400000, costCents: 200000 },
+    "bo",
+  );
+  e.issueVersion(bud.id, {}, "bo");
+  e.acceptVersion(bud.id, e.currentVersion(bud.id).id, { evidenceRef: "ok" }, "bo");
+  const prj = e.createProjectFromAcceptance(bud.id, "bo");
+  e.startWorks(prj.id, "bo");
+
+  const stranger = mk("Nada que ver SL", "B00000018");
+  assert(
+    e
+      .previewInvoice({
+        projectId: prj.id,
+        kind: "progress",
+        billToPartyId: stranger.id,
+        lines: [{ desc: "x", amountCents: 1000 }],
+      })
+      .blocks.map((b) => b.code)
+      .includes("AR-12"),
+    "a client that neither pays nor invoices under the payer is refused",
+  );
+
+  const line = [{ desc: "Certificacion 1", amountCents: 100000 }];
+  const pv = e.previewInvoice({
+    projectId: prj.id,
+    kind: "progress",
+    billToPartyId: owner.id,
+    lines: line,
+    vatBp: 1000,
+  });
+  assert(
+    pv.ok &&
+      pv.doc.customer.name === "Propietario del piso" &&
+      pv.doc.customer.taxId === "12345678Z",
+    "the preview is addressed to the owner, with the owner's NIF",
+    JSON.stringify({ ok: pv.ok, c: pv.doc.customer }),
+  );
+  const inv = e.issueInvoice(
+    { projectId: prj.id, kind: "progress", billToPartyId: owner.id, lines: line, vatBp: 1000 },
+    "bo",
+  );
+  assert(
+    inv.partyId === owner.id &&
+      e.renderInvoiceDoc(inv.number).customer.name === "Propietario del piso",
+    "and so is the issued document",
+    inv.partyId,
+  );
+  assert(
+    e.state.projects.find((x) => x.id === prj.id).partyId === admin.id,
+    "while the job itself still belongs to the manager",
+  );
+
+  /* THE FOLD, which is the guard. What the owner was billed counts against the
+     manager's scope, so the same chapter cannot go out twice under two names. */
+  assert(
+    e.invoiceBases(prj.id, admin.id).billedBaseCents === 100000,
+    "the manager's scope counts the owner's factura",
+    String(e.invoiceBases(prj.id, admin.id).billedBaseCents),
+  );
+  assert(
+    e
+      .previewInvoice({
+        projectId: prj.id,
+        kind: "progress",
+        billToPartyId: admin.id,
+        lines: [{ desc: "todo otra vez", amountCents: 400000 }],
+      })
+      .blocks.map((b) => b.code)
+      .includes("AR-11"),
+    "so billing the whole job again to the manager is refused",
+  );
+
+  // ---- route one: nobody holds it, so the number simply comes back --------
+  assert(
+    e.invoiceReaddressMode(inv.id) === "reissue",
+    "an unsent factura is re-addressed by re-issuing",
+    e.invoiceReaddressMode(inv.id),
+  );
+  const r1 = e.reassignInvoiceRecipient(inv.id, owner2.id, "el piso era de otra propietaria", "bo");
+  assert(
+    r1.mode === "reissue" &&
+      !r1.credit &&
+      r1.replacement.number === inv.number &&
+      r1.replacement.partyId === owner2.id &&
+      e.state.invoices.length === 1,
+    "one document, the same number, the new owner",
+    JSON.stringify({ m: r1.mode, n: r1.replacement.number, was: inv.number }),
+  );
+
+  // ---- route two: it has gone out, so it takes an abono and a replacement --
+  e.state.commsQueue.push({ subjectRef: r1.replacement.number, status: "sent" });
+  assert(
+    e.invoiceReaddressMode(r1.replacement.id) === "rectify",
+    "once it has been sent, the pair is the only route",
+    e.invoiceReaddressMode(r1.replacement.id),
+  );
+  const r2 = e.reassignInvoiceRecipient(
+    r1.replacement.id,
+    owner.id,
+    "la administradora mando los datos equivocados",
+    "bo",
+  );
+  assert(
+    r2.credit && r2.credit.partyId === owner2.id && r2.replacement.partyId === owner.id,
+    "the abono goes back to whoever was named, the replacement to whoever should have been",
+    JSON.stringify({ credit: r2.credit && r2.credit.partyId, repl: r2.replacement.partyId }),
+  );
+  assert(
+    r2.credit.baseCents === 100000 && r2.replacement.baseCents === 100000,
+    "same base on both, so it is a substitution and not an edit",
+    r2.credit.baseCents + "/" + r2.replacement.baseCents,
+  );
+  assert(
+    e.seriesGaps("invoice").length === 0 && e.seriesGaps("creditNote").length === 0,
+    "no gap in either series",
+  );
+  assert(
+    e.invoiceBases(prj.id, admin.id).billedBaseCents === 100000,
+    "and the job still reads one factura's worth of billing",
+    String(e.invoiceBases(prj.id, admin.id).billedBaseCents),
+  );
+  assert(
+    e.state.invoiceEvents.length === e.state.invoices.length,
+    "chain and book still agree",
+    e.state.invoiceEvents.length + "/" + e.state.invoices.length,
+  );
+  throws(
+    () => e.setBillingParent(owner.id, null, "bo"),
+    "the link cannot move under a client that already has invoices",
+  );
+  throws(
+    () => e.reassignInvoiceRecipient(r2.credit.id, owner.id, "porque", "bo"),
+    "an abono is not re-addressed",
+  );
+  throws(
+    () => e.reassignInvoiceRecipient(r2.replacement.id, owner.id, "porque", "bo"),
+    "nor is a factura re-addressed to the client it already names",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

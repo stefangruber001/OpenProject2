@@ -28590,6 +28590,37 @@
       /** `onSaved` lets a screen borrow this drawer and get control back — the
           visit uses it to fill in a client that is missing data and then return to
           the capture it was in the middle of, instead of sending the person away. */
+      /**
+       * WHO THIS CLIENT INVOICES UNDER — the administradora de fincas field.
+       *
+       * One level, by the engine's rule, so the candidates are the clients
+       * that do not themselves invoice under somebody. A client that already
+       * has others invoicing under it cannot acquire a parent of its own: the
+       * select is disabled rather than hidden, because the list underneath is
+       * the explanation and hiding the control would leave it unexplained.
+       *
+       * The static phrase and the names are separate text nodes on purpose.
+       * A sentence assembled around values is not a dictionary key and is not
+       * in the workspace either, so a composed one reports as untranslated for
+       * ever — which is exactly how the Inmueble column broke the audit.
+       */
+      function partyBillingField(p) {
+        const mine = erp.billingEntitiesOf(p.id);
+        const cands = erp.state.parties.filter(
+          (x) =>
+            x.id !== p.id && x.active && (x.roles || []).includes("customer") && !x.billingParentId,
+        );
+        const dis = mine.length ? " disabled" : "";
+        return `<div class="field full"><label>Factura bajo</label>
+          <select id="e_bparent" translate="no"${dis}>
+           <option value="">— nadie: factura a su propio nombre —</option>
+           ${cands.map((x) => `<option value="${x.id}"${p.billingParentId === x.id ? " selected" : ""}>${esc(x.name)}</option>`).join("")}
+          </select>
+          <div class="sub" style="margin-top:4px">Para administradoras de fincas y gestores: el presupuesto y la obra van a su nombre y la factura al del cliente final que ellos indiquen.</div>
+          ${mine.length ? `<div class="sub" style="margin-top:4px"><span>Clientes que facturan bajo este</span><span translate="no">: ${esc(mine.map((x) => x.name).join(", "))}</span></div>` : ""}
+         </div>`;
+      }
+
       function editPartyDrawer(id, onSaved) {
         const p = erp.party(id);
         const db = openDrawer("Editar — " + p.name);
@@ -28657,6 +28688,7 @@
              ? `<div class="field full"><label>IBAN (opcional — el cambio queda registrado)</label><input id="e_iban" value="${esc((p.bank && p.bank.iban) || "")}" placeholder="ES.."></div>`
              : `<div class="field full"><label>IBAN</label><div class="pill y" style="width:fit-content">Oculto — su perfil no tiene permiso para ver datos bancarios</div></div>`
          }
+         ${partyBillingField(p)}
          <div class="field full"><label>Notas</label><input id="e_notes" value="${esc(p.notes || "")}"></div></div>`;
         // A9 · save and delete pinned under the form, never behind a scroll.
         drawerFoot(
@@ -28753,6 +28785,13 @@
                   : Math.round(+$("#e_supterms").value),
               notes: $("#e_notes").value.trim(),
             };
+            /* Only when the control was actually offered: the engine routes
+               this key through `setBillingParent`, which refuses to move the
+               link under a client that already has issued invoices, and a
+               patch that always carried the key would ask it to do that on
+               every unrelated save. */
+            const bparent = $("#e_bparent");
+            if (bparent && !bparent.disabled) patch.billingParentId = bparent.value || null;
             // No #e_iban element exists when the field was masked — nothing to read,
             // and nothing this save could change even if it tried.
             if (SESSION.bankRead) {
@@ -28787,7 +28826,12 @@
          single place a tercero comes into existence, it just no longer has to be
          the place you were standing when it happened. */
       function newPartyDrawer(role, opts) {
-        const { back, onCreated, roleChoices } = opts || {};
+        /* `fields` is the third thing a borrowing drawer may hand over: record
+           values the caller already knows and the form does not ask for. The
+           invoice screen uses it for `billingParentId`, so a flat owner created
+           while invoicing arrives already invoicing under the manager who sent
+           their data over — a link nobody has to remember to make afterwards. */
+        const { back, onCreated, roleChoices, fields } = opts || {};
         const KNOWN = {
           customer: ["Nuevo cliente", "Guardar cliente", "Cliente creado"],
           supplier: ["Nuevo proveedor", "Guardar proveedor", "Proveedor creado"],
@@ -28857,6 +28901,7 @@
                 mobile: $("#f_mob").value.trim(),
                 email: $("#f_mail").value.trim(),
                 leadSource: $("#f_src").value,
+                ...(fields || {}),
               },
               "backoffice",
             );
@@ -32429,6 +32474,7 @@
         const bases = erp.invoiceBases(projectId);
         invWork = {
           projectId,
+          billToPartyId: (opts && opts.billToPartyId) || null,
           basis: (opts && opts.basis) || invDefaultBasis(bases),
           kind: "progress",
           lines: [],
@@ -32470,6 +32516,11 @@
       function invCorrectWork(inv) {
         return {
           projectId: inv.projectId,
+          /* The client it was addressed to, which on a corrected factura is a
+             thing the operator may also need to change — the manager hands the
+             flat owner over after the fact often enough that it is the reason
+             «Facturar a» exists at all. */
+          billToPartyId: inv.partyId,
           basis:
             inv.kind === "creditNote"
               ? "credit"
@@ -32570,11 +32621,41 @@
         }
       }
 
+      /**
+       * Every legal person this job's factura may be addressed to.
+       *
+       * The payers the project carries, and under each of them the clients
+       * that invoice under it — which is exactly the set `_payerFor` accepts,
+       * so a name offered here can never be refused by AR-12 afterwards.
+       * `scope` is the payer whose ceiling it bills against, which is what the
+       * «＋ Nuevo cliente» path needs in order to link a new one correctly.
+       */
+      function invoiceRecipientOptions(projectId) {
+        const p = erp.project(projectId);
+        const rows = p.billing && p.billing.length ? p.billing : [{ partyId: p.partyId }];
+        const out = [];
+        for (const r of rows) {
+          let party;
+          try {
+            party = erp.party(r.partyId);
+          } catch (e) {
+            continue;
+          }
+          out.push({ id: party.id, name: party.name, scope: party.id, own: true });
+          for (const sub of erp.billingEntitiesOf(party.id))
+            out.push({ id: sub.id, name: sub.name, scope: party.id, own: false });
+        }
+        return out;
+      }
+
       /** The draft as the engine wants it. Nothing here is a figure — only choices. */
       function invDraft() {
         const w = invWork;
         return {
           projectId: w.projectId,
+          // Null means «the job's own customer», which is what every factura
+          // issued before this existed meant and still means.
+          billToPartyId: w.billToPartyId || null,
           kind: w.kind,
           lines: w.lines.map((l) => ({ desc: l.desc, amountCents: l.amountCents })),
           vatBp: w.vatBp,
@@ -32637,6 +32718,35 @@
         invPaint();
       }
 
+      /**
+       * WHO THE FACTURA IS ADDRESSED TO, when that is not simply the job's
+       * customer.
+       *
+       * A property manager asks for the quote in their own name, manages
+       * dozens of flats, and at invoicing time hands over the owner of the one
+       * that was worked on. The quote, the contract and the job stay theirs —
+       * that is who they were agreed with — and only the factura moves, which
+       * is correct: a factura names whoever acquired the service.
+       *
+       * Always rendered, even on an ordinary job with one name in it, because
+       * this is also where the FIRST invoicing client is added. A control that
+       * only appears once somebody has already used it cannot be discovered.
+       */
+      function invRecipientCard() {
+        const w = invWork;
+        const opts = invoiceRecipientOptions(w.projectId);
+        const cur = w.billToPartyId || (opts[0] && opts[0].id) || "";
+        return `<div class="card"><div class="ch"><h3>Facturar a</h3></div>
+          <div class="fgrid" style="padding:10px 12px 0">
+           <div class="field full"><select id="inv_to" translate="no">
+            ${opts.map((o) => `<option value="${o.id}"${o.id === cur ? " selected" : ""}>${esc(o.name)}</option>`).join("")}
+           </select></div>
+          </div>
+          <div style="padding:0 12px 10px"><button class="btn sm" id="inv_to_new">＋ Nuevo cliente de facturación</button></div>
+          <div class="sub" style="padding:0 12px 12px">El presupuesto y la obra siguen a nombre del cliente de la obra. La factura lleva el nombre, el NIF y la dirección de quien se elija aquí.</div>
+         </div>`;
+      }
+
       /** Full repaint — after anything structural (origin, a line added or removed). */
       function invPaint() {
         const host = $("#invBody");
@@ -32647,6 +32757,7 @@
         const comp = erp.partyCompleteness(p.partyId);
         host.innerHTML = `
          ${w.correcting ? INV_FIX_NOTE_O + esc(w.correcting) + INV_FIX_NOTE_C : ""}
+         ${invRecipientCard()}
          <div class="card"><div class="ch"><h3>Origen</h3></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px">
            ${INV_BASES.map(([k, l]) => `<button class="btn sm${w.basis === k ? " primary" : ""}" data-invbasis="${k}">${l}</button>`).join("")}
@@ -32712,6 +32823,30 @@
               invPaint();
             }),
         );
+        const to = $("#inv_to");
+        if (to)
+          to.onchange = () => {
+            w.billToPartyId = to.value || null;
+            invSync();
+          };
+        /* A new invoicing client, created from here because here is when its
+           data arrives: the manager sends the owner over at the moment the
+           factura is needed. It is created by the one form that creates every
+           tercero — same validation, same duplicate warning, same audit entry —
+           with the link already made, and comes back selected. */
+        const toNew = $("#inv_to_new");
+        if (toNew)
+          toNew.onclick = () => {
+            const opts = invoiceRecipientOptions(w.projectId);
+            const hit = opts.find((o) => o.id === (w.billToPartyId || "")) || opts[0] || {};
+            newPartyDrawer("customer", {
+              fields: { billingParentId: hit.scope || null },
+              onCreated: (rec) => {
+                w.billToPartyId = rec.id;
+                invPaint();
+              },
+            });
+          };
         const pick = $("#inv_pick");
         if (pick)
           pick.onchange = () => {
@@ -32938,6 +33073,11 @@
          button offering to correct a factura that cannot be corrected is a
          promise, and the sentence underneath already says what to do instead. */
       const INV_FIX_BTN = '<button class="btn sm" id="iv_fix">Corregir la factura</button>';
+      /* RE-ADDRESSING, which is a different question from correcting: not what
+         the factura says, but WHO it is for. Offered on both routes the engine
+         has — see `invoiceReaddressMode` — because the manager hands the flat
+         owner over after the fact, and sometimes after the paper has gone. */
+      const INV_TO_BTN = '<button class="btn sm" id="iv_to">Facturar a otro cliente</button>';
       /* A RECORDED INVOICE OFFERS NO DOCUMENT, and that is the single most
          important thing on this screen. The customer is holding the original
          and the gestoría has it; a second paper printed from here would carry
@@ -32984,6 +33124,9 @@
            sentence underneath is printed for THIS one: it is the wider of the
            two, so every reason the undo button has ever printed still prints. */
         const fixBlock = isExt ? null : undoBlock || erp.invoiceCorrectBlock(inv.id);
+        /* Which of the two routes a re-addressing would take, or neither. The
+           engine decides, so the button cannot offer what it would refuse. */
+        const readdress = isExt ? null : erp.invoiceReaddressMode(inv.id);
         const out = erp.invoiceOutstandingCents(inv.id);
         const row = erp.invoiceRegister().find((r) => r.number === number) || { daysOverdue: 0 };
         /* An invoice need not belong to a job, and until a recorded one could
@@ -33043,6 +33186,7 @@
           ${isExt ? "" : INV_PDF_BTN + INV_WORD_BTN}
           ${inv.kind !== "creditNote" && !isExt ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
           ${isExt || fixBlock ? "" : INV_FIX_BTN}
+          ${readdress === "reissue" || readdress === "rectify" ? INV_TO_BTN : ""}
           ${isExt ? INV_EXT_DEL : undoBlock === "not-last" ? "" : INV_UNDO_BTN}
          </div>
          ${isExt ? INV_EXT_WHY : ""}
@@ -33132,6 +33276,8 @@
             invWork = work;
             go("invoicing");
           };
+        const toOther = $("#iv_to");
+        if (toOther) toOther.onclick = () => readdressInvoiceDrawer(inv, readdress);
         const undo = $("#iv_undo");
         if (undo && !undoBlock)
           undo.onclick = async () => {
@@ -33148,6 +33294,83 @@
               closeDrawer();
             }, "Factura retirada");
           };
+      }
+
+      /* The two routes, in the words that say what will exist afterwards. Flat
+         declarations: the source audit reads a gap between one tag and the next
+         as a sentence, and each of these has to stay its own text node to be a
+         dictionary key. */
+      const INV_RD_WHY = {
+        reissue:
+          "La factura todavía no ha salido de aquí, así que se retira y se vuelve a emitir con el mismo número a nombre del cliente que elija. La fecha será la de hoy.",
+        rectify:
+          "La factura ya ha salido, así que no se puede cambiar: se emite un abono a nombre del cliente actual y una factura nueva, por el mismo importe, a nombre del que elija.",
+      };
+      /**
+       * Address an issued factura to another client.
+       *
+       * The engine owns both routes and which one applies; this screen only
+       * has to say WHICH, before anything is minted, because the two leave
+       * different paper behind: one document under the same number, or an
+       * abono plus a replacement. An operator who expected the first and got
+       * the second would have two documents to explain to the gestoría.
+       *
+       * The amounts are deliberately not editable here. A substitution that
+       * also changed the figures would be two changes wearing one reason; the
+       * replacement lands as the newest factura and «Corregir la factura» is
+       * right there if the numbers need to move too.
+       */
+      function readdressInvoiceDrawer(inv, mode) {
+        const db = openDrawer("Facturar a otro cliente");
+        const paint = () => {
+          const opts = invoiceRecipientOptions(inv.projectId).filter((o) => o.id !== inv.partyId);
+          db.innerHTML = `<div class="card"><div class="daylist">
+            <div class="it"><span>${esc(INV_RD_WHY[mode] || "")}</span></div>
+           </div></div>
+           <div class="fgrid">
+            <div class="field full"><label>Cliente de la factura</label>
+             ${
+               opts.length
+                 ? `<select id="rd_to" translate="no">${opts.map((o) => `<option value="${o.id}">${esc(o.name)}</option>`).join("")}</select>`
+                 : '<div class="empty">Esta obra no tiene todavía ningún otro cliente al que facturar.</div>'
+             }</div>
+            <div class="field full"><button class="btn sm" id="rd_new">＋ Nuevo cliente de facturación</button></div>
+           </div>`;
+          drawerFoot(
+            opts.length
+              ? '<button class="btn primary" id="rd_go" style="flex:1">Cambiar el cliente</button>'
+              : "",
+          );
+          const add = $("#rd_new");
+          if (add)
+            add.onclick = () => {
+              const all = invoiceRecipientOptions(inv.projectId);
+              const hit = all.find((o) => o.id === inv.partyId) || all[0] || {};
+              newPartyDrawer("customer", {
+                fields: { billingParentId: hit.scope || null },
+                onCreated: () => readdressInvoiceDrawer(inv, mode),
+              });
+            };
+          const go = $("#rd_go");
+          if (go)
+            go.onclick = async () => {
+              const pick = $("#rd_to").value;
+              const reason = await askText("Facturar a otro cliente", {
+                label: "Motivo",
+                body: INV_RD_WHY[mode] || "",
+                required: true,
+                okLabel: "Cambiar",
+              });
+              if (reason === null) return;
+              let out = null;
+              const saved = await mutateNow(() => {
+                out = erp.reassignInvoiceRecipient(inv.id, pick, reason, "backoffice");
+                closeDrawer();
+              }, "Cliente de la factura cambiado");
+              if (saved && out && out.replacement) invoiceDrawer(out.replacement.number);
+            };
+        };
+        paint();
       }
 
       /* ================= COM-04 · the contract, full screen (S9) ================
