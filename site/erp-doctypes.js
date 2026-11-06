@@ -551,7 +551,16 @@
             "IBAN: " + f.company.iban + "   ·   Referencia: " + f.numbers.invoice,
           ],
           notes: [
-            "Las correcciones se emiten como factura rectificativa; esta factura es inmutable.",
+            /* WHAT THIS USED TO SAY was «esta factura es inmutable», and on
+               6 Nov it stopped being true: the operator may now rewrite an
+               issued factura in place, under its own number, until its quarter
+               goes to the gestoría. A document that asserts its own
+               immutability while the system allows it to change is worse than
+               one that says nothing — the customer would be holding a promise
+               the software does not keep. This says what actually happens, and
+               covers both routes, because once a quarter is filed or an abono
+               exists the rectificativa is still the only way. */
+            "Si hay que corregir algo, recibira el documento actualizado con el mismo numero o una factura rectificativa.",
             "Garantia de 2 anos sobre los trabajos.",
           ],
         };

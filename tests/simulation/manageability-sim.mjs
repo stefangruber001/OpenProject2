@@ -42,6 +42,7 @@ const at = (engine, projectId, chapterNum) => {
   const line = hit && hit.chapter.lines[0];
   return line ? { chapterNum: String(hit.chapter.num), lineId: line.id } : {};
 };
+const pct = (base, bp) => Math.round((base * bp) / 10000);
 const throws = (fn, name) => {
   try {
     fn();
@@ -6062,6 +6063,187 @@ assert(
   throws(
     () => e.reassignInvoiceRecipient(r2.replacement.id, owner.id, "porque", "bo"),
     "nor is a factura re-addressed to the client it already names",
+  );
+}
+
+/* ====== EDITING AN ISSUED FACTURA IN PLACE (6 Nov) ========================
+
+   «The whole idea is to make the invoices editable without the need for
+   re-invoicing — this, until the Factura Electrónica starts.» The operator's
+   mandate, after being shown the abono-and-replacement route and rejecting it.
+
+   So an issued factura can be rewritten under its own number, including one
+   that is NOT the last — FAC-63 with 64 and 65 behind it was the case that
+   prompted it, and that is precisely what `undoLastInvoice` can never do.
+
+   What is checked here is what makes it defensible rather than reckless: the
+   number and the date do not move, every previous version is kept with its
+   reason, the hash chain is rebuilt and still verifies, and the three things
+   that would be damaged by a silent rewrite — a filed quarter, an existing
+   rectificativa, money already collected — still refuse.
+   ========================================================================== */
+{
+  const e = new ERP("2026-11-06");
+  e.configureEntity(
+    {
+      legalName: "Canei Subirats, S.L.",
+      taxId: "B12345674",
+      street: "C/ X 1",
+      postalCode: "08960",
+      city: "Sant Just",
+      iban: "ES9121000418450200051332",
+    },
+    "bo",
+  );
+  const mk = (name, taxId, extra) =>
+    e.addParty(
+      Object.assign(
+        {
+          roles: ["customer"],
+          name,
+          taxId,
+          billStreet: "C/ Y 2",
+          billPostalCode: "08001",
+          billCity: "BCN",
+          billProvince: "Barcelona",
+          mobile: "600000001",
+          email: "x@y.example",
+          leadSource: "referral",
+        },
+        extra || {},
+      ),
+      "bo",
+    );
+  const manager = mk("Administradora SL", "A58818501");
+  const owner = mk("Propietaria del piso", "12345678Z", { billingParentId: manager.id });
+  const bud = e.createBudget({ partyId: manager.id }, "bo");
+  const ch = e.addChapter(bud.id, { name: "Obra" }, "bo");
+  e.addLine(
+    bud.id,
+    ch.id,
+    { desc: "Trabajos", unit: "m2", qtyMilli: 1000, priceCents: 900000, costCents: 400000 },
+    "bo",
+  );
+  e.issueVersion(bud.id, {}, "bo");
+  e.acceptVersion(bud.id, e.currentVersion(bud.id).id, { evidenceRef: "ok" }, "bo");
+  const prj = e.createProjectFromAcceptance(bud.id, "bo");
+  e.startWorks(prj.id, "bo");
+
+  // Three facturas, so the one being edited is NOT the newest.
+  const first = e.issueInvoice(
+    {
+      projectId: prj.id,
+      kind: "progress",
+      lines: [{ desc: "Certificacion 1", amountCents: 139988 }],
+      vatBp: 2101,
+    },
+    "bo",
+  );
+  const second = e.issueInvoice(
+    {
+      projectId: prj.id,
+      kind: "progress",
+      lines: [{ desc: "Certificacion 2", amountCents: 100000 }],
+      vatBp: 2100,
+    },
+    "bo",
+  );
+  const third = e.issueInvoice(
+    {
+      projectId: prj.id,
+      kind: "progress",
+      lines: [{ desc: "Certificacion 3", amountCents: 50000 }],
+      vatBp: 2100,
+    },
+    "bo",
+  );
+  assert(
+    e.invoiceUndoBlock(first.id) === "not-last" && e.invoiceEditBlock(first.id) === null,
+    "an older factura cannot be withdrawn, but can be edited",
+    e.invoiceUndoBlock(first.id) + " / " + String(e.invoiceEditBlock(first.id)),
+  );
+
+  const was = { partyId: first.partyId, totalCents: first.totalCents, date: first.date };
+  const edited = e.editIssuedInvoice(
+    first.id,
+    { billToPartyId: owner.id, vatBp: 2100 },
+    "bo",
+    "la administradora indico el titular final y el tipo estaba mal",
+  );
+  assert(
+    edited.number === first.number && edited.date === was.date,
+    "neither the number nor the date moves",
+    edited.number + " " + edited.date,
+  );
+  assert(
+    edited.partyId === owner.id &&
+      e.renderInvoiceDoc(edited.number).customer.name === "Propietaria del piso",
+    "the document is addressed to whoever it was changed to",
+    e.renderInvoiceDoc(edited.number).customer.name,
+  );
+  assert(
+    edited.vatBp === 2100 && edited.vatCents === pct(139988, 2100),
+    "and carries the corrected rate",
+    edited.vatBp + " / " + edited.vatCents,
+  );
+  assert(
+    e.state.invoices.length === 3 && !e.state.invoices.some((i) => i.kind === "creditNote"),
+    "no second document and no abono",
+    String(e.state.invoices.length),
+  );
+  assert(
+    edited.revisions.length === 1 &&
+      edited.revisions[0].before.partyId === was.partyId &&
+      edited.revisions[0].before.totalCents === was.totalCents &&
+      /titular final/.test(edited.revisions[0].reason),
+    "what it said before is kept, with its reason",
+    JSON.stringify(edited.revisions[0].before).slice(0, 90),
+  );
+  // The chain is the evidence, so it has to survive being rewritten.
+  let chainOk = true;
+  let prev = "GENESIS";
+  for (const ev of e.state.invoiceEvents) {
+    if (ev.prev !== prev) {
+      chainOk = false;
+      break;
+    }
+    prev = ev.hash;
+  }
+  assert(
+    chainOk && e.state.invoiceEvents[0].totalCents === edited.totalCents,
+    "the hash chain is rebuilt from the edit forward and still verifies",
+    String(chainOk),
+  );
+  assert(e.seriesGaps("invoice").length === 0, "the series keeps no gap");
+
+  throws(
+    () => e.editIssuedInvoice(second.id, { vatBp: 1000 }, "bo", "   "),
+    "an edit with no reason is refused",
+  );
+  const col = e.recordCollection(
+    { partyId: manager.id, amountCents: 100000, allocations: [] },
+    "bo",
+  );
+  e.allocateCollection(col.id, [{ invoiceId: second.id, amountCents: 100000 }], "bo");
+  throws(
+    () =>
+      e.editIssuedInvoice(
+        second.id,
+        { lines: [{ desc: "menos", amountCents: 1000 }] },
+        "bo",
+        "bajar",
+      ),
+    "it cannot be edited below what has already been collected against it",
+  );
+  e.state.packagesSent.push({ quarter: "2026-Q4" });
+  assert(
+    e.invoiceEditBlock(third.id) === "quarter-sent",
+    "a quarter already filed with the gestoría refuses the edit",
+    String(e.invoiceEditBlock(third.id)),
+  );
+  throws(
+    () => e.editIssuedInvoice(third.id, { vatBp: 1000 }, "bo", "porque"),
+    "…and the refusal names the reopen rather than doing it quietly",
   );
 }
 

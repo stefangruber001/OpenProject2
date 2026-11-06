@@ -7449,7 +7449,7 @@
          restatement of the same fact in worse words. Once approved the extra
          IS in the ceiling, so nothing is left unguarded either way. */
       if (payer && draft.kind !== "creditNote" && !draft.changeId) {
-        const bases = this.invoiceBases(p.id, billTo);
+        const bases = this.invoiceBases(p.id, billTo, draft.editingId || null);
         const room = bases.attributedCents - bases.billedBaseCents;
         const want = this._invoiceBase(draft);
         /* Rounding slack, and ONLY rounding slack.
@@ -7489,6 +7489,7 @@
       const firstForPayer = !this.state.invoices.some(
         (i) =>
           i.projectId === p.id &&
+          i.id !== (draft.editingId || null) &&
           this._billingScopeOwner(i.partyId) === billToScope &&
           i.kind !== "creditNote",
       );
@@ -7735,7 +7736,7 @@
      * before it ever reaches this screen. The generator's job is to let
      * somebody pick one, not to make them add it up again.
      */
-    invoiceBases(projectId, billToPartyId) {
+    invoiceBases(projectId, billToPartyId, excludeInvoiceId) {
       const p = this.project(projectId);
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
@@ -7751,9 +7752,17 @@
          same work could be billed twice over — once to each legal person — on
          two sealed documents in a gapless series. */
       const forParty = billToPartyId ? this._billingScopeOwner(billToPartyId) : null;
+      /* `excludeInvoiceId` leaves ONE factura out of every figure here, and
+         it exists for editing in place: the document being rewritten is still
+         in the book while its replacement content is being judged, so counting
+         it would refuse an edit that changes nothing about the total. Left out
+         of the signature everywhere else, so no other caller can pass it by
+         accident. */
       const invs = this.state.invoices.filter(
         (i) =>
-          i.projectId === p.id && (!forParty || this._billingScopeOwner(i.partyId) === forParty),
+          i.projectId === p.id &&
+          i.id !== excludeInvoiceId &&
+          (!forParty || this._billingScopeOwner(i.partyId) === forParty),
       );
       // Already billed, as BASE and net of abonos — the figure a certification
       // has to subtract. Totals would be the wrong number: VAT is not revenue.
@@ -8589,6 +8598,210 @@
         inv.number + " → " + credit.number + " + " + replacement.number + " " + reason,
       );
       return { mode, credit, replacement };
+    }
+
+    /**
+     * Why this factura cannot be edited in place, or null.
+     *
+     * THE MANDATE, 6 Nov: «the whole idea is to make the invoices editable
+     * without the need for re-invoicing — this, until the Factura Electrónica
+     * starts». So the default answer is yes, and what follows are the three
+     * cases where saying yes would damage something outside this screen rather
+     * than merely rewrite a document.
+     *
+     * Not in the list, deliberately: being an old factura rather than the
+     * newest one. That is what `undoLastInvoice` needs — it removes a number
+     * from a gapless series — and editing removes nothing, so the ordering of
+     * the series is untouched. FAC-63 with 64 and 65 behind it is exactly the
+     * case this exists for.
+     */
+    invoiceEditBlock(id) {
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (!inv) throw new Error("Invoice not found");
+      /* A factura this company issued BEFORE the platform. The document is
+         somebody else's paper and this record only says it happened; editing
+         it here would be inventing a second account of it. */
+      if (inv.origin === "external") return "external";
+      /* The gestoría already has the quarter. Rewriting a document inside a
+         filed period makes their figures wrong without telling them, which is
+         the one failure a reopen exists to prevent — so it is refused by name
+         and the reopen is the path. */
+      const q = quarterOf(inv.date);
+      const sent = (this.state.packagesSent || []).filter((x) => x.quarter === q);
+      if (sent.length && !sent[sent.length - 1].reopened) return "quarter-sent";
+      /* An abono already names it. Two corrections of one document disagree by
+         construction: the rectificativa cancels what the factura USED to say,
+         and editing it afterwards leaves the pair describing different sales. */
+      if (this.state.invoices.some((x) => x.rectifies === inv.id)) return "rectified";
+      return null;
+    }
+
+    /**
+     * Rewrite an issued factura in place — same number, same date, no abono.
+     *
+     * What this is NOT: a correction in the sense the law means. Until the
+     * Factura Electrónica regime applies to this company (LEGAL_REVIEW §1 and
+     * §15) its software is not required to keep issued documents immutable,
+     * and the client corrects a wrong factura by making it right rather than
+     * by putting three documents in front of a customer who only ever saw one.
+     * The operator asked for exactly that, twice, and this is it.
+     *
+     * WHAT MAKES IT DEFENSIBLE ANYWAY, and the part not to remove:
+     *   · every version is kept. `revisions` holds what the document said
+     *     before each edit, with who changed it, when and why. The paper is
+     *     mutable; the history of the paper is not.
+     *   · the chained event record (VFU-01) is RECOMPUTED, not patched. An
+     *     edited total changes that event's hash and therefore every hash
+     *     after it, so the chain is rebuilt from the edit forward and still
+     *     verifies end to end. A chain left stale would be worse than no
+     *     chain: it would assert that nothing had changed.
+     *   · the number, the date and the series are untouched. Nothing here can
+     *     open a gap, reorder a book or mint anything.
+     *
+     * Everything else is the same arithmetic `issueInvoice` performs, through
+     * the same helpers, so an edited factura and a freshly issued one with the
+     * same content are the same record.
+     */
+    editIssuedInvoice(id, patch, user, reason) {
+      const inv = this.state.invoices.find((x) => x.id === id);
+      if (!inv) throw new Error("Invoice not found");
+      const block = this.invoiceEditBlock(id);
+      if (block === "external")
+        throw new Error("That invoice was recorded, not issued here — it has no document to edit");
+      if (block === "quarter-sent")
+        throw new Error(
+          "That period has already gone to the adviser: reopen " +
+            quarterOf(inv.date) +
+            " first, or issue a rectificativa",
+        );
+      if (block === "rectified")
+        throw new Error("It already has a rectificativa — edit that one, or issue another");
+      if (!String(reason || "").trim())
+        throw new Error("An edited factura needs its reason: it is what the revision will say");
+      const p = this.project(inv.projectId);
+      /* The draft, as every other invoice path states it. `editingId` takes
+         THIS factura out of the over-billing ceiling: it is being rewritten,
+         not added, so counting its own amount against the job would refuse an
+         edit that changes no money at all. */
+      const draft = {
+        projectId: p.id,
+        editingId: inv.id,
+        kind: inv.kind,
+        billToPartyId: patch.billToPartyId != null ? patch.billToPartyId : inv.partyId,
+        lines:
+          patch.lines != null
+            ? patch.lines.map((l) => ({ desc: l.desc, amountCents: cents(l.amountCents) }))
+            : (inv.lines || []).map((l) => ({ desc: l.desc, amountCents: l.amountCents })),
+        vatBp: patch.vatBp != null ? patch.vatBp : inv.vatBp,
+        irpfBp: patch.irpfBp != null ? patch.irpfBp : inv.irpfBp || 0,
+        installmentIdx: inv.installmentIdx,
+        changeId: inv.changeId,
+        rectifies: inv.rectifies,
+        rectifyReason: inv.rectifyReason,
+        worksAddress: patch.worksAddress != null ? patch.worksAddress : inv.worksAddress,
+        language: patch.language !== undefined ? patch.language : inv.language,
+      };
+      const blocked = this._invoiceBlocks(draft);
+      if (blocked.length)
+        throw new Error(
+          `${blocked[0].code}: ${blocked[0].label}` +
+            (blocked[0].detail ? ` (${blocked[0].detail})` : ""),
+        );
+      const { payer, recipient } = this._invoiceRecipient(p, draft);
+      const baseCents = this._invoiceBase(draft);
+      const vatBp = draft.vatBp != null ? draft.vatBp : payer.vatBp != null ? payer.vatBp : p.vatBp;
+      const vatCents = pctOf(baseCents, vatBp);
+      const irpfBp = draft.irpfBp || 0;
+      const irpfCents = pctOf(baseCents, irpfBp);
+      const totalCents = baseCents + vatCents - irpfCents;
+      /* MONEY ALREADY APPLIED is the one figure an edit cannot argue with. A
+         factura may be edited after a collection — the amount was agreed, the
+         paperwork was wrong — but not BELOW what has already been received
+         against it, which would leave a payment explained by nothing. */
+      const collected = this.invoiceCollectedCents
+        ? this.invoiceCollectedCents(inv.id)
+        : sum(this.state.collections || [], (c) =>
+            sum(
+              (c.allocations || []).filter((a) => a.invoiceId === inv.id),
+              (a) => cents(a.amountCents),
+            ),
+          );
+      if (collected > totalCents)
+        throw new Error(
+          "Already collected " +
+            (collected / 100).toFixed(2) +
+            " € against this factura — it cannot be edited down to " +
+            (totalCents / 100).toFixed(2) +
+            " €. Undo the collection in Conciliación first.",
+        );
+      // ---- nothing above this line has changed anything ----------------
+      inv.revisions = Array.isArray(inv.revisions) ? inv.revisions : [];
+      inv.revisions.push({
+        at: this.state.today,
+        user: user || "system",
+        reason: String(reason).trim(),
+        before: {
+          partyId: inv.partyId,
+          lines: clone(inv.lines || []),
+          baseCents: inv.baseCents,
+          vatBp: inv.vatBp,
+          vatCents: inv.vatCents,
+          irpfBp: inv.irpfBp,
+          irpfCents: inv.irpfCents,
+          totalCents: inv.totalCents,
+          dueDate: inv.dueDate,
+          language: inv.language,
+        },
+      });
+      inv.partyId = recipient.id;
+      inv.taxTreatment = payer.taxTreatment || "standard";
+      inv.taxJustification = payer.taxJustification || "";
+      inv.lines = this._invoiceLines(draft, baseCents);
+      inv.baseCents = baseCents;
+      inv.vatBp = vatBp;
+      inv.vatCents = vatCents;
+      inv.irpfBp = irpfBp;
+      inv.irpfCents = irpfCents;
+      inv.totalCents = totalCents;
+      inv.worksAddress = draft.worksAddress || "";
+      // The DATE never moves: it is the document's date, it decides the VAT
+      // period, and the series is ordered by it. Only the due date follows,
+      // because it is derived from the recipient's terms and the recipient
+      // may have just changed.
+      inv.dueDate = addDays(
+        inv.date,
+        payer.paymentTermsDays ||
+          recipient.paymentTermsDays ||
+          this._configForRead().paymentTermsDays,
+      );
+      inv.paymentMethod = recipient.paymentMethod;
+      inv.language = this._docLanguageFor(draft.language, p.id, recipient.id);
+      inv.docRef = this._docName("factura", { number: inv.number, partyId: inv.partyId }, null);
+      this._rebuildInvoiceChain(inv.number, totalCents);
+      this._log(user, "editIssuedInvoice", inv.number + " " + String(reason).trim());
+      return inv;
+    }
+
+    /**
+     * Put the chained event record back in step after an edit.
+     *
+     * The event for this number takes the new total, and every hash from there
+     * to the end is recomputed — `hash` depends on `prev`, so one changed link
+     * invalidates all of them. Rebuilding is the only honest option: a chain
+     * that still verified after a document changed would be asserting that it
+     * had not.
+     */
+    _rebuildInvoiceChain(number, totalCents) {
+      const ev = this.state.invoiceEvents || [];
+      const at = ev.findIndex((x) => x.number === number);
+      if (at < 0) return;
+      ev[at].totalCents = totalCents;
+      let prev = at === 0 ? "GENESIS" : ev[at - 1].hash;
+      for (let i = at; i < ev.length; i++) {
+        ev[i].prev = prev;
+        ev[i].hash = djb2(prev + ev[i].number + ev[i].date + ev[i].totalCents);
+        prev = ev[i].hash;
+      }
     }
 
     invoiceOutstandingCents(invId) {

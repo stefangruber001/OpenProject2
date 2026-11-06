@@ -4514,3 +4514,26 @@ Puertas: manejabilidad 578/578 (eran 558) · numeración 55/55 · year-sim
 auditoría de páginas 107/83 · workspace-audit 0/0 en+ca · diccionario 4515
 completo en tres idiomas · boundaries OK · ownership guard OK · doc-pdf 47/47.
 La suite completa de navegador corre en CI sobre la rama antes del merge.
+
+## S49 · La factura emitida se edita, y la cadena se recalcula (2026-11-06)
+
+Mandato del operador: facturas editables sin reemitir, hasta que empiece la
+Factura Electrónica. Lo de esta mañana —retirar y volver a emitir— sólo valía
+para la última factura, y el caso real era la 63 con dos detrás.
+
+- **`editIssuedInvoice`** reescribe la factura en su sitio: destinatario,
+  líneas, tipo y retención. Mismo número, misma fecha, ningún abono.
+- **`revisions`** guarda cada versión anterior con su motivo, y la cadena
+  VFU-01 se recalcula desde la edición hacia adelante, así que sigue
+  verificando de punta a punta en vez de afirmar que no pasó nada.
+- **Tres negativas**: trimestre ya en la gestoría, rectificativa existente, y
+  cobrado por encima del nuevo total. Ser antigua no es una de ellas.
+- El cajón ofrece **«Editar la factura»** donde antes ofrecía «Corregir» y
+  «Facturar a otro cliente»; estas dos sólo aparecen ahora cuando la edición
+  está bloqueada, que es cuando el abono es realmente la única vía.
+- El papel ya no dice «esta factura es inmutable», porque ha dejado de serlo.
+
+Puertas: manejabilidad 590/590 (eran 578) · numeración 55/55 · year-sim
+149/149 · migraciones 154/154 hasta v30 · doc-docx 130/130 · doc-pdf 47/47 ·
+doc-i18n 13/13 · source-audit 158/158 en+ca · diccionario completo ·
+boundaries OK.

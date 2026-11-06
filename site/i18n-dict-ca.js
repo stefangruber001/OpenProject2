@@ -5250,6 +5250,17 @@ window.CANEI_DICT.ca = {
   "El presupuesto y la obra siguen a nombre del cliente de la obra. La factura lleva el nombre, el NIF y la dirección de quien se elija aquí.":
     "El pressupost i l'obra segueixen a nom del client de l'obra. La factura porta el nom, el NIF i l'adreça de qui es triï aquí.",
   "Facturar a otro cliente": "Facturar a un altre client",
+  "Editar la factura": "Editar la factura",
+  "Edición de la factura": "Edició de la factura",
+  "Factura actualizada": "Factura actualitzada",
+  "Se guarda sobre la misma factura: mismo número y misma fecha, y no se emite ningún abono. Lo que decía antes queda guardado en su historial.":
+    "Es desa sobre la mateixa factura: mateix número i mateixa data, i no s'emet cap abonament. El que deia abans queda desat al seu historial.",
+  "Se guarda sobre la misma factura, con el mismo número y la misma fecha. Queda registrado quién lo cambia, cuándo y por qué.":
+    "Es desa sobre la mateixa factura, amb el mateix número i la mateixa data. Queda registrat qui ho canvia, quan i per què.",
+  "Su trimestre ya se ha enviado al asesor: reábralo en Gestoría para poder editarla, o emita una rectificativa.":
+    "El seu trimestre ja s'ha enviat a l'assessor: reobriu-lo a Gestoria per poder editar-la, o emeteu una rectificativa.",
+  "Si hay que corregir algo, recibira el documento actualizado con el mismo numero o una factura rectificativa.":
+    "Si cal corregir alguna cosa, rebra el document actualitzat amb el mateix numero o una factura rectificativa.",
   "Cliente de la factura": "Client de la factura",
   "Cliente de la factura cambiado": "Client de la factura canviat",
   "Cambiar el cliente": "Canviar el client",

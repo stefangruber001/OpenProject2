@@ -56,3 +56,35 @@ Per mandate §2: logged, reasoned, and then implemented your way.
    the person who eventually removes one of them will not be told what it was
    for unless they read this file. That is why it is written here rather than
    only in a comment.
+
+8. **Editing an issued factura in place.** Asked on 6 Nov to make issued
+   invoices editable "without the need for re-invoicing — this, until the
+   Factura Electrónica starts", after being shown the abono-and-replacement
+   route and rejecting it. Implemented as instructed, and the objection is
+   narrow but worth the record.
+
+   What I believe is sound: the guards. A filed quarter, an existing
+   rectificativa and money already collected each refuse the edit by name; the
+   number, the date and the series never move; every previous version is kept
+   with who changed it, when and why; and the VFU-01 chain is rebuilt from the
+   edit forward so it still verifies rather than silently asserting that
+   nothing happened.
+
+   What I object to is the one thing no guard can reach: **a factura the
+   customer is already holding can now be changed underneath them.** Nothing in
+   this system knows whether a PDF was emailed, printed or handed over — the
+   only evidence is a `commsQueue` entry, which exists solely for messages this
+   ERP sent itself. So the operator can rewrite a document somebody else has a
+   copy of, and the two papers will carry the same number and different
+   content, with nothing on either saying which is current. That is the exact
+   failure the immutability rule existed to prevent, and the reason the printed
+   line now says a corrected document may arrive under the same number rather
+   than claiming the factura is immutable.
+
+   Recommendation, standing: when the Factura Electrónica regime reaches this
+   company — LEGAL_REVIEW §1 puts it at 2027-01-01 for sociedades, which is
+   eight weeks away, not the October the client has in mind — this path has to
+   close, and closing it is a code change somebody must remember to make. A
+   date-gated refusal would be better than a memory. I did not build one
+   because the date itself is unverified (§15), and a hard stop on a guessed
+   date would break invoicing on a day nobody chose.

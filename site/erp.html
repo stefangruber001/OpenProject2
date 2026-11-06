@@ -32349,10 +32349,14 @@
          value for the reason `GES_EXT_O` gives: the source audit reads the gap
          between one tag and the next as a sentence, and each static phrase has
          to stay its own text node to be a dictionary key. */
-      const INV_FIX_NOTE_O =
-        '<div class="note" style="margin-bottom:12px"><b>Corrección de la factura</b><span style="margin:0 6px">';
-      const INV_FIX_NOTE_C =
-        "</span><span>Se ha retirado para corregirla: al emitir vuelve a salir con el mismo número y con la fecha de hoy. Si sale de esta pantalla sin emitirla, la factura no constará en el libro.</span></div>";
+      /* EDITING IN PLACE — the mandate of 6 Nov, and the banner that says what
+         it means before anything is saved: the same document changes, rather
+         than a second one appearing beside it. Split open and closed around
+         the number for the reason `GES_EXT_O` gives. */
+      const INV_EDIT_NOTE_O =
+        '<div class="note" style="margin-bottom:12px"><b>Edición de la factura</b><span style="margin:0 6px">';
+      const INV_EDIT_NOTE_C =
+        "</span><span>Se guarda sobre la misma factura: mismo número y misma fecha, y no se emite ningún abono. Lo que decía antes queda guardado en su historial.</span></div>";
 
       /** Which origin to land on: the first one that actually has something in it. */
       function invDefaultBasis(bases) {
@@ -32513,7 +32517,7 @@
        * what it looks like from the engine's side anyway: `_invoiceBase` adds
        * up the lines and has never cared which chip produced them.
        */
-      function invCorrectWork(inv) {
+      function invEditWork(inv) {
         return {
           projectId: inv.projectId,
           /* The client it was addressed to, which on a corrected factura is a
@@ -32538,9 +32542,9 @@
           language: inv.language || null,
           rectifies: inv.rectifies || null,
           rectifyReason: inv.rectifyReason || "",
-          // The number that is coming back. Also the flag the screen, the
-          // confirmation and the way out all read.
-          correcting: inv.number,
+          // Which factura this screen is rewriting. Also the flag the
+          // header, the banner, the preview and the save button all read.
+          editing: { id: inv.id, number: inv.number },
         };
       }
 
@@ -32653,6 +32657,11 @@
         const w = invWork;
         return {
           projectId: w.projectId,
+          /* The factura being rewritten, so the gates leave it out of the
+             job's ceiling: it is being changed, not added, and counting its
+             own amount would refuse an edit that moves no money. Null on an
+             ordinary draft, which is every other caller. */
+          editingId: (w.editing && w.editing.id) || null,
           // Null means «the job's own customer», which is what every factura
           // issued before this existed meant and still means.
           billToPartyId: w.billToPartyId || null,
@@ -32684,7 +32693,7 @@
         v.innerHTML = `<div class="pb">
          <div class="pbbar">
           <button class="btn sm" id="invBack" title="Volver al registro de facturas">← Facturas</button>
-          <div class="who"><b>${invWork.correcting ? "Corregir factura" : "Nueva factura"}</b><span>${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</span></div>
+          <div class="who"><b>${invWork.editing ? "Editar la factura" : "Nueva factura"}</b><span>${esc(p.code)} · ${esc(erp.party(p.partyId).name)}</span></div>
           <span style="flex:1"></span>
           <div class="tot"><span>Total <span style="font-weight:400;color:var(--muted)">(IVA incl.)</span></span><b id="invTotal">—</b></div>
          </div>
@@ -32698,20 +32707,10 @@
           <div class="conpanel"><div id="invBody" style="padding:12px 14px 18px"></div></div>
          </div>
         </div>`;
-        /* LEAVING is the one way out of this screen that costs something
-           when a correction is in flight: the factura was withdrawn the moment
-           the operator asked to correct it, so walking away leaves the book
-           without it until it is issued again. Every other draft here is a
-           draft; this one is a document that has been taken down. */
-        $("#invBack").onclick = async () => {
-          if (invWork && invWork.correcting) {
-            const leave = await askConfirm("Salir sin emitir", {
-              body: "La factura no se ha vuelto a emitir. Si sale ahora no constará en el libro hasta que la emita de nuevo, y su número sigue libre en la serie.",
-              okLabel: "Salir",
-              danger: true,
-            });
-            if (!leave) return;
-          }
+        /* Leaving writes nothing. An edit is held on this screen until
+           «Guardar los cambios», so walking away from one leaves the factura
+           exactly as it was — which is why no confirmation stands here. */
+        $("#invBack").onclick = () => {
           invWork = null;
           render();
         };
@@ -32756,7 +32755,7 @@
         const p = erp.project(w.projectId);
         const comp = erp.partyCompleteness(p.partyId);
         host.innerHTML = `
-         ${w.correcting ? INV_FIX_NOTE_O + esc(w.correcting) + INV_FIX_NOTE_C : ""}
+         ${w.editing ? INV_EDIT_NOTE_O + esc(w.editing.number) + INV_EDIT_NOTE_C : ""}
          ${invRecipientCard()}
          <div class="card"><div class="ch"><h3>Origen</h3></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px">
@@ -32811,7 +32810,7 @@
          <div class="card" id="invGates"><div class="ch"><h3>Antes de emitir</h3></div><div class="daylist"></div></div>
 
          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn primary" id="invIssue">Emitir factura</button>
+          <button class="btn primary" id="invIssue">${w.editing ? "Guardar los cambios" : "Emitir factura"}</button>
          </div>`;
 
         host.querySelectorAll("[data-invbasis]").forEach(
@@ -32960,6 +32959,11 @@
         } catch (e) {
           return;
         }
+        /* An edit already HAS its number, and the preview must say so. The
+           draft shape leaves `number` null on purpose — nothing is minted
+           until issue — but on this screen the document is not a draft, it is
+           that factura with changes pending. */
+        if (invWork.editing) pv.doc.number = invWork.editing.number;
         const doc = $("#invDoc");
         if (doc) {
           doc.innerHTML = sheetDocHtml(
@@ -33008,14 +33012,40 @@
         const pv = erp.previewInvoice(invDraft());
         if (!pv.ok) return;
         const p = erp.project(w.projectId);
-        /* One dialog, two second paragraphs. A correction is not being given
-           a number, it is getting its own back, and that is the fact the
-           operator has to recognise before she commits — along with the date,
-           which is todays and not the withdrawn documents. */
+        /* AN EDIT IS NOT AN ISSUE. Nothing is minted, so there is no number to
+           confirm and no «ya no se puede modificar» to warn about — what the
+           operator has to give is the reason, which is the entry the revision
+           history will carry for ever. */
+        if (w.editing) {
+          const why = await askText("Editar la factura", {
+            label: "Motivo",
+            body: "Se guarda sobre la misma factura, con el mismo número y la misma fecha. Queda registrado quién lo cambia, cuándo y por qué.",
+            required: true,
+            okLabel: "Guardar",
+          });
+          if (why === null) return;
+          const d = invDraft();
+          const number = w.editing.number;
+          const stored = await mutateNow(() => {
+            erp.editIssuedInvoice(
+              w.editing.id,
+              {
+                billToPartyId: d.billToPartyId,
+                lines: d.lines,
+                vatBp: d.vatBp,
+                irpfBp: d.irpfBp,
+                language: d.language,
+              },
+              "backoffice",
+              why,
+            );
+            invWork = null;
+          }, "Factura actualizada");
+          if (stored) invoiceDrawer(number);
+          return;
+        }
         const okGo = await askConfirm("Emitir la factura", {
-          body: w.correcting
-            ? `${eur(pv.totalCents)} a ${erp.party(p.partyId).name}, obra ${p.code}.\n\nVuelve a salir con el número ${w.correcting} y con la fecha de hoy. Al emitirla ya no se puede modificar: una factura emitida sólo se corrige con un abono.`
-            : `${eur(pv.totalCents)} a ${erp.party(p.partyId).name}, obra ${p.code}.\n\nAl emitirla se le asigna el número definitivo y ya no se puede modificar: una factura emitida sólo se corrige con un abono.`,
+          body: `${eur(pv.totalCents)} a ${erp.party(p.partyId).name}, obra ${p.code}.\n\nAl emitirla se le asigna el número definitivo y queda en el libro. Después puede editarse desde la propia factura mientras su trimestre no haya ido al asesor.`,
           okLabel: "Emitir",
         });
         if (!okGo) return;
@@ -33025,13 +33055,10 @@
            nowhere else; opening its screen would be showing the operator a
            document the register does not have. Reloading restores the truth,
            number included, which is why the failure says to. */
-        const saved = await mutateNow(
-          () => {
-            issued = erp.issueInvoice(invDraft(), "backoffice");
-            invWork = null;
-          },
-          w.correcting ? "Factura corregida" : "Factura emitida",
-        );
+        const saved = await mutateNow(() => {
+          issued = erp.issueInvoice(invDraft(), "backoffice");
+          invWork = null;
+        }, "Factura emitida");
         if (saved && issued) invoiceDrawer(issued.number);
       }
 
@@ -33067,12 +33094,13 @@
          Flat declarations: the source audit reads a gap between one tag and the
          next as a sentence, and these are assembled around values. */
       const INV_UNDO_BTN = '<button class="btn sm danger" id="iv_undo">Retirar la factura</button>';
-      /* CORRECTING, beside withdrawing, because they are the same act seen from
-         two ends: both take the number down, and this one puts it back with the
-         corrected document behind it. Only when it is actually possible — a
-         button offering to correct a factura that cannot be corrected is a
-         promise, and the sentence underneath already says what to do instead. */
-      const INV_FIX_BTN = '<button class="btn sm" id="iv_fix">Corregir la factura</button>';
+      /* EDITING IN PLACE is now the first answer, and «Corregir la factura»
+         —withdraw and re-issue— is gone from this screen. It only ever worked
+         on the newest factura, which is the one case editing also covers, and
+         two buttons that do the same thing to different subsets of documents
+         is how somebody picks the wrong one. The engine keeps both verbs; the
+         screen offers the one that always applies. */
+      const INV_EDIT_BTN = '<button class="btn sm" id="iv_edit">Editar la factura</button>';
       /* RE-ADDRESSING, which is a different question from correcting: not what
          the factura says, but WHO it is for. Offered on both routes the engine
          has — see `invoiceReaddressMode` — because the manager hands the flat
@@ -33104,6 +33132,13 @@
         '<div class="sub" style="margin-top:8px">Factura anterior a la plataforma: aquí queda registrada para que la obra tenga su historial, pero el documento es el que ya se emitió y no se reimprime desde aquí.</div>';
       const INV_UNDO_WHY_O = '<div class="sub" style="margin-top:8px">';
       const INV_UNDO_WHY_C = "</div>";
+      /* Why an edit is refused, in the only three cases it can be. Each says
+         what to do instead rather than only what went wrong. */
+      const INV_EDIT_BLOCK = {
+        "quarter-sent":
+          "Su trimestre ya se ha enviado al asesor: reábralo en Gestoría para poder editarla, o emita una rectificativa.",
+        rectified: "Ya tiene una rectificativa que la referencia.",
+      };
       const INV_UNDO_BLOCK = {
         collected: "Tiene un cobro aplicado. Deshaga primero el cobro en Conciliación.",
         sent: "Ya se ha enviado al cliente. Emita una rectificativa en su lugar.",
@@ -33118,15 +33153,12 @@
         if (!inv) return;
         const isExt = inv.origin === "external";
         const undoBlock = isExt ? null : erp.invoiceUndoBlock(inv.id);
-        /* Everything that stops a withdrawal stops a correction, plus the one
-           reason that belongs to correcting alone — see `invoiceCorrectBlock`.
-           The two agree except across a year boundary, which is why the
-           sentence underneath is printed for THIS one: it is the wider of the
-           two, so every reason the undo button has ever printed still prints. */
-        const fixBlock = isExt ? null : undoBlock || erp.invoiceCorrectBlock(inv.id);
         /* Which of the two routes a re-addressing would take, or neither. The
            engine decides, so the button cannot offer what it would refuse. */
         const readdress = isExt ? null : erp.invoiceReaddressMode(inv.id);
+        /* And whether it can simply be rewritten, which is the first thing to
+           offer: no abono, no second document, same number. */
+        const editBlock = isExt ? "external" : erp.invoiceEditBlock(inv.id);
         const out = erp.invoiceOutstandingCents(inv.id);
         const row = erp.invoiceRegister().find((r) => r.number === number) || { daysOverdue: 0 };
         /* An invoice need not belong to a job, and until a recorded one could
@@ -33185,12 +33217,12 @@
          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
           ${isExt ? "" : INV_PDF_BTN + INV_WORD_BTN}
           ${inv.kind !== "creditNote" && !isExt ? '<button class="btn sm" id="iv_rect">Rectificar…</button>' : ""}
-          ${isExt || fixBlock ? "" : INV_FIX_BTN}
-          ${readdress === "reissue" || readdress === "rectify" ? INV_TO_BTN : ""}
+          ${editBlock ? "" : INV_EDIT_BTN}
+          ${editBlock && editBlock !== "external" && (readdress === "reissue" || readdress === "rectify") ? INV_TO_BTN : ""}
           ${isExt ? INV_EXT_DEL : undoBlock === "not-last" ? "" : INV_UNDO_BTN}
          </div>
          ${isExt ? INV_EXT_WHY : ""}
-         ${!isExt && fixBlock && fixBlock !== "not-last" ? INV_UNDO_WHY_O + esc(INV_UNDO_BLOCK[fixBlock] || fixBlock) + INV_UNDO_WHY_C : ""}`;
+         ${!isExt && editBlock ? INV_UNDO_WHY_O + esc(INV_EDIT_BLOCK[editBlock] || editBlock) + INV_UNDO_WHY_C : ""}`;
         if (!isExt) $("#iv_pdf").onclick = () => downloadInvoicePdf(inv.number);
         if (!isExt)
           $("#iv_word").onclick = () => {
@@ -33245,34 +33277,16 @@
               closeDrawer();
             }, "Registro quitado");
           };
-        /* THE CORRECTION, which is a withdrawal followed by the generator.
-           The withdrawal is committed on its own, before anything is edited,
-           and that order is the point: once the number is back in the series
-           the ceiling has room again, the milestone is pending again and the
-           adicional is approved again, so the generator, the preview and every
-           gate behind «Emitir» work on a consistent book instead of refusing a
-           draft for money the document being replaced is still counted in.
-           The draft is captured BEFORE the record goes. */
-        const fix = $("#iv_fix");
-        if (fix)
-          fix.onclick = async () => {
-            const reason = await askText("Corregir la factura", {
-              label: "Motivo",
-              body: "Se retira la factura y se abre el generador con sus datos para que los corrija. Al emitir vuelve a salir con el mismo número y con la fecha de hoy. Sólo se puede porque no ha salido de aquí.",
-              required: true,
-              okLabel: "Corregir",
-            });
-            if (reason === null) return;
-            const work = invCorrectWork(inv);
-            /* Awaited, and the generator opens only if the withdrawal was
-               STORED — the same rule `invIssue` follows for the same reason:
-               a page whose register disagrees with the database is a page
-               that should be reloaded, not edited further. */
-            const saved = await mutateNow(() => {
-              erp.undoLastInvoice(inv.id, "backoffice", reason);
-              closeDrawer();
-            }, "Factura retirada para corregirla");
-            if (!saved) return;
+        /* THE EDIT. Nothing is written here: the generator opens on the
+           factura as it stands and the reason is asked for at the end, where
+           the change actually happens. Opening it costs nothing, so walking
+           away from it costs nothing either — which is the whole difference
+           from the withdraw-first path this replaced. */
+        const edit = $("#iv_edit");
+        if (edit)
+          edit.onclick = () => {
+            const work = invEditWork(inv);
+            closeDrawer();
             invWork = work;
             go("invoicing");
           };

@@ -6675,6 +6675,27 @@ window.CANEI_DICT = {
       "The quote and the job stay in the job client's name. The invoice carries the name, the tax number and the address of whoever is chosen here.",
     ],
     ["Facturar a otro cliente", "Invoice another client"],
+    /* Editing an issued factura in place, 6 Nov: same number, same date, no
+       abono, until the Factura Electrónica regime applies. */
+    ["Editar la factura", "Edit the invoice"],
+    ["Edición de la factura", "Editing the invoice"],
+    ["Factura actualizada", "Invoice updated"],
+    [
+      "Se guarda sobre la misma factura: mismo número y misma fecha, y no se emite ningún abono. Lo que decía antes queda guardado en su historial.",
+      "It is saved over the same invoice: same number, same date, and no credit note is issued. What it said before is kept in its history.",
+    ],
+    [
+      "Se guarda sobre la misma factura, con el mismo número y la misma fecha. Queda registrado quién lo cambia, cuándo y por qué.",
+      "It is saved over the same invoice, with the same number and the same date. Who changed it, when and why are recorded.",
+    ],
+    [
+      "Su trimestre ya se ha enviado al asesor: reábralo en Gestoría para poder editarla, o emita una rectificativa.",
+      "Its quarter has already gone to the accountant: reopen it in Gestoría to edit it, or issue a credit note.",
+    ],
+    [
+      "Si hay que corregir algo, recibira el documento actualizado con el mismo numero o una factura rectificativa.",
+      "If anything needs correcting, you will receive the updated document under the same number, or a credit note.",
+    ],
     ["Cliente de la factura", "Client on the invoice"],
     ["Cliente de la factura cambiado", "Invoice client changed"],
     ["Cambiar el cliente", "Change the client"],

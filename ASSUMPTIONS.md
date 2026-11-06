@@ -11922,3 +11922,46 @@ dos cambios con un solo motivo.
 
 **Lo que queda abierto:** LEGAL_REVIEW §14 — quién es el adquirente cuando
 contrata una administradora, y qué le hace eso al tipo de IVA del §2.
+
+## S157 · Editar la factura emitida, en su sitio (2026-11-06)
+
+«The whole idea is to make the invoices editable without the need for
+re-invoicing — this, until the Factura Electrónica starts» (operador, 6 nov),
+después de ver la ruta del abono y rechazarla. El caso concreto: la FAC-63, con
+la 64 y la 65 detrás, tenía que pasar a nombre del titular final.
+
+**Lo que se construyó esta mañana y hoy ya no está en pantalla.** «Corregir la
+factura» retiraba el número y lo volvía a emitir. Sólo funcionaba sobre la
+ÚLTIMA factura —una serie sin huecos no deja sacar un número del medio— y ese
+es justo el caso que el operador no tenía. Se ha quitado del cajón: dos botones
+que hacen lo mismo sobre subconjuntos distintos de documentos es cómo alguien
+elige el que no era. `undoLastInvoice` sigue en el motor, con sus pruebas, para
+retirar la última.
+
+**La decisión que hace esto defendible, y que no se debe quitar:** cada versión
+anterior se guarda en `revisions` —qué decía, quién lo cambió, cuándo y por
+qué— y la cadena VFU-01 se RECALCULA desde la factura editada hacia adelante.
+Una cadena que siguiera verificando después de cambiar un documento estaría
+afirmando que no cambió, que es peor que no tener cadena.
+
+**Tres negativas, y por qué esas tres.** El trimestre ya enviado a la gestoría
+(sus cifras dejarían de cuadrar sin que nadie se entere: reabrir o
+rectificativa), una rectificativa que ya la referencia (el abono cancela lo que
+la factura DECÍA; editarla después deja al par describiendo ventas distintas), y
+cobrado por encima de lo que quedaría (un pago sin factura que lo explique). Ser
+una factura antigua NO está en la lista: eso es lo que necesita la retirada, no
+la edición.
+
+**La fecha no se mueve.** Es la fecha del documento, decide el periodo de IVA y
+ordena la serie. Sólo el vencimiento se recalcula, porque sale del plazo del
+destinatario y el destinatario puede acabar de cambiar.
+
+**Y una frase que el papel dejaba de cumplir.** La factura imprimía «esta
+factura es inmutable». Desde hoy no lo es, así que lo dice de otra manera: si
+hay que corregir algo, el cliente recibirá el documento actualizado con el mismo
+número o una rectificativa. Un documento que promete algo que el sistema no
+cumple es peor que uno que no promete nada.
+
+**Objeción en pie:** OBJECTIONS §8 — nada aquí sabe si el cliente ya tiene el
+PDF, así que se puede reescribir un papel que alguien tiene en la mano.
+LEGAL_REVIEW §15.

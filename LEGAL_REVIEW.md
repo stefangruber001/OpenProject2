@@ -413,3 +413,38 @@ review than a template.
   however many legal persons receive paper for it — and an entity cannot be
   moved underneath a client that already has issued invoices.
   **legally_verified: false.**
+
+## 15. Rewriting an issued factura in place (2026-11-06)
+
+- **The mandate.** _«The whole idea is to make the invoices editable without
+  the need for re-invoicing — this, until the Factura Electrónica starts»_, after
+  the abono-and-replacement route of §14 was shown and rejected. Implemented:
+  an issued factura can be rewritten under its own number — recipient, lines,
+  rate, withholding — with no credit note and no second document.
+- **What the product now does.** The number, the date and the series never
+  move. Every version the document had before an edit is kept on the record
+  with its author, date and stated reason. The chained event record (VFU-01) is
+  recomputed from the edit forward, so the chain still verifies instead of
+  asserting that nothing changed. Three cases refuse the edit by name: the
+  quarter has gone to the gestoría (reopen it, or issue a rectificativa), a
+  rectificativa already references it, or more money has been collected against
+  it than the edit would leave owing.
+- **NOT VERIFIED HERE, and this is the entry's point.** No source was read on
+  whether rewriting a factura that has already been delivered is permissible at
+  all. Art. 15 RD 1619/2012 provides the rectificativa as THE remedy for a
+  factura whose content is wrong, and nothing in this change argues that it
+  does not apply — the argument made is practical, not legal: that until the
+  software is required to keep immutable records, the client prefers one
+  correct document over three. The system cannot tell whether a given factura
+  reached its customer, so it cannot distinguish the defensible case (nobody
+  has it) from the indefensible one (they do).
+- **The questions for the gestoría**, in one line each: _may a factura that has
+  been sent to the customer be re-issued corrected under the same number, or
+  does that always require a rectificativa?_ And: _from which date must this
+  company's software stop allowing it — 2027-01-01 (Verifactu for sociedades,
+  §1), 2027-07-01, or the later B2B e-invoicing date the client has in mind?_
+- **What is NOT at stake:** nothing can be edited inside a quarter already sent
+  to the gestoría, nothing that an abono already corrects, and nothing below
+  what has been collected against it. The audit log and the per-factura
+  revision history keep every version. **legally_verified: false.** The
+  standing objection is OBJECTIONS §8.
