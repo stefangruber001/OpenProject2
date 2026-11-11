@@ -5251,6 +5251,15 @@ window.CANEI_DICT.ca = {
     "El pressupost i l'obra segueixen a nom del client de l'obra. La factura porta el nom, el NIF i l'adreça de qui es triï aquí.",
   "Facturar a otro cliente": "Facturar a un altre client",
   "Editar la factura": "Editar la factura",
+  "Vincular un cliente que ya existe": "Vincular un client que ja existeix",
+  "Cliente que recibirá la factura": "Client que rebrà la factura",
+  "Cliente vinculado": "Client vinculat",
+  "No hay ningún otro cliente que vincular.": "No hi ha cap altre client per vincular.",
+  "El cliente queda disponible para facturar en todas las obras de este cliente, no sólo en ésta.":
+    "El client queda disponible per facturar a totes les obres d'aquest client, no només en aquesta.",
+  "Sólo salen los que tienen el rol Cliente. Si falta alguno, actívelo en su ficha.":
+    "Només surten els que tenen el rol Client. Si en falta algun, activeu-lo a la seva fitxa.",
+  "De otros clientes": "D'altres clients",
   "Edición de la factura": "Edició de la factura",
   "Factura actualizada": "Factura actualitzada",
   "Se guarda sobre la misma factura: mismo número y misma fecha, y no se emite ningún abono. Lo que decía antes queda guardado en su historial.":

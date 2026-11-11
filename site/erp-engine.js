@@ -2754,19 +2754,39 @@
       const child = this.party(partyId);
       const wanted = parentPartyId || null;
       if ((child.billingParentId || null) === wanted) return child;
-      if (this.state.invoices.some((i) => i.partyId === child.id))
-        throw new Error(
-          "That client already has issued invoices — the link cannot move underneath them",
-        );
+      /* THE ONE ARRANGEMENT A LINK MUST NOT QUIETLY UNDO. Where the two of
+         them are SEPARATE PAYERS on the same job — the general-contractor
+         split, each owing their own chapters — folding them into one scope
+         merges two ceilings that were deliberately kept apart, and nothing on
+         screen would say so. Everywhere else the fold is safe now that
+         attribution and billing agree, which is what lets an existing client
+         with facturas of its own be linked at all: refusing that was the
+         broader rule this replaces, and it made the feature useless for the
+         case it was asked for. */
+      if (wanted)
+        for (const pr of this.state.projects || []) {
+          const rows = (pr.billing || []).map((b) => b.partyId);
+          if (rows.includes(child.id) && rows.includes(wanted))
+            throw new Error(
+              "Both are payers of " +
+                pr.code +
+                " — unlink them there before invoicing one under the other",
+            );
+        }
       this._assertBillingParent(child.id, wanted);
       child.billingParentId = wanted;
       this._log(user, "setBillingParent", child.code + " " + (wanted || "—"));
       return child;
     }
 
-    /** The clients that invoice under this one, newest last. Never itself. */
+    /** The clients that invoice under this one, by name. Never itself.
+        Alphabetical because every consumer is a list somebody reads — a
+        picker, a ficha, a drawer — and creation order is an order only the
+        database cares about. */
     billingEntitiesOf(partyId) {
-      return this.state.parties.filter((x) => x.billingParentId === partyId);
+      return this.state.parties
+        .filter((x) => x.billingParentId === partyId)
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
     }
 
     /**
@@ -7629,7 +7649,18 @@
      */
     _attributedCents(p, partyId) {
       const chapters = (p.baseline && p.baseline.chapters) || [];
-      const mine = chapters.filter((c) => (c.billToPartyId || p.partyId) === partyId);
+      /* FOLDED, like `invoiceBases` folds what has been billed. The two sides
+         of this subtraction have to agree about who a payer IS: billed counts
+         a client and everyone invoicing under it as one, so attributed must
+         too. While it did not, linking a client who already had facturas on a
+         job collapsed that job's ceiling to zero — attribution looked for a
+         payer the chapters no longer named — and the next invoice on it was
+         refused by AR-11 for money nobody had billed. That asymmetry is also
+         why `setBillingParent` used to refuse any client with an invoice to
+         its name; with both sides folded it does not have to. */
+      const mine = chapters.filter(
+        (c) => this._billingScopeOwner(c.billToPartyId || p.partyId) === partyId,
+      );
       const base =
         mine.length === chapters.length
           ? p.baseline.revenueCents
@@ -7779,7 +7810,9 @@
         );
       const prog = this.chapterProgress(p.id);
       const chapters = (p.baseline.chapters || [])
-        .filter((c) => !forParty || (c.billToPartyId || p.partyId) === forParty)
+        .filter(
+          (c) => !forParty || this._billingScopeOwner(c.billToPartyId || p.partyId) === forParty,
+        )
         .map((c) => {
           const hit = prog.find((x) => x.num === c.num);
           const progressPct = hit ? hit.progressPct : 0;

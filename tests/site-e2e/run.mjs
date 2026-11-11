@@ -9810,6 +9810,99 @@ async function testInvoiceGenerator(browser, base) {
       else bad("AR: issued to another legal person", JSON.stringify(issued));
     }
 
+    /* ---- PICKING WHAT ALREADY EXISTS, instead of making a second one -----
+     *
+     * Reported 11 Nov: the factura had to go to a company already on file,
+     * and «Facturar a» offered only the job's own client plus «＋ Nuevo
+     * cliente de facturación» — which would have made a duplicate of a record
+     * with its own history. The same shape of gap on the Inmueble picker is
+     * what turned one flat into «Carrer Bonavista 136» and «Crrer Bonavista
+     * 136». Both pickers now offer what is already there.
+     */
+    const link = await pg.evaluate(async () => {
+      const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      closeDrawer();
+      await sleep(300);
+      const target = erp.state.projects.find((x) => {
+        const b = erp.invoiceBases(x.id);
+        return b.billedBaseCents > 0 && b.attributedCents - b.billedBaseCents > 20000;
+      });
+      if (!target) return { target: false };
+      const customer = erp.project(target.id).partyId;
+      /* An established client with a factura of ITS OWN — the case the old
+         rule refused outright, and the reason the link was impossible. */
+      const other = erp.state.parties.find(
+        (x) =>
+          x.active &&
+          (x.roles || []).includes("customer") &&
+          x.id !== customer &&
+          !x.billingParentId &&
+          erp.state.invoices.some((i) => i.partyId === x.id),
+      );
+      if (!other) return { target: true, other: false };
+      invOpen(target.id);
+      await sleep(600);
+      return {
+        target: true,
+        other: true,
+        otherId: other.id,
+        otherName: other.name,
+        linkBtn: !!document.querySelector("#inv_to_link"),
+        before: [...(document.querySelector("#inv_to") || { options: [] }).options].map((o) =>
+          o.textContent.trim(),
+        ),
+      };
+    });
+    if (!link.target || !link.other) {
+      bad("AR: linking an existing client", JSON.stringify(link));
+    } else if (!link.linkBtn || link.before.includes(link.otherName)) {
+      bad("AR: «Vincular un cliente que ya existe» offered", JSON.stringify(link));
+    } else {
+      ok(`AR: «Facturar a» offers to link an existing client (${link.before.length} before)`);
+      await pg.click("#inv_to_link");
+      await pg.waitForSelector("#lk_pick", { timeout: 8000 });
+      await pg.selectOption("#lk_pick", link.otherId);
+      await pg.click("#lk_go");
+      await pg.waitForTimeout(1000);
+      const after = await pg.evaluate(
+        (o) => ({
+          options: [...(document.querySelector("#inv_to") || { options: [] }).options].map((x) =>
+            x.textContent.trim(),
+          ),
+          selected: (document.querySelector("#inv_to") || {}).value,
+          parent: (erp.state.parties.find((x) => x.id === o.otherId) || {}).billingParentId,
+          customer: erp.project(o.projectId || erp.state.projects[0].id) ? true : true,
+        }),
+        link,
+      );
+      if (after.options.includes(link.otherName) && after.selected === link.otherId && after.parent)
+        ok(`AR: ${link.otherName} is linked and selected, without creating a second record`);
+      else bad("AR: linked client", JSON.stringify(after).slice(0, 220));
+    }
+
+    /* The Inmueble picker, same question: a flat filed under another client
+       has to be selectable, or the only way forward makes a duplicate. */
+    const props = await pg.evaluate(() => {
+      const owner = erp.state.properties.find((p) => p.partyId);
+      if (!owner) return { any: false };
+      const someoneElse = erp.state.parties.find(
+        (x) => x.id !== owner.partyId && (x.roles || []).includes("customer"),
+      );
+      if (!someoneElse) return { any: false };
+      const html = propertyOptions(someoneElse.id, null);
+      return {
+        any: true,
+        // the other client's flat is offered…
+        offersOthers: html.includes(owner.id),
+        // …under a heading, and the create option is still there
+        heading: /De otros clientes/.test(html),
+        create: html.includes("__newprop__"),
+      };
+    });
+    if (props.any && props.offersOthers && props.heading && props.create)
+      ok("MDM-05: the Inmueble picker offers flats already on file under another client");
+    else bad("MDM-05: inmueble picker", JSON.stringify(props));
+
     if (!errs.length) ok("ADM-01: the generator raises no console error");
     else bad("ADM-01: console", errs.slice(0, 2).join(" | ").slice(0, 160));
   } catch (e) {

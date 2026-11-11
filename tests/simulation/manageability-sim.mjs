@@ -6052,9 +6052,29 @@ assert(
     "chain and book still agree",
     e.state.invoiceEvents.length + "/" + e.state.invoices.length,
   );
-  throws(
-    () => e.setBillingParent(owner.id, null, "bo"),
-    "the link cannot move under a client that already has invoices",
+  /* A CLIENT WITH FACTURAS OF ITS OWN CAN STILL BE LINKED, and this is the
+     case the feature was asked for: «la factura va a Sombra Oculta S.L», a
+     company already on file with its own history. The broad refusal that used
+     to live here made that impossible. What replaced it is narrower, and what
+     makes it safe is below: attribution folds exactly like billing, so the
+     job this client was already invoiced on keeps a ceiling that adds up. */
+  const already = e.invoiceBases(prj.id, admin.id);
+  e.setBillingParent(owner.id, null, "bo");
+  e.setBillingParent(owner.id, admin.id, "bo");
+  const after = e.invoiceBases(prj.id, admin.id);
+  assert(
+    after.attributedCents === already.attributedCents &&
+      after.billedBaseCents === already.billedBaseCents,
+    "a client with facturas can be unlinked and relinked, and the job's ceiling does not move",
+    JSON.stringify({
+      before: already.attributedCents + "/" + already.billedBaseCents,
+      after: after.attributedCents + "/" + after.billedBaseCents,
+    }),
+  );
+  assert(
+    after.attributedCents > 0,
+    "…and attribution does not collapse to zero, which is what AR-11 would read as «todo facturado»",
+    String(after.attributedCents),
   );
   throws(
     () => e.reassignInvoiceRecipient(r2.credit.id, owner.id, "porque", "bo"),

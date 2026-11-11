@@ -11965,3 +11965,41 @@ cumple es peor que uno que no promete nada.
 **Objeción en pie:** OBJECTIONS §8 — nada aquí sabe si el cliente ya tiene el
 PDF, así que se puede reescribir un papel que alguien tiene en la mano.
 LEGAL_REVIEW §15.
+
+## S158 · Elegir lo que ya existe, y el pliegue que faltaba (2026-11-11)
+
+El cliente tenía que facturar la obra de Sonia a Sombra Oculta S.L, y
+«Facturar a» sólo ofrecía a Sonia. No estaba roto: faltaba el vínculo. Pero
+intentar hacerlo destapó dos cosas peores que un botón ausente.
+
+**La asimetría.** `invoiceBases` plegaba por dueño de alcance lo FACTURADO y no
+lo ATRIBUIDO. Mientras las dos mitades de esa resta no estuvieran de acuerdo
+sobre quién es un pagador, vincular a un cliente que ya tenía facturas dejaba
+su obra con atribución cero y AR-11 refusaba la siguiente factura por un
+dinero que nadie había facturado. Arreglado: `_attributedCents` y el filtro de
+partidas pliegan igual que las facturas.
+
+**Y por eso la regla era tan ancha.** `setBillingParent` refusaba a cualquier
+cliente con una factura a su nombre —precisamente el caso real, una empresa ya
+en la base con su propio historial—, porque sin el pliegue no había forma de
+que cuadrara. Con las dos mitades plegadas, la única negativa que queda es la
+que sigue siendo insegura: que los dos sean pagadores SEPARADOS de la misma
+obra, donde unirlos deshace un reparto que alguien decidió a mano.
+
+**Dos selectores que sólo sabían crear.** «Facturar a» ofrecía «＋ Nuevo
+cliente de facturación» y nada más, así que para un cliente que ya existía la
+única salida visible era duplicarlo. Y `propertyOptions` sólo listaba los
+inmuebles del cliente elegido, así que un piso ya fichado a nombre de otro no
+se podía elegir: de ahí salieron «Carrer Bonavista 136» y «Crrer Bonavista
+136», dos registros de un mismo piso, y de ahí que una referencia deducida de
+la dirección fuera ambigua. Ahora los dos ofrecen lo que ya hay.
+
+**Y una lista sin ordenar**, «Factura bajo», que salía en orden de creación.
+`billingEntitiesOf` ordena por nombre en el motor, para todos sus lectores.
+
+**Una trampa de la propia auditoría, anotada porque volverá a pasar.** El
+source-audit lee como frase lo que haya entre el `>` de una etiqueta y el `<`
+de la siguiente. Concatenar dos `option` en una expresión hizo que contara el
+JavaScript de en medio como cadena sin traducir; y el comentario que lo
+explicaba, al nombrar las dos etiquetas, hizo exactamente lo mismo. Las
+constantes van planas y el comentario no nombra etiquetas.

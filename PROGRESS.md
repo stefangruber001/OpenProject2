@@ -4537,3 +4537,22 @@ Puertas: manejabilidad 590/590 (eran 578) · numeración 55/55 · year-sim
 149/149 · migraciones 154/154 hasta v30 · doc-docx 130/130 · doc-pdf 47/47 ·
 doc-i18n 13/13 · source-audit 158/158 en+ca · diccionario completo ·
 boundaries OK.
+
+## S50 · Elegir lo que ya existe (2026-11-11)
+
+«La factura va a Sombra Oculta S.L» y el selector sólo ofrecía a Sonia. El
+vínculo no estaba hecho, y hacerlo era imposible: `setBillingParent` refusaba a
+cualquier cliente con facturas propias. Debajo había una asimetría —el techo
+de AR-11 plegaba lo facturado y no lo atribuido—, que es lo que obligaba a esa
+regla tan ancha. Plegadas las dos mitades, la negativa se queda sólo donde
+sigue siendo necesaria: dos pagadores separados de la misma obra.
+
+- «Facturar a» ahora permite **vincular un cliente que ya existe**, no sólo
+  crear uno nuevo.
+- El selector de **Inmueble** ofrece los pisos ya fichados a nombre de otro
+  cliente, bajo un separador. Un piso es un sitio; el cliente es quien paga.
+- «Factura bajo» sale por orden alfabético.
+
+Puertas: manejabilidad 591/591 · year-sim 149/149 · migraciones 154/154 ·
+numeración 55/55 · source-audit 158/158 en+ca · diccionario completo ·
+boundaries OK · suite del generador 21/21 con los tres casos nuevos.

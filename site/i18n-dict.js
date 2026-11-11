@@ -6678,6 +6678,21 @@ window.CANEI_DICT = {
     /* Editing an issued factura in place, 6 Nov: same number, same date, no
        abono, until the Factura Electrónica regime applies. */
     ["Editar la factura", "Edit the invoice"],
+    /* Picking what already exists instead of making a second one: an
+       invoicing client on file, and an inmueble filed under another client. */
+    ["Vincular un cliente que ya existe", "Link a client that already exists"],
+    ["Cliente que recibirá la factura", "Client that will receive the invoice"],
+    ["Cliente vinculado", "Client linked"],
+    ["No hay ningún otro cliente que vincular.", "There is no other client to link."],
+    [
+      "El cliente queda disponible para facturar en todas las obras de este cliente, no sólo en ésta.",
+      "The client becomes available for invoicing on all of this client's jobs, not only this one.",
+    ],
+    [
+      "Sólo salen los que tienen el rol Cliente. Si falta alguno, actívelo en su ficha.",
+      "Only those with the Client role appear. If one is missing, enable it on their record.",
+    ],
+    ["De otros clientes", "From other clients"],
     ["Edición de la factura", "Editing the invoice"],
     ["Factura actualizada", "Invoice updated"],
     [

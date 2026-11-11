@@ -28606,10 +28606,16 @@
        */
       function partyBillingField(p) {
         const mine = erp.billingEntitiesOf(p.id);
-        const cands = erp.state.parties.filter(
-          (x) =>
-            x.id !== p.id && x.active && (x.roles || []).includes("customer") && !x.billingParentId,
-        );
+        const cands = erp.state.parties
+          .filter(
+            (x) =>
+              x.id !== p.id &&
+              x.active &&
+              (x.roles || []).includes("customer") &&
+              !x.billingParentId,
+          )
+          // By name. A picker is a list somebody reads down.
+          .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
         const dis = mine.length ? " disabled" : "";
         return `<div class="field full"><label>Factura bajo</label>
           <select id="e_bparent" translate="no"${dis}>
@@ -29104,24 +29110,47 @@
       }
       /** Same idea as NEW_PARTY, for the picker one field below it. */
       const NEW_PROPERTY = "__newprop__";
+      const PROP_OPT_NONE = '<option value="">— sin inmueble asociado —</option>';
+      const PROP_OPT_OTHERS = '<option disabled>De otros clientes</option>';
       /** Every inmueble on file for one client — "" is always offered first (a lead
           with no known address yet is normal; the client record itself is not).
           The sentinel only appears once a client is chosen — a property with no
           owner to attach it to is not a thing this screen can create. */
       function propertyOptions(partyId, selected) {
-        const props = erp.state.properties
-          .filter((p) => p.partyId === partyId)
-          .sort(byName("street"));
-        const rows = props
-          .map(
-            (p) =>
-              `<option value="${p.id}"${p.id === selected ? " selected" : ""}>${esc(p.street)}${p.city ? ", " + esc(p.city) : ""}</option>`,
-          )
-          .join("");
+        const all = erp.state.properties.slice().sort(byName("street"));
+        const opt = (p) =>
+          `<option value="${p.id}"${p.id === selected ? " selected" : ""}>${esc(p.street)}${p.city ? ", " + esc(p.city) : ""}</option>`;
+        const mine = all.filter((p) => p.partyId === partyId);
+        /* AND EVERY OTHER INMUEBLE ON FILE, under a separator.
+           A flat is a physical place; the client is whoever pays for the work
+           on it, and those are not the same fact. Offering only the chosen
+           client's own properties meant that a flat already on file under
+           somebody else could not be picked at all — the only way forward was
+           «＋ Nuevo inmueble», which makes a second record for one address.
+           That is how «Carrer Bonavista 136» and «Crrer Bonavista 136» came to
+           be two inmuebles, and why a reference derived from the address was
+           ambiguous for both.
+           A disabled option rather than an `optgroup`, deliberately: the label
+           of an optgroup is an attribute, and the translator walks text nodes,
+           so a group heading would have stayed in Spanish for an English
+           reader. This way it is a node like any other. */
+        const others = all.filter((p) => p.partyId !== partyId);
         const sentinel = partyId
           ? `<option value="${NEW_PROPERTY}">＋ Nuevo inmueble…</option>`
           : "";
-        return `<option value="">— sin inmueble asociado —</option>` + rows + sentinel;
+        /* Joined from an array, with the two static options declared flat
+           above. Concatenated inline, the audit reads the gap between the end
+           of one option tag and the start of the next as a sentence, and
+           reports the JavaScript in between as an untranslated string — which
+           is exactly what it did to the first version of this function, and
+           then to the comment that explained it. Neither this text nor the
+           code below may put one tag next to another. */
+        return [
+          PROP_OPT_NONE,
+          mine.map(opt).join(""),
+          sentinel,
+          others.length ? PROP_OPT_OTHERS + others.map(opt).join("") : "",
+        ].join("");
       }
       const PROPERTY_PART = [
         ["dwelling", "Vivienda"],
@@ -32741,9 +32770,65 @@
             ${opts.map((o) => `<option value="${o.id}"${o.id === cur ? " selected" : ""}>${esc(o.name)}</option>`).join("")}
            </select></div>
           </div>
-          <div style="padding:0 12px 10px"><button class="btn sm" id="inv_to_new">＋ Nuevo cliente de facturación</button></div>
+          <div style="padding:0 12px 10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="inv_to_new">＋ Nuevo cliente de facturación</button><button class="btn sm" id="inv_to_link">Vincular un cliente que ya existe</button></div>
           <div class="sub" style="padding:0 12px 12px">El presupuesto y la obra siguen a nombre del cliente de la obra. La factura lleva el nombre, el NIF y la dirección de quien se elija aquí.</div>
          </div>`;
+      }
+
+      /* Flat declarations: the source audit reads the gap between one tag and
+         the next as a sentence, and each of these has to stay its own text node
+         to be a dictionary key. */
+      const LINK_BC_WHY =
+        '<div class="sub" style="margin-top:4px">El cliente queda disponible para facturar en todas las obras de este cliente, no sólo en ésta.</div>';
+      const LINK_BC_ROLE =
+        '<div class="sub" style="margin-top:4px">Sólo salen los que tienen el rol Cliente. Si falta alguno, actívelo en su ficha.</div>';
+      /**
+       * Link a client that is ALREADY on file as an invoicing client of
+       * another.
+       *
+       * The engine owns every rule — one level, customers only, and never two
+       * payers of one job — so this screen offers the names and lets a refusal
+       * explain itself in its own words. Filtering the list down to what can
+       * certainly be linked would hide exactly the client somebody is looking
+       * for and say nothing about why.
+       */
+      function linkBillingClientDrawer(scopeId, onLinked) {
+        let scope;
+        try {
+          scope = erp.party(scopeId);
+        } catch (e) {
+          return;
+        }
+        const taken = new Set([scopeId].concat(erp.billingEntitiesOf(scopeId).map((x) => x.id)));
+        const list = erp.state.parties
+          .filter((x) => x.active && (x.roles || []).includes("customer") && !taken.has(x.id))
+          .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        const db = openDrawer("Vincular un cliente que ya existe");
+        db.innerHTML = `<div class="fgrid">
+          <div class="field full"><label>Cliente que recibirá la factura</label>
+           ${
+             list.length
+               ? `<select id="lk_pick" translate="no">${list.map((x) => `<option value="${x.id}">${esc(x.name)}</option>`).join("")}</select>`
+               : '<div class="empty">No hay ningún otro cliente que vincular.</div>'
+           }</div>
+          <div class="field full">${LINK_BC_WHY}${LINK_BC_ROLE}</div>
+         </div>`;
+        drawerFoot(
+          list.length
+            ? '<button class="btn primary" id="lk_go" style="flex:1">Vincular</button>'
+            : "",
+        );
+        const go = $("#lk_go");
+        if (go)
+          go.onclick = async () => {
+            const id = $("#lk_pick").value;
+            if (!id) return;
+            const saved = await mutateNow(() => {
+              erp.setBillingParent(id, scopeId, "backoffice");
+              closeDrawer();
+            }, "Cliente vinculado");
+            if (saved && onLinked) onLinked(erp.party(id));
+          };
       }
 
       /** Full repaint — after anything structural (origin, a line added or removed). */
@@ -32833,6 +32918,22 @@
            factura is needed. It is created by the one form that creates every
            tercero — same validation, same duplicate warning, same audit entry —
            with the link already made, and comes back selected. */
+        /* THE OTHER HALF OF THE SAME QUESTION, and the one that was missing.
+           «＋ Nuevo cliente» creates one, which is right when the manager hands
+           over an owner who is not on file. When the client already exists —
+           an established company that happens to pay for somebody else's job —
+           creating it again makes a duplicate of a record with its own
+           history. This links the one that is already there. */
+        const toLink = $("#inv_to_link");
+        if (toLink)
+          toLink.onclick = () => {
+            const all = invoiceRecipientOptions(w.projectId);
+            const hit = all.find((o) => o.id === (w.billToPartyId || "")) || all[0] || {};
+            linkBillingClientDrawer(hit.scope, (rec) => {
+              w.billToPartyId = rec.id;
+              invPaint();
+            });
+          };
         const toNew = $("#inv_to_new");
         if (toNew)
           toNew.onclick = () => {
