@@ -24043,6 +24043,23 @@
             columns: [
               { label: "Código", primary: true, get: (p) => p.code },
               { label: "Cliente", get: (p) => erp.party(p.partyId).name },
+              /* WHERE THE WORK IS, beside who is paying for it. The register
+                 reads «qué obra es ésta» and the answer this company gives is
+                 the flat, not the code: a job is «el piso de Rosselló», and two
+                 jobs for one client are told apart by address long before
+                 anybody looks at P-2026-0019.
+                 Called «Inmueble» and not «Dirección» on purpose — Dirección is
+                 the client's billing address on the Clientes register, and the
+                 same word for two different facts is how somebody ends up
+                 posting an invoice to a building site. Street only, like the
+                 presupuestos register: a composed «calle, ciudad» is a string
+                 that exists in no record, so the workspace audit reports it as
+                 untranslated for ever. */
+              {
+                label: "Inmueble",
+                get: (p) => propertyLabel(p),
+                html: (p) => esc(propertyLabel(p)) || "—",
+              },
               {
                 label: "Línea",
                 get: (p) =>
