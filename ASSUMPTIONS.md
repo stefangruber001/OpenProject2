@@ -12072,3 +12072,41 @@ fecha, así que se ve al instante cuál de los dos órdenes es.
 Sólo desempata cuando AMBAS filas tienen día de aceptación, lo que dentro de
 una misma etapa significa que las dos están contestadas: un borrador no tiene
 fecha y conserva el orden de siempre.
+
+## S161 · El adicional negativo ya funcionaba; lo que sobraba era el cobro
+
+«Puede pasar que hayan partidas que no se ejecuten y se tendría que poder
+sacar.» Dije que eso era trabajo nuevo. Era falso, y conviene anotar por qué
+me equivoqué: leí la regla que bloquea un presupuesto de variación con margen
+negativo —`c.section === "base" && c.marginCents < 0`, que es real— y deduje
+que toda minoración estaba cerrada. No comprobé la otra puerta.
+
+`priceChange` no mira el signo. Un adicional de −250 € pasa por valorar,
+enviar y aprobar sin que nada lo refuse, escribe una adenda de contrato
+negativa, y a partir de ahí **todo baja solo**: importe vigente 1.000 → 750,
+techo de facturación 1.000 → 750, coste previsto 600 → 450, margen 400 → 300
+y el PORCENTAJE de margen intacto en el 40 %, porque se fue alcance, no
+dinero. Medido, no supuesto.
+
+**Lo que sí estaba mal era el hito.** `_applyContractAnnex` añade toda adenda
+al plan de pagos, y tiene que añadirla —negativa incluida— o el plan deja de
+cuadrar con el bruto del nuevo importe vigente, que es la comparación en la
+que se apoya B1. El problema es que cuatro lectores del plan lo leen como «qué
+hay por cobrar», y ninguno distinguía un cobro de una devolución de alcance:
+
+- una alerta `critical` de «Hito de cobro vencido» al día siguiente de
+  aprobarlo, que nada podía cerrar nunca;
+- un recuento de facturas pendientes de emitir;
+- una entrada de «Cobro previsto» en el calendario;
+- y la peor: una línea en el selector de hitos del generador, ofreciéndole a
+  la operadora una cifra en negativo para ir a facturarla.
+
+Medido antes de arreglarlo: dos alertas de vencido en un contrato, una de
+ellas por dinero que nadie debe.
+
+**La decisión:** el hito negativo se queda y los cuatro lectores preguntan
+`_collectableMilestone` (planificado Y positivo) en vez de `status ===
+"planned"`. La previsión de tesorería deliberadamente NO lo usa y sigue
+sumando importes: ahí la minoración es un hecho sobre la caja esperada y se
+compensa bien. Cuatro de las trece comprobaciones nuevas fallan contra el
+motor publicado esta mañana y pasan contra este.

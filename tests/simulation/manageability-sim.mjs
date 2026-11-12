@@ -6281,6 +6281,149 @@ assert(
   );
 }
 
+/* ===========================================================================
+   SACAR UNA PARTIDA QUE NO SE EJECUTA: EL ADICIONAL NEGATIVO.
+   ===========================================================================
+   The client, relayed by the operator: "puede pasar que hayan partidas que no
+   se ejecuten y se tendría que poder sacar." The answer turned out to be that
+   she already can — `priceChange` never checked the sign, and a negative
+   adicional carries all the way through to a negative contract annex, so the
+   importe vigente, the invoicing ceiling, the forecast cost and the margin all
+   come down together and the margin PERCENTAGE holds.
+
+   What it also did was append a NEGATIVE payment milestone and leave it in
+   every place that reads the payment plan as "what is there to collect": a
+   `critical` overdue-collection alert the day after approval that nothing
+   could clear, a count of invoices waiting to be issued, a calendar entry, and
+   a line in the generator's own milestone picker offering a minus figure to go
+   and invoice. Measured before the fix: two overdue alerts on one contract,
+   one of them for money nobody owes.
+
+   The milestone itself stays — the plan has to keep footing to the gross of
+   the new importe vigente — and `_collectableMilestone` is what the four
+   readers now ask instead of `status === "planned"`.
+   =========================================================================== */
+{
+  const e = new ERP("2026-03-02");
+  e.configureEntity({
+    legalName: "Canei Subirats, S.L.",
+    taxId: "B66666660",
+    street: "Creu 74",
+    postalCode: "08960",
+    city: "SJD",
+    province: "Barcelona",
+    country: "España",
+    phone: "930000000",
+    email: "hola@canei.example",
+    iban: "ES9121000418450200051332",
+  });
+  const cl = e.addParty(
+    {
+      name: "Cliente Minoración S.L.",
+      roles: ["customer"],
+      taxId: "B64667629",
+      billStreet: "C/ Mayor 1",
+      billPostalCode: "08001",
+      billCity: "Barcelona",
+      billProvince: "Barcelona",
+      billCountry: "España",
+      mobile: "600000000",
+    },
+    "bo",
+  );
+  const bq = e.createBudget({ partyId: cl.id, activityLine: "renovation" }, "bo");
+  const bch = e.addChapter(bq.id, { name: "Obra" }, "bo");
+  e.addLine(
+    bq.id,
+    bch.id,
+    { desc: "Trabajo", unit: "ud", qtyMilli: 1000, priceCents: 100000, costCents: 60000 },
+    "bo",
+  );
+  e.issueVersion(bq.id, { channel: "hand" }, "bo");
+  e.acceptVersion(bq.id, e.currentVersion(bq.id).id, { evidenceRef: "ok" }, "bo");
+  const bcon = e.createContract(
+    bq.id,
+    {
+      installments: [{ pct: 100, trigger: "onSignature", expectedDate: e.today }],
+      duration: { estimatedDays: 30 },
+    },
+    "bo",
+  );
+  e.signContract(bcon.id, { evidence: { storageKey: "sig-min", name: "firmado.pdf" } }, "bo");
+  const bprj = e.createProjectFromAcceptance(bq.id, "bo");
+
+  const ceilingOf = () => e.invoiceBases(bprj.id, cl.id).attributedCents;
+  assert(e.contractValue(bcon.id).currentCents === 100000, "before: importe vigente is the base");
+  assert(ceilingOf() === 100000, "before: the invoicing ceiling is the base", ceilingOf());
+
+  // −250 € of scope withdrawn, at −150 € of cost.
+  const minor = e.addChange(
+    bprj.id,
+    { desc: "Partidas no ejecutadas", reason: "El cliente retira alcance" },
+    "bo",
+  );
+  e.priceChange(minor.id, -25000, -15000, 0, "bo");
+  e.sendChange(minor.id, "bo");
+  e.approveChange(minor.id, { evidenceRef: "conforme" }, "bo");
+
+  const cv = e.contractValue(bcon.id);
+  assert(cv.annexCents === -25000, "a negative adicional writes a negative annex", cv.annexCents);
+  assert(cv.currentCents === 75000, "…and the importe vigente comes down with it", cv.currentCents);
+  assert(ceilingOf() === 75000, "…and so does what may still be invoiced", ceilingOf());
+
+  const econ = e.projectEconomics(bprj.id);
+  assert(
+    econ.currentRevenueCents === 75000 && econ.forecastCostCents === 45000,
+    "revenue and forecast cost both fall",
+    `${econ.currentRevenueCents}/${econ.forecastCostCents}`,
+  );
+  assert(
+    econ.marginForecastPct === 40,
+    "…so the margin percentage is unchanged — scope left, not money",
+    econ.marginForecastPct,
+  );
+
+  /* THE PLAN STILL FOOTS. The milestone is appended negative on purpose: drop
+     it and the schedule sums to the OLD contract while the vigente says the
+     new one, which is the comparison B1 rests on. */
+  const inst = e.state.contracts.find((x) => x.id === bcon.id).installments;
+  const planSum = inst.reduce((a, i) => a + i.amountCents, 0);
+  assert(
+    planSum === cv.currentCents + Math.round((cv.currentCents * (bcon.vatBp || 0)) / 10000),
+    "the payment plan still foots to the gross of the new importe vigente",
+    `${planSum} vs vigente ${cv.currentCents}`,
+  );
+  assert(
+    inst.some((i) => i.amountCents < 0),
+    "the reduction IS in the plan, as a negative milestone",
+  );
+
+  /* …AND IS NOT MONEY OWED TO US, in any of the four readers. */
+  assert(
+    !e.invoiceBases(bprj.id, cl.id).milestones.some((m) => m.amountCents < 0),
+    "the generator never offers a negative milestone to invoice",
+  );
+  e.setToday("2026-03-16");
+  const overdue = (e.alerts() || []).filter((a) => a.code === "CON-INSTALLMENT-OVERDUE");
+  assert(
+    overdue.length === 1,
+    "a withdrawn scope raises no overdue collection — only the real one does",
+    `${overdue.length} alerts`,
+  );
+  assert(
+    e.backOfficeDay().invoicesToIssue === 1,
+    "…and is not counted among the invoices waiting to be issued",
+    String(e.backOfficeDay().invoicesToIssue),
+  );
+  const cal = e.upcomingMilestones("2026-03-01", "2026-04-30") || [];
+  assert(
+    cal.filter((x) => x.kind === "collectionMilestone" && /CTR-2026/.test(x.label || "")).length ===
+      1,
+    "…and puts no phantom collection in the calendar — only the real milestone",
+    String(cal.filter((x) => x.kind === "collectionMilestone").length),
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

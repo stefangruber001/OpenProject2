@@ -6241,6 +6241,33 @@
      * done the same thing and could have missed a row; an absent field cannot
      * be missed.
      */
+    /**
+     * A PAYMENT MILESTONE SOMEBODY WILL ACTUALLY COLLECT.
+     *
+     * `_applyContractAnnex` appends every annex to the payment plan, and an
+     * annex may REDUCE the contract: the client withdraws scope, a partida is
+     * never executed, and the adicional that records it is negative. That is a
+     * real and wanted operation — `contractValue` subtracts it from the
+     * importe vigente, the invoicing ceiling comes down with it, and the
+     * margin percentage holds, all measured. The milestone has to be appended
+     * too, negative, or the plan stops footing to the gross of the new
+     * importe vigente, which is the comparison B1 rests on.
+     *
+     * But a negative milestone is not money owed to us. Left in the four
+     * places that read the plan as "what is there to collect", it became: a
+     * `critical` overdue-collection alert the day after it was approved, that
+     * nothing could ever clear; a count of invoices waiting to be issued; an
+     * entry in the calendar for a collection that will never happen; and —
+     * worst — a line in the generator's own milestone picker, offering the
+     * operator a minus figure to go and invoice.
+     *
+     * So: planned AND positive. The cash forecast deliberately does NOT use
+     * this and keeps summing the amounts, because there the reduction is a
+     * fact about expected cash and nets off correctly.
+     */
+    _collectableMilestone(i) {
+      return i && i.status === "planned" && (i.amountCents || 0) > 0;
+    }
     _annexApplied(a) {
       return !a || a.applied !== false;
     }
@@ -7901,7 +7928,7 @@
                   expectedDate: i.expectedDate || null,
                   status: i.status,
                 }))
-                .filter((i) => i.status === "planned")
+                .filter((i) => this._collectableMilestone(i))
             : [],
         certification: {
           chapters,
@@ -13279,7 +13306,7 @@
           );
       for (const c of this.state.contracts)
         for (const i of c.installments)
-          if (i.status === "planned" && i.expectedDate && i.expectedDate < t)
+          if (this._collectableMilestone(i) && i.expectedDate && i.expectedDate < t)
             push("CON-INSTALLMENT-OVERDUE", "critical", `Hito de cobro vencido — ${c.number}`, {
               contract: c.number,
             });
@@ -13952,7 +13979,7 @@
           this.state.contracts,
           (c) =>
             c.installments.filter(
-              (i) => i.status === "planned" && i.expectedDate && i.expectedDate <= t,
+              (i) => this._collectableMilestone(i) && i.expectedDate && i.expectedDate <= t,
             ).length,
         ),
         collectionsDue: this.receivables().filter(
@@ -13991,7 +14018,7 @@
       }
       for (const c of this.state.contracts) {
         for (const i of c.installments)
-          if (i.status === "planned")
+          if (this._collectableMilestone(i))
             push(i.expectedDate, "collectionMilestone", `Cobro previsto — ${c.number}`, {
               contract: c.number,
             });

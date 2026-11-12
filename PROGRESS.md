@@ -4585,3 +4585,27 @@ Puertas: extracción 37/37 (7 nuevas, 5 fallan contra el código anterior) ·
 manejabilidad 593/593 · numeración 55/55 · year-sim 149/149 · migraciones
 154/154 hasta v30 · source-audit 158/158 en+ca · páginas 107 en / 83 ca ·
 workspace-audit 0/0 · diccionario completo · boundaries OK · lint y tipos OK.
+
+## S52 · Sacar lo que no se ejecuta (2026-11-12)
+
+Resulta que ya se podía. Un adicional con importe **negativo** atraviesa el
+ciclo entero —valorar, enviar, aprobar— escribe una adenda negativa y baja el
+importe vigente, el techo de facturación, el coste previsto y el margen, con
+el porcentaje de margen intacto. Lo que no estaba bien era que la adenda se
+añade al plan de pagos como hito, y cuatro lectores del plan lo contaban como
+dinero por cobrar: alerta `critical` de cobro vencido que nunca se podía
+cerrar, facturas pendientes de emitir, «Cobro previsto» en el calendario y una
+línea en el selector de hitos del generador.
+
+- `_collectableMilestone` (planificado **y** positivo) es lo que preguntan
+  ahora esos cuatro. El hito negativo se queda: sin él el plan deja de cuadrar
+  con el bruto del importe vigente.
+- La previsión de tesorería sigue sumando importes a propósito: una minoración
+  es menos caja esperada, y ahí se compensa bien.
+
+Trece comprobaciones nuevas; cuatro fallan contra el motor publicado esta
+mañana (`cff5ea6`) y pasan contra este.
+
+Puertas: manejabilidad 606/606 (eran 593) · numeración 55/55 · year-sim
+149/149 · migraciones 154/154 · source-audit 158/158 en+ca · boundaries OK ·
+lint y tipos OK.
