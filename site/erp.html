@@ -17312,12 +17312,37 @@
             : "Busca por número o cliente, o crea uno nuevo desde una visita realizada o un lead abierto.";
         const stageIndex = Object.fromEntries(BUD_STAGES.map(([k], i) => [k, i]));
         const stageMeta = Object.fromEntries(BUD_STAGES.map(([k, l, t]) => [k, [l, t]]));
+        /* Never throws: the register has to draw every row it was given, and a
+           budget whose data is older than the acceptance field is a row like
+           any other. `budgetAcceptedOn` is the engine's; this only keeps a
+           missing one from taking the screen down, the way `propertyLabel`
+           does for a removed property. */
+        const acceptedOn = (b) => {
+          try {
+            return erp.budgetAcceptedOn(b.id) || "";
+          } catch (e) {
+            return "";
+          }
+        };
         const baseRows = erp.state.budgets
           .filter((b) => (budgetTab === "adicionales" ? isAdi(b) : !isAdi(b)))
           .sort((a, b) => {
             const sa = stageIndex[erp.budgetStage(a)] ?? 99,
               sb = stageIndex[erp.budgetStage(b)] ?? 99;
-            return sa !== sb ? sa - sb : b.number.localeCompare(a.number);
+            if (sa !== sb) return sa - sb;
+            /* WITHIN A STAGE, BY THE DAY THE CUSTOMER ANSWERED — oldest
+               first. The client: "me gustaría tenerlos organizados por orden
+               de aceptación." The order she wants is the order the work
+               arrived in, so the quote that has been waiting longest sits at
+               the top of the accepted block rather than the bottom.
+               Only when BOTH rows have such a day, which inside one stage
+               means both are answered: a draft has no acceptance date and
+               keeps the newest-number-first order every other register uses,
+               and so does an accepted row whose answer predates the field. */
+            const aa = acceptedOn(a),
+              ab = acceptedOn(b);
+            if (aa && ab && aa !== ab) return aa < ab ? -1 : 1;
+            return b.number.localeCompare(a.number);
           });
         v.innerHTML = `
          <div class="tabstrip">
@@ -17464,6 +17489,19 @@
               label: "Validez",
               get: (b) => b.validityDate,
               html: (b) => fmtD(b.validityDate),
+            },
+            {
+              /* WHEN THEY SAID YES, beside the quote that was accepted. The
+                 register could say «Aceptado» and not when, so the only way to
+                 put the accepted quotes in the order they were accepted was to
+                 open each one. `get` carries the ISO date, which is what sorts
+                 and what a spreadsheet wants; the cell shows the local form. */
+              label: "Aceptado",
+              get: (b) => acceptedOn(b),
+              html: (b) => {
+                const on = acceptedOn(b);
+                return on ? `<span translate="no">${fmtD(on)}</span>` : "—";
+              },
             },
             {
               label: "Estado",

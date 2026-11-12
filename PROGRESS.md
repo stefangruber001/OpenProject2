@@ -4556,3 +4556,32 @@ sigue siendo necesaria: dos pagadores separados de la misma obra.
 Puertas: manejabilidad 591/591 · year-sim 149/149 · migraciones 154/154 ·
 numeración 55/55 · source-audit 158/158 en+ca · diccionario completo ·
 boundaries OK · suite del generador 21/21 con los tres casos nuevos.
+
+## S51 · El emisor y la fecha de aceptación (2026-11-12)
+
+Dos cosas que el cliente pidió el mismo día, y una tercera que no necesitaba
+código.
+
+**El emisor.** «Para dar de alta a un proveedor desde un documento nunca lee
+bien el emisor.» El nombre salía como la línea de fecha del encabezado y la
+dirección salía de la nuestra. La frontera del destinatario era un encabezado
+que los proveedores pequeños no imprimen, así que la hoja entera contaba como
+del emisor. Ahora la frontera es **nuestro propio nombre** —el anfitrión ya lo
+pasa— y el ancla es **su NIF**: el nombre está en esa línea o justo encima, y
+la dirección a una o dos. Si no hay ningún hecho que distinga los bloques, la
+dirección sale vacía en vez de salir la nuestra.
+
+**La fecha de aceptación.** Columna «Aceptado» en el registro de presupuestos,
+y los aceptados ordenados por ese día, del más antiguo al más reciente. El dato
+ya se guardaba desde siempre; lo que faltaba era leerlo (`budgetAcceptedOn`).
+
+**El adicional de Alberto Barreu Milanes.** No es un error del sistema: el
+adicional estaba _identificado_, no _aprobado_, y CHG-04 no deja facturar obra
+sin aprobar. Reproducido: sin aprobar el techo es 280 € y los 320 € a mano los
+refusa AR-11; aprobado el techo pasa a 320 € y entra por las dos vías. Se
+aprueba en la obra y se factura.
+
+Puertas: extracción 37/37 (7 nuevas, 5 fallan contra el código anterior) ·
+manejabilidad 593/593 · numeración 55/55 · year-sim 149/149 · migraciones
+154/154 hasta v30 · source-audit 158/158 en+ca · páginas 107 en / 83 ca ·
+workspace-audit 0/0 · diccionario completo · boundaries OK · lint y tipos OK.

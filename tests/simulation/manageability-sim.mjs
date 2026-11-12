@@ -256,7 +256,21 @@ throws(
 throws(() => erp.updateBudget(b.id, { vatBp: 2100 }, "bo"), "issued budget header is frozen");
 
 // contract lifecycle
+assert(
+  erp.budgetAcceptedOn(b.id) === null,
+  "an unanswered budget has no acceptance date",
+  erp.budgetAcceptedOn(b.id),
+);
 erp.acceptVersion(b.id, erp.currentVersion(b.id).id, { evidenceRef: "email-ok" }, "bo");
+/* THE DAY THE CUSTOMER SAID YES IS READABLE AFTERWARDS.
+   It was recorded from the start and nothing could read it back, so the
+   register could say a quote was accepted and not when — and the only way to
+   put the accepted quotes in acceptance order was to open each one. */
+assert(
+  erp.budgetAcceptedOn(b.id) === erp.today,
+  "an accepted budget reports the day it was accepted",
+  erp.budgetAcceptedOn(b.id),
+);
 const con = erp.createContract(
   b.id,
   {

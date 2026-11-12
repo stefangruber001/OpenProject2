@@ -12003,3 +12003,72 @@ de la siguiente. Concatenar dos `option` en una expresión hizo que contara el
 JavaScript de en medio como cadena sin traducir; y el comentario que lo
 explicaba, al nombrar las dos etiquetas, hizo exactamente lo mismo. Las
 constantes van planas y el comentario no nombra etiquetas.
+
+## S159 · El emisor se lee desde su NIF, no desde arriba
+
+«Para dar de alta a un proveedor desde un documento nunca lee bien el emisor.»
+En la página que mandaron, el nombre salía como la línea de fecha con la que
+abre el documento, y la dirección, el código postal y la población salían de
+NUESTRO bloque, el que factura a Canei.
+
+Las dos cosas tenían la misma causa. La frontera del destinatario era un
+encabezado («FACTURAR A», «CLIENTE»), y los proveedores pequeños no ponen
+ninguno: imprimen su membrete, luego nuestro nombre y nuestra dirección, y
+nada anuncia el cambio de sujeto. Sin encabezado, la página entera contaba
+como del emisor: el nombre era la primera línea que no fuera obviamente otra
+cosa, y la dirección el primer código postal de la hoja. Ninguno de los dos
+era suyo.
+
+**Lo que lo decide es lo que el anfitrión ya sabe: quién somos.** Se le pasa en
+cada lectura desde que existe el campo `exclude`, y sólo servía para no
+confundir los dos NIF. Ahora la primera línea que lleva nuestro nombre o
+nuestro NIF ES la frontera, haya encabezado o no. Un hecho donde antes había
+una esperanza.
+
+**Y un ancla: el NIF que no es el nuestro.** En cualquier membrete el nombre
+está en la línea de su NIF o justo encima, y la dirección a una o dos líneas.
+Se lee hacia fuera desde esa línea en vez de hacia abajo desde el principio de
+la hoja. Se guardan TODAS las líneas donde aparece su NIF, no sólo la mejor,
+porque el documento que imprime el membrete al pie —destinatario en la
+ventana, dirección del emisor bajo los totales— lo repite, y es esa segunda
+aparición la que dice dónde está la dirección.
+
+**Decisión reversible, y por qué.** Cuando no hay NIF ninguno y el documento
+nos nombra primero, no queda ningún hecho que distinga los dos bloques: la
+dirección se devuelve VACÍA en vez de arriesgar la nuestra. Una ficha de
+proveedor con nuestra propia calle es peor que una ficha a medio rellenar, y
+la que está a medio rellenar se ve.
+
+Tres reglas nuevas más, todas de la misma forma: una línea que es una fecha y
+un topónimo no es una empresa (se le ofrece cada palabra al perfil, que es
+quien sabe de fechas); una línea con código postal, teléfono o correo dice
+dónde está el emisor, no quién es; y una línea que es una etiqueta y su valor
+—«NIF: B64667629»— no deja residuo cuando el perfil se lleva lo que sabe
+nombrar, y no es un nombre.
+
+Cinco de las siete pruebas nuevas fallan contra el código anterior y pasan
+contra este. Están escritas en el país inventado del resto del fichero, como
+manda la capa: la capacidad no sabe de España.
+
+## S160 · La fecha de aceptación, que ya estaba escrita
+
+«¿Existe la posibilidad de que en los presupuestos aceptados ponga al lado la
+fecha, el día de aceptación? Me gustaría tenerlos organizados por orden de
+aceptación.»
+
+Ya se guardaba: `acceptVersion` la escribe en `customerResponse.date` y honra
+una fecha retroactiva, porque una respuesta pertenece al día en que se dio y
+no al día en que alguien la teclea. Lo que no había era quien la leyera, así
+que el registro podía decir «Aceptado» y no cuándo, y la única forma de
+ordenarlos por aceptación era abrirlos uno a uno.
+
+**Reversible, y es la que elijo: de la más antigua a la más reciente.** El
+resto de registros sale por número descendente, lo más nuevo arriba. Aquí el
+orden que pide es el orden en que llegó el trabajo, así que el presupuesto que
+lleva más tiempo esperando queda arriba del bloque de aceptados. Si lo quiere
+al revés es cambiar el signo de una comparación, y ahora la columna enseña la
+fecha, así que se ve al instante cuál de los dos órdenes es.
+
+Sólo desempata cuando AMBAS filas tienen día de aceptación, lo que dentro de
+una misma etapa significa que las dos están contestadas: un borrador no tiene
+fecha y conserva el orden de siempre.

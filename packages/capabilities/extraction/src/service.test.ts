@@ -423,3 +423,113 @@ describe("where the issuer is", () => {
       expect(field(r, k).verdict).toBe("amber");
   });
 });
+
+/* THE DOCUMENT NOBODY COULD CREATE A SUPPLIER FROM.
+ *
+ * The operator, relaying the client: creating a supplier from a document never
+ * reads the issuer right. On the page they sent, the name came back as the
+ * dateline the document opens with, and the street, the postal code and the
+ * town came back as OURS — read out of the block that bills us.
+ *
+ * Both had the same cause. The recipient boundary was a heading, and small
+ * suppliers print no heading: they print their letterhead, then our name and
+ * address, and nothing announces the change of subject. With no heading the
+ * whole page counted as the issuer's, so the name was the first line that was
+ * not obviously something else and the address was the first postal code on
+ * the page. Neither was theirs.
+ *
+ * What settles it is what the host already knows — who we are — and the one
+ * line that is certainly theirs: the tax id that is not ours.
+ */
+describe("the issuer on a document that labels nothing", () => {
+  // Who we are, as the host passes it on every read.
+  const me = { names: ["Our Company Ltd"], taxIds: ["CD111111"] };
+
+  /* The letterhead at the foot: the recipient in the window of the envelope,
+     the issuer's own address under the totals. The first postal code down the
+     page is ours, and the document opens with a date and a town. */
+  const FOOTER = [
+    "2026.11.12 Northgate",
+    "ACME SUPPLIES LTD",
+    "Registry no AB123400",
+    "Our Company Ltd",
+    "9 Other Street, TUV11 Southgate (Eastshire)",
+    "Doc: F-2026/0417",
+    "Dated 2026.11.12",
+    "Net 1_000|00",
+    "Levy 20 pct 200|00",
+    "Grand total 1_200|00",
+    "Acme Supplies Ltd \u00b7 14 Long Road, QRS42 Northgate (Westshire) \u00b7 AB123400 \u00b7 ring 55-1234-5678",
+  ].join("\n");
+
+  it("does not offer the dateline as the issuer's name", () => {
+    const r = svc().extract({ text: FOOTER, exclude: me });
+    expect(field(r, "issuerName").value).not.toBe("2026.11.12 Northgate");
+    expect(field(r, "issuerName").value).toBe("ACME SUPPLIES LTD");
+  });
+
+  it("reads the issuer's address from the footer, not ours from the window", () => {
+    const r = svc().extract({ text: FOOTER, exclude: me });
+    expect(field(r, "issuerAddress").value).toBe("14 Long Road");
+    expect(field(r, "issuerPostcode").value).toBe("QRS42");
+    expect(field(r, "issuerCity").value).toBe("Northgate");
+    expect(field(r, "issuerRegion").value).toBe("Westshire");
+    expect(field(r, "issuerPhone").value).toBe("55-1234-5678");
+  });
+
+  it("stops at our own name where no heading says the recipient starts", () => {
+    const r = svc().extract({ text: FOOTER, exclude: me });
+    // The three facts that used to come back, all of them ours.
+    expect(field(r, "issuerAddress").value).not.toBe("9 Other Street");
+    expect(field(r, "issuerPostcode").value).not.toBe("TUV11");
+    expect(field(r, "issuerCity").value).not.toBe("Southgate");
+  });
+
+  it("reads the issuer below us when the document names us first", () => {
+    const r = svc().extract({
+      text: [
+        "Our Company Ltd",
+        "9 Other Street, TUV11 Southgate (Eastshire)",
+        "ACME SUPPLIES LTD",
+        "14 Long Road, QRS42 Northgate (Westshire)",
+        "Registry no AB123400",
+        "Grand total 1_200|00",
+      ].join("\n"),
+      exclude: me,
+    });
+    expect(field(r, "issuerName").value).toBe("ACME SUPPLIES LTD");
+    expect(field(r, "issuerPostcode").value).toBe("QRS42");
+    expect(field(r, "issuerAddress").value).toBe("14 Long Road");
+  });
+
+  it("guesses no address at all when nothing says which block is theirs", () => {
+    /* No tax id anywhere, and we are named first: there is no fact left that
+       tells the two blocks apart. An empty address is the honest answer — a
+       supplier record carrying our own street is not. */
+    const r = svc().extract({
+      text: [
+        "Our Company Ltd",
+        "9 Other Street, TUV11 Southgate (Eastshire)",
+        "ACME SUPPLIES LTD",
+        "Grand total 1_200|00",
+      ].join("\n"),
+      exclude: me,
+    });
+    expect(field(r, "issuerPostcode").value).toBeNull();
+    expect(field(r, "issuerCity").value).toBeNull();
+  });
+
+  it("still finds nothing to anchor on, and says so, without our identity", () => {
+    // The hint is a hint: with no identity passed the reader keeps working,
+    // it simply loses the help. Nothing here may throw.
+    const r = svc().extract({ text: FOOTER });
+    expect(r.fields.length).toBeGreaterThan(0);
+    expect(field(r, "issuerTaxId").value).toBe("AB123400");
+  });
+
+  it("never claims green for a name or an address", () => {
+    const r = svc().extract({ text: FOOTER, exclude: me });
+    for (const k of ["issuerName", "issuerAddress", "issuerCity"] as const)
+      expect(field(r, k).verdict).toBe("amber");
+  });
+});

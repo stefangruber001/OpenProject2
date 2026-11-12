@@ -3387,6 +3387,30 @@
       const b = this.budget(budgetId);
       return b.versions.find((v) => v.id === b.currentVersionId);
     }
+    /**
+     * THE DAY THE CUSTOMER SAID YES, as a plain ISO date or null.
+     *
+     * It was already recorded — `acceptVersion` writes it on the version's
+     * `customerResponse`, and backdating is honoured there because an answer
+     * belongs to the day it was given, not the day somebody typed it in — but
+     * no screen read it back, so the register could show that a quote was
+     * accepted and never when. The operator, relaying the client: "¿existe la
+     * posibilidad de que en los presupuestos aceptados ponga al lado la fecha,
+     * el día de aceptación? Me gustaría tenerlos organizados por orden de
+     * aceptación." Both halves of that — the column and the ordering — need
+     * this one fact, so it is read here rather than twice in the host.
+     *
+     * Null, not an empty string: an unanswered quote has no such day, and a
+     * caller sorting on it must be able to tell that from a date it cannot
+     * parse. An accepted version with no date on its answer is possible in
+     * data written before the field existed, and comes back null too.
+     */
+    budgetAcceptedOn(budgetId) {
+      const b = this.budget(budgetId);
+      if (!b.acceptedVersionId) return null;
+      const v = b.versions.find((x) => x.id === b.acceptedVersionId);
+      return (v && v.customerResponse && v.customerResponse.date) || null;
+    }
     newVersion(budgetId, { reason, author, from } = {}, first) {
       // QUO-01/02: automatic numbering; frozen predecessors
       const b = this.budget(budgetId);

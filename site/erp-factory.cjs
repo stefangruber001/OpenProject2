@@ -238,21 +238,31 @@ var ExtractionService = class {
         (input.exclude?.taxIds ?? []).map((t) => t.toUpperCase().replace(/[^A-Z0-9]/g, "")).filter(Boolean)
       )
     };
-    const recipientAt = this.recipientBoundary(folded, profile);
+    const recipientAt = this.recipientBoundary(folded, lines, profile, exclude);
     const perField = /* @__PURE__ */ new Map();
     for (const key of FIELD_KEYS) {
       perField.set(key, this.candidatesFor(key, lines, folded, pageOf, profile, exclude));
     }
+    const anchors = (perField.get("issuerTaxId") ?? []).map((c) => c.source.line);
     for (const key of ["issuerName", "issuerTaxId"]) {
       const all = perField.get(key) ?? [];
       const above = all.filter((c) => c.source.line < recipientAt);
       if (above.length && above.length < all.length) perField.set(key, above);
     }
+    const anchor = best(perField.get("issuerTaxId"))?.source.line ?? null;
     if (!perField.get("issuerName")?.length) {
-      const guessed = this.unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt);
+      const guessed = this.unlabelledIssuer(
+        lines,
+        folded,
+        pageOf,
+        profile,
+        exclude,
+        recipientAt,
+        anchor
+      );
       if (guessed) perField.set("issuerName", [guessed]);
     }
-    for (const [key, cand] of this.issuerContact(lines, pageOf, profile, recipientAt))
+    for (const [key, cand] of this.issuerContact(lines, pageOf, profile, recipientAt, anchors))
       if (!perField.get(key)?.length) perField.set(key, [cand]);
     const issueDate = best(perField.get("issueDate"))?.value ?? input.assumeIssueDate;
     const taxBreakdown = this.taxBreakdown(lines, pageOf, profile);
@@ -522,19 +532,23 @@ var ExtractionService = class {
    * suffixes the profile names, because knowing what the end of a company name
    * looks like here is jurisdiction knowledge and does not belong in this file.
    */
-  unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt) {
+  unlabelledIssuer(lines, folded, pageOf, profile, exclude, recipientAt, anchor) {
     const suffixes = (profile.issuerSuffixes ?? []).map(fold);
-    const head = Math.min(lines.length, 8, recipientAt);
-    for (let i = 0; i < head; i++) {
-      const line = lines[i].trim();
-      if (line.length < 3 || line.length > 80) continue;
-      if (!new RegExp("\\p{Lu}", "u").test(line)) continue;
-      if (this.isLabelResidue(line, profile)) continue;
-      if (exclude.names.has(fold(line))) continue;
-      if (profile.parseDate(line) || profile.parseAmountCents(line)) continue;
+    const nameAt = (i, why, confidence) => {
+      const line = lines[i]?.trim();
+      if (!line) return null;
+      if (line.length < 3 || line.length > 80) return null;
+      if (!new RegExp("\\p{Lu}", "u").test(line)) return null;
+      if (this.isLabelResidue(line, profile)) return null;
+      if (exclude.names.has(fold(line))) return null;
+      if (profile.parseDate(line) || profile.parseAmountCents(line)) return null;
       const letters = (line.match(new RegExp("\\p{L}", "gu")) ?? []).length;
       const digits = (line.match(/\d/gu) ?? []).length;
-      if (digits >= letters) continue;
+      if (digits >= letters) return null;
+      if (this.isDateline(line, profile, suffixes)) return null;
+      for (const p of [profile.patterns.postcode, profile.patterns.phone, profile.patterns.email])
+        if (p && new RegExp(p.source, p.flags).test(line)) return null;
+      if (this.nameResidue(line, profile).length < 3) return null;
       let text = line;
       let end = i;
       const next = lines[i + 1]?.trim();
@@ -542,18 +556,77 @@ var ExtractionService = class {
         text = `${line} ${next}`;
         end = i + 1;
       }
-      if (exclude.names.has(fold(text))) continue;
+      if (exclude.names.has(fold(text))) return null;
       return {
         value: text,
         raw: text,
-        confidence: 0.35,
+        confidence,
         source: { line: i, text, start: 0, end: lines[end].length, page: pageOf[i] },
-        reasons: ["at the head of the document, and not this company"],
+        reasons: [why],
         labelled: false,
         validated: false
       };
+    };
+    if (anchor !== null) {
+      for (let i = anchor; i >= 0 && i >= anchor - 3; i--) {
+        const hit = nameAt(i, "beside the issuer's own tax id", 0.45);
+        if (hit) return hit;
+      }
+    }
+    const head = Math.min(lines.length, 8, recipientAt);
+    for (let i = 0; i < head; i++) {
+      const hit = nameAt(i, "at the head of the document, and not this company", 0.35);
+      if (hit) return hit;
     }
     return null;
+  }
+  /**
+   * A LINE THAT SAYS WHEN AND WHERE IS NOT A COMPANY.
+   *
+   * A real document opened with a date and a town on one line, and the reader
+   * offered that as the supplier's name. Every test above let it through: only
+   * a whole line parses as a date and this one has a word after it, and it is
+   * not mostly digits because the town is longer than the date. The operator,
+   * relaying the client: it never reads the issuer right.
+   *
+   * What gives it away is that taking the date out leaves almost nothing.
+   * Dates belong to the profile, so each word is offered to it rather than
+   * matched against a shape written here; a line with a date in it and at most
+   * two words besides, none of which ends a company name, states a fact about
+   * the document and names nobody.
+   */
+  /**
+   * What is left of a line once the profile has taken out everything it can
+   * name: the labels it knows and every shape it can match. A name is what
+   * nothing in the profile accounts for, so a line that accounts for itself
+   * entirely — a label and its value — leaves nothing behind and is not one.
+   *
+   * Letters only, so punctuation and separators cannot make an empty residue
+   * look like a word.
+   */
+  nameResidue(line, profile) {
+    let rest = line;
+    for (const p of Object.values(profile.patterns)) {
+      if (!p) continue;
+      const flags = p.flags.includes("g") ? p.flags : `${p.flags}g`;
+      rest = rest.replace(new RegExp(p.source, flags), " ");
+    }
+    let folded = fold(rest);
+    for (const list of Object.values(profile.keywords)) {
+      for (const k of list ?? []) {
+        const f = fold(k);
+        if (f.length >= 3) folded = folded.split(f).join(" ");
+      }
+    }
+    return (folded.match(new RegExp("\\p{L}", "gu")) ?? []).join("");
+  }
+  isDateline(line, profile, suffixes) {
+    const words = line.split(/[\s,;]+/u).filter(Boolean);
+    if (words.length < 2) return false;
+    const dated = words.filter((w) => profile.parseDate(w) !== null).length;
+    if (!dated) return false;
+    if (words.length - dated > 2) return false;
+    return !suffixes.some((sfx) => fold(line).includes(sfx));
   }
   /**
    * WHERE THE ISSUER IS, READ OFF THE HEAD OF THE PAGE.
@@ -586,9 +659,9 @@ var ExtractionService = class {
    * one. An address that this profile has no postal-code pattern for simply
    * comes back empty — nothing is guessed.
    */
-  issuerContact(lines, pageOf, profile, recipientAt) {
+  issuerContact(lines, pageOf, profile, recipientAt, anchors) {
     const out = /* @__PURE__ */ new Map();
-    const head = Math.min(lines.length, recipientAt);
+    const region = this.issuerLines(lines.length, recipientAt, anchors);
     const make = (value, line, start, end, why) => ({
       value,
       raw: value,
@@ -602,7 +675,7 @@ var ExtractionService = class {
     });
     const pc = profile.patterns.postcode;
     if (pc) {
-      outer: for (let i = 0; i < head; i++) {
+      outer: for (const i of region) {
         const raw = lines[i] ?? "";
         const segments = raw.split(/\s[·|—–]\s|\t{2,}/g);
         let consumed = 0;
@@ -651,7 +724,8 @@ var ExtractionService = class {
     const ph = profile.patterns.phone;
     const phoneWords = (profile.keywords.issuerPhone ?? []).map(fold).filter(Boolean);
     if (ph && phoneWords.length) {
-      for (let i = 0; i < head && !out.has("issuerPhone"); i++) {
+      for (const i of region) {
+        if (out.has("issuerPhone")) break;
         const raw = lines[i] ?? "";
         const segments = raw.split(/\s[·|—–]\s|\t{2,}/g);
         let consumed = 0;
@@ -673,7 +747,8 @@ var ExtractionService = class {
     }
     const em = profile.patterns.email;
     if (em) {
-      for (let i = 0; i < head && !out.has("issuerEmail"); i++) {
+      for (const i of region) {
+        if (out.has("issuerEmail")) break;
         const raw = lines[i] ?? "";
         const rx = new RegExp(em.source, em.flags);
         const m = rx.exec(raw);
@@ -687,6 +762,35 @@ var ExtractionService = class {
     return out;
   }
   /**
+   * WHICH LINES ARE THE ISSUER'S, AND IN WHICH ORDER TO READ THEM.
+   *
+   * Above the recipient boundary first: everything there is theirs. Within
+   * that, nearest the anchor first, because a letterhead keeps the tax id and
+   * the address together and one page carries several postal codes — theirs, a
+   * delivery address, a registry line, ours.
+   *
+   * Then, and ONLY where there is an anchor, the handful of lines around it
+   * that fall below the boundary. Some documents name the recipient first and
+   * print the issuer's own address at the foot, so "above the boundary" holds
+   * no address at all and the next postal code down the page is the
+   * recipient's — which is the shape that put our own street on a supplier's
+   * record. Their tax id is the one thing that says which block is theirs;
+   * with no tax id there is nothing to tell them apart by, and a wrong address
+   * is worse than an empty one, so nothing is guessed.
+   */
+  issuerLines(count, recipientAt, anchors) {
+    const head = Math.max(0, Math.min(count, recipientAt));
+    const distance = (i) => anchors.length ? Math.min(...anchors.map((a) => Math.abs(i - a))) : 0;
+    const order = (a, b) => distance(a) - distance(b) || a - b;
+    const above = Array.from({ length: head }, (_unused, i) => i).sort(order);
+    const below = /* @__PURE__ */ new Set();
+    for (const a of anchors) {
+      if (a < head) continue;
+      for (let i = Math.max(head, a - 4); i < Math.min(count, a + 5); i++) below.add(i);
+    }
+    return [...above, ...[...below].sort(order)];
+  }
+  /**
    * The line at which the document stops talking about the issuer.
    *
    * A heading, so the marker has to START the line — «FACTURAR A» does;
@@ -695,14 +799,45 @@ var ExtractionService = class {
    * terms. Returns the line count when there is no such heading, which means
    * "no boundary" and leaves every candidate in play.
    */
-  recipientBoundary(folded, profile) {
+  recipientBoundary(folded, lines, profile, exclude) {
+    let at = folded.length;
     const markers = (profile.recipientMarkers ?? []).map(fold).filter(Boolean);
-    if (!markers.length) return folded.length;
-    for (let i = 0; i < folded.length; i++) {
-      const line = folded[i].trim();
-      if (markers.some((m) => line.startsWith(m))) return i;
+    if (markers.length) {
+      for (let i = 0; i < folded.length; i++) {
+        const line = folded[i].trim();
+        if (markers.some((m) => line.startsWith(m))) {
+          at = i;
+          break;
+        }
+      }
     }
-    return folded.length;
+    const ours = this.ownIdentityLine(lines, folded, exclude);
+    if (ours !== null && ours < at) at = ours;
+    return at;
+  }
+  /**
+   * The first line that is about us rather than about the issuer.
+   *
+   * A substring match, because the name sits in a line with other things in
+   * it ("Cliente: <name>", a name followed by a tax id). Short names are
+   * ignored: a trade name of three characters is a syllable that lands
+   * anywhere, and a wrong boundary costs more than no boundary. The tax id is
+   * compared with punctuation and case removed, the way it is anywhere else
+   * here, so a hyphen or a space inside it changes nothing.
+   */
+  ownIdentityLine(lines, folded, exclude) {
+    const names = [...exclude.names].filter((n) => n.length >= 4);
+    const taxIds = [...exclude.taxIds].filter((t) => t.length >= 6);
+    if (!names.length && !taxIds.length) return null;
+    for (let i = 0; i < lines.length; i++) {
+      const f = folded[i] ?? "";
+      if (names.some((n) => f.includes(n))) return i;
+      if (taxIds.length) {
+        const squashed = (lines[i] ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (taxIds.some((t) => squashed.includes(t))) return i;
+      }
+    }
+    return null;
   }
   /**
    * THE THIRD AMOUNT IS ARITHMETIC, NOT A GUESS.
