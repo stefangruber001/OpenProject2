@@ -12110,3 +12110,39 @@ ellas por dinero que nadie debe.
 sumando importes: ahí la minoración es un hecho sobre la caja esperada y se
 compensa bien. Cuatro de las trece comprobaciones nuevas fallan contra el
 motor publicado esta mañana y pasan contra este.
+
+## S162 · La factura refusada dice qué paso falta
+
+AR-11 decía la aritmética —«Pendiente 280,00 €, factura 320,00 €»— y la
+aritmética no es nunca lo que alguien hizo mal. Dos veces en la misma semana
+la respuesta real era un paso que nadie había dado, y la negativa no nombraba
+ninguno de los dos:
+
+- un adicional parado en «valorado», cuyos 40 € no estaban por tanto en el
+  techo;
+- un adicional aceptado como presupuesto propio cuyo anexo de contrato nadie
+  había firmado, que es la misma omisión una pantalla más lejos.
+
+Las dos veces la operadora leyó «excede lo aceptado», concluyó que la
+aceptación del cliente no se había registrado, y llamó por teléfono.
+
+**Es tanto de ORDEN como de palabras.** `issueInvoice` lanza con
+`blocked[0]`, así que lo que encabeza esa lista es la frase que de verdad se
+lee en el aviso. El paso que falta va delante; las cifras, detrás, que siguen
+siendo ciertas y nunca fueron accionables.
+
+`_adicionalesAwaitingAStep` devuelve los dos motivos en el orden en que una
+persona los haría —un extra se aprueba antes de que su anexo pueda firmarse—
+y sólo para los extras sobre los que todavía se puede actuar: un adicional
+anulado o rechazado no es un paso pendiente, es uno cerrado, y nombrarlo
+mandaría a la lectora a buscar un botón que no está.
+
+**Decisión sobre dónde ponerlo.** La pista NO va en el `detail` de AR-11:
+ese campo está marcado `data: true` —son cifras, ningún traductor las toca—
+y meter prosa ahí la enviaría sin traducir para siempre. Van como entradas
+propias, con su `label` y su `detail` en el diccionario, en los tres idiomas.
+
+Cuatro comprobaciones nuevas fallan contra `b89a63e` devolviendo exactamente
+el mensaje que ella recibió; dos más cubren lo que NO debe cambiar: sin ningún
+adicional pendiente AR-11 sigue encabezando con sus cifras, y una factura
+dentro del techo no se refusa en absoluto.

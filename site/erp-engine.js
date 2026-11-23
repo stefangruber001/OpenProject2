@@ -7532,13 +7532,19 @@
            euros a real scope error is made of. The year simulation issued its
            own final invoice one cent over and was refused. */
         const slack = (bases.issued || []).length + 1;
-        if (want > room + slack)
+        if (want > room + slack) {
+          /* THE MISSING STEP FIRST, THE ARITHMETIC SECOND. `issueInvoice`
+             throws on `blocked[0]`, so whatever leads this list is the
+             sentence the operator actually reads. The figures are true and
+             were never the thing anybody could act on. */
+          for (const why of this._adicionalesAwaitingAStep(p.id)) out.push(why);
           out.push({
             code: "AR-11",
             label: "Excede lo que este cliente debe por esta obra",
             detail: `Pendiente ${(room / 100).toFixed(2)} €, factura ${(want / 100).toFixed(2)} €`,
             data: true, // A12 · figures
           });
+        }
       }
       const contract = p.contractId
         ? this.state.contracts.find((c) => c.id === p.contractId)
@@ -7613,8 +7619,58 @@
           out.push({
             code: "CHG-04",
             label: "Adicional sin aprobar",
-            detail: "Sólo se factura un adicional que el cliente ya ha aprobado.",
+            detail:
+              "Apruébelo en la obra antes de facturarlo: hasta entonces su importe no cuenta.",
           });
+      }
+      return out;
+    }
+
+    /**
+     * WHY THE CEILING IS LOWER THAN THE PERSON LOOKING AT IT EXPECTS.
+     *
+     * AR-11 states the arithmetic — «Pendiente 280,00 €, factura 320,00 €» —
+     * and the arithmetic is never what somebody got wrong. Twice in one week
+     * the real answer was a step nobody had taken, and the refusal named
+     * neither: an adicional sitting at «identificado» whose 40 € were
+     * therefore not in the ceiling, and an adicional accepted as its own
+     * budget whose contract annex nobody had signed, which is the same
+     * omission one screen further away. Both times the operator read «excede
+     * lo aceptado», believed the client's acceptance had not registered, and
+     * rang somebody.
+     *
+     * So: when the ceiling is short, say which step is missing. Returned in
+     * the order a person would take them — an extra has to be approved before
+     * its annex can be signed — and pushed AHEAD of AR-11 by the caller,
+     * because `issueInvoice` throws on the first entry of that list and the
+     * first entry is the one a toast shows.
+     *
+     * Only the extras somebody can still act on. A rejected or cancelled
+     * adicional is not a missing step, it is a closed one, and naming it
+     * would send the reader to press a button that is not there.
+     */
+    _adicionalesAwaitingAStep(projectId) {
+      const out = [];
+      for (const c of this.state.changes || []) {
+        if (c.projectId !== projectId) continue;
+        if (!["identified", "priced", "sent"].includes(c.status)) continue;
+        out.push({
+          code: "ADI-01",
+          label: "Hay un adicional sin aprobar en esta obra",
+          detail: "Apruébelo en la obra antes de facturarlo: hasta entonces su importe no cuenta.",
+        });
+        break; // one is enough to send them to the right screen
+      }
+      for (const b of this.state.budgets || []) {
+        if (b.variationOf !== projectId || !b.acceptedVersionId) continue;
+        const a = this._annexForBudget(projectId, b.id);
+        if (this._annexApplied(a)) continue;
+        out.push({
+          code: "ADI-02",
+          label: "El anexo del adicional está sin firmar",
+          detail: "Fírmelo en el contrato: hasta que se firma, su importe no entra en la obra.",
+        });
+        break;
       }
       return out;
     }

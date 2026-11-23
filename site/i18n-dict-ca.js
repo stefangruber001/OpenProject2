@@ -1505,6 +1505,12 @@ window.CANEI_DICT.ca = {
   "Adicional sin aprobar": "Addicional sense aprovar",
   "Sólo se factura un adicional que el cliente ya ha aprobado.":
     "Només es factura un addicional que el client ja ha aprovat.",
+  "Hay un adicional sin aprobar en esta obra": "Aquesta obra té un addicional sense aprovar",
+  "Apruébelo en la obra antes de facturarlo: hasta entonces su importe no cuenta.":
+    "Aproveu-lo a l'obra abans de facturar-lo: fins aleshores el seu import no compta.",
+  "El anexo del adicional está sin firmar": "L'annex de l'addicional és sense signar",
+  "Fírmelo en el contrato: hasta que se firma, su importe no entra en la obra.":
+    "Signeu-lo al contracte: fins que no es signa, el seu import no entra a l'obra.",
   "El adicional no existe": "L'addicional no existeix",
   "Cantidad cero": "Quantitat zero",
   "Precio cero (marque pendiente si procede)": "Preu zero (marqui pendent si escau)",

@@ -4609,3 +4609,27 @@ mañana (`cff5ea6`) y pasan contra este.
 Puertas: manejabilidad 606/606 (eran 593) · numeración 55/55 · year-sim
 149/149 · migraciones 154/154 · source-audit 158/158 en+ca · boundaries OK ·
 lint y tipos OK.
+
+## S53 · Decir qué paso falta (2026-11-23)
+
+Las dos veces que la factura de un adicional se refusó esta semana, el motivo
+era un paso sin dar y el mensaje hablaba de cifras. Ahora lo nombra:
+
+- adicional sin aprobar → **ADI-01** «Hay un adicional sin aprobar en esta
+  obra · Apruébelo en la obra antes de facturarlo: hasta entonces su importe
+  no cuenta.»
+- adicional aceptado con el anexo sin firmar → **ADI-02** «El anexo del
+  adicional está sin firmar · Fírmelo en el contrato: hasta que se firma, su
+  importe no entra en la obra.»
+
+Van **delante** de AR-11, porque `issueInvoice` lanza con `blocked[0]` y es
+esa primera entrada la que se lee. Sin adicionales pendientes, AR-11 encabeza
+con sus cifras igual que siempre, y un adicional anulado no manda a nadie a
+buscar un botón que no existe.
+
+Cuatro de las diez comprobaciones nuevas fallan contra `b89a63e`.
+
+Puertas: manejabilidad 616/616 (eran 606) · numeración 55/55 · year-sim
+149/149 · migraciones 154/154 · source-audit 158/158 en+ca · páginas 107 en /
+83 ca · workspace-audit 0/0 · diccionario completo 4.533 entradas ·
+boundaries OK · lint y tipos OK.

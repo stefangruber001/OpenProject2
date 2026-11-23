@@ -3591,6 +3591,16 @@ window.CANEI_DICT = {
       "Sólo se factura un adicional que el cliente ya ha aprobado.",
       "Only a variation the customer has approved is invoiced.",
     ],
+    ["Hay un adicional sin aprobar en esta obra", "This job has an unapproved variation"],
+    [
+      "Apruébelo en la obra antes de facturarlo: hasta entonces su importe no cuenta.",
+      "Approve it on the job before invoicing it: until then its amount does not count.",
+    ],
+    ["El anexo del adicional está sin firmar", "The variation's annex is unsigned"],
+    [
+      "Fírmelo en el contrato: hasta que se firma, su importe no entra en la obra.",
+      "Sign it on the contract: until it is signed, its amount does not join the job.",
+    ],
     ["El adicional no existe", "The variation does not exist"],
     ["Cantidad cero", "Zero quantity"],
     ["Precio cero (marque pendiente si procede)", "Zero price (mark it pending if applicable)"],

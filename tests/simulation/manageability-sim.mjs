@@ -6424,6 +6424,159 @@ assert(
   );
 }
 
+/* ===========================================================================
+   A REFUSED INVOICE NAMES THE STEP NOBODY TOOK.
+   ===========================================================================
+   AR-11 states the arithmetic — «Pendiente 280,00 €, factura 320,00 €» — and
+   the arithmetic is never what anybody got wrong. Twice in one week the real
+   answer was a missing step and the refusal named neither: an adicional
+   sitting at «valorado», whose amount was therefore not in the ceiling, and
+   an adicional accepted as its own budget whose contract annex nobody had
+   signed. Both times the operator read «excede lo aceptado», concluded the
+   client's acceptance had not registered, and rang somebody.
+
+   `issueInvoice` throws on `blocked[0]`, so this is as much about ORDER as
+   about words: the missing step leads, the figures follow.
+   =========================================================================== */
+{
+  const mk = () => {
+    const e = new ERP("2026-03-02");
+    e.configureEntity({
+      legalName: "Canei Subirats, S.L.",
+      taxId: "B66666660",
+      street: "Creu 74",
+      postalCode: "08960",
+      city: "SJD",
+      province: "Barcelona",
+      country: "España",
+      phone: "930000000",
+      email: "hola@canei.example",
+      iban: "ES9121000418450200051332",
+    });
+    const cl = e.addParty(
+      {
+        name: "Cliente Adicional S.L.",
+        roles: ["customer"],
+        taxId: "B64667629",
+        billStreet: "C/ Mayor 1",
+        billPostalCode: "08001",
+        billCity: "Barcelona",
+        billProvince: "Barcelona",
+        billCountry: "España",
+        mobile: "600000000",
+      },
+      "bo",
+    );
+    const bq = e.createBudget({ partyId: cl.id, activityLine: "renovation" }, "bo");
+    const bch = e.addChapter(bq.id, { name: "Obra" }, "bo");
+    e.addLine(
+      bq.id,
+      bch.id,
+      { desc: "T", unit: "ud", qtyMilli: 1000, priceCents: 28000, costCents: 15000 },
+      "bo",
+    );
+    e.issueVersion(bq.id, { channel: "hand" }, "bo");
+    e.acceptVersion(bq.id, e.currentVersion(bq.id).id, { evidenceRef: "ok" }, "bo");
+    const con = e.createContract(
+      bq.id,
+      {
+        installments: [{ pct: 100, trigger: "onSignature", expectedDate: e.today }],
+        duration: { estimatedDays: 30 },
+      },
+      "bo",
+    );
+    e.signContract(con.id, { evidence: { storageKey: "sg", name: "firmado.pdf" } }, "bo");
+    const prj = e.createProjectFromAcceptance(bq.id, "bo");
+    return { e, cl, prj, con };
+  };
+  /** The message the operator actually reads: `blocked[0]`, via the throw. */
+  const refusal = (e, prj, cl, cents) => {
+    try {
+      e.issueInvoice(
+        { projectId: prj.id, billToPartyId: cl.id, lines: [{ desc: "Obra", amountCents: cents }] },
+        "bo",
+      );
+      return "ISSUED";
+    } catch (err) {
+      return err.message;
+    }
+  };
+
+  // A · an adicional valued but not approved — Alberto Barreu Milanes' case.
+  {
+    const { e, cl, prj } = mk();
+    const chg = e.addChange(prj.id, { desc: "Extra", reason: "obra anadida" }, "bo");
+    e.priceChange(chg.id, 4000, 2000, 0, "bo");
+    const msg = refusal(e, prj, cl, 32000);
+    assert(msg.startsWith("ADI-01:"), "an unapproved adicional is what the refusal names", msg);
+    assert(/Apru[eé]belo en la obra/.test(msg), "…and it says where to go and what to press", msg);
+    // Approving it is still the thing that unblocks the invoice.
+    e.sendChange(chg.id, "bo");
+    e.approveChange(chg.id, { evidenceRef: "ok" }, "bo");
+    assert(
+      refusal(e, prj, cl, 32000) === "ISSUED",
+      "…and once approved the invoice issues",
+      refusal(e, prj, cl, 32000),
+    );
+  }
+
+  // B · accepted as its own budget, annex unsigned — one screen further away.
+  {
+    const { e, cl, prj, con } = mk();
+    const adi = e.createVariationBudget(prj.id, { reason: "Obra anadida" }, "bo");
+    const ach = e.addChapter(adi.id, { name: "Extra" }, "bo");
+    e.addLine(
+      adi.id,
+      ach.id,
+      { desc: "Extra", unit: "ud", qtyMilli: 1000, priceCents: 4000, costCents: 2000 },
+      "bo",
+    );
+    e.issueVersion(adi.id, { channel: "hand" }, "bo");
+    e.acceptVersion(adi.id, e.currentVersion(adi.id).id, { evidenceRef: "ok" }, "bo");
+    const msg = refusal(e, prj, cl, 32000);
+    assert(msg.startsWith("ADI-02:"), "an unsigned annex is what the refusal names", msg);
+    assert(/F[ií]rmelo en el contrato/.test(msg), "…and it names the contract", msg);
+    e.signContractAnnex(
+      con.id,
+      e.annexOfAdicional(adi.id).number,
+      { method: "verbal", by: "Diorka" },
+      "bo",
+    );
+    assert(
+      refusal(e, prj, cl, 32000) === "ISSUED",
+      "…and signing the annex issues the invoice",
+      refusal(e, prj, cl, 32000),
+    );
+  }
+
+  // C · nothing pending: the figures stand alone, exactly as before. A hint
+  //     invented where no step is missing would be worse than none.
+  {
+    const { e, cl, prj } = mk();
+    const msg = refusal(e, prj, cl, 32000);
+    assert(msg.startsWith("AR-11:"), "with no adicional pending, AR-11 still leads", msg);
+    assert(/Pendiente 280\.00/.test(msg), "…with the figures it always gave", msg);
+    assert(
+      refusal(e, prj, cl, 28000) === "ISSUED",
+      "…and an invoice inside the ceiling is not refused at all",
+    );
+  }
+
+  // D · a cancelled adicional is a closed step, not a missing one.
+  {
+    const { e, cl, prj } = mk();
+    const chg = e.addChange(prj.id, { desc: "Extra", reason: "x" }, "bo");
+    e.priceChange(chg.id, 4000, 2000, 0, "bo");
+    e.state.changes.find((x) => x.id === chg.id).status = "cancelled";
+    const msg = refusal(e, prj, cl, 32000);
+    assert(
+      msg.startsWith("AR-11:"),
+      "a cancelled adicional sends nobody to press a button that is not there",
+      msg,
+    );
+  }
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);
