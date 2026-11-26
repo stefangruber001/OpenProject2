@@ -4667,3 +4667,30 @@ Puertas: manejabilidad 638/638 (eran 616) · numeración 55/55 · year-sim
 149/149 y 214/214 · migraciones 154/154 · source-audit 158/158 en+ca ·
 páginas 107 en / 83 ca · workspace-audit 0/0 · diccionario completo 4.546
 entradas · boundaries OK · lint y tipos OK · bundle sin cambios.
+
+## S55 · Registrar la factura hoy, conciliar hoy (2026-11-26)
+
+El cliente necesita conciliar el banco; el reparto por obra y partida viene
+después. `registerBill` refusaba una factura sin destino ninguno.
+
+- **`requireCostDestination`**, ajuste en Configuración › Empresa, por defecto
+  encendido. Apagado, una factura se registra sin decir a dónde va.
+- Lo que la señala ya existía y no se había tocado: `payables()` la marca
+  `unallocated`, el registro la pinta roja «Sin asignar», y
+  `unallocatedSummary` (FIN-04) la cuantifica.
+- **Arreglado un guardia que era un error:** «las imputaciones deben sumar la
+  base» corría sobre el conjunto vacío, donde 0 ≠ base, y refusaba justo la
+  factura que el ajuste permite. Un reparto equivocado sigue refusándose.
+- Arco medido de punta a punta: registrar sin destino → `matchMovementSplit`
+  casa el movimiento de tarjeta (movimiento `matched`, factura `paid`) →
+  `allocateBill` le pone la obra después, y la partida queda en la cola de la
+  obra.
+
+Dos interruptores a propósito: uno pregunta si hay destino, el otro con qué
+grano.
+
+Trece comprobaciones nuevas (651/651, eran 638).
+
+Puertas: manejabilidad 651/651 · numeración 55/55 · year-sim 149/149 ·
+migraciones 154/154 · source-audit 158/158 en+ca · workspace-audit 0/0 ·
+diccionario completo 4.548 entradas · boundaries OK · lint y tipos OK.

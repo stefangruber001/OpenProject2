@@ -6862,6 +6862,177 @@ assert(
   }
 }
 
+/* ===========================================================================
+   LO URGENTE ES LA CONCILIACIÓN: LA FACTURA EXISTE ANTES DE SABER DE QUIÉN ES.
+   ===========================================================================
+   The operator, after speaking to the client: upload the invoice data so the
+   bank reconciliation can be done; project, partida and subpartida come later.
+
+   That needs a blunter relaxation than `requireCostSubpartida`. `registerBill`
+   refuses a bill with NO destination at all, and the refusal's own comment
+   describes what is being asked for back — «a bill with no allocation used to
+   be a legitimate state … the payables register flagged it, and flagging is
+   not refusing». Nothing that did the flagging was ever removed: `payables()`
+   still marks such a bill `unallocated`, the register still paints it red, and
+   `unallocatedSummary` (FIN-04) still quantifies it. Only the door was shut.
+
+   A second guard had to move with it. «Allocations must total the base» ran on
+   the empty set too, where 0 ≠ base, so it refused the very bill this setting
+   exists to allow — an empty set is not a wrong split, it is no split yet.
+
+   The arc these checks pin down is the one the client actually asked for:
+   register → conciliar contra el movimiento → repartir después.
+   =========================================================================== */
+{
+  const e = new ERP("2026-11-26");
+  e.configureEntity({
+    legalName: "Canei Subirats, S.L.",
+    taxId: "B66666660",
+    street: "Creu 74",
+    postalCode: "08960",
+    city: "SJD",
+    province: "Barcelona",
+    country: "España",
+    phone: "930000000",
+    email: "hola@canei.example",
+    iban: "ES9121000418450200051332",
+  });
+  const sup = e.addParty(
+    {
+      name: "Estrategias BigMat, S.L.U.",
+      roles: ["supplier"],
+      taxId: "B88430459",
+      mobile: "933788340",
+    },
+    "bo",
+  );
+  const put = (n, base, vat) =>
+    e.registerBill(
+      {
+        supplierId: sup.id,
+        number: n,
+        date: "2026-11-03",
+        baseCents: base,
+        vatCents: vat,
+        allocations: [],
+      },
+      "bo",
+    );
+
+  assert(e.requireCostDestination() === true, "a cost must name a destination by default");
+  delete e.state.config.requireCostDestination;
+  assert(
+    e.requireCostDestination() === true,
+    "…and a workspace saved before the setting existed still has the rule",
+  );
+  throws(() => put("F-1", 4453, 935), "a bill with no destination at all is refused");
+
+  e.configureEntity({ requireCostDestination: false });
+  assert(e.requireCostDestination() === false, "the setting turns that rule off too");
+  const b1 = put("00002-2026/A2101/00014649", 4453, 935);
+  const b2 = put("00002-2026/A2181/00018376", 1887, 396);
+  assert(!!b1.id && !!b2.id, "…and the invoice is filed with no destination at all");
+
+  /* FLAGGED, NOT HIDDEN — the half that makes this a deferral. */
+  const pay = e.payables();
+  assert(
+    pay.length === 2 && pay.every((p) => p.unallocated),
+    "both read «sin asignar» in the payables register",
+    JSON.stringify(pay.map((p) => [p.number, p.unallocated])),
+  );
+  const u = e.unallocatedSummary();
+  assert(
+    u.billsCount === 2 && u.billsCents === b1.totalCents + b2.totalCents,
+    "…and are quantified by unallocatedSummary (FIN-04)",
+    `${u.billsCount} / ${u.billsCents}`,
+  );
+
+  /* AND THE RECONCILIATION — the thing that was urgent — can now be done:
+     a card movement explains the invoice, through the same call the
+     Consolidación bancaria screen uses. */
+  const card = e.addBankAccount(
+    { name: "Tarjeta", kind: "card", iban: "", openingBalanceCents: 0 },
+    "bo",
+  );
+  e.importMovements(
+    card.id,
+    [{ accountingDate: "2026-11-03", concept: "BIGMAT SANT JUST", amountCents: -5388 }],
+    "bo",
+  );
+  const mov = e.state.movements.find((m) => m.accountId === card.id);
+  e.matchMovementSplit(mov.id, [{ billId: b1.id, amountCents: 5388 }], "bo");
+  assert(
+    e.state.movements.find((m) => m.id === mov.id).status === "matched",
+    "the movement is explained by the invoice",
+    e.state.movements.find((m) => m.id === mov.id).status,
+  );
+  assert(
+    e.billOutstandingCents(b1.id) === 0,
+    "…and the invoice is settled by it",
+    e.billOutstandingCents(b1.id),
+  );
+
+  /* …and the distribution still happens afterwards, not instead. */
+  const cl = e.addParty(
+    {
+      name: "Isabel Margarit Pelaz",
+      roles: ["customer"],
+      taxId: "B64667629",
+      billStreet: "Rosselló 340",
+      billPostalCode: "08037",
+      billCity: "Barcelona",
+      billProvince: "Barcelona",
+      billCountry: "España",
+      mobile: "600000001",
+    },
+    "bo",
+  );
+  const bq = e.createBudget({ partyId: cl.id, activityLine: "renovation" }, "bo");
+  const ch = e.addChapter(bq.id, { name: "Instalaciones" }, "bo");
+  e.addLine(
+    bq.id,
+    ch.id,
+    { desc: "Fontanería", unit: "ud", qtyMilli: 1000, priceCents: 100000, costCents: 60000 },
+    "bo",
+  );
+  e.issueVersion(bq.id, { channel: "hand" }, "bo");
+  e.acceptVersion(bq.id, e.currentVersion(bq.id).id, { evidenceRef: "ok" }, "bo");
+  const prj = e.createProjectFromAcceptance(bq.id, "bo");
+  e.configureEntity({ requireCostSubpartida: false });
+  e.allocateBill(b1.id, [{ projectId: prj.id, kind: "material", amountCents: 4453 }], "bo");
+  assert(
+    !e.payables().some((p) => p.id === b1.id && p.unallocated),
+    "once assigned to an obra it stops reading «sin asignar»",
+  );
+  assert(
+    e.projectEconomics(prj.id).actualCents === 4453,
+    "…the obra's cost is right immediately",
+    e.projectEconomics(prj.id).actualCents,
+  );
+  assert(
+    e.costsAwaitingDestination(prj.id).length === 1,
+    "…and it is still owed a partida, counted on the obra's worklist",
+    e.costsAwaitingDestination(prj.id).length,
+  );
+
+  /* A SPLIT THAT IS WRONG IS STILL WRONG. Only the EMPTY set is excused. */
+  throws(
+    () =>
+      e.registerBill(
+        {
+          supplierId: sup.id,
+          number: "F-mal",
+          date: "2026-11-03",
+          baseCents: 4453,
+          vatCents: 935,
+          allocations: [{ projectId: prj.id, kind: "material", amountCents: 1000 }],
+        },
+        "bo",
+      ),
+    "a split that does not total the base is refused as it always was",
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

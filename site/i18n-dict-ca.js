@@ -664,6 +664,10 @@ window.CANEI_DICT.ca = {
   Horas: "Hores",
   Coste: "Cost",
   "Sin asignar": "Sense assignar",
+  "Exigir que cada factura diga a dónde va (obra o gasto general)":
+    "Exigir que cada factura digui on va (obra o despesa general)",
+  "Déjalo marcado: es la regla. Desmarcarlo permite registrar la factura sin decir todavía a dónde va, para poder conciliar el banco hoy y repartir después. Las facturas sin asignar salen en rojo como «Sin asignar» en la lista de facturas de proveedor.":
+    "Deixa-ho marcat: és la regla. Desmarcar-ho permet registrar la factura sense dir encara on va, per poder conciliar el banc avui i repartir després. Les factures sense assignar surten en vermell com a «Sense assignar» a la llista de factures de proveïdor.",
   "Total por proyecto": "Total per projecte",
   "Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.":
     "Factures generades des del pressupost acceptat, les fites del contracte o els extres aprovats. Numeració sense buits; les emeses són immutables.",

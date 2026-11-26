@@ -556,6 +556,14 @@ window.CANEI_DICT = {
     ["Horas", "Hours"],
     ["Coste", "Cost"],
     ["Sin asignar", "Unallocated"],
+    [
+      "Exigir que cada factura diga a dónde va (obra o gasto general)",
+      "Require every bill to say where it goes (job or general expense)",
+    ],
+    [
+      "Déjalo marcado: es la regla. Desmarcarlo permite registrar la factura sin decir todavía a dónde va, para poder conciliar el banco hoy y repartir después. Las facturas sin asignar salen en rojo como «Sin asignar» en la lista de facturas de proveedor.",
+      "Leave it ticked: it is the rule. Unticking it allows a bill to be registered without saying yet where it goes, so the bank can be reconciled today and split later. Unallocated bills show in red as «Unallocated» in the supplier-invoice list.",
+    ],
     ["Total por proyecto", "Total per project"],
     [
       "Facturas generadas desde el presupuesto aceptado, los hitos del contrato o los extras aprobados. Numeración sin huecos; las emitidas son inmutables.",

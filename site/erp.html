@@ -20271,7 +20271,12 @@
                 kind: a.kind || "material",
                 amountCents: a.amountCents,
               }));
-            if (!rows.length)
+            /* Mirrored from the engine, and only while the engine is asking.
+               With `requireCostDestination` off, a factura can be registered
+               with no destination so the bank reconciliation can be finished
+               today; the payables register shows it as «Sin asignar» until
+               somebody says where it goes. */
+            if (!rows.length && erp.requireCostDestination())
               throw new Error("Reparta la factura: a una obra o a gastos generales");
             /* Refused HERE, in the operator's language, before the engine says
                the same thing in English on a Spanish screen — and only while
@@ -25990,6 +25995,8 @@
           )}
           <div class="daylist"><div class="it" style="color:var(--muted)">Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.</div></div>
           <div class="daylist">
+            <div class="it"><label><input type="checkbox" id="co_reqdest"${erp.requireCostDestination() ? " checked" : ""}> Exigir que cada factura diga a dónde va (obra o gasto general)</label></div>
+            <div class="it" style="color:var(--muted)">Déjalo marcado: es la regla. Desmarcarlo permite registrar la factura sin decir todavía a dónde va, para poder conciliar el banco hoy y repartir después. Las facturas sin asignar salen en rojo como «Sin asignar» en la lista de facturas de proveedor.</div>
             <div class="it"><label><input type="checkbox" id="co_reqsub"${erp.requireCostSubpartida() ? " checked" : ""}> Exigir partida y subpartida en cada coste de obra</label></div>
             <div class="it" style="color:var(--muted)">Déjalo marcado: es la regla. Desmarcarlo permite registrar una factura contra la obra sin decir todavía en qué partida va — sirve para ponerse al día con la conciliación bancaria sin frenarla. Mientras está desmarcado el total de la obra y la conciliación son correctos, y la comparación por partidas queda incompleta: lo no repartido aparece como «Sin partida», y la columna «Sin repartir» del registro dice cuánto queda. Vuelve a marcarlo cuando esté al día.</div>
           </div></div>
@@ -26140,6 +26147,7 @@
              stored as one. Reading it as absent would quietly restore the
              rule the operator just turned off. */
           patch.requireCostSubpartida = !!$("#co_reqsub").checked;
+          patch.requireCostDestination = !!$("#co_reqdest").checked;
           mutate(() => {
             erp.configureEntity(patch);
             companyLogo = null;

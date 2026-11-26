@@ -12207,3 +12207,46 @@ da una, y el grano que se da es el grano que se guarda.
 el techo son 107 y las dos siguientes volvieron a 107: el rastreo de páginas
 no es determinista. No se baja el techo con una ejecución afortunada; si una
 sesión futura ve 102 y aprieta el ratchet, CI fallará de forma intermitente.
+
+## S164 · Lo urgente es la conciliación, no el reparto
+
+El operador, después de hablar con el cliente: subir los datos de la factura
+para poder conciliar; obra, partida y subpartida se reparten después.
+
+Eso pide una apertura más basta que la de S163. `registerBill` refusa una
+factura SIN DESTINO NINGUNO, y el comentario de ese propio refuse describe lo
+que se está pidiendo de vuelta: «a bill with no allocation used to be a
+legitimate state — filed, and belonging to nothing … the payables register
+flagged it, and flagging is not refusing».
+
+**Nada de lo que señalaba se había quitado.** `payables()` sigue marcando esas
+facturas `unallocated`, el registro de facturas de proveedor sigue pintando
+una etiqueta roja «Sin asignar» en la columna Asignación, y
+`unallocatedSummary` (FIN-04) sigue cuantificándolas. Sólo se había cerrado la
+puerta. Así que `requireCostDestination` (por defecto ENCENDIDO) la abre otra
+vez, y lo que la convierte en un aplazamiento y no en una pérdida ya estaba
+escrito.
+
+**Un segundo guardia tenía que moverse con ella, y éste sí era un error.** «Las
+imputaciones deben sumar la base» corría también sobre el conjunto VACÍO,
+donde 0 ≠ base, así que refusaba exactamente la factura que el ajuste existe
+para permitir. Un conjunto vacío no es un reparto que suma mal: es un reparto
+que nadie ha hecho todavía. `allocateBill` sigue exigiendo la base completa
+cuando alguien sí reparte.
+
+**El arco completo está medido**, y es el que pidió el cliente:
+
+1. factura registrada sin destino → sale «Sin asignar» y la cuenta FIN-04 la
+   incluye;
+2. `matchMovementSplit` —la vía de la pantalla de Consolidación bancaria— casa
+   el movimiento de tarjeta con ella: movimiento `matched`, factura `paid`,
+   pendiente 0;
+3. `allocateBill` le pone la obra después, y con S163 apagado basta la obra:
+   el coste de la obra es correcto al instante y `costsAwaitingDestination` la
+   sigue debiendo una partida.
+
+**Dos interruptores, no uno, a propósito.** `requireCostDestination` pregunta
+si hay destino; `requireCostSubpartida` pregunta con qué grano. Son
+aflojamientos distintos y una empresa puede querer uno sin el otro —
+exactamente lo que pasa aquí: hoy ni destino, la semana que viene obra sin
+partida, y al final las dos cosas.

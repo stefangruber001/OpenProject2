@@ -1047,6 +1047,27 @@
          what is owed. */
       requireCostSubpartida: true,
 
+      /* --- must a cost say where it belongs AT ALL ---
+         A different and blunter question than the one above. TRUE is the rule:
+         a bill names an obra or a general-expense category, and «filed and
+         belonging to nothing» is refused.
+
+         FALSE restores what this product did before PK12, and the refusal's
+         own comment describes it exactly — «a bill with no allocation used to
+         be a legitimate state — filed, and belonging to nothing … the payables
+         register flagged it, and flagging is not refusing». That is the state
+         a company needs when the urgent job is the BANK RECONCILIATION: the
+         invoice has to exist so a card charge has something to point at, and
+         which obra it belongs to is a separate question that can be answered
+         next week by somebody who was there. Refusing the first until the
+         second is answered does not get the bank reconciled; it stops it.
+
+         Nothing is hidden while it is off. `payables()` already marks every
+         such bill `unallocated` and the register already paints it a red «Sin
+         asignar»; `unallocatedSummary` (FIN-04) already quantifies them. None
+         of that was removed when the rule arrived — only the door was shut. */
+      requireCostDestination: true,
+
       /* --- free text printed under every document --- */
       legalFooter: "",
     };
@@ -2240,6 +2261,15 @@
     requireCostSubpartida() {
       const c = this.state.config;
       return !(c && c.requireCostSubpartida === false);
+    }
+    /**
+     * Must a cost name a destination at all? Default TRUE, including for a
+     * workspace saved before the field existed — a missing setting is never
+     * permission.
+     */
+    requireCostDestination() {
+      const c = this.state.config;
+      return !(c && c.requireCostDestination === false);
     }
     /**
      * The company's own record, or a refusal naming what is missing.
@@ -9158,11 +9188,21 @@
       /* A bill with no allocation used to be a legitimate state — filed, and
          belonging to nothing. Under the rule it is a cost with no home, which
          is the one thing that may not happen; the payables register flagged it,
-         and flagging is not refusing. */
-      if (!rec.allocations.length)
+         and flagging is not refusing.
+
+         `requireCostDestination` is how that earlier state is asked for back,
+         deliberately and per company: see `blankConfig`. The flag and the
+         count it refers to above are still there, which is what makes turning
+         it off a deferral rather than a loss. */
+      if (!rec.allocations.length && this.requireCostDestination())
         throw new Error("A bill must be allocated: to a project's subpartidas, or to overheads");
+      /* …and the destinations must add up to the base — WHEN THERE ARE ANY.
+         An empty set is not a split that comes to the wrong total, it is a
+         split nobody has made yet, and reading it as 0 ≠ base refused exactly
+         the bill `requireCostDestination` exists to allow. `allocateBill`
+         still demands the full base when somebody does assign it. */
       const allocSum = sum(rec.allocations, (a) => a.amountCents);
-      if (Math.abs(allocSum - rec.baseCents) > 1)
+      if (rec.allocations.length && Math.abs(allocSum - rec.baseCents) > 1)
         throw new Error("Bill allocations must total the taxable base");
       this.state.bills.push(rec);
       if (rec.capId) {
