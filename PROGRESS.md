@@ -4633,3 +4633,37 @@ Puertas: manejabilidad 616/616 (eran 606) · numeración 55/55 · year-sim
 149/149 · migraciones 154/154 · source-audit 158/158 en+ca · páginas 107 en /
 83 ca · workspace-audit 0/0 · diccionario completo 4.533 entradas ·
 boundaries OK · lint y tipos OK.
+
+## S54 · Imputar a la obra ahora, a la partida después (2026-11-26)
+
+Para que el cliente pueda ponerse al día con la conciliación bancaria sin que
+la regla de la subpartida se lo impida.
+
+- **`requireCostSubpartida`**, ajuste en Configuración › Empresa, por defecto
+  encendido. Apagado, un coste puede nombrar sólo la obra. Lo responden las
+  **tres** puertas que llevaban la regla: `_lineAlloc` (facturas, capturas,
+  movimientos, splits) y `recordHours` / `correctHours`, que tenían su propia
+  copia fuera del cuello.
+- **`costsAwaitingDestination`** cuenta todo lo que se debe —sin partida Y sin
+  subpartida—, y es lo que leen el contador «Sin repartir» del registro y la
+  tabla de la obra. Contar sólo lo primero habría dejado el contador en cero
+  con media obra sin colocar.
+- **`assignChapterSplit`** acepta subpartida por parte y por fin tiene
+  pantalla: **«Repartir por partidas»**, desde la fila «Sin partida». Varias
+  partidas por factura es el caso normal, así que la tabla de reparto es el
+  centro de la pantalla. Un parte de horas va a una sola partida y también
+  llega a su subpartida, que antes no podía.
+- Una reparación rápida sigue completa a nivel de partida: no tiene grano más
+  fino y no debe aparecer en ninguna cola.
+
+Lo que cuesta mientras está apagado está escrito en `blankConfig` y en
+ASSUMPTIONS S163: el total de la obra y la conciliación correctos, la
+comparación por partidas incompleta hasta que se reparta.
+
+Veintidós comprobaciones nuevas. Contra `4b8a330` la suite ni arranca
+(`requireCostSubpartida is not a function`).
+
+Puertas: manejabilidad 638/638 (eran 616) · numeración 55/55 · year-sim
+149/149 y 214/214 · migraciones 154/154 · source-audit 158/158 en+ca ·
+páginas 107 en / 83 ca · workspace-audit 0/0 · diccionario completo 4.546
+entradas · boundaries OK · lint y tipos OK · bundle sin cambios.

@@ -6577,6 +6577,291 @@ assert(
   }
 }
 
+/* ===========================================================================
+   PONERSE AL DÍA: EL COSTE QUE TODAVÍA NO SABE SU PARTIDA.
+   ===========================================================================
+   The operator, plainly: the client has to do the bank reconciliation and is
+   a long way behind on assigning invoices. Can a cost name the obra alone for
+   now?
+
+   It can, and the rule that said otherwise is theirs — `_lineAlloc` has
+   refused a project cost without a subpartida since PK12, through the one
+   choke point all seven doors pass. So the rule becomes a SETTING, default on,
+   and what it costs while it is off is the thing these checks pin down: the
+   job's total and the reconciliation stay right, the per-partida comparison
+   goes incomplete, and every euro still owed is counted so the debt cannot go
+   quiet.
+
+   The other half is that the catch-up has to be FINISHABLE.
+   `assignChapterSplit` existed and was reachable from no screen; it also only
+   ever set the partida, so a cost classified through it would have been owed a
+   subpartida that nothing could give it — off the old worklist and still in
+   the wrong place.
+   =========================================================================== */
+{
+  const mk = () => {
+    const e = new ERP("2026-03-02");
+    e.configureEntity({
+      legalName: "Canei Subirats, S.L.",
+      taxId: "B66666660",
+      street: "Creu 74",
+      postalCode: "08960",
+      city: "SJD",
+      province: "Barcelona",
+      country: "España",
+      phone: "930000000",
+      email: "hola@canei.example",
+      iban: "ES9121000418450200051332",
+    });
+    const cl = e.addParty(
+      {
+        name: "Cliente Reparto S.L.",
+        roles: ["customer"],
+        taxId: "B64667629",
+        billStreet: "C/ Mayor 1",
+        billPostalCode: "08001",
+        billCity: "Barcelona",
+        billProvince: "Barcelona",
+        billCountry: "España",
+        mobile: "600000000",
+      },
+      "bo",
+    );
+    const sup = e.addParty(
+      {
+        name: "Materiales Vallès S.A.",
+        roles: ["supplier"],
+        taxId: "A08932907",
+        mobile: "931111111",
+      },
+      "bo",
+    );
+    const bq = e.createBudget({ partyId: cl.id, activityLine: "renovation" }, "bo");
+    const c1 = e.addChapter(bq.id, { name: "Demolición" }, "bo");
+    const c2 = e.addChapter(bq.id, { name: "Albañilería" }, "bo");
+    const l1 = e.addLine(
+      bq.id,
+      c1.id,
+      { desc: "Retirada", unit: "m2", qtyMilli: 1000, priceCents: 50000, costCents: 30000 },
+      "bo",
+    );
+    const l2 = e.addLine(
+      bq.id,
+      c2.id,
+      { desc: "Tabique", unit: "m2", qtyMilli: 1000, priceCents: 50000, costCents: 30000 },
+      "bo",
+    );
+    e.issueVersion(bq.id, { channel: "hand" }, "bo");
+    e.acceptVersion(bq.id, e.currentVersion(bq.id).id, { evidenceRef: "ok" }, "bo");
+    const prj = e.createProjectFromAcceptance(bq.id, "bo");
+    return { e, cl, sup, prj, c1, c2, l1, l2 };
+  };
+  const putBill = (e, sup, n, alloc) =>
+    e.registerBill(
+      {
+        supplierId: sup.id,
+        number: n,
+        date: e.state.today,
+        baseCents: 60000,
+        vatCents: 12600,
+        allocations: alloc,
+      },
+      "bo",
+    );
+
+  // The rule is the default, and a config that predates the field says so too.
+  {
+    const { e, sup, prj } = mk();
+    assert(e.requireCostSubpartida() === true, "the subpartida rule is the default");
+    delete e.state.config.requireCostSubpartida;
+    assert(
+      e.requireCostSubpartida() === true,
+      "…and a workspace saved before the setting existed still has the rule",
+    );
+    throws(
+      () => putBill(e, sup, "F-1", [{ projectId: prj.id, kind: "material", amountCents: 60000 }]),
+      "a project cost with no subpartida is refused while the rule is on",
+    );
+  }
+
+  // Switched off: filed against the obra, and COUNTED as still owed.
+  {
+    const { e, sup, prj, c1, c2, l1, l2 } = mk();
+    e.configureEntity({ requireCostSubpartida: false });
+    assert(e.requireCostSubpartida() === false, "the setting turns the rule off");
+    const bl = putBill(e, sup, "F-2", [
+      { projectId: prj.id, kind: "material", amountCents: 60000 },
+    ]);
+    assert(!!bl.number, "…and the invoice is filed against the obra alone");
+    const owed = e.costsAwaitingDestination(prj.id);
+    assert(owed.length === 1, "the cost is counted as awaiting a destination", owed.length);
+    assert(
+      owed[0].amountCents === 60000 && !owed[0].chapterNum,
+      "…with its amount and nothing named",
+      JSON.stringify(owed[0]),
+    );
+    /* THE OBRA'S OWN TOTAL IS RIGHT. This is the whole trade: the figure the
+       reconciliation needs is correct from the moment the invoice is filed,
+       and only the per-partida breakdown waits. */
+    assert(
+      e.projectEconomics(prj.id).actualCents === 60000,
+      "the job's actual cost is right immediately — that is the point",
+      e.projectEconomics(prj.id).actualCents,
+    );
+
+    // Classified later, across two partidas, each naming its subpartida.
+    e.assignChapterSplit(
+      prj.id,
+      owed[0].id,
+      [
+        { chapterNum: c1.num, lineId: l1.id, amountCents: 40000 },
+        { chapterNum: c2.num, lineId: l2.id, amountCents: 20000 },
+      ],
+      "bo",
+    );
+    assert(
+      e.costsAwaitingDestination(prj.id).length === 0,
+      "once split across partidas and subpartidas, nothing is owed",
+      e.costsAwaitingDestination(prj.id).length,
+    );
+    const rows = e.projectCostRows(prj.id).filter((r) => r.source === "bill");
+    assert(
+      rows.length === 2 && rows.every((r) => r.chapterNum && r.lineId),
+      "…and each part landed on a partida AND a subpartida",
+      JSON.stringify(rows.map((r) => [r.chapterNum, !!r.lineId, r.amountCents])),
+    );
+    assert(
+      e.projectEconomics(prj.id).actualCents === 60000,
+      "…and the total did not move: the money was placed, not changed",
+      e.projectEconomics(prj.id).actualCents,
+    );
+  }
+
+  // Half placed — partida named, subpartida not — is still owed AND finishable.
+  {
+    const { e, sup, prj, c1, l1 } = mk();
+    e.configureEntity({ requireCostSubpartida: false });
+    putBill(e, sup, "F-3", [
+      { projectId: prj.id, chapterNum: c1.num, kind: "material", amountCents: 60000 },
+    ]);
+    const owed = e.costsAwaitingDestination(prj.id);
+    assert(
+      owed.length === 1 && owed[0].chapterNum === String(c1.num),
+      "a cost with a partida and no subpartida is still owed",
+      JSON.stringify(owed[0] || null),
+    );
+    e.assignChapterSplit(
+      prj.id,
+      owed[0].id,
+      [{ chapterNum: c1.num, lineId: l1.id, amountCents: 60000 }],
+      "bo",
+    );
+    assert(
+      e.costsAwaitingDestination(prj.id).length === 0,
+      "…and finishing it clears the queue — the half-done state is not a dead end",
+    );
+    // A cost already filed as finely as it can be is not re-assignable.
+    const done = e.projectCostRows(prj.id).find((r) => r.source === "bill");
+    throws(
+      () =>
+        e.assignChapterSplit(prj.id, done.id, [{ chapterNum: c1.num, amountCents: 60000 }], "bo"),
+      "a fully placed cost refuses to be re-assigned",
+    );
+  }
+
+  // An hours entry reaches its subpartida too, and stays indivisible.
+  {
+    const { e, prj, c1, l1 } = mk();
+    e.configureEntity({ requireCostSubpartida: false });
+    const w = e.addWorker(
+      {
+        name: "Peón",
+        kind: "employee",
+        rateHistory: [{ from: "2026-01-01", rateCentsPerHour: 1900 }],
+      },
+      "bo",
+    );
+    // No chapter and no line: the state a day's work arrives in when nobody
+    // has said yet which partida it was for.
+    e.recordHours({ workerId: w.id, projectId: prj.id, hoursMilli: 8000 }, "bo");
+    const owed = e.costsAwaitingDestination(prj.id).filter((r) => r.source === "labour");
+    assert(owed.length === 1, "an hours entry with no partida is owed too", owed.length);
+    throws(
+      () =>
+        e.assignChapterSplit(
+          prj.id,
+          owed[0].id,
+          [
+            { chapterNum: c1.num, lineId: l1.id, amountCents: 1 },
+            { chapterNum: c1.num, lineId: l1.id, amountCents: owed[0].amountCents - 1 },
+          ],
+          "bo",
+        ),
+      "…and it still refuses to be split across two partidas",
+    );
+    e.assignChapterSplit(
+      prj.id,
+      owed[0].id,
+      [{ chapterNum: c1.num, lineId: l1.id, amountCents: owed[0].amountCents }],
+      "bo",
+    );
+    const after = e.projectCostRows(prj.id).find((r) => r.source === "labour");
+    assert(
+      after.chapterNum === String(c1.num) && after.lineId === l1.id,
+      "…and lands on a partida and a subpartida, so it leaves the queue",
+      JSON.stringify([after.chapterNum, after.lineId]),
+    );
+    assert(
+      e.costsAwaitingDestination(prj.id).length === 0,
+      "…which is the point: a queue item that cannot be cleared is worse than the gap",
+    );
+  }
+
+  // A quick repair has no finer grain, so a chapter IS fully placed there.
+  {
+    const { e, sup, cl } = mk();
+    const q = e.createQuickProject({ partyId: cl.id, desc: "Fuga en bajante" }, "bo");
+    const ch = (q.baseline.chapters || [])[0];
+    putBill(e, sup, "F-Q", [
+      { projectId: q.id, chapterNum: ch.num, kind: "material", amountCents: 60000 },
+    ]);
+    assert(
+      e.costsAwaitingDestination(q.id).length === 0,
+      "a quick repair's cost is complete at chapter level — no phantom queue item",
+      e.costsAwaitingDestination(q.id).length,
+    );
+  }
+
+  // The checks that were already there still refuse what they always refused.
+  {
+    const { e, sup, prj, c1 } = mk();
+    e.configureEntity({ requireCostSubpartida: false });
+    putBill(e, sup, "F-4", [{ projectId: prj.id, kind: "material", amountCents: 60000 }]);
+    const row = e.costsAwaitingDestination(prj.id)[0];
+    throws(
+      () => e.assignChapterSplit(prj.id, row.id, [{ chapterNum: "999", amountCents: 60000 }], "bo"),
+      "an unknown partida is still refused",
+    );
+    throws(
+      () =>
+        e.assignChapterSplit(prj.id, row.id, [{ chapterNum: c1.num, amountCents: 10000 }], "bo"),
+      "a split that does not total the cost is still refused",
+    );
+    /* A subpartida from the WRONG partida is refused by `_lineAlloc`, which is
+       where that check has always lived — this path now reaches it. */
+    throws(
+      () =>
+        e.assignChapterSplit(
+          prj.id,
+          row.id,
+          [{ chapterNum: c1.num, lineId: "nope", amountCents: 60000 }],
+          "bo",
+        ),
+      "a subpartida that is not in the budget is refused",
+    );
+  }
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

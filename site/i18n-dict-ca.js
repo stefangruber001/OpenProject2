@@ -2020,6 +2020,23 @@ window.CANEI_DICT.ca = {
     "Un part d'hores va a una sola partida: són les hores d'una persona en un dia, i partir-les aquí seria inventar un segon part.",
   "Coste repartido por partida": "Cost repartit per partida",
   "Sin partida": "Sense partida",
+  "Coste repartido": "Cost repartit",
+  "Repartir por partidas": "Repartir per partides",
+  "Esta partida no tiene subpartidas": "Aquesta partida no té subpartides",
+  "Estos costes ya están en la obra y todavía no dicen en qué partida. Reparte cada uno cuando sepas dónde va.":
+    "Aquests costos ja són a l'obra i encara no diuen a quina partida van. Reparteix cadascun quan sàpiguis on va.",
+  "Exigir partida y subpartida en cada coste de obra":
+    "Exigir partida i subpartida a cada cost d'obra",
+  "Falta la subpartida": "Falta la subpartida",
+  "Pendiente de repartir:": "Pendent de repartir:",
+  "Todo repartido: esta obra no tiene costes pendientes.":
+    "Tot repartit: aquesta obra no té costos pendents.",
+  "Una entrada de horas va a una sola partida.": "Una entrada d'hores va a una sola partida.",
+  "— sin subpartida —": "— sense subpartida —",
+  "Guardar reparto": "Desa el repartiment",
+  "‹ Volver": "‹ Torna",
+  "Déjalo marcado: es la regla. Desmarcarlo permite registrar una factura contra la obra sin decir todavía en qué partida va — sirve para ponerse al día con la conciliación bancaria sin frenarla. Mientras está desmarcado el total de la obra y la conciliación son correctos, y la comparación por partidas queda incompleta: lo no repartido aparece como «Sin partida», y la columna «Sin repartir» del registro dice cuánto queda. Vuelve a marcarlo cuando esté al día.":
+    "Deixa-ho marcat: és la regla. Desmarcar-ho permet registrar una factura contra l'obra sense dir encara a quina partida va — serveix per posar-se al dia amb la conciliació bancària sense frenar-la. Mentre està desmarcat el total de l'obra i la conciliació són correctes, i la comparació per partides queda incompleta: el que no s'ha repartit apareix com a «Sense partida», i la columna «Sin repartir» del registre diu quant queda. Torna a marcar-ho quan estigui al dia.",
   "Esta obra no tiene contrato, así que no hay hitos de cobro que recalcular.":
     "Aquesta obra no té contracte, així que no hi ha fites de cobrament per recalcular.",
   "Lo que dice la planificación": "El que diu la planificació",

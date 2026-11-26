@@ -12146,3 +12146,64 @@ Cuatro comprobaciones nuevas fallan contra `b89a63e` devolviendo exactamente
 el mensaje que ella recibió; dos más cubren lo que NO debe cambiar: sin ningún
 adicional pendiente AR-11 sigue encabezando con sus cifras, y una factura
 dentro del techo no se refusa en absoluto.
+
+## S163 · La regla de la subpartida se vuelve un interruptor
+
+El operador, sin rodeos: el cliente tiene que hacer la conciliación bancaria y
+va muy retrasado asignando facturas. ¿Se puede, por ahora, imputar el gasto
+sólo a la obra?
+
+Se puede, y la regla que lo impedía **es la suya**: desde PK12 `_lineAlloc`
+refusa un coste de obra que no nombre su subpartida, y las siete puertas pasan
+por ese mismo cuello. Así que la regla pasa a ser un ajuste,
+`requireCostSubpartida`, por defecto ENCENDIDO —un ajuste que falta nunca debe
+leerse como permiso— y editable en Configuración › Empresa, que es donde vive
+`marginThresholdBp`. Es configuración, no una bifurcación del código: la regla
+sigue intacta para el inquilino siguiente.
+
+**Lo que cuesta mientras está apagado, escrito en un solo sitio** para que
+nadie tenga que redescubrirlo: el total de la obra y la conciliación son
+correctos desde el momento en que se registra la factura —que es exactamente
+lo que hace falta— y la comparación POR PARTIDAS queda incompleta: lo no
+imputado se queda en «Sin partida» en vez de contra una línea. Eso es
+precisamente lo que la regla protege, y por eso es un interruptor para volver
+a encender y no un borrado.
+
+**No era un cuello, eran tres.** `_lineAlloc` cubre bills, capturas,
+movimientos y splits, pero `recordHours` y `correctHours` llevan cada uno su
+propia copia de la regla, fuera del cuello. Un interruptor que liberara las
+facturas y siguiera refusando el parte de horas habría sido una puerta a
+medio abrir: una empresa que se pone al día tiene atraso de las dos cosas.
+Las tres responden ahora al mismo ajuste.
+
+**Y la deuda tenía que ser contable.** `unassignedChapterCosts` sólo pregunta
+si hay partida, que era toda la pregunta mientras nombrarla era obligatorio.
+Apagado el ajuste aparece un segundo estado —partida sí, subpartida no— y
+contar sólo el primero habría dejado el contador «Sin repartir» en cero con
+media obra sin colocar: la única forma de que una deuda asumida a propósito se
+vuelva silenciosa. `costsAwaitingDestination` cuenta todo lo que se debe, y es
+lo que leen el contador del registro y la tabla de la obra.
+
+**Lo que faltaba de verdad.** `assignChapterSplit` estaba en el motor y bajo
+test desde PK12 y **no era alcanzable desde ninguna pantalla**, y además sólo
+ponía la partida: un coste imputado por ahí se quedaba debiendo una subpartida
+que nada en el producto podía darle —fuera de la lista vieja y aún en el sitio
+equivocado—. Ahora acepta subpartida por parte, validada por `_lineAlloc`
+(existe en la versión aceptada, y pertenece a la partida de al lado), y tiene
+pantalla: «Repartir por partidas», desde la fila «Sin partida» de la obra.
+Varias partidas por factura es el caso normal y no la excepción —preguntado
+directamente: «an invoice can be several partidas at ones»— así que la tabla de
+reparto es el centro de la pantalla y no algo escondido.
+
+**Una decisión que conviene no repetir mal.** Enrutar TODO el reemplazo por
+`withAccountCode` rompió la suite: aplica la regla de ALTA a una operación de
+REPARACIÓN. Los costes que esta pantalla arregla son justo los que no pueden
+cumplirla —filas heredadas de antes de la regla, una reparación rápida sin
+líneas, lo dejado a nivel de obra a propósito—, así que habría vuelto
+inarreglable exactamente lo que venía a arreglar. Se valida la línea cuando se
+da una, y el grano que se da es el grano que se guarda.
+
+**Un apunte sobre la auditoría de páginas.** Una ejecución devolvió 102 donde
+el techo son 107 y las dos siguientes volvieron a 107: el rastreo de páginas
+no es determinista. No se baja el techo con una ejecución afortunada; si una
+sesión futura ve 102 y aprieta el ratchet, CI fallará de forma intermitente.

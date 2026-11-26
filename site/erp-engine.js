@@ -1025,6 +1025,28 @@
       startWithinDays: 15,
       marginThresholdBp: 1500,
 
+      /* --- how finely a project cost must say where it belongs ---
+         TRUE is the rule: a cost that names a project names its partida and
+         its subpartida too. It is the operator's own, and `_lineAlloc` is
+         where it is enforced.
+
+         FALSE lets a cost name the project alone, which is the state this
+         product was in before PK12 — and the reason to keep the switch rather
+         than the rule alone is a company that has fallen behind. Bank
+         reconciliation needs the invoice filed against the job TODAY; which
+         partida it belongs to is a different question, answerable later and
+         by somebody who was there. Refusing the first until the second is
+         answered does not get the books done, it stops them.
+
+         What it costs while it is off is written down in one place, so nobody
+         has to rediscover it: the job's TOTAL is right and the reconciliation
+         is right, and the per-partida comparison is INCOMPLETE — unclassified
+         money sits under «Sin partida» instead of against a line. That is
+         exactly what the rule protects, which is why this is a switch to be
+         turned back on and not a deletion. `costsAwaitingDestination` counts
+         what is owed. */
+      requireCostSubpartida: true,
+
       /* --- free text printed under every document --- */
       legalFooter: "",
     };
@@ -2209,6 +2231,15 @@
     marginThresholdBp() {
       const c = this.state.config;
       return c && typeof c.marginThresholdBp === "number" ? c.marginThresholdBp : 1500;
+    }
+    /**
+     * Must a project cost name its subpartida? Default TRUE, including for a
+     * workspace saved before the field existed: the rule is the rule, and a
+     * missing setting must never read as permission.
+     */
+    requireCostSubpartida() {
+      const c = this.state.config;
+      return !(c && c.requireCostSubpartida === false);
     }
     /**
      * The company's own record, or a refusal naming what is missing.
@@ -10420,7 +10451,14 @@
              built through `createProjectFromAcceptance` has both, so this
              admits quick jobs and nothing else. */
           const proj = this.project(alloc.projectId);
-          if (proj.budgetId) throw new Error("A project cost must name its partida and subpartida");
+          /* …AND ONE SETTING, which is not a second exemption but the same
+             rule held open on purpose. See `requireCostSubpartida` in
+             `blankConfig` for what it costs while it is off and why it is a
+             switch. The cost is stored at whatever grain was given — project
+             only, or project and partida — and `costsAwaitingDestination`
+             counts every one of them until somebody finishes the job. */
+          if (proj.budgetId && this.requireCostSubpartida())
+            throw new Error("A project cost must name its partida and subpartida");
           return { ...alloc, lineId: null };
         }
         // Normalised to null (not undefined, not "") so every stored
@@ -11429,8 +11467,20 @@
 
            BOTH hours doors carry it. `correctHours` has the identical branch,
            and guarding only the first would have left editing an entry as the
-           way around the rule — file it with a subpartida, then take it off. */
-        throw new Error("Hours on a project must name their partida and subpartida");
+           way around the rule — file it with a subpartida, then take it off.
+
+           AND BOTH ANSWER TO THE SETTING, for the same reason. Hours are not
+           a lesser cost than an invoice: a company catching up on its books
+           has a backlog of both, and a switch that freed the invoices and
+           still refused the day's work would have been a half-open door —
+           `requireCostSubpartida` in `blankConfig` says what it costs while
+           it is off. An unplaced entry is counted by
+           `costsAwaitingDestination` and finished through
+           `assignChapterSplit`, which reaches a subpartida for an hours entry
+           exactly as it does for a bill. */
+        if (this.requireCostSubpartida())
+          throw new Error("Hours on a project must name their partida and subpartida");
+        rec.lineId = null;
       } else rec.lineId = null;
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);
@@ -12139,6 +12189,52 @@
           kind: r.kind,
         }));
     }
+    /**
+     * Is this cost filed as finely as its own project allows?
+     *
+     * Not simply «has a partida». A job built from a budget has subpartidas,
+     * so a cost that stops at the partida is half filed and somebody still
+     * owes the rest. A quick repair has no lines at all — chapter level IS
+     * the finest grain that exists on it — so a cost there is complete the
+     * moment it names the chapter, and must never appear on a worklist as
+     * though something were missing.
+     *
+     * The same shape of question `_lineAlloc` asks, asked after the fact.
+     */
+    _costFullyPlaced(projectId, alloc) {
+      if (!alloc || !alloc.chapterNum) return false;
+      const p = this.project(projectId);
+      if (!p.budgetId) return true;
+      return !!alloc.lineId;
+    }
+    /**
+     * EVERY COST ON THIS JOB THAT STILL OWES AN ANSWER.
+     *
+     * `unassignedChapterCosts` asks only whether a partida is named, which was
+     * the whole question while naming one was compulsory. With
+     * `requireCostSubpartida` off, a cost can be filed against the job and
+     * nothing else — on purpose, so the bank reconciliation can be finished
+     * today — and a second, half-filled state appears: partida named,
+     * subpartida not. Counting only the first would let the «Sin repartir»
+     * badge read zero while half the job was still unplaced, which is the one
+     * way a deliberate debt turns into a silent one.
+     */
+    costsAwaitingDestination(projectId) {
+      this.project(projectId);
+      return this.projectCostRows(projectId)
+        .filter((r) => !this._costFullyPlaced(projectId, r))
+        .map((r) => ({
+          id: r.id,
+          source: r.source,
+          ref: r.source === "labour" ? r.date : r.ref,
+          party: r.party,
+          date: r.date,
+          amountCents: r.amountCents,
+          kind: r.kind,
+          chapterNum: r.chapterNum || null,
+          lineId: r.lineId || null,
+        }));
+    }
     assignChapterSplit(projectId, rowId, splits, user) {
       const p = this.project(projectId);
       const parts = Array.isArray(splits) ? splits : [];
@@ -12176,7 +12272,31 @@
           throw new Error("An hours entry goes to a single chapter — split the timesheet instead");
         if (Math.abs(parts[0].amountCents - l.costCents) > 1)
           throw new Error("Split must total the cost");
-        l.chapterNum = String(parts[0].chapterNum);
+        /* THE SUBPARTIDA TOO, and it is not an embellishment. An hours entry
+           carries `lineId` like every other project cost and
+           `_costFullyPlaced` asks for one, so a labour row assigned here with
+           only a chapter would go back onto the worklist owed a subpartida
+           that nothing in the product could ever give it — a queue item that
+           cannot be cleared, which is worse than the gap it was reporting.
+           `correctHours` has always accepted one; this is the same field by
+           the other door.
+
+           Validated by `_lineAlloc` rather than `withAccountCode`: the checks
+           are the ones that matter — the line exists in the accepted version,
+           and it belongs to the chapter named beside it — and an hours entry
+           has no account code to resolve. */
+        if (parts[0].lineId) {
+          const placed = this._lineAlloc({
+            projectId: l.projectId,
+            chapterNum: String(parts[0].chapterNum),
+            lineId: parts[0].lineId,
+          });
+          l.chapterNum = String(placed.chapterNum);
+          l.lineId = placed.lineId;
+        } else {
+          l.chapterNum = String(parts[0].chapterNum);
+          l.lineId = null;
+        }
         this._log(user, "assignChapterSplit", rowId);
         return l;
       }
@@ -12184,16 +12304,43 @@
       const rec = collection.find((x) => x.id === recId);
       if (!rec) throw new Error("Cost not found on this project");
       const alloc = rec.allocations[idx];
-      if (!alloc || alloc.projectId !== projectId || alloc.chapterNum)
-        throw new Error("That cost is no longer waiting for a chapter");
+      /* FULLY placed, not merely «has a partida». A cost that names its
+         partida and no subpartida is half filed, and refusing to touch it
+         again is what would make the catch-up unfinishable: it would be off
+         the old worklist and still not where it belongs. A quick repair has
+         no finer grain, so there it stays refused as before. */
+      if (!alloc || alloc.projectId !== projectId || this._costFullyPlaced(projectId, alloc))
+        throw new Error("That cost is no longer waiting for a destination");
       const total = Math.abs(alloc.amountCents);
       if (Math.abs(sum(parts, (s) => Math.round(s.amountCents)) - total) > 1)
         throw new Error("Split must total the cost");
-      const replacement = parts.map((s) => ({
-        ...clone(alloc),
-        chapterNum: String(s.chapterNum),
-        amountCents: Math.round(s.amountCents),
-      }));
+      /* A SPLIT MAY NOW NAME THE SUBPARTIDA TOO. An invoice covering several
+         partidas is the ordinary case here, not the exception, so each part
+         has to be able to say where it lands — and a part that names a line
+         goes through `withAccountCode`, which already owns the two checks
+         that matter: the line exists in the project's accepted version, and
+         it belongs to the chapter named beside it. A second copy here would
+         be a second copy of the law.
+
+         A part that names only the partida does NOT go through that door, and
+         the distinction is the whole of this comment. `_lineAlloc` enforces
+         the rule that a project cost must REACH a subpartida, which is a rule
+         about filing a cost in the first place. This method repairs costs that
+         are already filed — legacy rows from before the rule, rows a quick
+         repair can never file more finely, rows deliberately left at project
+         level while the switch is off. Putting the creation rule on the repair
+         path would make exactly those unfixable: off every worklist and still
+         in the wrong place. So the grain given is the grain stored, and
+         `costsAwaitingDestination` keeps counting whatever is still owed. */
+      const replacement = parts.map((s) => {
+        const part = {
+          ...clone(alloc),
+          chapterNum: String(s.chapterNum),
+          amountCents: Math.round(s.amountCents),
+        };
+        if (!s.lineId) return { ...part, lineId: null };
+        return this.withAccountCode({ ...part, lineId: s.lineId });
+      });
       rec.allocations.splice(idx, 1, ...replacement);
       this._log(user, "assignChapterSplit", rowId);
       return rec;
@@ -15291,8 +15438,20 @@
 
            BOTH hours doors carry it. `correctHours` has the identical branch,
            and guarding only the first would have left editing an entry as the
-           way around the rule — file it with a subpartida, then take it off. */
-        throw new Error("Hours on a project must name their partida and subpartida");
+           way around the rule — file it with a subpartida, then take it off.
+
+           AND BOTH ANSWER TO THE SETTING, for the same reason. Hours are not
+           a lesser cost than an invoice: a company catching up on its books
+           has a backlog of both, and a switch that freed the invoices and
+           still refused the day's work would have been a half-open door —
+           `requireCostSubpartida` in `blankConfig` says what it costs while
+           it is off. An unplaced entry is counted by
+           `costsAwaitingDestination` and finished through
+           `assignChapterSplit`, which reaches a subpartida for an hours entry
+           exactly as it does for a bill. */
+        if (this.requireCostSubpartida())
+          throw new Error("Hours on a project must name their partida and subpartida");
+        rec.lineId = null;
       } else rec.lineId = null;
       rec.rateCents = this.workerRateCents(rec.workerId, rec.date, rec.kind);
       rec.costCents = mul(rec.hoursMilli, rec.rateCents) + (rec.extraPayCents || 0);

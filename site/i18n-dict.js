@@ -4300,6 +4300,31 @@ window.CANEI_DICT = {
     ],
     ["Coste repartido por partida", "Cost split by line item"],
     ["Sin partida", "No line item"],
+    ["Coste repartido", "Cost split"],
+    ["Repartir por partidas", "Split by line item"],
+    ["Esta partida no tiene subpartidas", "This line item has no sub-line items"],
+    [
+      "Estos costes ya están en la obra y todavía no dicen en qué partida. Reparte cada uno cuando sepas dónde va.",
+      "These costs are already on the job and do not yet say which line item they belong to. Split each one when you know where it goes.",
+    ],
+    [
+      "Exigir partida y subpartida en cada coste de obra",
+      "Require a line item and sub-line item on every job cost",
+    ],
+    ["Falta la subpartida", "Sub-line item missing"],
+    ["Pendiente de repartir:", "Left to split:"],
+    [
+      "Todo repartido: esta obra no tiene costes pendientes.",
+      "All split: this job has no costs pending.",
+    ],
+    ["Una entrada de horas va a una sola partida.", "An hours entry goes to a single line item."],
+    ["— sin subpartida —", "— no sub-line item —"],
+    ["Guardar reparto", "Save split"],
+    ["‹ Volver", "‹ Back"],
+    [
+      "Déjalo marcado: es la regla. Desmarcarlo permite registrar una factura contra la obra sin decir todavía en qué partida va — sirve para ponerse al día con la conciliación bancaria sin frenarla. Mientras está desmarcado el total de la obra y la conciliación son correctos, y la comparación por partidas queda incompleta: lo no repartido aparece como «Sin partida», y la columna «Sin repartir» del registro dice cuánto queda. Vuelve a marcarlo cuando esté al día.",
+      "Leave it ticked: it is the rule. Unticking it allows a bill to be registered against the job without saying yet which line item it belongs to — for catching up on the bank reconciliation without stopping it. While it is unticked the job's total and the reconciliation are correct, and the per-line-item comparison is incomplete: whatever is unsplit shows as «No line item», and the register's «Unsplit» column says how much is left. Tick it again once they are up to date.",
+    ],
     [
       "Esta obra no tiene contrato, así que no hay hitos de cobro que recalcular.",
       "This site has no contract, so there are no payment milestones to recalculate.",

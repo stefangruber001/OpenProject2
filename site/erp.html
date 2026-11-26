@@ -20273,9 +20273,15 @@
               }));
             if (!rows.length)
               throw new Error("Reparta la factura: a una obra o a gastos generales");
-            // Refused HERE, in the operator's language, before the engine says
-            // the same thing in English on a Spanish screen.
-            if (rows.some((a) => a.projectId && !a.lineId))
+            /* Refused HERE, in the operator's language, before the engine says
+               the same thing in English on a Spanish screen — and only while
+               the engine is actually asking. `requireCostSubpartida` can be
+               turned off in Configuración so a company that has fallen behind
+               can file the invoice against the obra today and say which
+               partida it was later; a screen that kept refusing would make
+               the setting look broken. The engine stays the authority: this
+               is the same question, asked earlier and in Spanish. */
+            if (erp.requireCostSubpartida() && rows.some((a) => a.projectId && !a.lineId))
               throw new Error("Cada línea de obra necesita partida y subpartida");
             const total = rows.reduce((s, a) => s + a.amountCents, 0);
             if (Math.abs(total - baseCents) > 1)
@@ -23897,9 +23903,15 @@
                 },
               },
               {
+                /* COUNTS EVERYTHING STILL OWED, not only the costs with no
+                   partida at all. With `requireCostSubpartida` off a second,
+                   half-filled state exists — partida named, subpartida not —
+                   and counting only the first would let this badge read zero
+                   while half the job was still unplaced. That is the one way a
+                   debt taken on deliberately turns into a silent one. */
                 label: "Sin repartir",
                 html: (p) => {
-                  const n = erp.unassignedChapterCosts(p.id).length;
+                  const n = erp.costsAwaitingDestination(p.id).length;
                   return n ? `<span class="pill y">${n}</span>` : '<span class="pill g">0</span>';
                 },
               },
@@ -25976,7 +25988,11 @@
             "startWithinDays",
             "marginThresholdBp",
           )}
-          <div class="daylist"><div class="it" style="color:var(--muted)">Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.</div></div></div>
+          <div class="daylist"><div class="it" style="color:var(--muted)">Estos valores eran fijos dentro del programa y ahora se leen de aquí. Un presupuesto o un contrato que ya existe conserva los suyos.</div></div>
+          <div class="daylist">
+            <div class="it"><label><input type="checkbox" id="co_reqsub"${erp.requireCostSubpartida() ? " checked" : ""}> Exigir partida y subpartida en cada coste de obra</label></div>
+            <div class="it" style="color:var(--muted)">Déjalo marcado: es la regla. Desmarcarlo permite registrar una factura contra la obra sin decir todavía en qué partida va — sirve para ponerse al día con la conciliación bancaria sin frenarla. Mientras está desmarcado el total de la obra y la conciliación son correctos, y la comparación por partidas queda incompleta: lo no repartido aparece como «Sin partida», y la columna «Sin repartir» del registro dice cuánto queda. Vuelve a marcarlo cuando esté al día.</div>
+          </div></div>
 
          <div class="card"><div class="ch"><h3>Cuentas y tarjetas</h3>
            <span class="tag" translate="no">${accounts.length}</span>
@@ -26119,6 +26135,11 @@
             } else patch[k] = el.value.trim();
           });
           patch.legalFooter = $("#co_legalFooter").value.trim();
+          /* A checkbox, so its value is never "missing": unlike the number
+             fields above, an unticked box is a deliberate FALSE and must be
+             stored as one. Reading it as absent would quietly restore the
+             rule the operator just turned off. */
+          patch.requireCostSubpartida = !!$("#co_reqsub").checked;
           mutate(() => {
             erp.configureEntity(patch);
             companyLogo = null;
@@ -29166,7 +29187,7 @@
       /** Same idea as NEW_PARTY, for the picker one field below it. */
       const NEW_PROPERTY = "__newprop__";
       const PROP_OPT_NONE = '<option value="">— sin inmueble asociado —</option>';
-      const PROP_OPT_OTHERS = '<option disabled>De otros clientes</option>';
+      const PROP_OPT_OTHERS = "<option disabled>De otros clientes</option>";
       /** Every inmueble on file for one client — "" is always offered first (a lead
           with no known address yet is normal; the client record itself is not).
           The sentinel only appears once a client is chosen — a property with no
@@ -31696,7 +31717,7 @@
                    second and report the code between them as a user-visible string.
                    Fifth variant of that trap in this package. */
           out.push(
-            `<tr><td class="k"><span class="pill y">Sin partida</span></td><td class="num">—</td><td class="num">${eur0(sum2)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`,
+            `<tr><td class="k"><span class="pill y">Sin partida</span> <button class="btn sm" data-ecoassign="1">Repartir</button></td><td class="num">—</td><td class="num">${eur0(sum2)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num">—</td></tr>`,
           );
         }
         return (
@@ -31704,6 +31725,200 @@
           `<tr><td colspan="7"><div class="empty">Esta obra no tiene partidas en su línea base.</div></td></tr>`
         );
       }
+      /**
+       * REPARTIR POR PARTIDAS LO QUE YA ESTÁ EN LA OBRA.
+       *
+       * The other half of `requireCostSubpartida`. With the rule off a cost
+       * can be filed against the job and nothing finer — so the bank
+       * reconciliation can be finished today — and this is where somebody who
+       * knows the job says afterwards where each euro went. Without it the
+       * switch would not be a deferral, it would be a hole:
+       * `assignChapterSplit` has been in the engine and under test since PK12
+       * and reachable from no screen at all.
+       *
+       * ONE INVOICE, SEVERAL PARTIDAS, because that is the ordinary case here
+       * and not the exception — the operator, asked directly: «an invoice can
+       * be several partidas at ones». So the split table is the middle of this
+       * screen rather than something hidden behind a link, and it opens with
+       * one row because one row is still the commonest answer.
+       *
+       * An hours entry takes a single partida and says so: it is one worker on
+       * one day and splitting it would invent a second timesheet row. The
+       * engine refuses it; this screen does not offer it.
+       */
+      function assignCostsDrawer(projectId) {
+        const SRCL = {
+          bill: "Factura",
+          labour: "Horas",
+          capture: "Documento",
+          movement: "Movimiento",
+        };
+        /* The chapters this project will actually accept, built the way the
+           engine builds its own set — baseline plus accepted variations — so
+           the picker cannot offer a partida that `assignChapterSplit` would
+           then refuse. */
+        const chapters = () => {
+          const seen = new Map();
+          try {
+            const p = erp.project(projectId);
+            for (const c of (p.baseline && p.baseline.chapters) || [])
+              seen.set(String(c.num), c.name || "");
+          } catch (e) {}
+          try {
+            for (const x of erp.projectChapters(projectId))
+              seen.set(String(x.chapter.num), x.chapter.name || "");
+          } catch (e) {}
+          return [...seen.entries()].map(([num, name]) => ({ num, name }));
+        };
+        const CHAPS = chapters();
+        const chapOptions = (sel) =>
+          CHAPS.map(
+            (c) =>
+              `<option value="${esc(c.num)}"${String(sel) === String(c.num) ? " selected" : ""}>${esc(c.num + ". " + c.name)}</option>`,
+          ).join("");
+
+        let editing = null; // the row being split, or null for the list
+        let parts = [];
+        const db = openDrawer("Repartir por partidas");
+
+        const listHtml = () => {
+          const owed = erp.costsAwaitingDestination(projectId);
+          if (!owed.length)
+            return '<div class="empty">Todo repartido: esta obra no tiene costes pendientes.</div>';
+          const rows = owed
+            .map(
+              (r) =>
+                `<tr class="click" data-assign="${esc(r.id)}"><td class="k"><span class="pill b">${esc(SRCL[r.source] || r.source)}</span> <span translate="no">${esc(r.ref || "—")}</span></td><td><span translate="no">${esc(r.party || "—")}</span></td><td><span translate="no">${fmtD(r.date)}</span></td><td class="num"><span translate="no">${eur0(Math.abs(r.amountCents))}</span></td><td>${r.chapterNum ? `<span class="pill y">Falta la subpartida</span>` : `<span class="pill y">Sin partida</span>`}</td><td><button class="btn sm" data-assign2="${esc(r.id)}">Repartir</button></td></tr>`,
+            )
+            .join("");
+          return `<div class="it" style="color:var(--muted)">Estos costes ya están en la obra y todavía no dicen en qué partida. Reparte cada uno cuando sepas dónde va.</div>
+            <div class="card"><div class="scroll"><table class="mlist"><thead><tr><th>Origen</th><th>Proveedor</th><th>Fecha</th><th class="num">Importe</th><th>Estado</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+        };
+
+        const editorHtml = (row) => {
+          const total = Math.abs(row.amountCents);
+          const given = parts.reduce((a, p) => a + (p.amountCents || 0), 0);
+          const left = total - given;
+          const single = row.source === "labour";
+          const rows = parts
+            .map((p, i) => {
+              const lopts = lineOptionsFor(projectId, p.chapterNum, p.lineId || "");
+              const sub = lopts
+                ? `<select data-pl="${i}"><option value="">— sin subpartida —</option>${lopts}</select>`
+                : `<span class="tag">Esta partida no tiene subpartidas</span>`;
+              const kill =
+                parts.length > 1
+                  ? `<button class="btn sm danger" data-pk="${i}">Quitar</button>`
+                  : "";
+              return `<div class="it" style="gap:6px;flex-wrap:wrap"><select data-pc="${i}">${chapOptions(p.chapterNum)}</select>${sub}<input data-pa="${i}" type="number" step="0.01" min="0" style="width:110px" value="${((p.amountCents || 0) / 100).toFixed(2)}">${kill}</div>`;
+            })
+            .join("");
+          const add = single
+            ? '<div class="it" style="color:var(--muted)">Una entrada de horas va a una sola partida.</div>'
+            : '<div class="it"><button class="btn sm" id="ac_add">＋ Añadir partida</button></div>';
+          return `<div class="it"><b><span translate="no">${esc(SRCL[row.source] || row.source)} ${esc(row.ref || "")}</span></b> · <span translate="no">${eur0(total)}</span></div>
+            ${rows}${add}
+            <div class="it" style="color:${Math.abs(left) <= 1 ? "var(--greenDeep)" : "var(--danger)"}">Pendiente de repartir: <span translate="no">${eur0(left)}</span></div>`;
+        };
+
+        const paint = () => {
+          if (!editing) {
+            db.innerHTML = listHtml();
+            drawerFoot('<button class="btn" id="ac_close">Cerrar</button>');
+            $("#ac_close").onclick = closeDrawer;
+            db.querySelectorAll("[data-assign2]").forEach(
+              (b) =>
+                (b.onclick = (ev) => {
+                  ev.stopPropagation();
+                  open(b.dataset.assign2);
+                }),
+            );
+            db.querySelectorAll("[data-assign]").forEach(
+              (tr) => (tr.onclick = () => open(tr.dataset.assign)),
+            );
+            return;
+          }
+          const owed = erp.costsAwaitingDestination(projectId);
+          const row = owed.find((r) => r.id === editing);
+          if (!row) {
+            editing = null;
+            return paint();
+          }
+          db.innerHTML = editorHtml(row);
+          drawerFoot(
+            '<button class="btn" id="ac_back">‹ Volver</button><button class="btn primary" id="ac_save">Guardar reparto</button>',
+          );
+          $("#ac_back").onclick = () => {
+            editing = null;
+            paint();
+          };
+          const addBtn = $("#ac_add");
+          if (addBtn)
+            addBtn.onclick = () => {
+              parts.push({
+                chapterNum: (CHAPS[0] && CHAPS[0].num) || "",
+                lineId: "",
+                amountCents: 0,
+              });
+              paint();
+            };
+          db.querySelectorAll("[data-pc]").forEach(
+            (s) =>
+              (s.onchange = () => {
+                const i = Number(s.dataset.pc);
+                parts[i].chapterNum = s.value;
+                // A subpartida belongs to ONE partida; changing the partida
+                // cannot keep a line that lives under the old one.
+                parts[i].lineId = "";
+                paint();
+              }),
+          );
+          db.querySelectorAll("[data-pl]").forEach(
+            (s) => (s.onchange = () => (parts[Number(s.dataset.pl)].lineId = s.value)),
+          );
+          db.querySelectorAll("[data-pa]").forEach(
+            (inp) =>
+              (inp.onchange = () => {
+                const i = Number(inp.dataset.pa);
+                parts[i].amountCents =
+                  Math.round(Number(String(inp.value).replace(",", ".")) * 100) || 0;
+                paint();
+              }),
+          );
+          $("#ac_save").onclick = () =>
+            mutate(() => {
+              erp.assignChapterSplit(
+                projectId,
+                editing,
+                parts.map((p) => ({
+                  chapterNum: p.chapterNum,
+                  lineId: p.lineId || null,
+                  amountCents: p.amountCents,
+                })),
+                "backoffice",
+              );
+              editing = null;
+              paint();
+            }, "Coste repartido");
+        };
+
+        const open = (rowId) => {
+          const row = erp.costsAwaitingDestination(projectId).find((r) => r.id === rowId);
+          if (!row) return paint();
+          editing = rowId;
+          parts = [
+            {
+              chapterNum: row.chapterNum || (CHAPS[0] && CHAPS[0].num) || "",
+              lineId: row.lineId || "",
+              amountCents: Math.abs(row.amountCents),
+            },
+          ];
+          paint();
+        };
+
+        paint();
+      }
+
       /**
        * The projection view of the same partidas — the forward half of a cost
        * report, at chapter level.
@@ -31968,7 +32183,9 @@
             if (c.variation) variationNums.add(String(c.num));
           });
         } catch (err) {}
-        const pend = erp.unassignedChapterCosts(id);
+        // Everything still owed — see the «Sin repartir» column for why this
+        // is not `unassignedChapterCosts`.
+        const pend = erp.costsAwaitingDestination(id);
         const marginCents = e.currentRevenueCents - e.actualCents;
         const marginPct = e.currentRevenueCents
           ? Math.round((marginCents / e.currentRevenueCents) * 1000) / 10
@@ -32125,6 +32342,13 @@
             (btn.onclick = (ev) => {
               ev.stopPropagation();
               lineCostsDrawer(id, btn.dataset.ecodocs, btn.dataset.ecoline || null);
+            }),
+        );
+        body.querySelectorAll("[data-ecoassign]").forEach(
+          (btn) =>
+            (btn.onclick = (ev) => {
+              ev.stopPropagation();
+              assignCostsDrawer(id);
             }),
         );
         body.querySelectorAll("[data-ecoview]").forEach(
@@ -33283,7 +33507,7 @@
       const GES_EXT_O =
         '<div class="note" style="margin-bottom:12px"><b>Facturas anteriores a la plataforma en este trimestre</b><span style="margin:0 6px">';
       const GES_EXT_C =
-        '</span><span>La gestoría puede tenerlas ya por otra vía: conviene preguntarle si deben ir en el paquete.</span></div>';
+        "</span><span>La gestoría puede tenerlas ya por otra vía: conviene preguntarle si deben ir en el paquete.</span></div>";
       const INV_EXT_WHY =
         '<div class="sub" style="margin-top:8px">Factura anterior a la plataforma: aquí queda registrada para que la obra tenga su historial, pero el documento es el que ya se emitió y no se reimprime desde aquí.</div>';
       const INV_UNDO_WHY_O = '<div class="sub" style="margin-top:8px">';
