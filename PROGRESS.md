@@ -4790,3 +4790,31 @@ migraciones 154/154 · import-sim 25/25 · bank-import 71/71 · bank-import-pdf
 28/28 · real-life 8/8 · libro 63/63 · numeración 55/55 · source-audit 158/158
 en+ca · workspace-audit 0/0 · páginas 107 en / 83 ca · diccionario 4.557
 completo · boundaries, lint y tipos OK.
+
+## S171–S172 · Carga masiva de facturas, y el informe para la gestoría
+
+Objetivo de la semana: subir las facturas (sólo la cabecera) para conciliar el
+banco, y un informe que case cada movimiento con sus facturas.
+
+- **`site/erp-bill-import.js`**: leer, planear, aplicar. **La regla del
+  signo**: Tipo, importe negativo y serie del número (datos de la hoja, no
+  código); si se contradicen, la fila no entra. Abonos con importes negativos
+  y `creditNoteFor` vacío — medido contra la conciliación: neteo y devolución
+  cuadran a cero. IVA del tipo, sólo el general se deduce; retención de la
+  ficha. Duplicados por cualquiera de los dos números y en el mismo año.
+- **Pantalla:** «⬆ Importar facturas» en Facturas registradas.
+- **El paquete de la gestoría firma los abonos de compra** (`txFromBill`): su
+  registro de facturas recibidas y su resumen de IVA ya cuadran.
+- **`conciliacion.xlsx` dejaba en blanco todo lo conciliado en pantalla**
+  (leía un campo que sólo escribe el casado antiguo). Arreglado y probado
+  contra el código anterior. Añadidas la columna **Clasificación** (obra, gasto
+  general, sin asignar, ingreso, remuneración) y la hoja **«Sin movimiento»**.
+- **Fichero preparado para Canei** desde su propio material: 99 facturas de 11
+  proveedores, 0 errores, base neta 16.397,72 €; 6 documentos en
+  «Pendientes» con su motivo. LEGAL_REVIEW §16: IVA mixto y el anticipo.
+
+Puertas: navegador 936/936 (eran 918) · facturas 48/48 ·
+manejabilidad 663/663 · proveedores 43/43 · year-sim 149/149 · migraciones
+154/154 · real-life 8/8 · bank-import 71/71 · libro 63/63 · source-audit
+158/158 en+ca · workspace-audit 0/0 · páginas 107/83 · diccionario completo ·
+boundaries, lint y tipos OK.

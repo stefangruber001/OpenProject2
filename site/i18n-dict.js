@@ -6819,6 +6819,77 @@ window.CANEI_DICT = {
       "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.",
       "Jobs that started earlier: an invoice already issued is recorded here so the job has its full history. It is neither reissued nor reprinted.",
     ],
+    // S172 · el informe para la gestoría: clasificación y «Sin movimiento».
+    ["Clasificación", "Classification"],
+    ["Liquidado por banco (€)", "Settled through the bank (€)"],
+    ["Sin movimiento (€)", "Without a movement (€)"],
+    ["Sin movimiento", "Without a movement"],
+    ["Documentos que el banco no explica ·", "Documents the bank does not explain ·"],
+    ["Abono recibido", "Credit note received"],
+    ["Gasto sin asignar", "Unassigned expense"],
+    ["Ingreso de obra", "Job income"],
+    ["Sin factura, justificado", "No invoice, justified"],
+    [
+      "Todos los documentos del trimestre están liquidados por banco",
+      "Every document of the quarter is settled through the bank",
+    ],
+    ["Remuneración", "Remuneration"],
+    ["Cobro", "Collection"],
+    // S171 · las dos cargas — la de proveedores y la de facturas — enteras.
+    ["Cambios", "Changes"],
+    ["Fila", "Row"],
+    ["filas leídas", "rows read"],
+    ["No se pueden importar", "Cannot be imported"],
+    ["No se puede cargar", "Cannot be loaded"],
+    [
+      "Una fila por proveedor. La razón social y el NIF son obligatorios: el NIF es lo que casa cada factura con su emisor. El nombre comercial se guarda como alias, así que «Obramat» sigue encontrando a Bricolaje Bricoman. Una celda en blanco no borra nada.",
+      "One row per supplier. The legal name and the tax id are required: the tax id is what matches each invoice to its issuer. The trading name is kept as an alias, so «Obramat» still finds Bricolaje Bricoman. A blank cell erases nothing.",
+    ],
+    [
+      "Si el proveedor practica retención, ponla aquí: el total de sus facturas no sale de sumar el IVA a la base, y sin este dato la carga de facturas lo calcularía mal.",
+      "If the supplier withholds tax, enter it here: the total of their invoices is not the base plus VAT, and without this the invoice import would get it wrong.",
+    ],
+    ["ya estaban igual", "were already the same"],
+    ["Importar facturas de proveedor", "Import supplier invoices"],
+    ["⬆ Importar facturas", "⬆ Import invoices"],
+    [
+      "Muchas facturas de golpe, sólo la cabecera, para conciliar el banco",
+      "Many invoices at once, header only, to reconcile the bank",
+    ],
+    [
+      "Una fila por factura, sólo la cabecera: el reparto por obra se hace después. El proveedor se reconoce por su NIF, así que la hoja de proveedores va antes. El IVA se calcula con el tipo y el total sirve de comprobación.",
+      "One row per invoice, header only: splitting by job comes later. The supplier is recognised by its tax id, so the supplier sheet goes first. VAT is computed from the rate, and the total is used as a check.",
+    ],
+    [
+      "Si un proveedor trae los abonos en positivo, la pestaña «Series» dice qué series son abonos y la carga les pone el signo. Cuando el Tipo, el importe y la serie no coinciden, la factura no entra.",
+      "If a supplier lists credit notes as positive, the «Series» tab says which series are credit notes and the import gives them their sign. When the Type, the amount and the series disagree, the invoice is not imported.",
+    ],
+    ["Abonos", "Credit notes"],
+    ["Facturas nuevas", "New invoices"],
+    ["Abonos nuevos (restan)", "New credit notes (subtract)"],
+    ["Base neta", "Net base"],
+    ["Total neto", "Net total"],
+    ["Ya estaban registradas", "Already registered"],
+    ["Abonos: revisa el signo antes de importar", "Credit notes: check the sign before importing"],
+    ["Entran con aviso", "Imported with a warning"],
+    [
+      "Registradas con otro importe: no se cambian",
+      "Registered with another amount: left unchanged",
+    ],
+    ["Facturas importadas", "Invoices imported"],
+    [
+      "La empresa exige repartir cada factura al registrarla. Para cargar sólo la cabecera y conciliar el banco, desmarca «Exigir que cada factura diga a dónde va» en Configuración › Empresa.",
+      "The company requires every invoice to be split when it is registered. To load only the header and reconcile the bank, untick «Exigir que cada factura diga a dónde va» in Configuración › Empresa.",
+    ],
+    [
+      "serie desconocida para este proveedor: entra como factura",
+      "unknown series for this supplier: imported as an invoice",
+    ],
+    [
+      "el número es la referencia del proveedor: falta el número fiscal",
+      "the number is the supplier's reference: the fiscal number is missing",
+    ],
+    ["con otra base en el libro", "with another base in the books"],
     // S170 · los dos números de una factura, y la que emitimos nosotros.
     ["Ref. del proveedor", "Supplier's ref."],
     [
@@ -6835,6 +6906,12 @@ window.CANEI_DICT = {
     ["Este fichero no cambiaría nada.", "This file would change nothing."],
   ],
   rxEs2En: [
+    [
+      new RegExp("^⚠ (\\d+) facturas no se pudieron registrar$"),
+      "⚠ $1 invoices could not be registered",
+    ],
+    [new RegExp("^⚠ (\\d+) filas no se pudieron dar de alta$"), "⚠ $1 rows could not be created"],
+
     /* The customer and lead cards put the source and the date into ONE text
        node, so neither half could ever reach the dictionary on its own — fifteen
        identical-shaped strings across two screens, and the largest single block

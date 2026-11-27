@@ -448,3 +448,44 @@ review than a template.
   what has been collected against it. The audit log and the per-factura
   revision history keep every version. **legally_verified: false.** The
   standing objection is OBJECTIONS §8.
+
+## 16. Supplier invoices with two VAT rates, and a supplier's prepayment (2026-11-27)
+
+Both found in the client's own T4 folder while preparing the bulk invoice
+load. Neither is decided here; both are kept OUT of the load until the gestoría
+answers, so the books carry nothing that might be wrong in a way nobody sees.
+
+- **Mixed-rate invoice.** Obramat `036-0010-554647` (27/10/2026) itemises two
+  rates on one document: 98,35 € at 21 % (IVA 20,65) and 53,64 € at 10 % (IVA
+  5,36, a waste-collection bag service), total 178,00 €. A supplier bill in
+  this product holds **one** rate. Filing it with a single rate makes the totals
+  right and the per-rate breakdown wrong: 53,64 € would sit in the 21 % line of
+  the summary the gestoría files from. The product does not do that silently.
+  **Question:** _confirm the 10 % on a waste-management service sold to a
+  company is correct; and is it acceptable meanwhile to record this invoice as
+  two entries (one per rate) under the same number, or must the product store
+  several rates per invoice before it is filed?_
+- **Prepayment (anticipo).** BigMat document `ZVA20199766` (16/10/2026, 88,30 €
+  - 21 % = 106,84 €) is not a credit note — an earlier assumption that every
+    `ZVA` document was one was wrong, and was removed before anything was
+    loaded. It is a payment Canei made in advance, later drawn down to settle
+    three invoices (`BIG-0008` 29,23 €, `BIG-0009` 42,51 €, `BIG-0015` 19,81 €;
+    91,55 € in all). The document itself is missing from the folder. It carries
+    VAT, and so do the three invoices that consume it, in full.
+    **Question:** _is VAT being counted twice on the 91,55 € consumed, and if so,
+    how should the anticipo be recorded — as an invoice, as a payment on account
+    with no VAT of its own, or regularised by a rectificativa from BigMat?_
+- **The vale is understood, and loaded.** BigMat `VAL 20123799` (−100 €, at 0 %,
+  "cheque acción comercial, operación no sujeta a IVA") is a separate credit
+  from the 88,09 € return `00003-2026/A2181/00000523`, which was refunded to the
+  card. The vale paid 100 € of invoice `00002-2026/A2181/00019704` (157,38 €; the
+  card paid 57,38 €). Loaded as Diorca recorded it. **Question, lighter:** _the
+  note cites art. 20.1º LIVA (exemptions) for an operation it calls "no
+  sujeta" (art. 7) — which applies?_
+- **Also for the gestoría, same message.** The three autónomos in the quarter
+  (Fernando Bustos Gregorio, Jorge Garcia Garcia, Oleg Belenciuc) invoice 21 %
+  with **no** IRPF retention — consistent with an empresarial rather than a
+  profesional activity, but theirs to confirm. Anthropic, PBC invoices from an
+  Irish EU VAT number with no Spanish VAT (reverse charge): theirs to treat.
+
+**legally_verified: false.**

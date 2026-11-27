@@ -12532,3 +12532,118 @@ esos mismos bloques, así que moverlo habría arrastrado media prueba. El primer
 borrador de la prueba nueva chocó con el mismo muro desde el otro lado —al
 intentar dar de alta un segundo contacto con el NIF puntuado— y de ahí salió
 que el caso de la puntuación hay que probarlo desde la ficha de la empresa.
+
+## S171 · La carga masiva de facturas, y la regla del signo
+
+El objetivo de la semana, en palabras del operador: subir los datos de las
+facturas para poder conciliar el banco, y sacar de ahí un informe para la
+gestoría que case cada movimiento con sus facturas — de coste y de ingreso —
+y diga si es obra, gasto general o remuneración. El reparto por partida
+viene después.
+
+**Sólo la cabecera, y por eso pide «Exigir que cada factura diga a dónde va»
+desmarcado** (S164). Con la casilla marcada `registerBill` refusa una factura
+sin repartir, y es correcto que lo haga; la carga lo dice con el texto real de
+la casilla en vez de fallar fila a fila.
+
+**La regla del signo.** El listado de BigMat trae los abonos en positivo y su
+identificador interno no los distingue. El signo sale de tres evidencias: el
+Tipo escrito, un importe negativo (sólo cuenta cuando lo es: un positivo es
+una magnitud) y la serie del número según la pestaña «Series» de la propia
+hoja — datos, no código, porque qué serie es un abono lo decide la numeración
+de cada proveedor. Si las evidencias se contradicen, la fila no entra; si un
+proveedor tiene series y el número no encaja en ninguna, entra como factura y
+señalada.
+
+**Cómo se guarda un abono: importes negativos, `creditNoteFor` vacío.** El
+motor conoce otra convención (AP-09: positivos más `creditNoteFor`) y las dos
+no se combinan nunca — `vatSummary` niega lo que lleva `creditNoteFor`, y
+negar un negativo lo vuelve a sumar. Ésta se eligió MEDIDA contra la
+conciliación antes de escribir una línea: un cargo que paga una factura y
+descuenta un abono, y una devolución que entra en la tarjeta, cuadran los dos
+a cero.
+
+**El IVA sale del tipo, y sólo el GENERAL se deduce.** La primera versión
+buscaba entre los tipos de la empresa el que cuadrara, y el listado real la
+desmintió en la primera pasada: `ZCO25925068` (54,55 → 60,01) cuadra al
+céntimo con un 10 % por coincidencia, y lleva en verdad seis euros de
+descuento, igual que su gemela `ZCO25941514`. Se habría registrado en silencio
+una compra de material al 10 %. Un tipo reducido se escribe, o la fila no
+entra.
+
+**Lo que el material real corrigió, y que una prueba escrita contra
+supuestos no habría encontrado:**
+
+1. **«ZVA» no es una serie de abonos.** Un documento ZVA de BigMat era una
+   rectificativa; otro, `ZVA20199766`, es un **anticipo** — 106,84 € que
+   Canei PAGÓ el 16/10 y que luego consumieron BIG-0008, BIG-0009 y BIG-0015
+   (91,55 €). La regla «ZVA → abono» lo habría cargado al revés: 213,68 € de
+   diferencia en una fila. Fuera de las series, de la plantilla y de la
+   prueba, que ahora fija lo contrario.
+2. **Las notas citan OTROS documentos.** El cruce con el registro manual leía
+   todo identificador que apareciera en las notas, y «UTILIZ. ANTI.:
+   29,23 € (ZVA2019976600)» nombra el anticipo que pagó la factura, no la
+   factura. Sólo vale el identificador que da nombre a un fichero.
+3. **El vale y la devolución son DOS abonos, no uno contado dos veces.** La
+   devolución `00003…523` (−88,09) se reembolsó en la tarjeta; el vale
+   `VAL 20123799` (−100, sin IVA) es aparte y pagó 100 € de la factura
+   `00002…19704`. Se cargan los dos, como los anotó Diorca.
+
+**Lo que queda fuera de la carga, con su motivo, en la pestaña «Pendientes»
+del fichero preparado:** el anticipo (documento ausente y posible IVA doble,
+LEGAL_REVIEW §16), la factura de Obramat con dos tipos de IVA (§16), las dos
+de BigMat con seis euros de descuento (hace falta el papel), la factura
+EMITIDA por Canei que estaba en la carpeta, y el albarán del T3.
+
+**Un hallazgo de alcance general: el paquete de la gestoría no firmaba los
+abonos de compra.** `txFromInvoice` negaba una rectificativa de venta y
+`vatSummary` un abono AP-09, pero `txFromBill` no negaba nada: el mismo
+paquete mandaba un IVA que restaba el abono y un registro de facturas
+recibidas que lo sumaba. Arreglado, con una prueba que exige que los dos
+cuadren.
+
+**Lo que la carga NO traduce, a propósito:** los mensajes de cada fila
+(«el total no sale de la base…») siguen en castellano, igual que los de la
+carga del libro de precios y la del banco. Lo que sí se traduce es el cajón:
+sus textos, etiquetas y botones — incluidos los dos párrafos del cajón de
+proveedores (S168), que se habían quedado fuera del diccionario sin que
+ninguna auditoría lo viera, porque un cajón no está abierto cuando arranca el
+espacio de trabajo.
+
+## S172 · El informe de conciliación dejaba en blanco todo lo conciliado en pantalla
+
+`buildAccountantZip` escribe `conciliacion.xlsx`, una fila por movimiento —
+que es exactamente el informe que pidió el operador— y leía el documento de
+`matched.billId` / `matched.invoiceId`. Eso sólo lo escribe el casado antiguo
+de un documento. **La pantalla de conciliación sólo llama a
+`matchMovementSplit`**, que escribe `matched.documents`. Así que cada
+movimiento conciliado en pantalla llegaba a la gestoría con el documento, el
+número, el tercero y el NIF en blanco: indistinguible de uno sin explicar.
+
+La prueba del export seguía verde porque casaba por la puerta vieja. La nueva
+casa por la de la pantalla, y está **comprobada contra el código anterior**:
+con el `erp.html` de antes, el movimiento sale con las cuatro columnas
+vacías; con el de ahora, con sus dos documentos y su NIF.
+
+Encima, lo que pidió el operador:
+
+- **«Clasificación» por movimiento, leída del DOCUMENTO**, no de la clase del
+  movimiento — `matchMovementSplit` pone `projectCost` a cualquier movimiento
+  que pague una factura, incluida la del alquiler de la oficina y una que
+  nadie ha repartido. Obra (con su número), gasto general, gasto sin
+  asignar, ingreso de obra; y sin documento, la clase que el operador le dio
+  al movimiento: **remuneración** para las nóminas, que no traen factura.
+- **Hoja «Sin movimiento»: la otra mitad.** Cada documento del trimestre que
+  el banco no liquida del todo, con lo que el banco sí liquidó y lo que
+  falta. Es donde salen la factura pagada en parte con un vale y el propio
+  vale — y donde saldrán las tres que consumieron el anticipo. Lo liquidado
+  se suma de los movimientos que NOMBRAN el documento, en cualquier trimestre.
+
+**La hoja nueva va la ÚLTIMA.** Se insertó primero en segunda posición, junto
+a la conciliación, que es donde tiene sentido leerla — y la suite completa lo
+pilló: la comprobación 1G lee las hojas del libro POR POSICIÓN, y «Facturas
+recibidas» pasó de la segunda a la tercera, así que leyó «Sin movimiento»
+como si fueran las facturas. El orden de las cuatro hojas que ya había es un
+contrato: con esa prueba y con un gestor que sabe dónde está cada cosa. La
+hoja nueva va detrás de «Resumen», y su propia prueba busca cada hoja por su
+cabecera, no por su número, para que la próxima que se añada no rompa nada.

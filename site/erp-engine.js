@@ -12942,37 +12942,51 @@
           docRef: i.docRef,
         };
       };
-      const txFromBill = (b) => ({
-        partyCode: this.party(b.supplierId).code,
-        accountingCode: this.party(b.supplierId).accountingCode,
-        // From the bill, not the party file — see `billSupplier`. The four
-        // fields the accountant works from are the number, the date, the issuer
-        // and its tax id, and the tax id was the one of the four that this
-        // dictionary did not carry at all.
-        partyName: this.billSupplier(b).name,
-        partyTaxId: this.billSupplier(b).taxId,
-        direction: "purchase",
-        category: b.allocations[0]
-          ? b.allocations[0].overheadCategory || "projectCost"
-          : "unallocated",
-        invoiceExists: true,
-        invoiceNumber: b.number,
-        budgetRef:
-          b.allocations[0] && b.allocations[0].projectId
-            ? this.project(b.allocations[0].projectId).budgetNumber
-            : null,
-        date: b.date,
-        treatment: "expense",
-        baseCents: b.baseCents,
-        vatBp: b.vatBp,
-        vatCents: b.vatCents,
-        totalCents: b.totalCents,
-        irpfBp: b.irpfBp,
-        irpfCents: b.irpfCents,
-        dueDate: b.dueDate,
-        paidCents: b.totalCents - this.billOutstandingCents(b.id),
-        docRef: b.docRef || b.capId,
-      });
+      /* SIGNED LIKE ITS SALES TWIN. `txFromInvoice` above negates a
+         rectificativa and `vatSummary` negates a bill carrying `creditNoteFor`
+         (AP-09: amounts stored positive, the flag says which way they run).
+         This one negated nothing, so an AP-09 credit note reached the
+         accountant as a PURCHASE of the same amount — the one register in the
+         package whose sign disagreed with the VAT figures sent beside it.
+         A credit note stored with negative amounts (how the invoice import
+         files them, with `creditNoteFor` empty) already carries its sign, and
+         `sg` leaves it alone; the two conventions are never combined. */
+      const txFromBill = (b) => {
+        const sg = b.creditNoteFor ? -1 : 1;
+        return {
+          partyCode: this.party(b.supplierId).code,
+          accountingCode: this.party(b.supplierId).accountingCode,
+          // From the bill, not the party file — see `billSupplier`. The four
+          // fields the accountant works from are the number, the date, the issuer
+          // and its tax id, and the tax id was the one of the four that this
+          // dictionary did not carry at all.
+          partyName: this.billSupplier(b).name,
+          partyTaxId: this.billSupplier(b).taxId,
+          direction: "purchase",
+          category: b.allocations[0]
+            ? b.allocations[0].overheadCategory || "projectCost"
+            : "unallocated",
+          invoiceExists: true,
+          invoiceNumber: b.number,
+          budgetRef:
+            b.allocations[0] && b.allocations[0].projectId
+              ? this.project(b.allocations[0].projectId).budgetNumber
+              : null,
+          date: b.date,
+          treatment: "expense",
+          baseCents: sg * b.baseCents,
+          vatBp: b.vatBp,
+          vatCents: sg * b.vatCents,
+          totalCents: sg * b.totalCents,
+          irpfBp: b.irpfBp,
+          irpfCents: sg * b.irpfCents,
+          dueDate: b.dueDate,
+          paidCents: sg * (b.totalCents - this.billOutstandingCents(b.id)),
+          // The supplier's own number for the document, beside the fiscal one.
+          supplierDocRef: b.supplierDocRef || "",
+          docRef: b.docRef || b.capId,
+        };
+      };
       const pkg = {
         quarter,
         generatedAt: this.state.today,

@@ -161,6 +161,13 @@ jobs:
         if: always()
         run: node tests/supplier-import/run.mjs
 
+      # La carga de facturas para conciliar: la regla del signo (el listado de
+      # un proveedor trae los abonos en positivo), el IVA desde el tipo y no
+      # desde la diferencia, y que un abono cargado así se concilie a cero.
+      - name: The uploaded invoice sheet (sign rule, VAT, reconciliation)
+        if: always()
+        run: node tests/bill-import/run.mjs
+
       # ORG-04 with the company's own convention: a business already on invoice
       # 56 cannot have a book that restarts at 1.
       - name: Document numbering (shape, starting point, year rule)

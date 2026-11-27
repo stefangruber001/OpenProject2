@@ -5505,6 +5505,10 @@
          facturas: el total de una factura con retención no se puede verificar
          sin la ficha del proveedor que la practica. -->
     <script src="erp-supplier-import.js"></script>
+    <!-- Las facturas de proveedor, sólo la cabecera, para conciliar el banco.
+         Va después de la de proveedores porque la necesita: cada fila casa con
+         su proveedor por el NIF, y su retención sale de la ficha. -->
+    <script src="erp-bill-import.js"></script>
     <!-- The PDF sibling of erp-import.js — same bank, the other export shape.
      Depends on ErpImport for toCents/toIsoDate (loaded just above) and, only
      once a .pdf is actually chosen, on ErpOcr.loadPdfjs() (below) for pdf.js
@@ -12755,7 +12759,7 @@
           })
           .join("");
         const errRows = errs
-          .map((e) => `<div class="it"><span class="pill r">Fila ${esc(String(e.row))}</span>
+          .map((e) => `<div class="it"><span class="pill r"><span>Fila</span> <b>${esc(String(e.row))}</b></span>
             <span style="flex:1;margin-left:8px">${esc(e.msg)}</span></div>`)
           .join("");
 
@@ -12764,21 +12768,21 @@
            como un par de frases sin traducir. Ver la nota del cajón de abajo,
            que tropezó con esto siete veces. */
         const newBlock = nNew
-          ? `<div class="field full"><label>Altas (${nNew})</label>
+          ? `<div class="field full"><label><span>Altas</span> <b>${nNew}</b></label>
              <table class="tbl"><thead><tr><th>Fila</th><th>Razón social</th><th>NIF/CIF</th><th>Retención</th></tr></thead>
              <tbody>${newRows}</tbody></table></div>`
           : "";
         const updBlock = nUpd
-          ? `<div class="field full"><label>Cambios (${nUpd})</label>
+          ? `<div class="field full"><label><span>Cambios</span> <b>${nUpd}</b></label>
              <table class="tbl"><thead><tr><th>Fila</th><th>Proveedor</th><th>Código</th><th>Qué cambia</th></tr></thead>
              <tbody>${updRows}</tbody></table></div>`
           : "";
         const sameBlock = nSame
           ? `<div class="field full"><div class="it"><span class="pill g">Sin cambios</span>
-             <span style="flex:1;margin-left:8px">${nSame} ya estaban igual.</span></div></div>`
+             <span style="flex:1;margin-left:8px"><b>${nSame}</b> <span>ya estaban igual</span></span></div></div>`
           : "";
         const errBlock = errs.length
-          ? `<div class="field full"><label>No se pueden importar (${errs.length})</label>${errRows}</div>`
+          ? `<div class="field full"><label><span>No se pueden importar</span> <b>${errs.length}</b></label>${errRows}</div>`
           : "";
         const nothing =
           !nNew && !nUpd
@@ -12786,12 +12790,12 @@
             : "";
         const goBtn =
           nNew || nUpd
-            ? `<div class="field full"><button class="btn primary" id="si_go">Importar ${nNew + nUpd} proveedores</button></div>`
+            ? `<div class="field full"><button class="btn primary" id="si_go"><span>Importar</span> <b>${nNew + nUpd}</b> <span>proveedores</span></button></div>`
             : "";
 
         out.innerHTML = `<div class="fgrid">
          <div class="field full"><div class="it"><span class="pill b">${esc(file.name)}</span>
-          <span style="flex:1;margin-left:8px">${parsed.rows.length} filas leídas.</span></div></div>
+          <span style="flex:1;margin-left:8px"><b>${parsed.rows.length}</b> <span>filas leídas</span></span></div></div>
          ${newBlock}${updBlock}${sameBlock}${errBlock}${nothing}${goBtn}</div>`;
 
         const go = $("#si_go");
@@ -12812,6 +12816,177 @@
           closeDrawer();
           if (made && made.failed.length)
             toast("⚠ " + made.failed.length + " filas no se pudieron dar de alta");
+          if (stored && typeof o.onDone === "function") o.onDone(made);
+        };
+      }
+
+      /* ===================== LA CARGA DE FACTURAS ==========================
+         Sólo la cabecera, para conciliar el banco: proveedor, número, fecha,
+         base y total. El reparto por obra viene después, así que esta pantalla
+         necesita «Exigir destino» apagado y lo dice si no lo está.
+
+         Lo que la vista previa tiene que enseñar, por encima de todo, son los
+         ABONOS: el listado de un proveedor puede traerlos en positivo, y la
+         regla del signo los convierte en negativo por su serie. Si esa regla
+         se equivoca, el error es el doble del importe al revés — así que cada
+         abono sale con su número y su total, para que una persona lo mire
+         antes de pulsar el segundo botón. */
+      function billImportDrawer(opts) {
+        const o = opts || {};
+        const db = openDrawer("Importar facturas de proveedor");
+        if (typeof ErpBillImport === "undefined") {
+          db.innerHTML =
+            '<div class="it"><span class="pill r">No se pudo cargar</span>' +
+            '<span style="flex:1;margin-left:8px">Recargue la página para actualizar la aplicación.</span></div>';
+          return;
+        }
+        const COLS = ErpBillImport.FACTURA_COLUMNS;
+        const intro =
+          "Una fila por factura, sólo la cabecera: el reparto por obra se hace después. El proveedor se reconoce por su NIF, así que la hoja de proveedores va antes. El IVA se calcula con el tipo y el total sirve de comprobación.";
+        const signo =
+          "Si un proveedor trae los abonos en positivo, la pestaña «Series» dice qué series son abonos y la carga les pone el signo. Cuando el Tipo, el importe y la serie no coinciden, la factura no entra.";
+        db.innerHTML = `<div class="fgrid">
+         <div class="field full"><div class="it" style="color:var(--muted)">${esc(intro)}</div></div>
+         <div class="field full"><div class="it"><span class="pill y">Abonos</span>
+           <span style="flex:1;margin-left:8px">${esc(signo)}</span></div></div>
+         <div class="field full"><label>Columnas</label>
+           <div style="font-size:12.5px">${COLS.map((c) => `<span class="pill b" style="margin:2px">${esc(c.lab)}</span>`).join("")}</div></div>
+         <div class="field full row" style="gap:8px;margin-top:4px">
+           <button class="btn" id="fi_tpl">⬇ Descargar plantilla</button>
+           <label class="btn primary">Elegir archivo<input type="file" id="fi_file" accept=".xlsx" hidden></label>
+         </div>
+         <div class="field full" id="fi_out"></div>
+        </div>`;
+
+        $("#fi_tpl").onclick = () => {
+          const t = ErpBillImport.plantilla();
+          /* Ni título ni pie, igual que la de proveedores: es un formulario
+             que vuelve a entrar por el lector, no un informe. */
+          downloadBlob(
+            xlsxWorkbookBlob(
+              t.sheets.map((sh) => ({
+                name: sh.name,
+                rows: sh.rows,
+                opts: { noHead: true, noFoot: true },
+              })),
+            ),
+            "plantilla-facturas.xlsx",
+          );
+        };
+
+        $("#fi_file").onchange = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const out = $("#fi_out");
+          out.innerHTML = `<div class="it">Leyendo ${esc(file.name)}…</div>`;
+          let parsed, plan;
+          try {
+            parsed = await ErpBillImport.parseFacturas(await file.arrayBuffer());
+            plan = ErpBillImport.planFacturas(erp, parsed.rows, parsed.series);
+          } catch (err) {
+            out.innerHTML = `<div class="it"><span class="pill r">No se pudo leer</span>
+              <span style="flex:1;margin-left:8px">${esc(String(err.message || err))}</span></div>`;
+            return;
+          }
+          renderBillPlan(out, plan, parsed, file, o);
+        };
+      }
+
+      function renderBillPlan(out, plan, parsed, file, o) {
+        const E = ErpBillImport.eur;
+        const credits = plan.creates.filter((c) => c.sign < 0);
+        const invoices = plan.creates.length - credits.length;
+        const netBase = plan.creates.reduce((a, c) => a + c.baseCents, 0);
+        const netTotal = plan.creates.reduce((a, c) => a + c.totalCents, 0);
+        const errs = plan.errors || [];
+        const differs = plan.unchanged.filter((u) => u.differs);
+
+        /* Los avisos, agrupados: cuarenta filas con el mismo aviso son UNA
+           cosa que mirar, no cuarenta. */
+        const byFlag = {};
+        plan.creates.forEach((c) =>
+          c.flags.forEach((f) => (byFlag[f] = byFlag[f] || []).push(c.number)),
+        );
+
+        const blockedBlock = plan.blocked
+          ? `<div class="field full"><div class="it"><span class="pill r">No se puede cargar</span>
+             <span style="flex:1;margin-left:8px">${esc(plan.blocked)}</span></div></div>`
+          : "";
+        const summaryBlock = `<div class="field full"><div class="daylist">
+           <div class="it"><span style="flex:1">Facturas nuevas</span><b>${invoices}</b></div>
+           <div class="it"><span style="flex:1">Abonos nuevos (restan)</span><b>${credits.length}</b></div>
+           <div class="it"><span style="flex:1">Base neta</span><b>${esc(E(netBase))}</b></div>
+           <div class="it"><span style="flex:1">Total neto</span><b>${esc(E(netTotal))}</b></div>
+           <div class="it"><span style="flex:1">Ya estaban registradas</span><b>${plan.unchanged.length}</b></div>
+           <div class="it"><span style="flex:1">No se pueden importar</span><b>${errs.length}</b></div>
+         </div></div>`;
+        const creditRows = credits
+          .map(
+            (c) => `<tr><td>${esc(String(c.row))}</td><td>${esc(c.supplier)}</td>
+              <td translate="no">${esc(c.number)}</td><td class="num">${esc(E(c.totalCents))}</td></tr>`,
+          )
+          .join("");
+        const creditBlock = credits.length
+          ? `<div class="field full"><label>Abonos: revisa el signo antes de importar</label>
+             <table class="tbl"><thead><tr><th>Fila</th><th>Proveedor</th><th>Nº factura</th><th class="num">Total</th></tr></thead>
+             <tbody>${creditRows}</tbody></table></div>`
+          : "";
+        const flagRows = Object.keys(byFlag)
+          .map(
+            (f) => `<div class="it"><span class="pill y">${byFlag[f].length}</span>
+              <span style="flex:1;margin-left:8px">${esc(f)}</span>
+              <span style="font-size:12px;color:var(--muted)" translate="no">${esc(byFlag[f].slice(0, 3).join(", "))}</span></div>`,
+          )
+          .join("");
+        const flagBlock = flagRows
+          ? `<div class="field full"><label>Entran con aviso</label>${flagRows}</div>`
+          : "";
+        const differRows = differs
+          .map(
+            (u) => `<div class="it"><span class="pill y"><span>Fila</span> <b>${esc(String(u.row))}</b></span>
+              <span style="flex:1;margin-left:8px" translate="no">${esc(u.number)}</span>
+              <span style="font-size:12px;color:var(--muted)">${esc(u.differs)}</span></div>`,
+          )
+          .join("");
+        const differBlock = differRows
+          ? `<div class="field full"><label>Registradas con otro importe: no se cambian</label>${differRows}</div>`
+          : "";
+        const errRows = errs
+          .map(
+            (e) => `<div class="it"><span class="pill r"><span>Fila</span> <b>${esc(String(e.row))}</b></span>
+              <span style="flex:1;margin-left:8px">${esc(e.msg)}</span></div>`,
+          )
+          .join("");
+        const errBlock = errRows
+          ? `<div class="field full"><label>No se pueden importar</label>${errRows}</div>`
+          : "";
+        const nothing =
+          !plan.creates.length && !plan.blocked
+            ? `<div class="field full"><div class="it">Este fichero no cambiaría nada.</div></div>`
+            : "";
+        const goBtn =
+          plan.creates.length && !plan.blocked
+            ? `<div class="field full"><button class="btn primary" id="fi_go"><span>Importar</span> <b>${plan.creates.length}</b> <span>facturas</span></button></div>`
+            : "";
+
+        out.innerHTML = `<div class="fgrid">
+         <div class="field full"><div class="it"><span class="pill b">${esc(file.name)}</span>
+          <span style="flex:1;margin-left:8px"><b>${parsed.rows.length}</b> <span>filas leídas</span></span></div></div>
+         ${blockedBlock}${summaryBlock}${creditBlock}${flagBlock}${differBlock}${errBlock}${nothing}${goBtn}</div>`;
+
+        const go = $("#fi_go");
+        if (!go) return;
+        go.onclick = async (ev) => {
+          const btn = ev.currentTarget;
+          if (btn.disabled) return;
+          btn.disabled = true;
+          let made = null;
+          const stored = await mutateNow(() => {
+            made = ErpBillImport.applyFacturas(erp, plan, "backoffice");
+          }, "Facturas importadas");
+          closeDrawer();
+          if (made && made.failed.length)
+            toast("⚠ " + made.failed.length + " facturas no se pudieron registrar");
           if (stored && typeof o.onDone === "function") o.onDone(made);
         };
       }
@@ -23116,12 +23291,89 @@
 
         const acc = (id) => (erp.state.bankAccounts.find((a) => a.id === id) || {}).name || "";
         const eurTxt = (c) => (c / 100).toFixed(2).replace(".", ",");
+
+        /* A MOVEMENT'S DOCUMENTS, WHICHEVER WAY IT WAS MATCHED.
+           This sheet read `matched.billId` and `matched.invoiceId`, which only
+           the old one-document `matchMovement` writes. The reconciliation
+           screen has only ever called `matchMovementSplit`, which writes
+           `matched.documents` — so every movement reconciled on screen reached
+           the gestoría with its document, number, party and tax id BLANK,
+           indistinguishable from a movement nobody had explained. The test of
+           this export stayed green because it matched through the old door.
+           Both shapes are read; a movement that settled several documents
+           names all of them on its one row. */
+        const docsOf = (m) => {
+          const x = m.matched;
+          if (!x) return [];
+          if (Array.isArray(x.documents)) return x.documents;
+          if (x.billId || x.invoiceId) return [x];
+          return [];
+        };
+        const describeDoc = (d) => {
+          if (d.billId) {
+            const b = erp.state.bills.find((y) => y.id === d.billId);
+            if (!b) return null;
+            const sp = erp.billSupplier(b);
+            return {
+              type: b.totalCents < 0 ? GR_LAB.creditIn : GR_LAB.billIn,
+              number: b.number,
+              party: sp.name,
+              taxId: sp.taxId,
+              bill: b,
+            };
+          }
+          if (d.invoiceId) {
+            const i = erp.state.invoices.find((y) => y.id === d.invoiceId);
+            if (!i) return null;
+            const pt = erp.state.parties.find((y) => y.id === i.partyId);
+            return {
+              type: i.kind === "creditNote" ? GR_LAB.creditOut : GR_LAB.invoiceOut,
+              number: i.number,
+              party: pt ? pt.name : "",
+              taxId: pt ? pt.taxId || "" : "",
+              invoice: i,
+            };
+          }
+          return null;
+        };
+        /* WHAT THE MONEY WAS FOR — read from the DOCUMENT, not from the
+           movement's class. `matchMovementSplit` sets `projectCost` on any
+           movement that pays a bill, including a bill for the office rent and
+           a bill nobody has distributed yet; the bill's own allocations are the
+           only place that knows which it is. With no document, the class the
+           operator gave the movement is the answer — which is where wages
+           (`salary`) live, since a payroll transfer carries no invoice. */
+        const projRef = (id) => {
+          try {
+            const pj = erp.project(id);
+            return pj.budgetNumber || pj.name || "";
+          } catch {
+            return "";
+          }
+        };
+        const classOfDoc = (x) => {
+          if (x.invoice) return GR_LAB.income + (x.invoice.budgetNumber ? " " + x.invoice.budgetNumber : "");
+          const al = x.bill.allocations || [];
+          if (!al.length) return GR_LAB.unassigned;
+          const jobs = [...new Set(al.filter((a) => a.projectId).map((a) => projRef(a.projectId)))];
+          const parts = [];
+          if (jobs.length) parts.push(GR_LAB.project + " " + jobs.join(", "));
+          if (al.some((a) => !a.projectId)) parts.push(GR_LAB.overhead);
+          return parts.join(" · ");
+        };
+        const classOfMovement = (m, ds) => {
+          if (ds.length) return [...new Set(ds.map(classOfDoc))].join(" · ");
+          if (m.class && GR_CLASS[m.class]) return GR_CLASS[m.class];
+          return m.unbacked ? GR_LAB.unbacked : GR_LAB.unexplained;
+        };
+
         const rows = [
           [
             "Fecha",
             "Cuenta",
             "Concepto",
             "Importe (€)",
+            "Clasificación",
             "Documento",
             "Nº documento",
             "Tercero",
@@ -23131,29 +23383,12 @@
           ],
         ];
         for (const m of pkg.bankMovements) {
-          let docType = "";
-          let docNumber = "";
-          let party = "";
-          let taxId = "";
-          if (m.matched && m.matched.billId) {
-            const b = erp.state.bills.find((x) => x.id === m.matched.billId);
-            if (b) {
-              docType = "Factura recibida";
-              docNumber = b.number;
-              const sp = erp.billSupplier(b);
-              party = sp.name;
-              taxId = sp.taxId;
-            }
-          } else if (m.matched && m.matched.invoiceId) {
-            const i = erp.state.invoices.find((x) => x.id === m.matched.invoiceId);
-            if (i) {
-              docType = "Factura emitida";
-              docNumber = i.number;
-              const pt = erp.state.parties.find((x) => x.id === i.partyId);
-              party = pt ? pt.name : "";
-              taxId = pt ? pt.taxId || "" : "";
-            }
-          }
+          const ds = docsOf(m).map(describeDoc).filter(Boolean);
+          const uniq = (f) => [...new Set(ds.map(f).filter(Boolean))].join(" · ");
+          const docType = uniq((x) => x.type);
+          const docNumber = ds.map((x) => x.number).join(" · ");
+          const party = uniq((x) => x.party);
+          const taxId = uniq((x) => x.taxId);
           const reason = m.unbacked
             ? (erp.listAll("unbackedReasons").find((r) => r.code === m.unbacked.reason) || {}).es ||
               m.unbacked.reason
@@ -23164,13 +23399,14 @@
                 "mov_" + m.accountingDate + "_" + (m.concept || ""),
               )
             : "";
-          const matchedBillDoc =
-            m.matched && m.matched.billId ? billDocName[m.matched.billId] || "" : "";
+          const firstBill = docsOf(m).find((d) => d.billId);
+          const matchedBillDoc = firstBill ? billDocName[firstBill.billId] || "" : "";
           rows.push([
             m.accountingDate,
             acc(m.accountId),
             m.concept || m.merchantText || "",
             eurTxt(m.amountCents),
+            classOfMovement(m, ds),
             docType,
             docNumber,
             party,
@@ -23199,7 +23435,71 @@
             "",
             "",
             "",
+            "",
           ]);
+
+        /* THE OTHER HALF: DOCUMENTS THE BANK DOES NOT EXPLAIN.
+           The sheet above starts from each movement; a gestor also needs to
+           start from each document. An invoice paid with a supplier's voucher,
+           or by drawing down a prepayment made weeks earlier, has no movement
+           of its own — and the client's own quarter is full of both. So every
+           document of the quarter whose amount the bank has not fully settled
+           is listed here with what the bank did settle and what is left. The
+           settled figure is summed from the movements that NAME the document,
+           in any quarter: an October invoice paid in January is still paid. */
+        const viaBank = {};
+        for (const m of erp.state.movements)
+          for (const d of docsOf(m)) {
+            const k = d.billId ? "b:" + d.billId : d.invoiceId ? "i:" + d.invoiceId : null;
+            if (!k) continue;
+            /* A split names what it paid each document, signed like the
+               document. The old one-document match names nothing: the whole
+               movement paid it — a payment leaves the bank negative, a
+               collection arrives positive. */
+            const amt =
+              d.amountCents != null
+                ? cents0(d.amountCents)
+                : d.billId
+                  ? -cents0(m.amountCents)
+                  : cents0(m.amountCents);
+            viaBank[k] = (viaBank[k] || 0) + amt;
+          }
+        const inQuarter = (d) => String(d || "").slice(0, 4) + "-Q" + Math.ceil(Number(String(d || "").slice(5, 7)) / 3) === quarter;
+        const unsettledRows = [
+          [
+            "Fecha",
+            "Documento",
+            "Nº documento",
+            "Tercero",
+            "NIF",
+            "Total (€)",
+            "Liquidado por banco (€)",
+            "Sin movimiento (€)",
+            "Clasificación",
+          ],
+        ];
+        const unsettled = [];
+        for (const b of erp.state.bills.filter((x) => inQuarter(x.date))) {
+          const paid = viaBank["b:" + b.id] || 0;
+          if (Math.abs(b.totalCents - paid) <= 1) continue;
+          const x = describeDoc({ billId: b.id });
+          unsettled.push([b.date, x.type, b.number, x.party, x.taxId, b.totalCents, paid, classOfDoc(x)]);
+        }
+        for (const i of erp.state.invoices.filter((x) => inQuarter(x.date))) {
+          const sg = i.kind === "creditNote" ? -1 : 1;
+          const total = sg * i.totalCents;
+          const paid = viaBank["i:" + i.id] || 0;
+          if (Math.abs(total - paid) <= 1) continue;
+          const x = describeDoc({ invoiceId: i.id });
+          unsettled.push([i.date, x.type, i.number, x.party, x.taxId, total, paid, classOfDoc(x)]);
+        }
+        unsettled
+          .sort((a, b) => String(a[0]).localeCompare(String(b[0])))
+          .forEach((r) =>
+            unsettledRows.push([r[0], r[1], r[2], r[3], r[4], eurTxt(r[5]), eurTxt(r[6]), eurTxt(r[5] - r[6]), r[7]]),
+          );
+        if (unsettledRows.length === 1)
+          unsettledRows.push(["", "", "", "", "", "", "", "", GR_LAB.allSettled]);
 
         const pctTxt = (bp) => (bp == null ? "" : (bp / 100).toFixed(2).replace(".", ",") + " %");
         const docOfNumber = {};
@@ -23332,6 +23632,16 @@
               styleOf: (i) => sumStyle[i],
             },
           },
+          /* LAST, on purpose. The four sheets above have a fixed order that
+             readers rely on — the gestor who knows where the received
+             invoices are, and the export's own test, which reads them by
+             position. Inserted second, this sheet moved every one of them
+             along and the test read «Sin movimiento» as the bills. */
+          {
+            name: "Sin movimiento",
+            rows: unsettledRows,
+            opts: { subtitle: "Documentos que el banco no explica · " + quarter },
+          },
         ]);
         files.unshift({
           path: "conciliacion.xlsx",
@@ -23344,8 +23654,35 @@
           rows: rows.length - 1,
           bills: pkg.receivedBills.length,
           invoices: pkg.issuedInvoices.length,
+          unsettled: unsettledRows.length - 1,
         };
       }
+      /* The words of the reconciliation report, in ONE place: every one of
+         them is a cell a gestor reads, and the dictionary needs each as a
+         complete literal. */
+      const GR_LAB = {
+        billIn: "Factura recibida",
+        creditIn: "Abono recibido",
+        invoiceOut: "Factura emitida",
+        creditOut: "Rectificativa emitida",
+        unassigned: "Gasto sin asignar",
+        project: "Obra",
+        overhead: "Gasto general",
+        income: "Ingreso de obra",
+        unbacked: "Sin factura, justificado",
+        unexplained: "Sin explicar",
+        allSettled: "Todos los documentos del trimestre están liquidados por banco",
+      };
+      const GR_CLASS = {
+        projectCost: "Obra",
+        overhead: "Gasto general",
+        salary: "Remuneración",
+        tax: "Impuestos",
+        financial: "Financiero",
+        internalTransfer: "Traspaso interno",
+        customerReceipt: "Cobro",
+      };
+      const cents0 = (v) => Math.round(Number(v) || 0);
 
       /* Every cost behind one chapter of one job, grouped by subpartida when the
                rows name one. Sums to the same figure as the chapter table above it
@@ -25258,6 +25595,7 @@
           const rows = erp.payables();
           v.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
           <span style="flex:1"></span>
+          <button class="btn sm" id="sb_imp" title="Muchas facturas de golpe, sólo la cabecera, para conciliar el banco">⬆ Importar facturas</button>
           <button class="btn sm" id="sb_new" title="Para una factura que no llega como documento — la mayoría se suben o se fotografían en Documentos">＋ Nueva factura</button></div>
          <div class="card"><div class="ch"><h3>Facturas de proveedor</h3><span class="tag">pendiente ${eur0(rows.reduce((s, r) => s + Math.max(0, r.outstandingCents), 0))}</span></div>
          <div class="scroll"><table><thead><tr><th>Proveedor</th><th>Nº factura</th><th class="num">Total</th><th class="num">Pendiente</th><th>Vence</th><th>Asignación</th><th>Estado</th><th></th></tr></thead><tbody>
@@ -25280,6 +25618,7 @@
            .join("")}
          </tbody></table></div></div>`;
           $("#sb_new").onclick = () => billDrawer(null);
+          $("#sb_imp").onclick = () => billImportDrawer({ onDone: () => render() });
           v.querySelectorAll("[data-billfix]").forEach(
             (b) => (b.onclick = () => billUnregisterDrawer(b.dataset.billfix)),
           );

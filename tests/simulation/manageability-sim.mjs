@@ -7164,6 +7164,66 @@ assert(
   assert(ok, "S170: sin NIF propio configurado, la regla calla en vez de refusar todo");
 }
 
+/* ── S171 · the accountant's package signs a purchase credit note ─────────────
+   `txFromInvoice` negated a sales rectificativa and `vatSummary` negated an
+   AP-09 purchase credit note, but `txFromBill` negated nothing — so the same
+   package sent the gestoría a VAT figure that subtracted the credit note and
+   a register of received bills that ADDED it. Both conventions are checked:
+   AP-09 (positive amounts + `creditNoteFor`) and the invoice import's
+   (negative amounts, `creditNoteFor` empty). */
+{
+  const e = new ERP("2026-11-27");
+  e.configureEntity({
+    legalName: "Canei Subirats, S.L.",
+    taxId: "B26942003",
+    iban: "ES9121000418450200051332",
+    requireCostDestination: false,
+  });
+  const s1 = e.addParty(
+    { name: "Estrategias BigMat, S.L.U.", taxId: "B88430459", roles: ["supplier"] },
+    "bo",
+  );
+  const orig = e.registerBill(
+    { supplierId: s1.id, number: "F-1", date: "2026-11-02", baseCents: 10000 },
+    "bo",
+  );
+  const ap09 = e.registerBill(
+    {
+      supplierId: s1.id,
+      number: "R-1",
+      date: "2026-11-03",
+      baseCents: 2000,
+      creditNoteFor: orig.id,
+    },
+    "bo",
+  );
+  const neg = e.registerBill(
+    { supplierId: s1.id, number: "R-2", date: "2026-11-04", baseCents: -3000 },
+    "bo",
+  );
+  for (const x of e.exceptionsWithStatus("2026-Q4").filter((x) => !x.accepted))
+    e.acceptException("2026-Q4", x.key, "prueba", "bo");
+  const pkg = e.quarterlyPackage("2026-Q4", { recipient: "gestoria@example.com" }, "bo");
+  const tx = (num) => pkg.receivedBills.find((t) => t.invoiceNumber === num);
+  assert(tx("F-1").baseCents === 10000, "S171: a purchase invoice reaches the package positive");
+  assert(
+    tx("R-1").baseCents === -2000 && tx("R-1").vatCents === -420,
+    "S171: an AP-09 credit note reaches the package NEGATIVE",
+    JSON.stringify(tx("R-1")),
+  );
+  assert(
+    tx("R-2").baseCents === -3000 && tx("R-2").vatCents === -630,
+    "S171: an imported credit note keeps its own sign — never negated twice",
+    JSON.stringify(tx("R-2")),
+  );
+  const regVat = pkg.receivedBills.reduce((a, t) => a + t.vatCents, 0);
+  assert(
+    regVat === pkg.vat.inputVatCents,
+    "S171: the register of received bills and the VAT summary now agree",
+    regVat + " vs " + pkg.vat.inputVatCents,
+  );
+}
+
 const failed = checks.filter((c) => !c.pass);
 for (const c of failed) console.log(`✗ ${c.name} → ${c.detail}`);
 console.log(`${checks.length - failed.length}/${checks.length} manageability checks passed`);

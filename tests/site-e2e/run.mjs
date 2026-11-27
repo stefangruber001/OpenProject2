@@ -125,6 +125,8 @@ async function main() {
     testPriceBookLinks,
     testBookImport,
     testSupplierImport,
+    testBillImport,
+    testGestoriaReport,
     testClientFeedback,
     testNumbering,
     testNotes,
@@ -14110,6 +14112,10 @@ async function testAdmin(browser, base) {
       const bills = await readSheet(2);
       const invs = await readSheet(3);
       const summary = await readSheet(4);
+      /* The fifth, added LAST so the four above keep their positions: the
+         documents the bank does not explain. Checked by its header, so the
+         count below means «these five», not merely «five of something». */
+      const unsettled = await readSheet(5);
       const billBody = bodyOf(bills, "Nº factura");
       const invBody = bodyOf(invs, "Nº factura");
       const concText = conc.flat().join(" ");
@@ -14125,13 +14131,15 @@ async function testAdmin(browser, base) {
         emptySaysWhy: /Sin movimientos de banco/.test(concText),
         // The counterparty's tax id travels on BOTH halves now.
         billsHaveTaxId: !!billBody && billBody.some((r) => /[A-Z]?\d{7,}/.test(String(r[3] || ""))),
+        fifthIsUnsettled: !!bodyOf(unsettled, "Sin movimiento (€)"),
         hasSummary: summary.flat().some((c) => /IVA/.test(String(c || ""))),
         warned: !z.rows && z.bills + z.invoices > 0,
       };
     });
     if (emptyQ.skip) bad("1G: PK13-S24 fixture", JSON.stringify(emptyQ));
     else if (
-      emptyQ.sheets === 4 &&
+      emptyQ.sheets === 5 &&
+      emptyQ.fifthIsUnsettled &&
       emptyQ.movements === 0 &&
       emptyQ.billRows === emptyQ.modelBills &&
       emptyQ.invRows === emptyQ.modelInvoices &&
@@ -20120,6 +20128,322 @@ async function testSupplierImport(browser, base) {
     else bad("proveedores: consola", errors.slice(0, 3).join(" | "));
   } catch (e) {
     bad("proveedores: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * LA CARGA DE FACTURAS, pulsada en vez de descrita.
+ *
+ * El planificador y la regla del signo tienen su puerta en Node
+ * (`tests/bill-import`). Lo que sólo falla aquí es el cableado: el botón en
+ * Facturas registradas, la plantilla de DOS pestañas descargada de un clic
+ * real y leída de vuelta, el aviso cuando la empresa exige repartir, que la
+ * vista previa enseñe el abono con su signo antes de escribir nada — y que al
+ * pulsar, la rectificativa que el listado trae en positivo quede en negativo.
+ */
+async function testBillImport(browser, base) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    acceptDownloads: true,
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#supplier-invoices`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+    /* Los dos proveedores de la plantilla, dados de alta como lo haría la
+       hoja de proveedores — que tiene su propia prueba. */
+    await pg.evaluate(async () => {
+      const has = (t) => erp.state.parties.some((p) => String(p.taxId).replace(/\W/g, "") === t);
+      if (!has("B88430459"))
+        erp.addParty(
+          { name: "Estrategias BigMat, S.L.U.", taxId: "B88430459", roles: ["supplier"] },
+          "e2e",
+        );
+      if (!has("E16698854"))
+        erp.addParty(
+          {
+            name: "Luengo Sanchez C.B.",
+            taxId: "E16698854",
+            roles: ["supplier"],
+            irpfApplies: true,
+            irpfRateBp: 1900,
+          },
+          "e2e",
+        );
+      erp.configureEntity({ requireCostDestination: true });
+      goTab("supplier-invoices", "_supplierBills");
+      await new Promise((r) => setTimeout(r, 450));
+    });
+
+    const opened = await pg.evaluate(async () => {
+      const btn = document.querySelector("#sb_imp");
+      if (!btn) return { button: false };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        button: true,
+        drawer: !!document.querySelector("#fi_file"),
+        template: !!document.querySelector("#fi_tpl"),
+        title: (document.querySelector("#dttl") || {}).textContent || "",
+      };
+    });
+    if (opened.button && opened.drawer && opened.template)
+      ok(`facturas: el cajón ofrece plantilla y selector («${opened.title}»)`);
+    else bad("facturas: cajón", JSON.stringify(opened));
+
+    const dl = pg.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+    await pg.click("#fi_tpl");
+    const file = await dl;
+    let b64 = null;
+    const handed = { got: !!file };
+    if (file) {
+      const stream = await file.createReadStream();
+      const chunks = [];
+      for await (const c of stream) chunks.push(c);
+      b64 = Buffer.concat(chunks).toString("base64");
+      handed.read = await pg.evaluate(async (b) => {
+        const bin = atob(b);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        const p = await ErpBillImport.parseFacturas(u8.buffer);
+        return { rows: p.rows.length, series: p.series.length };
+      }, b64);
+    }
+    if (handed.read && handed.read.rows === 3 && handed.read.series === 4)
+      ok(
+        "facturas: la plantilla trae sus dos pestañas y vuelve a entrar por su lector (3 facturas, 4 series)",
+      );
+    else bad("facturas: plantilla descargada", JSON.stringify(handed));
+
+    /* Con «Exigir que cada factura diga a dónde va» marcado: aviso, sin botón. */
+    const preview = (b) =>
+      pg.evaluate(async (bb) => {
+        const bin = atob(bb);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        const parsed = await ErpBillImport.parseFacturas(u8.buffer);
+        const plan = ErpBillImport.planFacturas(erp, parsed.rows, parsed.series);
+        renderBillPlan(document.querySelector("#fi_out"), plan, parsed, { name: "t.xlsx" }, {});
+        await new Promise((r) => setTimeout(r, 250));
+        return {
+          bills: erp.state.bills.length,
+          go: !!document.querySelector("#fi_go"),
+          shown: (document.querySelector("#fi_out") || {}).textContent || "",
+        };
+      }, b);
+    const blocked = await preview(b64);
+    if (!blocked.go && /dónde va/.test(blocked.shown))
+      ok(
+        "facturas: con la empresa exigiendo repartir, dice qué casilla desmarcar y no ofrece importar",
+      );
+    else bad("facturas: bloqueo", blocked.shown.slice(0, 160));
+
+    await pg.evaluate(() => erp.configureEntity({ requireCostDestination: false }));
+    const before = await pg.evaluate(() => erp.state.bills.length);
+    const ready = await preview(b64);
+    if (ready.bills === before && ready.go)
+      ok("facturas: la vista previa no escribe nada; el botón aparece");
+    else
+      bad("facturas: vista previa", JSON.stringify({ before, after: ready.bills, go: ready.go }));
+    if (/Abonos: revisa el signo/.test(ready.shown) && /−88,09/.test(ready.shown))
+      ok("facturas: la previa enseña el abono, ya en negativo, ANTES de importar");
+    else bad("facturas: abono en la previa", ready.shown.slice(0, 200));
+
+    await pg.click("#fi_go");
+    await pg.waitForTimeout(2000);
+    const after = await pg.evaluate(() => {
+      const b = (n) => erp.state.bills.find((x) => x.number === n) || {};
+      return {
+        bills: erp.state.bills.length,
+        credit: b("00003-2026/A2181/00000523").totalCents,
+        creditRef: b("00003-2026/A2181/00000523").supplierDocRef,
+        rent: b("7").totalCents,
+        rentIrpf: b("7").irpfCents,
+        drawerClosed: !document.querySelector("#drawer.on"),
+      };
+    });
+    if (after.bills === before + 3 && after.drawerClosed)
+      ok(`facturas: tres registradas (${before} → ${after.bills}) y el cajón se cierra`);
+    else bad("facturas: altas", JSON.stringify(after));
+    if (after.credit === -8809 && after.creditRef === "ZCO25893685")
+      ok(
+        "facturas: la rectificativa que el listado trae en positivo queda en −88,09, con sus dos números",
+      );
+    else bad("facturas: signo del abono", JSON.stringify(after));
+    if (after.rent === 76500 && after.rentIrpf === 14250)
+      ok("facturas: el alquiler queda en 765,00 con 142,50 retenidos de la ficha");
+    else bad("facturas: retención", JSON.stringify(after));
+
+    const again = await preview(b64);
+    if (!again.go && after.bills === (await pg.evaluate(() => erp.state.bills.length)))
+      ok("facturas: subir el mismo fichero otra vez no propone nada");
+    else bad("facturas: segunda pasada", again.shown.slice(0, 160));
+
+    if (!errors.length) ok("facturas: sin errores de consola");
+    else bad("facturas: consola", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("facturas: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * EL INFORME PARA LA GESTORÍA, leído de vuelta del ZIP.
+ *
+ * `conciliacion.xlsx` leía `matched.billId`, que sólo escribe el casado
+ * antiguo de un documento; la pantalla de conciliación usa SIEMPRE
+ * `matchMovementSplit`, que escribe `matched.documents`. Así que todo
+ * movimiento conciliado en pantalla llegaba a la gestoría con el documento,
+ * el número, el tercero y el NIF en blanco. La prueba del export seguía verde
+ * porque casaba por la puerta vieja. Ésta casa por la de la pantalla.
+ *
+ * Y fija lo que el operador pidió encima: una clasificación por movimiento
+ * (obra, gasto general, sin asignar, remuneración) leída del DOCUMENTO, y la
+ * hoja de los documentos que el banco no explica — la factura pagada en parte
+ * con un vale, y el propio vale.
+ */
+async function testGestoriaReport(browser, base) {
+  const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 } });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#banking`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+    const got = await pg.evaluate(async () => {
+      erp.configureEntity({ requireCostDestination: false });
+      const norm = (v) => String(v || "").replace(/\W/g, "");
+      let s = erp.state.parties.find((p) => norm(p.taxId) === "B88430459");
+      if (!s)
+        s = erp.addParty(
+          { name: "Estrategias BigMat, S.L.U.", taxId: "B88430459", roles: ["supplier"] },
+          "e2e",
+        );
+      const reg = (o) =>
+        erp.registerBill(Object.assign({ supplierId: s.id, date: "2026-11-05" }, o), "e2e");
+      const A = reg({ number: "GR-00002/1", baseCents: 10000 });
+      const C = reg({ number: "GR-00003/9", baseCents: -1736 });
+      const D = reg({ number: "GR-00002/2", baseCents: 13007 });
+      const V = reg({ number: "GR-VAL-1", baseCents: -10000, vatBp: 0, vatCents: 0 });
+      const acc = erp.addBankAccount({ name: "Visa GR", kind: "card" }, "e2e");
+      const before = erp.state.movements.length;
+      erp.importMovements(
+        acc.id,
+        [
+          {
+            date: "2026-11-05",
+            accountingDate: "2026-11-05",
+            concept: "GR BIGMAT NETO",
+            amountCents: -(A.totalCents + C.totalCents),
+          },
+          {
+            date: "2026-11-05",
+            accountingDate: "2026-11-05",
+            concept: "GR BIGMAT TARJETA",
+            amountCents: -5738,
+          },
+          {
+            date: "2026-11-30",
+            accountingDate: "2026-11-30",
+            concept: "GR NOMINA NOVIEMBRE",
+            amountCents: -150000,
+          },
+        ],
+        "e2e",
+      );
+      const [m1, m2, m3] = erp.state.movements.slice(before);
+      // THE SCREEN'S DOOR, not the old one.
+      erp.matchMovementSplit(
+        m1.id,
+        [
+          { billId: A.id, amountCents: A.totalCents },
+          { billId: C.id, amountCents: C.totalCents },
+        ],
+        "e2e",
+      );
+      erp.matchMovementSplit(m2.id, [{ billId: D.id, amountCents: 5738 }], "e2e");
+      erp.classifyMovement(m3.id, "salary", "e2e");
+      const q = "2026-Q4";
+      for (const x of erp.exceptionsWithStatus(q).filter((r) => !r.accepted))
+        erp.acceptException(q, x.key, "e2e", "bo");
+      const pkg = erp.quarterlyPackage(q, { recipient: "E2E" }, "bo");
+      const z = await buildAccountantZip(q, pkg);
+      const bytes = new Uint8Array(await z.blob.arrayBuffer());
+      const dir = ErpImport.zip.centralDirectory(bytes);
+      const book = await ErpImport.zip.readEntry(bytes, dir["conciliacion.xlsx"]);
+      const bk = book.buffer ? book : new Uint8Array(book);
+      const table = (rows, key) => {
+        const h = rows.findIndex((r) => (r || []).includes(key));
+        const head = rows[h] || [];
+        const body = [];
+        for (const r of rows.slice(h + 1)) {
+          if (!(r || []).some((c) => String(c || "").trim())) break;
+          body.push(r);
+        }
+        return body.map((r) => Object.fromEntries(head.map((k, i) => [k, r[i]])));
+      };
+      /* Each sheet found by its HEADER, not its position: a sheet added
+         later must not make this read the wrong one — which is exactly how
+         adding this report's own sheet broke the 1G check above. */
+      const sheets = [];
+      for (let n = 1; n <= 8; n++)
+        sheets.push(await ErpImport.parseXlsxRows(bk, n).catch(() => []));
+      const withHeader = (key) =>
+        sheets.find((rows) => rows.some((r) => (r || []).includes(key))) || [];
+      const conc = table(withHeader("Nº documento"), "Nº documento");
+      const sinMov = table(withHeader("Sin movimiento (€)"), "Sin movimiento (€)");
+      const row = (concept) => conc.find((r) => r["Concepto"] === concept) || {};
+      return {
+        net: row("GR BIGMAT NETO"),
+        card: row("GR BIGMAT TARJETA"),
+        wage: row("GR NOMINA NOVIEMBRE"),
+        sin: sinMov.filter((r) => String(r["Nº documento"]).startsWith("GR-")),
+      };
+    });
+    const net = got.net;
+    if (
+      /GR-00002\/1/.test(net["Nº documento"]) &&
+      /GR-00003\/9/.test(net["Nº documento"]) &&
+      net["NIF"] === "B88430459"
+    )
+      ok(
+        "gestoría: un movimiento conciliado EN PANTALLA nombra sus documentos y el NIF (antes salía en blanco)",
+      );
+    else bad("gestoría: documentos del movimiento", JSON.stringify(net));
+    if (/Factura recibida/.test(net["Documento"]) && /Abono recibido/.test(net["Documento"]))
+      ok("gestoría: el cargo que paga una factura y descuenta un abono dice las dos cosas");
+    else bad("gestoría: tipos de documento", JSON.stringify(net["Documento"]));
+    if (net["Clasificación"] === "Gasto sin asignar")
+      ok(
+        "gestoría: una factura cargada sólo con su cabecera se clasifica «Gasto sin asignar», no «Obra»",
+      );
+    else bad("gestoría: clasificación del gasto", JSON.stringify(net["Clasificación"]));
+    if (got.wage["Clasificación"] === "Remuneración")
+      ok("gestoría: una nómina sin factura se clasifica «Remuneración»");
+    else bad("gestoría: remuneración", JSON.stringify(got.wage));
+    const sinOf = (n) => got.sin.find((r) => r["Nº documento"] === n);
+    if (sinOf("GR-00002/2") && sinOf("GR-00002/2")["Sin movimiento (€)"] === "100,00")
+      ok(
+        "gestoría: la factura pagada en parte con un vale sale en «Sin movimiento» con los 100,00 que el banco no explica",
+      );
+    else bad("gestoría: factura con vale", JSON.stringify(got.sin));
+    if (sinOf("GR-VAL-1") && sinOf("GR-VAL-1")["Sin movimiento (€)"] === "-100,00")
+      ok("gestoría: y el vale también, con su −100,00");
+    else bad("gestoría: el vale", JSON.stringify(got.sin));
+    if (!sinOf("GR-00002/1") && !sinOf("GR-00003/9"))
+      ok("gestoría: lo que el banco ya explica no se repite en «Sin movimiento»");
+    else bad("gestoría: liquidadas listadas", JSON.stringify(got.sin));
+    if (!errors.length) ok("gestoría: sin errores de consola");
+    else bad("gestoría: consola", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("gestoría: suite", e.message);
   } finally {
     await ctx.close();
   }

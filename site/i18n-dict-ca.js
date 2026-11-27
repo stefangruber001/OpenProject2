@@ -5338,6 +5338,56 @@ window.CANEI_DICT.ca = {
     "El document original no es toca: aquí només s'anota el que ja es va emetre, amb el seu número i la seva data.",
   "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.":
     "Obres que van començar abans: la factura ja emesa es registra aquí perquè l'obra tingui el seu historial complet. No es torna a emetre ni es reimprimeix.",
+  // S172 · el informe para la gestoría: clasificación y «Sin movimiento».
+  Clasificación: "Classificació",
+  "Liquidado por banco (€)": "Liquidat pel banc (€)",
+  "Sin movimiento (€)": "Sense moviment (€)",
+  "Sin movimiento": "Sense moviment",
+  "Documentos que el banco no explica ·": "Documents que el banc no explica ·",
+  "Abono recibido": "Abonament rebut",
+  "Gasto sin asignar": "Despesa sense assignar",
+  "Ingreso de obra": "Ingrés d'obra",
+  "Sin factura, justificado": "Sense factura, justificat",
+  "Todos los documentos del trimestre están liquidados por banco":
+    "Tots els documents del trimestre estan liquidats pel banc",
+  Remuneración: "Remuneració",
+  Cobro: "Cobrament",
+  // S171 · las dos cargas — la de proveedores y la de facturas — enteras.
+  Cambios: "Canvis",
+  Fila: "Fila",
+  "filas leídas": "files llegides",
+  "No se pueden importar": "No es poden importar",
+  "No se puede cargar": "No es pot carregar",
+  "Una fila por proveedor. La razón social y el NIF son obligatorios: el NIF es lo que casa cada factura con su emisor. El nombre comercial se guarda como alias, así que «Obramat» sigue encontrando a Bricolaje Bricoman. Una celda en blanco no borra nada.":
+    "Una fila per proveïdor. La raó social i el NIF són obligatoris: el NIF és el que lliga cada factura amb el seu emissor. El nom comercial es guarda com a àlies, així que «Obramat» continua trobant Bricolaje Bricoman. Una cel·la en blanc no esborra res.",
+  "Si el proveedor practica retención, ponla aquí: el total de sus facturas no sale de sumar el IVA a la base, y sin este dato la carga de facturas lo calcularía mal.":
+    "Si el proveïdor practica retenció, posa-la aquí: el total de les seves factures no surt de sumar l'IVA a la base, i sense aquesta dada la càrrega de factures el calcularia malament.",
+  "ya estaban igual": "ja eren iguals",
+  "Importar facturas de proveedor": "Importar factures de proveïdor",
+  "⬆ Importar facturas": "⬆ Importar factures",
+  "Muchas facturas de golpe, sólo la cabecera, para conciliar el banco":
+    "Moltes factures de cop, només la capçalera, per conciliar el banc",
+  "Una fila por factura, sólo la cabecera: el reparto por obra se hace después. El proveedor se reconoce por su NIF, así que la hoja de proveedores va antes. El IVA se calcula con el tipo y el total sirve de comprobación.":
+    "Una fila per factura, només la capçalera: el repartiment per obra es fa després. El proveïdor es reconeix pel seu NIF, així que el full de proveïdors va abans. L'IVA es calcula amb el tipus i el total serveix de comprovació.",
+  "Si un proveedor trae los abonos en positivo, la pestaña «Series» dice qué series son abonos y la carga les pone el signo. Cuando el Tipo, el importe y la serie no coinciden, la factura no entra.":
+    "Si un proveïdor porta els abonaments en positiu, la pestanya «Series» diu quines sèries són abonaments i la càrrega els posa el signe. Quan el Tipus, l'import i la sèrie no coincideixen, la factura no entra.",
+  Abonos: "Abonaments",
+  "Facturas nuevas": "Factures noves",
+  "Abonos nuevos (restan)": "Abonaments nous (resten)",
+  "Base neta": "Base neta",
+  "Total neto": "Total net",
+  "Ya estaban registradas": "Ja estaven registrades",
+  "Abonos: revisa el signo antes de importar": "Abonaments: revisa el signe abans d'importar",
+  "Entran con aviso": "Entren amb avís",
+  "Registradas con otro importe: no se cambian": "Registrades amb un altre import: no es canvien",
+  "Facturas importadas": "Factures importades",
+  "La empresa exige repartir cada factura al registrarla. Para cargar sólo la cabecera y conciliar el banco, desmarca «Exigir que cada factura diga a dónde va» en Configuración › Empresa.":
+    "L'empresa exigeix repartir cada factura en registrar-la. Per carregar només la capçalera i conciliar el banc, desmarca «Exigir que cada factura diga a dónde va» a Configuración › Empresa.",
+  "serie desconocida para este proveedor: entra como factura":
+    "sèrie desconeguda per a aquest proveïdor: entra com a factura",
+  "el número es la referencia del proveedor: falta el número fiscal":
+    "el número és la referència del proveïdor: falta el número fiscal",
+  "con otra base en el libro": "amb una altra base al llibre",
   // S170 · los dos números de una factura, y la que emitimos nosotros.
   "Ref. del proveedor": "Ref. del proveïdor",
   "Esa factura la emitió la propia empresa: es una factura emitida, no una recibida":
@@ -5352,6 +5402,15 @@ window.CANEI_DICT.ca = {
   "Este fichero no cambiaría nada.": "Aquest fitxer no canviaria res.",
 };
 window.CANEI_DICT.rxEs2Ca = [
+  [
+    new RegExp("^⚠ (\\d+) facturas no se pudieron registrar$"),
+    "⚠ $1 factures no s'han pogut registrar",
+  ],
+  [
+    new RegExp("^⚠ (\\d+) filas no se pudieron dar de alta$"),
+    "⚠ $1 files no s'han pogut donar d'alta",
+  ],
+
   /* See the note on the English side. Origen and Alta are the Catalan words
      too, so the output matches the input — but the rule MATCHING is the point:
      it is the difference between a string nobody has translated and one whose
