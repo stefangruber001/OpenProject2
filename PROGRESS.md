@@ -4818,3 +4818,30 @@ manejabilidad 663/663 · proveedores 43/43 · year-sim 149/149 · migraciones
 154/154 · real-life 8/8 · bank-import 71/71 · libro 63/63 · source-audit
 158/158 en+ca · workspace-audit 0/0 · páginas 107/83 · diccionario completo ·
 boundaries, lint y tipos OK.
+
+## S173 · Listados de tarjeta de BBVA en PDF
+
+- **El lector de PDF reconoce el «Listado de movimientos de tarjeta»**, que
+  antes refusaba entero. Columnas por posición, tarjeta y titular de la
+  cabecera, movimientos en orden de fecha, el comercio en `merchantText` para
+  las reglas de comercio (BNK-05). **Si lo leído no suma el «Importe total»
+  impreso, no se importa nada.** Los dos listados reales del cliente: 198 y 202
+  movimientos, 0 sin leer, los dos cuadran.
+- **«RECIBO MES ANTERIOR»** se archiva como traspaso interno al importarlo en
+  una cuenta de tarjeta, venga del PDF o del Excel.
+- **Un listado de tarjeta en una cuenta corriente se refusa**, nombrando la
+  tarjeta.
+- **Daniela Blanco** (NIE `Z4678640P`, factura 005, 1.004,30 €) añadida a las
+  hojas preparadas: 12 proveedores, 100 facturas, 0 errores.
+- **Falta para conciliar:** el extracto de la cuenta corriente, el listado de
+  la tercera tarjeta (…1291, la que pagó Obramat) y las facturas de los
+  proveedores de material que sólo aparecen en las tarjetas.
+
+Quince comprobaciones nuevas en el lector de PDF (43/43, eran 28), una en el
+de Excel (72/72) y seis en el navegador.
+
+Puertas: navegador 942/942 (eran 936) · PDF 43/43 · Excel 72/72 ·
+manejabilidad 663/663 · facturas 48/48 · proveedores 43/43 · year-sim
+149/149 · migraciones 154/154 · real-life 8/8 · source-audit 158/158 en+ca
+· workspace-audit 0/0 · páginas 107/83 · diccionario completo ·
+boundaries, lint y tipos OK.

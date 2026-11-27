@@ -22635,12 +22635,36 @@
         const pv = erp.previewImport(accountId, parsed.rows);
         const acc = erp.state.bankAccounts.find((a) => a.id === accountId);
         const db = openDrawer("Importar extracto · " + (acc ? acc.name : ""));
+        /* A CARD LISTING HAS NO BALANCE, AND IS STILL CHECKED. The reader has
+           already refused any listing whose rows do not add up to the total
+           the bank prints in its header, so «no se puede comprobar que esté
+           completo» — true of a statement with no balance column — would be
+           false here. Each block is computed before the markup, words inside
+           complete literals, numbers in their own element. */
+        const isCard = parsed.layout === "card";
+        /* Acted on only when the statement goes onto a CARD account, whichever
+           file it came from: the Excel export and the PDF both flag the line,
+           and the flag alone would not stop a current account from filing a
+           same-named line as a transfer. */
+        const onCard = !!acc && acc.kind === "card";
+        const repaying = onCard ? pv.fresh.filter((r) => r.cardRepayment).length : 0;
+        const cardBlock = isCard
+          ? `<div class="it"><span>Tarjeta</span><span style="flex:1"></span><b translate="no">…${esc(parsed.card.last4)} · ${esc(parsed.card.holder)}</b></div>`
+          : "";
+        const cardChecked =
+          isCard && parsed.card.verified
+            ? `<div style="padding:0 12px 10px"><span class="pill g"><span>Completo: los movimientos suman exactamente el total del listado</span> <b>${eur(parsed.card.totalCents)}</b></span></div>`
+            : "";
+        const repayBlock = repaying
+          ? `<div style="padding:0 12px 10px"><span class="pill b"><b>${repaying}</b> <span>cobros del recibo mensual de la tarjeta se archivan como traspaso interno, no como ingreso</span></span></div>`
+          : "";
         db.innerHTML = `<div class="card"><div class="daylist">
            <div class="it"><span>Periodo del extracto</span><span style="flex:1"></span><b>${pv.from ? fmtD(pv.from) + " — " + fmtD(pv.to) : "—"}</b></div>
            <div class="it"><span>Movimientos nuevos</span><span style="flex:1"></span><b>${pv.fresh.length}</b></div>
            <div class="it"><span>Ya importados</span><span style="flex:1"></span><b>${pv.duplicates.length}</b></div>
            <div class="it"><span>Filas no legibles</span><span style="flex:1"></span><b>${parsed.skipped}</b></div>
            ${pv.closedRows ? `<div class="it"><span>En un periodo cerrado</span><span style="flex:1"></span><b>${pv.closedRows}</b></div>` : ""}
+           ${cardBlock}
            ${
              pv.statement
                ? `<div class="it"><span>Saldo inicial del extracto</span><span style="flex:1"></span><b>${eur(pv.statement.openingCents)}</b></div>
@@ -22660,10 +22684,11 @@
               : ""
           }
           ${
-            !pv.statement
+            !pv.statement && !isCard
               ? '<div style="padding:0 12px 10px"><span class="pill y">Este extracto no trae columna de saldo, así que no se puede comprobar que esté completo.</span></div>'
               : ""
           }
+          ${cardChecked}${repayBlock}
           <div style="display:flex;gap:8px;padding:0 12px 12px">
            <span style="flex:1"></span>
            <button class="btn primary" id="stGo"${pv.fresh.length && !pv.closedRows && !(pv.statement && !pv.statement.closes) ? "" : " disabled"}>Importar</button>
@@ -22672,7 +22697,16 @@
           mutate(() => {
             // The statement travels with the rows: it was computed over ALL
             // of them, and the engine checks the resulting balance against it.
-            erp.importMovements(accountId, pv.fresh, "backoffice", { statement: pv.statement });
+            const made = erp.importMovements(accountId, pv.fresh, "backoffice", {
+              statement: pv.statement,
+            });
+            /* The card being paid off: the other leg of the transfer that
+               `markCardSettlement` records on the bank line. `importMovements`
+               returns the records in the order of the rows it was given. */
+            pv.fresh.forEach((r, i) => {
+              if (onCard && r.cardRepayment && made[i])
+                erp.classifyMovement(made[i].id, "internalTransfer", "backoffice");
+            });
             closeDrawer();
           }, "Extracto importado");
       }
@@ -25821,6 +25855,23 @@
               }
             } catch (err) {
               say(String(err.message || err));
+              return;
+            }
+            /* A CARD'S LISTING GOES ON THE CARD. Its purchases are the costs
+               and the bank line that pays the card off is a transfer; filed on
+               the current account, every purchase would be a movement of an
+               account that never made it, and the monthly repayment would be
+               counted as income. The file says which card it is, so the
+               refusal can say it too. */
+            const target = erp.state.bankAccounts.find((a) => a.id === bankAcc);
+            if (parsed.layout === "card" && (!target || target.kind !== "card")) {
+              say(
+                "Este PDF es el listado de la tarjeta …" +
+                  parsed.card.last4 +
+                  " (" +
+                  parsed.card.holder +
+                  "). Elige su cuenta de tarjeta; si no existe, créala en Configuración › Empresa.",
+              );
               return;
             }
             statementPreviewDrawer(bankAcc, parsed);

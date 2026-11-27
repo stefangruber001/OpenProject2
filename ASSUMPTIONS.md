@@ -12647,3 +12647,67 @@ como si fueran las facturas. El orden de las cuatro hojas que ya había es un
 contrato: con esa prueba y con un gestor que sabe dónde está cada cosa. La
 hoja nueva va detrás de «Resumen», y su propia prueba busca cada hoja por su
 cabecera, no por su número, para que la próxima que se añada no rompa nada.
+
+## S173 · Las tarjetas de BBVA en PDF, y lo que dicen de la conciliación
+
+El cliente mandó dos listados de tarjeta de crédito de empresa en PDF — el de
+Diorka (…5347) y el de Enric (…9158) — y el lector de extractos los **refusó
+los dos**: «no he encontrado ningún movimiento con fecha». No es el extracto
+de cuenta con otra cabecera, es otro documento: fechas ISO, ninguna columna
+de saldo, y una columna de tipo de movimiento que el texto unido no separa
+del nombre del comercio.
+
+**Las columnas se leen por posición.** pdf.js da una celda por elemento, cada
+una bajo su cabecera (fecha, concepto, tipo, importe), y cada celda va a la
+columna que tiene encima. Leer el texto unido habría partido mal un comercio
+que se llamara «COMPRA FACIL»; el fixture lleva exactamente ese caso.
+
+**La comprobación de este formato es el «Importe total».** Sin saldo, la
+aritmética del extracto (saldo inicial + movimientos = saldo final) no tiene
+nada sobre lo que trabajar. Lo que sí imprime el listado es el total de sus
+movimientos, y los leídos tienen que sumarlo al céntimo o **no se importa
+nada**. Los dos reales cuadran: 198 movimientos y −545,43 €; 202 y −185,95 €.
+La vista previa lo dice — «Completo» — en lugar del «no se puede comprobar»
+que sería cierto de un extracto sin saldo y falso de éste.
+
+**«RECIBO MES ANTERIOR» no es un ingreso.** Es la tarjeta cobrándose de la
+cuenta corriente: la otra pata del traspaso que `markCardSettlement` ya anota
+en el lado del banco. Los dos lectores de BBVA —PDF y Excel— lo marcan, y la
+pantalla lo archiva como traspaso interno **sólo si el extracto va a una
+cuenta de tarjeta**, para que una línea igual en una cuenta corriente no se
+convierta en traspaso por error. Sin esto, cada tarjeta habría dejado cuatro
+«ingresos sin explicar» por trimestre en el informe de la gestoría.
+
+**Un listado de tarjeta no entra en una cuenta corriente.** El fichero dice
+qué tarjeta es; la pantalla lo refusa nombrándola.
+
+**Lo que no se cambia: los periodos cerrados.** El listado de BBVA abarca
+meses hacia atrás (los reales, de abril a noviembre), y la regla existente
+bloquea la importación entera si alguna fila cae en un periodo cerrado — aunque
+sea un duplicado ya importado. No se toca dentro de esta unidad: la salida es
+exportar el listado sólo del periodo abierto, que BBVA permite elegir.
+
+**El fixture es inventado.** Los listados reales llevan un número de tarjeta,
+el nombre de una persona y en qué se gasta su dinero; no se suben al
+repositorio. `tests/fixtures/make-bbva-card-pdf-fixture.py` reproduce la forma
+con valores inventados y lleva cada trampa del real.
+
+### Lo que la prueba en seco con los listados reales enseñó
+
+Cruzando los dos listados (01/10–27/11) con las 100 facturas preparadas:
+
+- **10 casan al céntimo y el mismo día**: 9 de BigMat Sant Just y la de Leroy
+  Merlin. Un cargo de 11,50 € en un bar casó también con una factura de BigMat
+  de 11,50 € por pura coincidencia de importe: casar sólo por importe y fecha
+  no basta, el comercio tiene que pesar.
+- **89 de las 100 facturas no están en ninguna de las dos tarjetas**, y por
+  dos razones distintas. Los autónomos, el alquiler y algunos proveedores se
+  pagan por **transferencia**, desde la cuenta corriente, cuyo extracto no ha
+  llegado. Y las seis facturas de Obramat dicen en el propio papel que se
+  pagaron con la tarjeta **…1291** — **una tercera tarjeta** de la que no
+  tenemos listado, y que probablemente paga también la mayor parte de BigMat
+  a partir del 21 de octubre.
+- **152 cargos de tarjeta, 1.996,79 €, sin factura detrás**: cafeterías y
+  bares, ropa, combustible, suscripciones de software — y **materiales de
+  proveedores que no están en la carpeta** (Suministros Eléctricos Quars
+  169,28 €, Corella Idaplac 66,94 €, una ferretería 48,25 €).

@@ -6819,6 +6819,16 @@ window.CANEI_DICT = {
       "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.",
       "Jobs that started earlier: an invoice already issued is recorded here so the job has its full history. It is neither reissued nor reprinted.",
     ],
+    // S173 · el listado de tarjeta de BBVA en PDF.
+    ["Este PDF es el listado de la tarjeta …", "This PDF is the statement of card …"],
+    [
+      "cobros del recibo mensual de la tarjeta se archivan como traspaso interno, no como ingreso",
+      "monthly card repayments are filed as an internal transfer, not as income",
+    ],
+    [
+      "Completo: los movimientos suman exactamente el total del listado",
+      "Complete: the movements add up exactly to the statement's total",
+    ],
     // S172 · el informe para la gestoría: clasificación y «Sin movimiento».
     ["Clasificación", "Classification"],
     ["Liquidado por banco (€)", "Settled through the bank (€)"],
@@ -6906,6 +6916,13 @@ window.CANEI_DICT = {
     ["Este fichero no cambiaría nada.", "This file would change nothing."],
   ],
   rxEs2En: [
+    [
+      new RegExp(
+        "^Este PDF es el listado de la tarjeta …(\\d+) \\((.*)\\)\\. Elige su cuenta de tarjeta; si no existe, créala en Configuración › Empresa\\.$",
+      ),
+      "This PDF is the statement of card …$1 ($2). Choose its card account; if it does not exist, create it in Configuración › Empresa.",
+    ],
+
     [
       new RegExp("^⚠ (\\d+) facturas no se pudieron registrar$"),
       "⚠ $1 invoices could not be registered",

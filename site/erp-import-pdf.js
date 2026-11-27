@@ -61,7 +61,17 @@
   const MONEY_RE = /-?\d{1,3}(?:\.\d{3})*,\d{1,2}\s*EUR\b/gi;
 
   /** Every text-showing item on every page, grouped into visual lines, ONE ARRAY PER PAGE. */
-  async function pdfLines(arrayBuffer, pdfjs) {
+  /**
+   * Every page as visual lines, each KEEPING its items and their x.
+   *
+   * The account statement only ever needed the joined text of a line. The card
+   * listing needs the positions: its four columns are told apart by WHERE each
+   * cell sits under its header, because a merchant can be called «COMPRA FACIL»
+   * and joined text cannot say where the concept ends and the movement type
+   * begins. So the PDF is read once into positioned items, and `pdfLines` is
+   * the text projection of that — the same output it always had.
+   */
+  async function pdfItemLines(arrayBuffer, pdfjs) {
     const doc = await pdfjs.getDocument({
       data: new Uint8Array(arrayBuffer),
       useSystemFonts: true,
@@ -85,19 +95,23 @@
         row.items.push({ x, str: it.str });
       }
       rows.sort((a, b) => b.y - a.y);
-      const lines = [];
-      for (const r of rows) {
-        r.items.sort((a, b) => a.x - b.x);
-        const text = r.items
-          .map((i) => i.str)
-          .join(" ")
-          .replace(/\s+/g, " ")
-          .trim();
-        if (text) lines.push(text);
-      }
-      pages.push(lines);
+      for (const r of rows) r.items.sort((a, b) => a.x - b.x);
+      pages.push(rows);
     }
     return pages;
+  }
+  function textOf(line) {
+    return line.items
+      .map((i) => i.str)
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function linesOf(itemPages) {
+    return itemPages.map((rows) => rows.map(textOf).filter(Boolean));
+  }
+  async function pdfLines(arrayBuffer, pdfjs) {
+    return linesOf(await pdfItemLines(arrayBuffer, pdfjs));
   }
 
   /**
@@ -181,8 +195,180 @@
    * all — a row that starts right but fails to parse is counted in
    * `skipped`, never silently dropped.
    */
+  /* ===================== THE CARD LISTING ===================================
+     BBVA's other PDF: «Listado de movimientos de tarjeta», what a business
+     credit card exports. Not the account statement with a different header —
+     a different document:
+
+       · dates are ISO (2026-11-23), not dd/mm/yyyy, so the statement reader
+         found no movement at all and refused the file outright;
+       · there is NO running balance, so the statement's own arithmetic
+         (opening + movements = closing) has nothing to work on;
+       · there is a TYPE column — Compra, Reembolso, «Sin categoría» — that
+         joined text cannot separate from the merchant's name.
+
+     What it does print is an «Importe total» in its header, and that is the
+     guard this format gets instead of the balance: the rows read must add up
+     to it to the cent, or NOTHING is imported. A reader that silently drops a
+     line hands the reconciliation a card that paid less than it did.
+
+     Columns are found by the x of their header cells — repeated on every page
+     at the same place — and each cell of a row goes to the column it sits
+     under. And one line is not a purchase: «RECIBO MES ANTERIOR» is the card
+     being PAID OFF from the current account, the other leg of the transfer
+     `markCardSettlement` records on the bank side. It is flagged, so the
+     screen can file it as an internal transfer instead of leaving the
+     gestoría an unexplained income four times a quarter. */
+  const CARD_TITLE = /listado de movimientos de tarjeta/i;
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const CARD_HEAD = {
+    date: "FECHA DE OPERACION",
+    concept: "CONCEPTO",
+    kind: "TIPO DE MOVIMIENTO",
+    amount: "IMPORTE",
+  };
+  const CARD_REPAYMENT = "RECIBO MES ANTERIOR";
+  function foldU(s) {
+    return String(s == null ? "" : s)
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+  }
+  function eurCents(s) {
+    return toCents(String(s || "").replace(/\s*EUR\s*$/i, ""));
+  }
+  function eurTxt(c) {
+    return (c / 100).toFixed(2).replace(".", ",");
+  }
+  function parseCardListing(itemPages) {
+    const meta = {};
+    const LABELS = [
+      ["number", "Nº de tarjeta"],
+      ["holder", "Titular de la tarjeta"],
+      ["period", "Periodo"],
+      ["total", "Importe total"],
+    ];
+    let cols = null;
+    let last = null;
+    const rows = [];
+    let skipped = 0;
+    for (const lines of itemPages)
+      for (const line of lines) {
+        const items = line.items;
+        const f = items.map((it) => foldU(it.str));
+        for (const [key, lab] of LABELS) {
+          if (meta[key] != null) continue;
+          const at = f.indexOf(foldU(lab));
+          if (at >= 0 && items[at + 1]) meta[key] = items[at + 1].str.trim();
+        }
+        if (f.includes(CARD_HEAD.date) && f.includes(CARD_HEAD.amount)) {
+          cols = {};
+          for (const [key, head] of Object.entries(CARD_HEAD)) {
+            const it = items.find((x) => foldU(x.str) === head);
+            if (it) cols[key] = it.x;
+          }
+          last = null;
+          continue;
+        }
+        if (!cols || !items.length) continue;
+        const order = Object.entries(cols).sort((a, b) => a[1] - b[1]);
+        const columnOf = (x) => {
+          let k = order[0][0];
+          for (const [name, cx] of order) if (x >= cx - 3) k = name;
+          return k;
+        };
+        if (!ISO_DATE.test(items[0].str.trim())) {
+          /* A concept too long for its cell wraps onto a line of its own,
+             with text only under CONCEPTO. Anything else without a date — a
+             page number, the next page's header block — is not part of a
+             movement. */
+          if (last && items.every((it) => columnOf(it.x) === "concept")) {
+            last.concept = (last.concept + " " + textOf(line)).trim();
+            last.merchantText = last.concept;
+          }
+          continue;
+        }
+        const cell = { date: [], concept: [], kind: [], amount: [] };
+        for (const it of items) cell[columnOf(it.x)].push(it.str.trim());
+        const amountCents = eurCents(cell.amount.join(" "));
+        if (amountCents == null) {
+          skipped++;
+          last = null;
+          continue;
+        }
+        const date = cell.date[0];
+        const concept = cell.concept.join(" ").replace(/\s+/g, " ").trim();
+        const row = {
+          accountingDate: date,
+          valueDate: date,
+          concept,
+          // The merchant, where BNK-05's merchant rules look — so a line from
+          // «PLATAFORMA CONSTR.-SANT J» can propose its supplier by itself.
+          merchantText: concept,
+          opCode: cell.kind.join(" ").trim(),
+          amountCents,
+          balanceCents: null,
+          card: meta.number ? "…" + String(meta.number).replace(/\D/g, "").slice(-4) : "tarjeta",
+        };
+        if (foldU(concept) === CARD_REPAYMENT) row.cardRepayment = true;
+        rows.push(row);
+        last = row;
+      }
+    if (!rows.length)
+      throw new Error(
+        "El PDF es un listado de tarjeta, pero no he encontrado ningún movimiento en él.",
+      );
+    const sum = rows.reduce((a, r) => a + r.amountCents, 0);
+    const printed = meta.total != null ? eurCents(meta.total) : null;
+    if (printed != null && printed !== sum)
+      throw new Error(
+        "El listado dice que sus movimientos suman " +
+          eurTxt(printed) +
+          " € y los que he leído suman " +
+          eurTxt(sum) +
+          " €. No se importa nada: falta o sobra algún movimiento en la lectura.",
+      );
+    /* By date, oldest first, STABLY. The export is mostly newest-first but
+       prints still-pending movements in a block of their own at the top, in
+       the other order; with no balance whose story a reversal must keep, a
+       sort is the honest reading. */
+    const ordered = rows
+      .map((r, i) => ({ r, i }))
+      .sort((a, b) =>
+        a.r.accountingDate < b.r.accountingDate
+          ? -1
+          : a.r.accountingDate > b.r.accountingDate
+            ? 1
+            : a.i - b.i,
+      )
+      .map((x) => x.r);
+    const last4 = meta.number ? String(meta.number).replace(/\D/g, "").slice(-4) : "";
+    return {
+      rows: ordered,
+      skipped,
+      layout: "card",
+      card: {
+        number: meta.number || "",
+        last4,
+        holder: meta.holder || "",
+        period: meta.period || "",
+        totalCents: printed,
+        verified: printed != null,
+      },
+      repayments: rows.filter((r) => r.cardRepayment).length,
+    };
+  }
+
   async function parseBbvaPdf(arrayBuffer, pdfjs) {
-    const lines = await pdfLines(arrayBuffer, pdfjs);
+    /* ONE read. pdf.js may hand the buffer to its worker and leave this side
+       of it detached, so a second `getDocument` on the same bytes is not a
+       thing to rely on — the layout is decided from what was already read. */
+    const itemPages = await pdfItemLines(arrayBuffer, pdfjs);
+    const lines = linesOf(itemPages);
+    if (lines.some((page) => page.some((l) => CARD_TITLE.test(l))))
+      return parseCardListing(itemPages);
     const groups = groupLines(lines);
     if (!groups.length)
       throw new Error(
@@ -206,5 +392,5 @@
     return { rows, skipped };
   }
 
-  return { parseBbvaPdf, pdfLines, groupLines, parseRowGroup };
+  return { parseBbvaPdf, pdfLines, pdfItemLines, groupLines, parseRowGroup, parseCardListing };
 });

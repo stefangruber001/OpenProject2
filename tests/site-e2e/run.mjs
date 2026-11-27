@@ -8491,6 +8491,95 @@ async function testBankAndCash(browser, base) {
     if (pdfFinal === 16) ok("1B·PDF: and nothing was imported twice");
     else bad("1B·PDF: no duplicate import", String(pdfFinal));
 
+    // ── 1B·TARJETA: BBVA's card listing as a PDF — the shape the client's two
+    //    real card statements arrive in, which the statement reader refused
+    //    outright («ningún movimiento con fecha»). Through the real file input.
+    const chooseAcc = (id) =>
+      pg.evaluate((x) => {
+        if (bankAcc === x) return;
+        const row = document.querySelector(`#view [data-acct="${x}"]`);
+        if (row) row.click();
+      }, id);
+    // First on the CURRENT account: a card's listing must not land there.
+    await chooseAcc(pdfAcc);
+    await pg.waitForTimeout(400);
+    const cardBefore = await pg.evaluate(() => erp.state.movements.length);
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-tarjeta.pdf");
+    await pg.waitForTimeout(1500);
+    /* The drawer is asked by its `.on` class: a closed drawer stays in the
+       DOM with the previous preview's button still inside it. And the
+       refusal is a MODAL a person acknowledges, so it is dismissed before
+       the next step — left open, it covers every button behind it. */
+    const wrongAcc = await pg.evaluate(
+      (n) => ({
+        drawer: !!document.querySelector("#drawer.on"),
+        said: document.body.textContent.includes("listado de la tarjeta …1234"),
+        grew: erp.state.movements.length !== n,
+      }),
+      cardBefore,
+    );
+    if (!wrongAcc.drawer && wrongAcc.said && !wrongAcc.grew)
+      ok("1B·TARJETA: a card listing chosen onto a current account is refused, naming the card");
+    else bad("1B·TARJETA: wrong account", JSON.stringify(wrongAcc));
+    await pg.keyboard.press("Escape");
+    await pg.waitForTimeout(300);
+
+    await makeAccount(pg, "Tarjeta PDF E2E", "card");
+    const cardPdfAcc = await pg.evaluate(() => {
+      const a = erp.state.bankAccounts.find((a) => a.name === "Tarjeta PDF E2E");
+      return a ? a.id : null;
+    });
+    await chooseAcc(cardPdfAcc);
+    await pg.waitForTimeout(500);
+    await pg.setInputFiles("#bkFile", "tests/fixtures/bbva-tarjeta.pdf");
+    await pg.waitForTimeout(1500);
+    const cardPv = await pg.evaluate(() => {
+      const go = document.getElementById("stGo");
+      if (!go) return null;
+      const t = go.closest(".card").textContent.replace(/\s+/g, " ");
+      return { disabled: go.disabled, text: t.slice(0, 900) };
+    });
+    if (cardPv && !cardPv.disabled && /Movimientos nuevos\s*54/.test(cardPv.text))
+      ok("1B·TARJETA: the drawer previews all 54 movements of the listing");
+    else bad("1B·TARJETA: preview", JSON.stringify(cardPv));
+    if (
+      cardPv &&
+      /Completo/.test(cardPv.text) &&
+      /213,34/.test(cardPv.text) &&
+      !/no se puede comprobar/.test(cardPv.text)
+    )
+      ok(
+        "1B·TARJETA: it says the listing is COMPLETE against its printed total, not «cannot be checked»",
+      );
+    else bad("1B·TARJETA: verified", JSON.stringify(cardPv));
+    if (cardPv && /2\s*cobros del recibo mensual/.test(cardPv.text))
+      ok("1B·TARJETA: and announces the two monthly repayments it will file as transfers");
+    else bad("1B·TARJETA: repayments announced", JSON.stringify(cardPv));
+    await pg.click("#stGo");
+    await pg.waitForTimeout(800);
+    const cardOut = await pg.evaluate((id) => {
+      const ms = erp.state.movements.filter((m) => m.accountId === id);
+      const rec = ms.filter((m) => m.concept === "RECIBO MES ANTERIOR");
+      return {
+        count: ms.length,
+        cards: [...new Set(ms.map((m) => m.card))],
+        repay: rec.map((m) => m.class),
+        purchase: (ms.find((m) => m.concept === "COMPRA FACIL SL") || {}).class,
+      };
+    }, cardPdfAcc);
+    if (cardOut.count === 54 && cardOut.cards.length === 1 && cardOut.cards[0] === "…1234")
+      ok("1B·TARJETA: 54 movements land on the card account, each naming the card");
+    else bad("1B·TARJETA: imported", JSON.stringify(cardOut));
+    if (
+      cardOut.repay.length === 2 &&
+      cardOut.repay.every((c) => c === "internalTransfer") &&
+      cardOut.purchase !== "internalTransfer"
+    )
+      ok(
+        "1B·TARJETA: the repayments are filed as internal transfers; the purchases are left to reconcile",
+      );
+    else bad("1B·TARJETA: repayment class", JSON.stringify(cardOut));
+
     // ── 1C: a credit card is an ACCOUNT — created through the product, fed
     //    by the same importer, settled from the bank as an internal transfer.
     await makeAccount(pg, "Visa E2E", "card");

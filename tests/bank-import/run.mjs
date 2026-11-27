@@ -231,6 +231,16 @@ assert(
   "card: the monthly settlement row is positive on the card",
   recibo && recibo.amountCents,
 );
+assert(
+  recibo &&
+    recibo.cardRepayment === true &&
+    tarjeta.rows.filter((r) => r.cardRepayment).length === 1,
+  "card: …and flagged as the card being paid off, as the PDF reader flags it",
+  tarjeta.rows
+    .filter((r) => r.cardRepayment)
+    .map((r) => r.concept)
+    .join(","),
+);
 // It lands on a card account through the same door as any other statement.
 const card2 = e2.addBankAccount({ name: "Visa", kind: "card" }, "bo");
 const cpv = e2.previewImport(card2.id, tarjeta.rows);

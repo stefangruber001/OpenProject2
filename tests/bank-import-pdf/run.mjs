@@ -244,6 +244,120 @@ assert(
 );
 
 // =============================================================================
+// THE CARD LISTING — BBVA's other PDF, «Listado de movimientos de tarjeta».
+// The client's two real listings were REFUSED by the statement reader («no
+// he encontrado ningún movimiento con fecha»): ISO dates, no balance, a type
+// column. The fixture reproduces that shape with invented values; see
+// tests/fixtures/make-bbva-card-pdf-fixture.py for every trap it carries.
+{
+  const { pdfItemLines, parseCardListing } = require("../../site/erp-import-pdf.js");
+  const cbuf = readFileSync(new URL("../fixtures/bbva-tarjeta.pdf", import.meta.url));
+  const card = await parseBbvaPdf(new Uint8Array(cbuf), pdfjs);
+  assert(
+    card.layout === "card",
+    "card: the listing is recognised as a card, not refused",
+    card.layout,
+  );
+  assert(
+    card.rows.length === 54 && card.skipped === 0,
+    "card: every movement on both pages read, the repeated header on page 2 is not one",
+    `${card.rows.length}/${card.skipped}`,
+  );
+  assert(
+    card.card.last4 === "1234" && card.card.holder === "TITULAR DE PRUEBA",
+    "card: which card and whose, from the header",
+    JSON.stringify(card.card),
+  );
+  const sum = card.rows.reduce((a, r) => a + r.amountCents, 0);
+  assert(
+    card.card.verified && card.card.totalCents === sum && sum === 21334,
+    "card: the rows add up to the «Importe total» the bank prints — the format's completeness check",
+    `${sum} vs ${card.card.totalCents}`,
+  );
+  const find = (c) => card.rows.find((r) => r.concept === c);
+  assert(
+    find("COMPRA FACIL SL") && find("COMPRA FACIL SL").opCode === "Compra",
+    "card: a merchant called «COMPRA…» stays a concept — cells go to the column they sit under",
+    JSON.stringify(find("COMPRA FACIL SL")),
+  );
+  assert(
+    find("MATERIALES DE OBRA SUMINISTROS DEL VALLES") &&
+      find("MATERIALES DE OBRA SUMINISTROS DEL VALLES").amountCents === -123456,
+    "card: a wrapped concept is joined back, and «1.234,56» is 1.234,56",
+  );
+  assert(
+    find("ESTACION DE SERVICIO").amountCents === -5000,
+    "card: «50,0 EUR» — the trimmed zero — is 50,00",
+  );
+  assert(
+    card.rows.filter((r) => r.concept === "TOT DEGUSTACIO").length === 2,
+    "card: two identical purchases on one day are two movements",
+  );
+  const dates = card.rows.map((r) => r.accountingDate);
+  assert(
+    dates.every((d, i) => i === 0 || dates[i - 1] <= d) && dates[dates.length - 1] === "2026-11-26",
+    "card: sorted oldest first — the pending block printed at the top lands at the end",
+    dates.slice(-3).join(","),
+  );
+  const rep = card.rows.filter((r) => r.cardRepayment);
+  assert(
+    rep.length === 2 &&
+      rep.every((r) => r.concept === "RECIBO MES ANTERIOR" && r.amountCents > 0) &&
+      card.repayments === 2,
+    "card: «RECIBO MES ANTERIOR» is flagged as the card being paid off, not a purchase",
+  );
+  assert(
+    card.rows.every(
+      (r) => r.card === "…1234" && r.merchantText === r.concept && r.balanceCents === null,
+    ),
+    "card: every row names its card, carries the merchant for the rules (BNK-05), and no balance",
+  );
+
+  /* THE GUARD. One movement lost in the reading — here, deleted from the
+     item lines — and the listing no longer adds up to its own total. Nothing
+     may be imported from it. */
+  const pages = await pdfItemLines(new Uint8Array(cbuf), pdfjs);
+  const at = pages[0].findIndex((l) => l.items.some((i) => i.str === "BRICO SANT BOI"));
+  pages[0].splice(at, 1);
+  let refused = "";
+  try {
+    parseCardListing(pages);
+  } catch (err) {
+    refused = err.message;
+  }
+  assert(
+    /suman 213,34 € y los que he leído suman 226,31 €/.test(refused),
+    "card: a listing that does not add up to its printed total is refused, with both figures",
+    refused || "not refused",
+  );
+
+  /* It lands on a card account through the same door as any statement, and
+     the same file imported twice is all duplicates the second time. */
+  const ec = new ERP("2026-11-27");
+  const visa = ec.addBankAccount({ name: "Visa de prueba", kind: "card" }, "bo");
+  const pv = ec.previewImport(visa.id, card.rows);
+  const made = ec.importMovements(visa.id, pv.fresh, "bo");
+  assert(
+    made.length === 54 && made.every((m) => m.card === "…1234"),
+    "card: imported onto the card account, 54 movements",
+  );
+  assert(
+    ec.previewImport(visa.id, card.rows).fresh.length === 0,
+    "card: the same listing again is all duplicates",
+  );
+}
+{
+  /* And the statement reader is still the statement reader: the refactor that
+     keeps positions for the card did not change a single line it returns. */
+  const again = await parseBbvaPdf(new Uint8Array(buf), pdfjs);
+  assert(
+    again.layout === undefined && again.rows.length === 16,
+    "statement: still read as a statement after the card layout was added",
+    `${again.layout}/${again.rows.length}`,
+  );
+}
+
+// =============================================================================
 const failed = checks.filter((c) => !c.pass);
 for (const c of checks)
   console.log((c.pass ? "✓" : "✗") + " " + c.name + (c.pass ? "" : " — " + c.detail));

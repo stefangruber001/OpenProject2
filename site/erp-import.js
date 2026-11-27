@@ -388,6 +388,11 @@
         amountCents,
         balanceCents: toCents(get("balance")),
         currency: String(get("currency") || "EUR").trim() || "EUR",
+        /* The card being paid off from the current account — BBVA's own label
+           for it on a card export, the PDF reader flags it the same way. A
+           hint only: the import screen acts on it solely when the statement
+           is going onto a CARD account. */
+        cardRepayment: /^RECIBO MES ANTERIOR$/i.test(concept || detail) || undefined,
       });
     }
     /* Chronological, whatever order the export used. BBVA writes newest
