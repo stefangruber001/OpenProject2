@@ -4694,3 +4694,37 @@ Trece comprobaciones nuevas (651/651, eran 638).
 Puertas: manejabilidad 651/651 · numeración 55/55 · year-sim 149/149 ·
 migraciones 154/154 · source-audit 158/158 en+ca · workspace-audit 0/0 ·
 diccionario completo 4.548 entradas · boundaries OK · lint y tipos OK.
+
+## S165–S167 · Medido el material del cliente antes de escribir el importador
+
+Sin código: los dos ficheros del cliente y los tres PDF de ejemplo, leídos y
+cuadrados, porque la carga acordada en la reunión del 26 de noviembre se
+rompía en tres sitios que sólo se ven en los datos reales.
+
+- **Las dos numeraciones son las dos necesarias.** Las 30 facturas de BigMat
+  del registro de Diorca están las 30 en el listado del T4 bajo un
+  identificador interno distinto. **El signo del asiento sólo es recuperable
+  desde la serie del número fiscal**: tres abonos salen POSITIVOS en el
+  listado y el prefijo interno no los distingue (`ZCO25893685` es un abono y
+  lleva el prefijo normal). Cargar el listado tal cual sobrevalora el
+  trimestre en **562,98 € de base / 608,62 € de total**.
+- **El IVA no puede salir de la diferencia.** `ZCO25941514` y `ZCO25925068`
+  llevan exactamente 6,00 € menos que `base × 1,21` — un descuento posterior
+  al impuesto, no un tipo distinto; restar base de total les inventaría un
+  11,2 % y un 10,0 %. Y en el alquiler (`Luengo Sanchez C.B.`, base 750,00,
+  total 765,00) la diferencia da 15,00 € donde el IVA es 157,50 con una
+  retención de 142,50. El banco cuadra igual, así que el error no se vería.
+- **Cargar los dos ficheros duplicaría 29 facturas** (1.292,43 € de base). El
+  listado es la fuente; el registro manual es el detalle de línea para el
+  reparto posterior.
+- **«Inelec» es Sinelec Ciutadella, S.L.**, CIF `B70972336`.
+- **S159 verificado contra los tres PDF reales:** el NIF del emisor sale bien
+  en los tres y en verde, incluida la factura de Obramat que lleva el NIF de
+  Canei impreso en el cuerpo bajo la etiqueta «Numero NIF». El nombre, en
+  cambio, sale inservible en los tres (una dirección, la palabra «RECEPTOR»,
+  un trozo del aviso de privacidad) — siempre en ámbar, nunca aceptado solo,
+  pero es lo que la clienta ve y por lo que dice que «nunca lee bien el
+  emisor». Con el NIF en verde el nombre se puede tomar de la ficha del
+  proveedor en vez de la página.
+
+Puertas: boundaries OK. Sin cambios de código.
