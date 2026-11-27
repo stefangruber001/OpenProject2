@@ -2856,7 +2856,7 @@ assert(
 {
   const e = new ERP();
   e.configureEntity(
-    { legalName: "Obras Test SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    { legalName: "Obras Test SL", taxId: "B20000006", iban: "ES9121000418450200051332" },
     "bo",
   );
   const supplier = e.addParty(
@@ -3000,7 +3000,7 @@ assert(
   e.configureEntity(
     {
       legalName: "Obras 1F SL",
-      taxId: "B12345674",
+      taxId: "B20000014",
       street: "s",
       postalCode: "08960",
       city: "c",
@@ -3268,7 +3268,7 @@ assert(
 {
   const e = new ERP("2026-03-10");
   e.configureEntity(
-    { legalName: "Obras 1C SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    { legalName: "Obras 1C SL", taxId: "B20000022", iban: "ES9121000418450200051332" },
     "bo",
   );
   const sup = e.addParty({ roles: ["supplier"], name: "Ferretería 1C", taxId: "B12345674" }, "bo");
@@ -3344,7 +3344,7 @@ assert(
 {
   const e = new ERP("2026-03-10");
   e.configureEntity(
-    { legalName: "Obras 1D SL", taxId: "B12345674", iban: "ES9121000418450200051332" },
+    { legalName: "Obras 1D SL", taxId: "B20000030", iban: "ES9121000418450200051332" },
     "bo",
   );
   const acc = e.addBankAccount({ name: "BBVA", kind: "bank" }, "bo");
@@ -3678,7 +3678,7 @@ assert(
   e.configureEntity(
     {
       legalName: "Obras V SL",
-      taxId: "B12345674",
+      taxId: "B20000048",
       street: "s",
       postalCode: "08960",
       city: "c",
@@ -7031,6 +7031,137 @@ assert(
       ),
     "a split that does not total the base is refused as it always was",
   );
+}
+
+/* ── S170 · dos numeraciones para un documento, y el documento que es nuestro ──
+   Los dos salen del material real del cliente, y ninguno de los dos lo podía
+   encontrar una prueba escrita contra supuestos.
+
+   UN PROVEEDOR IDENTIFICA LA MISMA FACTURA DE DOS MANERAS: el número fiscal
+   que imprime en el papel y un identificador interno con el que la exporta en
+   su listado y con el que nombra sus PDF. De las 30 facturas de BigMat del
+   registro manual, las 30 están en el listado bajo el otro nombre. Si el
+   duplicado se busca sólo por el número fiscal, la misma factura entrando por
+   las dos puertas se queda en el libro dos veces.
+
+   Y EL MISMO NÚMERO LLEGA PUNTUADO DE DOS FORMAS, porque el que va en un
+   nombre de fichero lleva guiones donde el papel lleva barras. */
+{
+  const e = new ERP("2026-11-27");
+  e.configureEntity({
+    legalName: "Canei Subirats, S.L.",
+    taxId: "B26942003",
+    iban: "ES9121000418450200051332",
+    requireCostDestination: false,
+  });
+  const s1 = e.addParty(
+    { name: "Estrategias BigMat, S.L.U.", taxId: "B88430459", roles: ["supplier"] },
+    "bo",
+  );
+  const bill = (over) =>
+    e.registerBill(Object.assign({ supplierId: s1.id, baseCents: 4453 }, over), "bo");
+
+  const first = bill({ number: "00002-2026/A2101/00014649", supplierDocRef: "ZCO25884582" });
+  assert(
+    first.supplierDocRef === "ZCO25884582" && first.duplicateSuspect === null,
+    "S170: una factura guarda los dos números y la primera vez no es duplicado",
+    first.supplierDocRef + "/" + first.duplicateSuspect,
+  );
+  /* El mismo número fiscal, escrito como lo escribe un nombre de fichero. */
+  const punct = bill({ number: "00002-2026-A2101-00014649" });
+  assert(
+    punct.duplicateSuspect === first.id,
+    "S170: el mismo número con otra puntuación es el mismo documento",
+    String(punct.duplicateSuspect),
+  );
+  /* La misma factura llegando del listado, donde sólo viene el id interno. */
+  const byRef = bill({ number: "ZCO25884582", supplierDocRef: "ZCO25884582" });
+  assert(
+    byRef.duplicateSuspect !== null,
+    "S170: y también se reconoce por la referencia del proveedor",
+    String(byRef.duplicateSuspect),
+  );
+  /* Una factura distinta de verdad NO se marca: una regla que marca todo no
+     dice nada, y la alerta AP-DUPLICATE es de prioridad alta. */
+  const other = bill({ number: "00002-2026/A2101/00014650", supplierDocRef: "ZCO25884599" });
+  assert(
+    other.duplicateSuspect === null,
+    "S170: una factura distinta no se marca como duplicada",
+    String(other.duplicateSuspect),
+  );
+  /* Vacío nunca casa con vacío, que es como «ningún número» se convertía en
+     «el mismo número» en la regla de CAP-05 antes de arreglarse. */
+  const blank1 = bill({ number: "", supplierDocRef: "", baseCents: 111 });
+  const blank2 = bill({ number: "", supplierDocRef: "", baseCents: 222 });
+  assert(
+    blank2.duplicateSuspect === null && blank1.duplicateSuspect === null,
+    "S170: dos documentos sin número no son duplicados el uno del otro",
+    String(blank2.duplicateSuspect),
+  );
+
+  /* UNA FACTURA QUE EMITIÓ LA PROPIA EMPRESA NO ES UNA FACTURA RECIBIDA.
+     Estaba en la carpeta del trimestre del cliente, entre las de proveedor:
+     «Factura a: …», firmada al pie con el CIF y la cuenta de la empresa.
+     Registrarla como gasto da de alta a una clienta como proveedora y anota
+     once mil euros de ingreso como coste. */
+  const self = e.addParty(
+    { name: "Canei Subirats, S.L.", taxId: "B26942003", roles: ["supplier"] },
+    "bo",
+  );
+  let refused = "";
+  try {
+    e.registerBill({ supplierId: self.id, number: "15-2026", baseCents: 1192100 }, "bo");
+  } catch (err) {
+    refused = err.message;
+  }
+  assert(
+    /propia empresa/.test(refused),
+    "S170: una factura emitida por la empresa se refusa como gasto",
+    refused || "no refusó",
+  );
+  /* Y NO depende de cómo esté escrito el NIF a cada lado. Se prueba desde la
+     ficha de la empresa, no con un segundo contacto: MDM-03 ya impide que dos
+     registros activos compartan NIF, así que el segundo contacto no llega a
+     existir — y el guardia tiene que funcionar igual cuando quien lleva los
+     puntos y los guiones es la configuración. */
+  const punctuated = new ERP("2026-11-27");
+  punctuated.configureEntity({
+    legalName: "Canei Subirats, S.L.",
+    taxId: "B-2694200-3",
+    iban: "ES9121000418450200051332",
+    requireCostDestination: false,
+  });
+  const samePty = punctuated.addParty(
+    { name: "Canei Subirats, S.L.", taxId: "B26942003", roles: ["supplier"] },
+    "bo",
+  );
+  let refused2 = "";
+  try {
+    punctuated.registerBill({ supplierId: samePty.id, number: "16-2026", baseCents: 1000 }, "bo");
+  } catch (err) {
+    refused2 = err.message;
+  }
+  assert(
+    /propia empresa/.test(refused2),
+    "S170: con el NIF puntuado, igual",
+    refused2 || "no refusó",
+  );
+
+  /* Una empresa SIN configurar no puede reconocerse, y refusar ahí dejaría sin
+     registrar ni una factura en una instalación nueva. */
+  const fresh = new ERP("2026-11-27");
+  const anyone = fresh.addParty(
+    { name: "Alguien, S.L.", taxId: "B88430459", roles: ["supplier"] },
+    "bo",
+  );
+  fresh.configureEntity({ requireCostDestination: false });
+  let ok = true;
+  try {
+    fresh.registerBill({ supplierId: anyone.id, number: "1", baseCents: 100 }, "bo");
+  } catch {
+    ok = false;
+  }
+  assert(ok, "S170: sin NIF propio configurado, la regla calla en vez de refusar todo");
 }
 
 const failed = checks.filter((c) => !c.pass);

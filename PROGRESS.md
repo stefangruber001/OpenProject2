@@ -4762,3 +4762,31 @@ numeración 55/55 · year-sim 149/149 · migraciones 154/154 · libro 63/63 ·
 import-sim 25/25 · scheduling 30/30 · source-audit 158/158 en+ca ·
 workspace-audit 0/0 · páginas 107 en / 83 ca · diccionario completo 4.555
 entradas · boundaries OK · lint y tipos OK.
+
+## S170 · Los dos números de una factura, y la que emitimos nosotros
+
+- **`supplierDocRef`** junto a `number` en la factura de proveedor: el número
+  fiscal es el del libro, el del proveedor es la vuelta a su listado y a sus
+  PDF. Campo nuevo en el cajón de Gastos, «Ref. del proveedor».
+- **Duplicados por cualquiera de los dos números y sin depender de la
+  puntuación.** Las 30 facturas de BigMat del registro manual están las 30 en
+  el listado del T4 bajo el otro nombre; antes entraban dos veces sin aviso.
+  Una factura distinta de verdad sigue sin marcarse.
+- **`billFromCapture`** pasa el `reference` del documento capturado, un campo
+  que se recogía desde que existe y no leía nadie.
+- **Una factura emitida por la empresa se refusa como gasto.** Estaba en la
+  carpeta del cliente entre las de proveedor; registrada habría anotado
+  11.921,00 € de ingreso como coste. Refusa en vez de señalar, y calla en un
+  workspace sin NIF configurado. La hoja de proveedores refusa la misma fila.
+- **Cinco fixtures daban a la empresa y a su proveedor el mismo CIF.** No
+  existe esa configuración; se les ha dado uno propio en vez de ablandar la
+  regla.
+
+Ocho comprobaciones nuevas en manejabilidad (659/659, eran 651), una en la
+hoja de proveedores (43/43) y una en el navegador.
+
+Puertas: manejabilidad 659/659 · proveedores 43/43 · year-sim 149/149 ·
+migraciones 154/154 · import-sim 25/25 · bank-import 71/71 · bank-import-pdf
+28/28 · real-life 8/8 · libro 63/63 · numeración 55/55 · source-audit 158/158
+en+ca · workspace-audit 0/0 · páginas 107 en / 83 ca · diccionario 4.557
+completo · boundaries, lint y tipos OK.

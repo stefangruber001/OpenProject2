@@ -256,6 +256,11 @@
   function planProveedores(erp, rows) {
     var plan = { creates: [], updates: [], unchanged: [], errors: [] };
     var parties = (erp.state && erp.state.parties) || [];
+    /* La propia empresa no es un proveedor suyo. Una hoja la puede traer por
+       descuido —es el NIF que más aparece en los papeles de la carpeta, porque
+       está impreso en todas las facturas que RECIBE— y darla de alta abriría
+       la puerta a registrarse una factura a sí misma. */
+    var ourTaxId = normTaxId(((erp.state && erp.state.config) || {}).taxId);
 
     /* Índices sobre lo que YA hay. El del NIF manda: es la identidad fiscal y
        es además lo único que el lector de documentos acierta de forma fiable. */
@@ -289,6 +294,11 @@
         return plan.errors.push({
           row: r.row,
           msg: "«" + name + "»: NIF/CIF no válido (" + taxId + ") — " + whyBadTaxId(taxId),
+        });
+      if (ourTaxId && taxId === ourTaxId)
+        return plan.errors.push({
+          row: r.row,
+          msg: "«" + name + "» es la propia empresa: no puede ser proveedor de sí misma",
         });
       if (seenTax[taxId])
         return plan.errors.push({

@@ -272,6 +272,25 @@ function plantillaRows() {
   );
 }
 
+/* ---------- 8b · la propia empresa no es proveedora suya ---------- */
+{
+  /* `B26942003` es el NIF que más aparece en los papeles del cliente, porque
+     está impreso en todas las facturas que RECIBE. Es exactamente el que una
+     hoja hecha a mano recoge por descuido. */
+  const erp = freshErp();
+  const plan = S.planProveedores(erp, [
+    { row: 2, name: "Empresa de pruebas, S.L.", taxId: "B26942003" },
+    { row: 3, name: "Un proveedor de verdad, S.L.", taxId: "B70972336" },
+  ]);
+  is(
+    plan.creates.length === 1 &&
+      plan.errors.length === 1 &&
+      /propia empresa/.test(plan.errors[0].msg),
+    "la propia empresa en la hoja es un error, y el resto de la hoja sigue",
+    JSON.stringify(plan.errors),
+  );
+}
+
 /* ---------- 9 · un nombre que ya existe con OTRO NIF no se duplica en silencio ---------- */
 {
   const erp = freshErp();

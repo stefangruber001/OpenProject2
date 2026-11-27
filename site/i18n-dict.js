@@ -6819,6 +6819,12 @@ window.CANEI_DICT = {
       "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.",
       "Jobs that started earlier: an invoice already issued is recorded here so the job has its full history. It is neither reissued nor reprinted.",
     ],
+    // S170 · los dos números de una factura, y la que emitimos nosotros.
+    ["Ref. del proveedor", "Supplier's ref."],
+    [
+      "Esa factura la emitió la propia empresa: es una factura emitida, no una recibida",
+      "That invoice was issued by this company: it is a sales invoice, not a purchase invoice",
+    ],
     // S168 · la hoja de proveedores: el cajón, su vista previa y su aviso.
     ["Qué cambia", "What changes"],
     ["Teléfono fijo", "Landline"],

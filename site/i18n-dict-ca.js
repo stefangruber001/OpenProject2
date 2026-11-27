@@ -5338,6 +5338,10 @@ window.CANEI_DICT.ca = {
     "El document original no es toca: aquí només s'anota el que ja es va emetre, amb el seu número i la seva data.",
   "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.":
     "Obres que van començar abans: la factura ja emesa es registra aquí perquè l'obra tingui el seu historial complet. No es torna a emetre ni es reimprimeix.",
+  // S170 · los dos números de una factura, y la que emitimos nosotros.
+  "Ref. del proveedor": "Ref. del proveïdor",
+  "Esa factura la emitió la propia empresa: es una factura emitida, no una recibida":
+    "Aquesta factura l'ha emès la mateixa empresa: és una factura emesa, no una de rebuda",
   // S168 · la hoja de proveedores: el cajón, su vista previa y su aviso.
   "Qué cambia": "Què canvia",
   "Teléfono fijo": "Telèfon fix",

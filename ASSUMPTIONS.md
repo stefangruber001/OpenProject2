@@ -12460,3 +12460,75 @@ como persona física porque su sufijo no era «S.L.». Se añaden PBC, Inc, Ltd,
 LLC, GmbH, PLC, SARL, SRL, BV y NV, y se dejan fuera a propósito las siglas de
 dos letras que chocan con palabras corrientes (AG, AB, OY, SPA): acertar una
 más no compensa clasificar mal a «Spa Vallès».
+
+## S170 · Dos números para un documento, y el documento que es nuestro
+
+Las dos cosas que el operador pidió después de ver el material, y las dos
+salen de los ficheros del cliente, no de un supuesto.
+
+### El número del proveedor, junto al nuestro
+
+`number` sigue siendo el **número fiscal**: lo que la ley numera, lo que la
+gestoría necesita y lo que lleva el signo —una rectificativa se distingue de
+una factura por su serie—. Al lado va `supplierDocRef`: el identificador con
+el que el proveedor exporta esa misma factura en su listado y con el que
+nombra sus PDF. Guardar sólo el fiscal pierde la vuelta a los registros del
+proveedor; guardar sólo el suyo pierde el número con el que corren los libros.
+
+**La detección de duplicados cambia en dos cosas, cada una por su motivo.**
+
+1. **Pliega la puntuación.** El mismo número fiscal llega escrito de dos
+   maneras: `00002-2026/A2101/00014649` en el papel y
+   `00002-2026-A2101-00014649` cuando ese número ha pasado por un nombre de
+   fichero. La igualdad exacta leía eso como dos facturas.
+2. **Mira los dos números.** De las 30 facturas de BigMat del registro manual
+   de Diorca, las 30 están en el listado del T4 bajo el identificador interno.
+   Una carga desde el listado y la misma factura tecleada del papel se
+   quedaban en el libro las dos, sin que nada lo dijera.
+
+Vacío sigue sin casar con vacío, que es como «ningún número» se convertía en
+«el mismo número» en la regla de CAP-05 antes de arreglarse. Y una factura
+distinta de verdad NO se marca: `AP-DUPLICATE` es una alerta de prioridad
+alta, y una regla que marca todo no dice nada.
+
+`billFromCapture` pasa ahora el `reference` del documento capturado —«el
+número que trae la papelería del proveedor», recogido desde que se escribió el
+campo y leído por nadie hasta hoy—. Era exactamente esto.
+
+### Una factura que emitimos nosotros no es un gasto
+
+En la carpeta del trimestre del cliente, entre las facturas de proveedor,
+había una **factura emitida por Canei**: «Factura a: …», firmada al pie con el
+CIF de la empresa y su cuenta del BBVA. Nada la habría parado. Registrada
+como gasto da de alta a una clienta como proveedora y anota 11.921,00 € de
+ingreso como coste: el resultado del trimestre se mueve el doble de eso y en
+el sentido contrario.
+
+**Esto refusa, no señala.** No es un aplazamiento como `requireCostDestination`
+—donde señalar era la respuesta honesta y refusar no—: no hay ningún estado
+del mundo en el que una empresa se compre a sí misma. Calla sólo cuando la
+empresa no tiene NIF configurado, porque un workspace que no sabe quién es no
+puede reconocerse, y convertir una cadena vacía en una regla refusaría todas
+las facturas de una instalación nueva.
+
+Segunda puerta: la hoja de proveedores refusa la fila que trae el NIF de la
+propia empresa. Importa más de lo que parece — `B26942003` es el NIF que más
+aparece en esa carpeta, porque está impreso en todas las facturas que la
+empresa RECIBE, y es justo el que una hoja hecha a mano recoge por descuido.
+
+### Lo que la regla encontró el primer día
+
+Cinco fixtures de la simulación de manejabilidad daban a la empresa **y a su
+proveedor el mismo CIF**, `B12345674`, que el fichero usa como «el CIF de
+prueba» en todas partes. Esa configuración no existe: MDM-03 impide que dos
+contactos activos compartan NIF, pero nada impedía que un contacto tuviera el
+de la propia empresa, y los fixtures llevaban tiempo aprovechando ese hueco
+sin que nadie lo mirara.
+
+Se les ha dado un CIF propio distinto en lugar de ablandar la regla, y se ha
+cambiado **el lado de la empresa, no el del proveedor**: el NIF del proveedor
+se afirma en dos comprobaciones y se refleja en los documentos capturados de
+esos mismos bloques, así que moverlo habría arrastrado media prueba. El primer
+borrador de la prueba nueva chocó con el mismo muro desde el otro lado —al
+intentar dar de alta un segundo contacto con el NIF puntuado— y de ahí salió
+que el caso de la puntuación hay que probarlo desde la ficha de la empresa.

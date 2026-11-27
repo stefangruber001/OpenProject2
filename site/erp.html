@@ -20394,6 +20394,11 @@
              : ""
          }
          <div class="field"><label>Nº factura *</label><input id="bd_num" value="${esc(cf ? cf.docNumber || "" : "")}"></div>
+         <!-- El número del proveedor, al lado del nuestro. Al libro va el
+              número fiscal; éste es el que trae el listado que el proveedor
+              exporta y el que da nombre a sus PDF, y es por donde se vuelve a
+              encontrar la misma factura cuando llega por los dos sitios. -->
+         <div class="field"><label>Ref. del proveedor</label><input id="bd_ref" value="${esc(cf ? cf.reference || "" : "")}" placeholder="ZCO25884582"></div>
          <div class="field"><label>Fecha</label><input id="bd_date" type="date" value="${esc(cf && cf.date ? cf.date : erp.state.today)}"></div>
          <div class="field"><label>Vencimiento</label><input id="bd_due" type="date" value="${esc(cf && cf.dueDate ? cf.dueDate : "")}"></div>
          <div class="field"><label>Base imponible (€) *</label><input id="bd_base" type="number" step="0.01" value="${(base / 100).toFixed(2)}"></div>
@@ -20492,6 +20497,7 @@
             const fields = {
               supplierId: $("#bd_sup").value,
               number,
+              supplierDocRef: $("#bd_ref").value.trim(),
               date: $("#bd_date").value || erp.state.today,
               dueDate: $("#bd_due").value || null,
               baseCents,

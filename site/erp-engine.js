@@ -161,6 +161,25 @@
       .replace(/[^0-9A-Z]/g, "");
   }
   /**
+   * A DOCUMENT NUMBER, COMPARED THE WAY A PERSON WOULD COMPARE IT.
+   *
+   * «00002-2026/A2101/00014649» and «00002-2026 A2101 00014649» are one
+   * invoice, and the client's own files hold both spellings of the same
+   * number: the fiscal number as the supplier prints it, and the same number
+   * with the slashes turned into hyphens because it was used as a filename.
+   * Exact equality reads those as two documents and lets the same bill be
+   * filed twice with nothing said.
+   *
+   * Same folding `_dupKeys` already applies to a captured document; lifted to
+   * module scope so the register and the capture file agree about what «the
+   * same number» means. Empty is not a number and never matches anything.
+   */
+  function squashRef(v) {
+    return String(v || "")
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, "");
+  }
+  /**
    * WHICH DOCUMENT IS THIS, or why is it none?
    *
    * A customer is not always a Spanish taxpayer. A foreign natural person with
@@ -2984,6 +3003,31 @@
         Math.round(100 * (1 - (missing.length + extras.length * 0.5) / (total || 1))),
       );
       return { pct, missing, recommendedMissing: extras, ok: missing.length === 0 };
+    }
+    /**
+     * A DOCUMENT THIS COMPANY ISSUED IS NOT A BILL.
+     *
+     * Found in the client's own folder: among the supplier invoices for the
+     * quarter sat one of their OWN sales invoices — «Factura a: …», signed at
+     * the foot with this company's tax id and bank account. Nothing would have
+     * stopped it. Registered as a bill it files a customer as a supplier and
+     * books eleven thousand euros of revenue as cost, which moves the result
+     * of the quarter by twice that and in the wrong direction.
+     *
+     * This is not a deferral like `requireCostDestination`, where flagging was
+     * the honest answer and refusing was not. There is no state of the world
+     * in which a company buys from itself, so this refuses.
+     *
+     * Silent when the company has not been configured yet: a workspace with no
+     * tax id of its own cannot recognise itself, and inventing a rule out of
+     * an empty string would refuse every bill on a fresh install.
+     */
+    _assertNotSelfIssued(supplier) {
+      const mine = normTaxId((this._configForRead() || {}).taxId);
+      if (!mine || normTaxId(supplier.taxId) !== mine) return;
+      throw new Error(
+        "Esa factura la emitió la propia empresa: es una factura emitida, no una recibida",
+      );
     }
     _requireComplete(partyId, what) {
       // MDM-10 block
@@ -9141,9 +9185,23 @@
       // would have said instead — true, and unhelpful about which party.
       if (!b.supplierId) throw new Error("A bill must name the supplier it belongs to");
       const supplier = this.party(b.supplierId);
+      this._assertNotSelfIssued(supplier);
+      /* AP-03, now on BOTH numbers and on neither exactly.
+         Two things changed, for one reason each. The comparison folds
+         (`squashRef`) because the same fiscal number arrives punctuated two
+         ways. And it looks at the supplier's own reference as well as the
+         fiscal number, because one supplier identifies the same invoice both
+         ways — the fiscal number on the paper, an internal id in the listing
+         it exports — so a file loaded from the listing and the same invoice
+         typed off the paper would otherwise sit side by side, unflagged. */
+      const nKey = squashRef(b.number);
+      const rKey = squashRef(b.supplierDocRef);
       const dup = this.state.bills.find(
-        (x) => x.supplierId === b.supplierId && x.number === b.number,
-      ); // AP-03
+        (x) =>
+          x.supplierId === b.supplierId &&
+          ((nKey && squashRef(x.number) === nKey) ||
+            (rKey && squashRef(x.supplierDocRef) === rKey)),
+      );
       const baseCents = cents(b.baseCents);
       const vatCents =
         b.vatCents != null ? cents(b.vatCents) : pctOf(baseCents, b.vatBp != null ? b.vatBp : 2100);
@@ -9177,6 +9235,17 @@
           supplierName: supplier.name || "",
           supplierTaxId: supplier.taxId || "",
           docRef: b.docRef || null,
+          /* THE SUPPLIER'S OWN NAME FOR THIS DOCUMENT, beside ours for it.
+             `number` is the fiscal number: what the law numbers, what the
+             accountant needs, and what carries the sign — a rectificativa is
+             told apart from an invoice by its series. This is the other one:
+             the id the supplier's own system uses, which is what their
+             exported listing is keyed by and what their PDFs are named after.
+             Storing only the fiscal number loses the join back to their
+             records; storing only theirs loses the number the books run on.
+             The register needs both, and duplicate detection above reads
+             both. Empty on a supplier that has only one. */
+          supplierDocRef: b.supplierDocRef || "",
           capId: b.capId || null,
           status: "registered",
           disputed: false,
@@ -9284,6 +9353,11 @@
           capId: c.id,
           allocations: scaled,
           docRef: o.docRef || c.stdName || null,
+          /* Gap 11's field, finally going somewhere. `reference` is «the
+             number the supplier's own paperwork carries», captured when the
+             document was filed and until now read by nobody. It is exactly
+             what `supplierDocRef` is for. */
+          supplierDocRef: o.supplierDocRef != null ? o.supplierDocRef : c.reference || "",
         },
         user,
       );

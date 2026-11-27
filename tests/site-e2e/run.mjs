@@ -3923,8 +3923,13 @@ async function testSupplierBillEntry(browser, base) {
       ok("AP-01: a new invoice starts with no supplier chosen, rather than the first in the list");
     else bad("AP-01: supplier starts unchosen", JSON.stringify(unchosen));
 
+    /* Los DOS números. `bd_ref` guarda el identificador del proveedor junto al
+       número fiscal, que es por donde se vuelve a encontrar la misma factura
+       cuando llega del listado que el proveedor exporta y no del papel. */
     await pg.evaluate(() => {
       document.getElementById("bd_num").value = "E2E-001";
+      const ref = document.getElementById("bd_ref");
+      if (ref) ref.value = "ZCO99999999";
       document.getElementById("bd_base").value = "1000";
       document.getElementById("bd_base").dispatchEvent(new Event("input", { bubbles: true }));
     });
@@ -3970,6 +3975,7 @@ async function testSupplierBillEntry(browser, base) {
         base: b ? b.baseCents : null,
         name: b ? b.supplierName : null,
         taxId: b ? b.supplierTaxId : null,
+        ref: b ? b.supplierDocRef : null,
       };
     }, before);
     if (made.grew && made.base === 100000)
@@ -3978,6 +3984,9 @@ async function testSupplierBillEntry(browser, base) {
     if (made.name && made.taxId)
       ok(`AP-01: the bill carries its issuer's name and tax id (${made.name} · ${made.taxId})`);
     else bad("AP-01: issuer stamped on the bill", JSON.stringify(made));
+    if (made.ref === "ZCO99999999")
+      ok("AP-01: y la referencia del proveedor viaja junto al número fiscal");
+    else bad("AP-01: supplier ref on the bill", JSON.stringify(made.ref));
 
     const noDoc = await pg.evaluate(() => {
       const b = erp.state.bills.find((x) => x.number === "E2E-001");
