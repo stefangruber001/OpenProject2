@@ -12250,3 +12250,98 @@ si hay destino; `requireCostSubpartida` pregunta con qué grano. Son
 aflojamientos distintos y una empresa puede querer uno sin el otro —
 exactamente lo que pasa aquí: hoy ni destino, la semana que viene obra sin
 partida, y al final las dos cosas.
+
+## S165 · Dos numeraciones, y el signo sólo vive en una de ellas
+
+El operador preguntó si el número de factura puede ser «los dos». Puede, y
+además **tiene que serlo**, por una razón que no se veía hasta medir los dos
+ficheros del cliente.
+
+BigMat identifica el mismo documento de dos maneras: el **número fiscal**
+(`00002-2026/A2101/00014649`), que es el que la gestoría necesita y el que la
+ley numera, y un **identificador interno** (`ZCO25884582`), que es el que trae
+su listado trimestral y el que nombra los PDF que descarga el cliente. De las
+30 facturas de BigMat del registro manual de Diorca, **30 aparecen en el
+listado del T4** — los mismos documentos bajo dos nombres.
+
+**El hallazgo: el listado no tiene signos.** Tres abonos del registro salen
+POSITIVOS en el listado de BigMat:
+
+| Registro               | serie fiscal         | importe | en el listado             |
+| ---------------------- | -------------------- | ------- | ------------------------- |
+| BIG-0022 rectificativa | `00003-2026/A2181/…` | −72,80  | `ZCO25893685` **+72,80**  |
+| BIG-0023 vale          | `VAL 20123799`       | −100,00 | `VAL20123799` **+100,00** |
+| BIG-0030 rectificativa | `08002-2026/A2106/…` | −20,39  | `ZVA20201408` **+20,39**  |
+
+Y el prefijo del identificador interno **no sirve** para distinguirlos:
+`ZCO25893685` es un abono y lleva el prefijo normal. Lo que sí lo distingue es
+la **serie del número fiscal**: `00002` factura, `00003` y `08002`
+rectificativa. Es decir, el signo del asiento sólo es recuperable desde el
+número que el listado no trae.
+
+Cargar el listado tal cual sobrevalora el trimestre en **562,98 € de base y
+608,62 € de total** (se suma lo que había que restar, dos veces).
+
+**Decisiones, todas reversibles:**
+
+1. **`number` es el número fiscal; un campo nuevo guarda el del proveedor.**
+   La identidad contable y la detección de duplicados cuelgan del fiscal; el
+   interno es la traza al listado y al PDF. La detección de duplicados mira
+   los dos, para que la misma factura entrando por cualquiera de las dos
+   puertas se vea.
+2. **El signo se deduce de la serie fiscal, nunca del prefijo interno.** Una
+   fila sin número fiscal cuyo prefijo sea `ZVA` o `VAL` se **marca, no se
+   adivina**: entra al plan como «revisar», no al libro.
+3. **El IVA se calcula del tipo, no de la diferencia.** El Total del listado
+   es una COMPROBACIÓN, no una fuente. Dos filas lo demuestran:
+   `ZCO25941514` y `ZCO25925068` llevan exactamente 6,00 € menos que
+   `base × 1,21` — un descuento aplicado después del impuesto, no un tipo
+   distinto. Restar base de total les habría asignado un 11,2 % y un 10,0 %
+   de IVA inventados. Con el tipo, la comprobación falla y la fila se marca.
+4. **El listado del T4 es la fuente de la carga; el registro manual no.** El
+   listado trae el trimestre completo (85 facturas, 4.887,55 € de base); el
+   registro es la digitalización manual de un subconjunto (32 facturas,
+   1.448,68 €) con el detalle de línea que servirá para el reparto POSTERIOR.
+   Cargar los dos duplicaría 29 facturas: **1.292,43 € de base**.
+
+## S166 · La retención que la carga de cabecera no veía
+
+Entre los PDF de ejemplo había un alquiler: `Luengo Sanchez C.B.`, NIF
+`E16698854`, factura **nº 7**, base 750,00, IVA 21 % 157,50, **IRPF −19 %
+−142,50**, total **765,00**.
+
+La carga acordada en la reunión (proveedor, nº, base, total; el IVA por
+diferencia) daría **IVA = 765 − 750 = 15,00 €**. El IVA real es 157,50 y hay
+una retención de 142,50. El banco mostrará 765,00, así que la conciliación
+cuadraría igual y el error no se vería — y la cifra de IVA que viajara a la
+gestoría estaría mal en 142,50 € por factura de alquiler.
+
+`registerBill` ya lo resuelve y no hace falta tocarlo: `irpfBp` sale del perfil
+del proveedor (`irpfApplies` / `irpfRateBp`, AP-07) cuando la carga no lo
+trae. Con base 750 y el perfil puesto, el motor calcula 157,50 de IVA, 142,50
+de retención y 765,00 de total — y el total del fichero vuelve a ser la
+comprobación que confirma que el perfil está bien.
+
+**Decisión: los proveedores se cargan ANTES que las facturas**, con su régimen
+de retención, porque el total de una factura con retención no es verificable
+sin él. Es también lo que hace falta para la numeración: el proveedor es quien
+dice qué serie fiscal usa.
+
+## S167 · «Inelec» es Sinelec Ciutadella, S.L.
+
+El resumen de la reunión lo dejó como «Inelec (por confirmar)». Está en el
+registro de Diorca: código `SIN`, **Sinelec Ciutadella, S.L.**, CIF
+`B70972336`, una factura de 285,00 € de base / 344,85 € de total. Confirmado
+desde el fichero del cliente, no desde el nombre de la reunión.
+
+Los tres proveedores del registro manual, con su razón social — que es la que
+va al libro, no el rótulo de la tienda:
+
+| Código | Rótulo                         | Razón social               | CIF         |
+| ------ | ------------------------------ | -------------------------- | ----------- |
+| `BIG`  | BigMat La Plataforma Sant Just | Estrategias BigMat, S.L.U. | `B88430459` |
+| `OBR`  | Obramat Badalona               | Bricolaje Bricoman, S.L.U. | `B84406289` |
+| `SIN`  | Sinelec Ciutadella             | Sinelec Ciutadella, S.L.   | `B70972336` |
+
+Más dos que aparecen sólo en los PDF de ejemplo: `Saltoki Cornellà, S.A.`
+(`A64207400`) y `Luengo Sanchez C.B.` (`E16698854`, el alquiler).
