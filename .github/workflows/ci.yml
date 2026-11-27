@@ -154,6 +154,13 @@ jobs:
         if: always()
         run: node tests/book-import/run.mjs
 
+      # Los proveedores van ANTES que las facturas: el total de una factura
+      # con retención no se puede verificar sin la ficha de quien la practica.
+      # Este suite fija ese arco de punta a punta.
+      - name: The uploaded supplier sheet (and the withholding arc)
+        if: always()
+        run: node tests/supplier-import/run.mjs
+
       # ORG-04 with the company's own convention: a business already on invoice
       # 56 cannot have a book that restarts at 1.
       - name: Document numbering (shape, starting point, year rule)

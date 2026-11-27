@@ -35,6 +35,7 @@
     "test:shell": "node tests/shell-syntax/run.mjs",
     "test:docx": "node tests/doc-docx/run.mjs",
     "test:book": "node tests/book-import/run.mjs",
+    "test:suppliers": "node tests/supplier-import/run.mjs",
     "test:mailbox": "tsx tests/mailbox/run.mts",
     "test:numbering": "node tests/numbering/run.mjs"
   },

@@ -5338,6 +5338,14 @@ window.CANEI_DICT.ca = {
     "El document original no es toca: aquí només s'anota el que ja es va emetre, amb el seu número i la seva data.",
   "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.":
     "Obres que van començar abans: la factura ja emesa es registra aquí perquè l'obra tingui el seu historial complet. No es torna a emetre ni es reimprimeix.",
+  // S168 · la hoja de proveedores: el cajón, su vista previa y su aviso.
+  "Qué cambia": "Què canvia",
+  "Teléfono fijo": "Telèfon fix",
+  "Días de pago": "Dies de pagament",
+  "Importar proveedores": "Importar proveïdors",
+  "Proveedores importados": "Proveïdors importats",
+  "Sin cambios": "Sense canvis",
+  "Este fichero no cambiaría nada.": "Aquest fitxer no canviaria res.",
 };
 window.CANEI_DICT.rxEs2Ca = [
   /* See the note on the English side. Origen and Alta are the Catalan words

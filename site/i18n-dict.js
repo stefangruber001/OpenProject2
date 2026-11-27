@@ -6819,6 +6819,14 @@ window.CANEI_DICT = {
       "Obras que empezaron antes: la factura ya emitida se registra aquí para que la obra tenga su historial completo. No se vuelve a emitir ni se reimprime.",
       "Jobs that started earlier: an invoice already issued is recorded here so the job has its full history. It is neither reissued nor reprinted.",
     ],
+    // S168 · la hoja de proveedores: el cajón, su vista previa y su aviso.
+    ["Qué cambia", "What changes"],
+    ["Teléfono fijo", "Landline"],
+    ["Días de pago", "Payment days"],
+    ["Importar proveedores", "Import suppliers"],
+    ["Proveedores importados", "Suppliers imported"],
+    ["Sin cambios", "No changes"],
+    ["Este fichero no cambiaría nada.", "This file would change nothing."],
   ],
   rxEs2En: [
     /* The customer and lead cards put the source and the date into ONE text

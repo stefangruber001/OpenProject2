@@ -5501,6 +5501,10 @@
     <script src="erp-store.js"></script>
     <script src="erp-import.js"></script>
     <script src="erp-book-import.js"></script>
+    <!-- Los proveedores, como una hoja subida. Primero ellos y después las
+         facturas: el total de una factura con retención no se puede verificar
+         sin la ficha del proveedor que la practica. -->
+    <script src="erp-supplier-import.js"></script>
     <!-- The PDF sibling of erp-import.js — same bank, the other export shape.
      Depends on ErpImport for toCents/toIsoDate (loaded just above) and, only
      once a .pdf is actually chosen, on ErpOcr.loadPdfjs() (below) for pdf.js
@@ -12625,6 +12629,193 @@
         };
       }
 
+      /* ===================== LA HOJA DE PROVEEDORES =========================
+         Misma disciplina que el libro de precios de arriba, y por la misma
+         razón: NADA SE ESCRIBE HASTA EL SEGUNDO BOTÓN. El fichero se lee, se
+         compara contra los contactos que ya hay y se ENSEÑA — cada campo que
+         cambiaría con su valor viejo y el nuevo — y sólo «Importar» lo aplica.
+
+         Por qué esta pantalla existe antes que la carga de facturas: una
+         factura con retención no se puede verificar sin el perfil de quien la
+         emite. El alquiler del cliente lo enseña en una línea — base 750,00,
+         total 765,00 — porque deducir el IVA de la diferencia da 15,00 € donde
+         son 157,50 con una retención de 142,50, el banco cuadra igual y nada
+         lo señala. Con la ficha cargada, `registerBill` lo calcula solo. */
+      const SI_FIELD_LAB = {
+        name: "Razón social",
+        taxId: "NIF/CIF",
+        billStreet: "Domicilio",
+        billPostalCode: "C.P.",
+        billCity: "Población",
+        billProvince: "Provincia",
+        billCountry: "País",
+        email: "Email",
+        landline: "Teléfono fijo",
+        mobile: "Móvil",
+        category: "Categoría",
+        irpfRateBp: "Retención IRPF",
+        supplierTermsDays: "Días de pago",
+        roles: "Roles",
+        aliases: "Nombre comercial",
+      };
+      /** Puntos básicos a algo que una persona lee como porcentaje. */
+      function siBp(v) {
+        return String(Math.round(Number(v) / 100) || 0) + " %";
+      }
+      function siValue(field, v) {
+        if (field === "irpfRateBp") return siBp(v);
+        if (!String(v || "").trim()) return "—";
+        return String(v);
+      }
+
+      function supplierImportDrawer(opts) {
+        const o = opts || {};
+        const db = openDrawer("Importar proveedores");
+        /* Un cajón que no puede cargar su motor lo DICE, en vez de abrirse
+           vacío: ver la nota en `bookImportDrawer`, mismo fallo y mismo
+           síntoma — una pestaña vieja abierta después de un despliegue. */
+        if (typeof ErpSupplierImport === "undefined") {
+          db.innerHTML =
+            '<div class="it"><span class="pill r">No se pudo cargar</span>' +
+            '<span style="flex:1;margin-left:8px">Recargue la página para actualizar la aplicación.</span></div>';
+          return;
+        }
+        const COLS = ErpSupplierImport.PROVEEDOR_COLUMNS;
+        const intro =
+          "Una fila por proveedor. La razón social y el NIF son obligatorios: el NIF es lo que casa cada factura con su emisor. El nombre comercial se guarda como alias, así que «Obramat» sigue encontrando a Bricolaje Bricoman. Una celda en blanco no borra nada.";
+        const aviso =
+          "Si el proveedor practica retención, ponla aquí: el total de sus facturas no sale de sumar el IVA a la base, y sin este dato la carga de facturas lo calcularía mal.";
+        db.innerHTML = `<div class="fgrid">
+         <div class="field full"><div class="it" style="color:var(--muted)">${esc(intro)}</div></div>
+         <div class="field full"><div class="it"><span class="pill y">Retención</span>
+           <span style="flex:1;margin-left:8px">${esc(aviso)}</span></div></div>
+         <div class="field full"><label>Columnas</label>
+           <div style="font-size:12.5px">${COLS.map((c) => `<span class="pill b" style="margin:2px">${esc(c.lab)}</span>`).join("")}</div></div>
+         <div class="field full row" style="gap:8px;margin-top:4px">
+           <button class="btn" id="si_tpl">⬇ Descargar plantilla</button>
+           <label class="btn primary">Elegir archivo<input type="file" id="si_file" accept=".xlsx" hidden></label>
+         </div>
+         <div class="field full" id="si_out"></div>
+        </div>`;
+
+        $("#si_tpl").onclick = () => {
+          const t = ErpSupplierImport.plantilla();
+          /* Ni título ni pie: esto no es un informe, es un formulario que
+             vuelve a entrar por el lector de arriba. Ver `xlsxSheetPart`. */
+          downloadBlob(
+            xlsxBlob(t.name, t.rows, { noHead: true, noFoot: true }),
+            "plantilla-proveedores.xlsx",
+          );
+        };
+
+        $("#si_file").onchange = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file) return;
+          const out = $("#si_out");
+          out.innerHTML = `<div class="it">Leyendo ${esc(file.name)}…</div>`;
+          let parsed, plan;
+          try {
+            parsed = await ErpSupplierImport.parseProveedores(await file.arrayBuffer());
+            plan = ErpSupplierImport.planProveedores(erp, parsed.rows);
+          } catch (err) {
+            out.innerHTML = `<div class="it"><span class="pill r">No se pudo leer</span>
+              <span style="flex:1;margin-left:8px">${esc(String(err.message || err))}</span></div>`;
+            return;
+          }
+          renderSupplierPlan(out, plan, parsed, file, o);
+        };
+      }
+
+      /* La vista previa: lo que el fichero haría, en los términos del
+         operador. Un recuento de filas no le dice a nadie si una hoja está a
+         punto de cambiarle el domicilio fiscal a un proveedor. */
+      function renderSupplierPlan(out, plan, parsed, file, o) {
+        const nNew = plan.creates.length;
+        const nUpd = plan.updates.length;
+        const nSame = plan.unchanged.length;
+        const errs = plan.errors || [];
+
+        const newRows = plan.creates
+          .map((c) => {
+            const retencion = c.irpfBp ? siBp(c.irpfBp) : "—";
+            return `<tr><td>${esc(String(c.row))}</td><td>${esc(c.name)}</td>
+              <td translate="no">${esc(c.taxId)}</td><td>${esc(retencion)}</td></tr>`;
+          })
+          .join("");
+        const updRows = plan.updates
+          .map((u) => {
+            const detail = u.changes
+              .map((ch) => {
+                const lab = SI_FIELD_LAB[ch.field] || ch.field;
+                return `${esc(lab)}: ${esc(siValue(ch.field, ch.from))} → <b>${esc(siValue(ch.field, ch.to))}</b>`;
+              })
+              .join("<br>");
+            return `<tr><td>${esc(String(u.row))}</td><td>${esc(u.name)}</td>
+              <td translate="no">${esc(u.code)}</td><td>${detail}</td></tr>`;
+          })
+          .join("");
+        const errRows = errs
+          .map((e) => `<div class="it"><span class="pill r">Fila ${esc(String(e.row))}</span>
+            <span style="flex:1;margin-left:8px">${esc(e.msg)}</span></div>`)
+          .join("");
+
+        /* Cada condicional se calcula AQUÍ, nunca empotrado en el marcado: un
+           ternario entre dos literales es lo que la auditoría de fuentes lee
+           como un par de frases sin traducir. Ver la nota del cajón de abajo,
+           que tropezó con esto siete veces. */
+        const newBlock = nNew
+          ? `<div class="field full"><label>Altas (${nNew})</label>
+             <table class="tbl"><thead><tr><th>Fila</th><th>Razón social</th><th>NIF/CIF</th><th>Retención</th></tr></thead>
+             <tbody>${newRows}</tbody></table></div>`
+          : "";
+        const updBlock = nUpd
+          ? `<div class="field full"><label>Cambios (${nUpd})</label>
+             <table class="tbl"><thead><tr><th>Fila</th><th>Proveedor</th><th>Código</th><th>Qué cambia</th></tr></thead>
+             <tbody>${updRows}</tbody></table></div>`
+          : "";
+        const sameBlock = nSame
+          ? `<div class="field full"><div class="it"><span class="pill g">Sin cambios</span>
+             <span style="flex:1;margin-left:8px">${nSame} ya estaban igual.</span></div></div>`
+          : "";
+        const errBlock = errs.length
+          ? `<div class="field full"><label>No se pueden importar (${errs.length})</label>${errRows}</div>`
+          : "";
+        const nothing =
+          !nNew && !nUpd
+            ? `<div class="field full"><div class="it">Este fichero no cambiaría nada.</div></div>`
+            : "";
+        const goBtn =
+          nNew || nUpd
+            ? `<div class="field full"><button class="btn primary" id="si_go">Importar ${nNew + nUpd} proveedores</button></div>`
+            : "";
+
+        out.innerHTML = `<div class="fgrid">
+         <div class="field full"><div class="it"><span class="pill b">${esc(file.name)}</span>
+          <span style="flex:1;margin-left:8px">${parsed.rows.length} filas leídas.</span></div></div>
+         ${newBlock}${updBlock}${sameBlock}${errBlock}${nothing}${goBtn}</div>`;
+
+        const go = $("#si_go");
+        if (!go) return;
+        /* `mutateNow` y no un guardado optimista: una importación es
+           exactamente el caso para el que se escribió — un cambio grande que
+           no se puede deshacer, hecho por alguien que después se va a mirar el
+           registro. Desactivado mientras vuela, porque un segundo clic
+           aplicaría la hoja entera dos veces. */
+        go.onclick = async (ev) => {
+          const btn = ev.currentTarget;
+          if (btn.disabled) return;
+          btn.disabled = true;
+          let made = null;
+          const stored = await mutateNow(() => {
+            made = ErpSupplierImport.applyProveedores(erp, plan, "backoffice");
+          }, "Proveedores importados");
+          closeDrawer();
+          if (made && made.failed.length)
+            toast("⚠ " + made.failed.length + " filas no se pudieron dar de alta");
+          if (stored && typeof o.onDone === "function") o.onDone(made);
+        };
+      }
+
       /* ============ recovering from an earlier version of this budget ========
          Asked for on 1 Oct. A new version deep-clones the one it supersedes, so
          everything travels forward by itself; what has no route is backwards. A
@@ -15780,7 +15971,14 @@
           }));
         });
         const all = head.concat(body);
-        if (foot) all.push([{ v: "", s: 0 }], [{ v: foot, s: 6 }]);
+        /* `noFoot` for the one case where the identity block is not decoration
+           but a BUG: a plantilla is a form the operator fills in and uploads
+           back, and the footer — legal name, NIF, address, all joined into one
+           cell — comes back as a data row with a name and no NIF, which is
+           exactly what the supplier reader is built to refuse. An empty string
+           cannot say this, because `opts.foot || …` falls back to the issuer
+           block for any falsy value. */
+        if (foot && !opts.noFoot) all.push([{ v: "", s: 0 }], [{ v: foot, s: 6 }]);
 
         // Assembled through named parts rather than template literals butted
         // against .join(""): the i18n source audit reads that shape as a
@@ -23238,7 +23436,8 @@
                      here, because a party record is not a document store. */
             leading:
               `<label class="btn sm" id="supDocL">＋ Alta desde documento<input type="file" id="supDoc" accept="image/*,application/pdf" hidden></label>` +
-              `<label class="btn sm">Cámara<input type="file" id="supCam" accept="image/*" capture="environment" hidden></label>`,
+              `<label class="btn sm">Cámara<input type="file" id="supCam" accept="image/*" capture="environment" hidden></label>` +
+              `<button class="btn sm" id="supXls">⬆ Importar Excel</button>`,
             searchPlaceholder: "Buscar proveedor o industrial por nombre o NIF",
             nounSingular: "proveedor",
             nounPlural: "proveedores",
@@ -23316,6 +23515,12 @@
                 if (el.files && el.files[0]) supplierFromDocStart(el.files[0]);
               };
           });
+          /* La hoja entera, frente al documento de uno en uno de al lado. Las
+             dos puertas valen y hacen falta las dos: la de arriba nace de un
+             papel que ya está encima de la mesa, ésta de un fichero que la
+             gestoría o el propio proveedor ya tenían hecho. */
+          const supXls = $("#supXls");
+          if (supXls) supXls.onclick = () => supplierImportDrawer({ onDone: () => render() });
         },
 
         /* ---------- Personal interno (spec DMT-04) ----------

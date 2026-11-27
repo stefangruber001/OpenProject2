@@ -4728,3 +4728,37 @@ rompía en tres sitios que sólo se ven en los datos reales.
   proveedor en vez de la página.
 
 Puertas: boundaries OK. Sin cambios de código.
+
+## S168 · La hoja de proveedores
+
+Primero los proveedores y después las facturas, porque el total de una factura
+con retención no se puede verificar sin la ficha de quien la practica.
+
+- **`site/erp-supplier-import.js`** — leer, planear, aplicar, con la misma
+  disciplina que el libro de precios: nada se escribe hasta el segundo botón.
+  Dieciséis columnas, la plantilla escrita desde la misma lista que lee el
+  parser, y las tres cestas del plan separadas (altas, cambios campo a campo
+  con su valor viejo y el nuevo, y **sin cambios** como cesta propia, que es
+  lo que hace honesta la segunda pasada).
+- **El arco de la retención, medido de punta a punta:** base 750,00 y nada
+  más → IVA 157,50, retención 142,50, total 765,00. Al lado, la comprobación
+  que explica el orden de carga: restar base de total habría dado 15,00 € de
+  IVA y el banco habría cuadrado igual.
+- **Pantalla:** «⬆ Importar Excel» en Datos maestros › Proveedores, junto a
+  las dos puertas que ya había (alta desde documento y cámara). La de arriba
+  nace de un papel que ya está encima de la mesa; ésta, de un fichero que la
+  gestoría o el propio proveedor ya tenían hecho.
+- **Un error latente de la exportación, encontrado por el navegador:** la
+  plantilla salía con el bloque de identidad de la empresa al pie y volvía a
+  entrar como una fila de datos con nombre y sin NIF. `noFoot` lo apaga para
+  un formulario; un informe lo sigue llevando.
+
+Treinta y nueve comprobaciones nuevas en Node (`tests/supplier-import`, en CI)
+y diez en el navegador (`testSupplierImport`, contexto propio porque crea
+registros).
+
+Puertas: proveedores 39/39 · navegador 50 suites · manejabilidad 651/651 ·
+numeración 55/55 · year-sim 149/149 · migraciones 154/154 · libro 63/63 ·
+import-sim 25/25 · scheduling 30/30 · source-audit 158/158 en+ca ·
+workspace-audit 0/0 · páginas 107 en / 83 ca · diccionario completo 4.555
+entradas · boundaries OK · lint y tipos OK.

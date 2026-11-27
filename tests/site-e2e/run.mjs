@@ -124,6 +124,7 @@ async function main() {
     testChapterTitles,
     testPriceBookLinks,
     testBookImport,
+    testSupplierImport,
     testClientFeedback,
     testNumbering,
     testNotes,
@@ -19951,6 +19952,165 @@ async function testBookImport(browser, base) {
     else bad("importar: console", errors.slice(0, 3).join(" | "));
   } catch (e) {
     bad("importar: suite", e.message);
+  } finally {
+    await ctx.close();
+  }
+}
+
+/**
+ * LA HOJA DE PROVEEDORES, pulsada en vez de descrita.
+ *
+ * El planificador tiene su propia puerta (`tests/supplier-import`) y corre en
+ * Node, donde no hay botón, ni cajón, ni fichero. Lo que sólo puede fallar
+ * AQUÍ es el cableado: que el botón esté en el registro de Proveedores, que
+ * abra el cajón, que la plantilla que reparte sea un libro de verdad, que no
+ * se escriba NADA hasta el segundo botón — y que al pulsarlo el proveedor del
+ * alquiler quede con su retención puesta, que es lo que la carga de facturas
+ * necesitará para no calcular el IVA restando la base del total.
+ *
+ * Contexto propio, como `testBookImport` y por su razón: este suite CREA
+ * registros y `newPage` comparte una sola IndexedDB con todos los de arriba.
+ */
+async function testSupplierImport(browser, base) {
+  const ctx = await browser.newContext({
+    viewport: { width: 1400, height: 1000 },
+    acceptDownloads: true,
+  });
+  const pg = await ctx.newPage();
+  const errors = [];
+  attachConsole(pg, errors);
+  try {
+    await pg.goto(`${base}/erp.html#suppliers`, { waitUntil: "networkidle" });
+    await bootedShell(pg);
+    await pg.waitForTimeout(900);
+
+    // ── el botón está, y abre el cajón ──────────────────────────────────────
+    const opened = await pg.evaluate(async () => {
+      const btn = document.querySelector("#supXls");
+      if (!btn) return { button: false };
+      btn.click();
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        button: true,
+        drawer: !!document.querySelector("#si_file"),
+        template: !!document.querySelector("#si_tpl"),
+        title: (document.querySelector("#dttl") || {}).textContent || "",
+      };
+    });
+    if (opened.button && opened.drawer && opened.template)
+      ok(`proveedores: el cajón ofrece plantilla y selector («${opened.title}»)`);
+    else bad("proveedores: cajón", JSON.stringify(opened));
+
+    // ── la plantilla se descarga de un clic real y parsea bajo su parser ────
+    const dl = pg.waitForEvent("download", { timeout: 15000 }).catch(() => null);
+    await pg.click("#si_tpl");
+    const file = await dl;
+    const handed = { got: !!file, name: file ? file.suggestedFilename() : null };
+    let b64 = null;
+    if (file) {
+      const stream = await file.createReadStream();
+      const chunks = [];
+      for await (const c of stream) chunks.push(c);
+      const buf = Buffer.concat(chunks);
+      handed.bytes = buf.length;
+      b64 = buf.toString("base64");
+      handed.read = await pg.evaluate(async (b) => {
+        const bin = atob(b);
+        const u8 = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+        try {
+          const parsed = await ErpSupplierImport.parseProveedores(u8.buffer);
+          const plan = ErpSupplierImport.planProveedores(erp, parsed.rows);
+          return {
+            rows: parsed.rows.length,
+            creates: plan.creates.length,
+            errs: plan.errors.length,
+          };
+        } catch (e) {
+          return { error: String(e.message || e) };
+        }
+      }, b64);
+    }
+    if (handed.got && handed.read && handed.read.rows === 3 && handed.read.errs === 0)
+      ok(`proveedores: «${handed.name}» (${handed.bytes} b) vuelve a entrar por su propio lector`);
+    else bad("proveedores: plantilla descargada", JSON.stringify(handed));
+
+    // ── NADA SE ESCRIBE HASTA EL SEGUNDO BOTÓN ──────────────────────────────
+    const before = await pg.evaluate(() => erp.state.parties.length);
+    const preview = await pg.evaluate(async (b) => {
+      const bin = atob(b);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const parsed = await ErpSupplierImport.parseProveedores(u8.buffer);
+      const plan = ErpSupplierImport.planProveedores(erp, parsed.rows);
+      renderSupplierPlan(document.querySelector("#si_out"), plan, parsed, { name: "t.xlsx" }, {});
+      await new Promise((r) => setTimeout(r, 300));
+      return {
+        parties: erp.state.parties.length,
+        go: !!document.querySelector("#si_go"),
+        shown: (document.querySelector("#si_out") || {}).textContent || "",
+      };
+    }, b64);
+    if (preview.parties === before && preview.go)
+      ok("proveedores: la vista previa no escribe; el botón de importar aparece");
+    else
+      bad(
+        "proveedores: vista previa",
+        JSON.stringify({ before, p: preview.parties, go: preview.go }),
+      );
+    if (/Altas/.test(preview.shown) && /19 %|19%/.test(preview.shown))
+      ok("proveedores: la previa nombra las altas y enseña la retención del 19 %");
+    else bad("proveedores: previa sin retención", preview.shown.slice(0, 160));
+
+    // ── el segundo botón: ahora sí ──────────────────────────────────────────
+    await pg.click("#si_go");
+    await pg.waitForTimeout(2000);
+    const after = await pg.evaluate(() => {
+      const norm = (v) =>
+        String(v || "")
+          .toUpperCase()
+          .replace(/[^0-9A-Z]/g, "");
+      const alq = erp.state.parties.find((p) => norm(p.taxId) === "E16698854");
+      const big = erp.state.parties.find((p) => norm(p.taxId) === "B88430459");
+      return {
+        parties: erp.state.parties.length,
+        alquiler: alq ? { irpf: alq.irpfApplies, bp: alq.irpfRateBp, type: alq.partyType } : null,
+        bigmat: big ? { alias: big.aliases || [], type: big.partyType } : null,
+        drawerClosed: !document.querySelector("#drawer.on"),
+      };
+    });
+    if (after.parties === before + 3 && after.drawerClosed)
+      ok(`proveedores: tres altas escritas (${before} → ${after.parties}) y el cajón se cierra`);
+    else bad("proveedores: altas", JSON.stringify(after));
+    if (after.alquiler && after.alquiler.irpf === true && after.alquiler.bp === 1900)
+      ok(
+        "proveedores: el del alquiler queda con retención del 19 % — lo que la carga de facturas necesita",
+      );
+    else bad("proveedores: retención tras importar", JSON.stringify(after.alquiler));
+    if (after.alquiler && after.alquiler.type === "community")
+      ok("proveedores: una C.B. se archiva como comunidad de bienes, no como persona física");
+    else bad("proveedores: forma jurídica", JSON.stringify(after.alquiler));
+    if (after.bigmat && (after.bigmat.alias || []).some((a) => /BigMat La Plataforma/.test(a)))
+      ok("proveedores: el rótulo de la tienda queda como alias de la razón social");
+    else bad("proveedores: alias", JSON.stringify(after.bigmat));
+
+    // ── y la segunda pasada no hace nada ────────────────────────────────────
+    const again = await pg.evaluate(async (b) => {
+      const bin = atob(b);
+      const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const parsed = await ErpSupplierImport.parseProveedores(u8.buffer);
+      const plan = ErpSupplierImport.planProveedores(erp, parsed.rows);
+      return { c: plan.creates.length, u: plan.updates.length, s: plan.unchanged.length };
+    }, b64);
+    if (again.c === 0 && again.u === 0 && again.s === 3)
+      ok("proveedores: subir el mismo fichero otra vez no propone nada");
+    else bad("proveedores: segunda pasada", JSON.stringify(again));
+
+    if (!errors.length) ok("proveedores: sin errores de consola");
+    else bad("proveedores: consola", errors.slice(0, 3).join(" | "));
+  } catch (e) {
+    bad("proveedores: suite", e.message);
   } finally {
     await ctx.close();
   }

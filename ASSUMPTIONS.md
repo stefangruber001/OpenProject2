@@ -12345,3 +12345,73 @@ va al libro, no el rótulo de la tienda:
 
 Más dos que aparecen sólo en los PDF de ejemplo: `Saltoki Cornellà, S.A.`
 (`A64207400`) y `Luengo Sanchez C.B.` (`E16698854`, el alquiler).
+
+## S168 · Los proveedores primero, y por qué ese orden no es una preferencia
+
+La carga de facturas que pidió la reunión del 26 de noviembre —proveedor,
+número, base, total— no se puede verificar sola. S166 lo midió sobre el
+alquiler del cliente y el importador lo convierte ahora en una puerta: **la
+hoja de proveedores se carga ANTES que la de facturas**, porque el total de
+una factura con retención no sale de sumar el IVA a la base, y sin la ficha
+del emisor nada lo dice.
+
+El test lo fija de punta a punta, que es la única forma de que no se vuelva a
+perder: base 750,00 sin más dato que el perfil → IVA 157,50, retención
+142,50, total 765,00. Y al lado, la comprobación que explica el orden: restar
+la base del total habría dado **15,00 € de IVA**, el banco habría cuadrado
+igual contra los 765,00 que se pagaron, y el error habría llegado a la
+gestoría sin que ninguna pantalla lo señalara.
+
+**Lo que se decidió, todo reversible:**
+
+1. **Una celda vacía no borra nada.** Es «no opino», no «déjalo en blanco».
+   La hoja que trae los datos de pago de un proveedor no suele traer su
+   domicilio, y una importación no puede vaciar el domicilio fiscal de un
+   registro por el que ya pasan facturas. Un **cero explícito sí es una
+   opinión** y apaga la retención: vacío y cero no son lo mismo.
+2. **El rótulo de la tienda no es la razón social.** Al libro va «Bricolaje
+   Bricoman, S.L.U.»; «Obramat Badalona» se guarda como ALIAS. Es el único
+   campo que permite volver a casar el registro contra una subida futura, y
+   es además el nombre por el que la clienta lo busca. Una hoja posterior que
+   escriba el rótulo donde va la razón social encuentra al proveedor en vez
+   de duplicarlo.
+3. **El nombre de un contacto no se reescribe desde una hoja.** Casamos por
+   NIF; un NIF que casa con otra razón social significa que el nombre cambió
+   o que la hoja lo trae peor escrito, y ninguna de las dos es razón para
+   renombrar a alguien por quien ya pasan facturas. Entra como alias.
+4. **Los roles se suman.** Un proveedor que además es cliente no deja de
+   serlo porque una hoja de proveedores lo mencione. Misma razón por la que
+   `setItemPartidas` recibe la unión.
+5. **La forma jurídica se deduce del sufijo.** `addParty` crea todo como
+   persona física, que es falso para las seis razones sociales reales de este
+   cliente. «S.L.», «S.A.» y «S.L.U.» son sociedades; «C.B.» es una comunidad
+   de bienes — y una de las facturas del cliente, la del alquiler, viene
+   justamente de una C.B. No cuelga ninguna aritmética de esto y se corrige en
+   Contactos en un clic, así que deducirlo es mejor que dejarlo mal.
+6. **Un NIF ausente, inválido o repetido es un error CON MOTIVO y con número
+   de fila, y no detiene el resto de la hoja.** Treinta proveedores no se
+   tiran a la basura porque la fila nueve esté mal. Sin NIF no hay alta: es
+   lo único que casa una factura con su emisor, y es además lo único que el
+   lector de documentos acierta de forma fiable (3 de 3 en verde sobre los
+   PDF reales, frente a 0 de 3 en el nombre).
+
+**Dos cosas que el navegador encontró y el planificador no podía:**
+
+- **La plantilla se descargaba con el bloque de identidad de la empresa al
+  pie.** `xlsxSheetPart` lo añade a cualquier hoja que exporta, que es lo
+  correcto para un informe y un error para un formulario: el pie —razón
+  social, NIF y dirección, todo en una celda— volvía a entrar como una fila
+  de datos con nombre y sin NIF, que es exactamente lo que el lector refusa.
+  La plantilla del libro de precios arrastra el mismo pie desde siempre; allí
+  no se nota porque su planificador ignora las filas sin título, partida ni
+  subpartida. Se añade `noFoot` y lo usa la plantilla de proveedores; la del
+  libro se deja como está, que lleva meses en verde.
+- **El cajón sigue en el DOM después de cerrarse**; lo que se va es la clase
+  `.on`. Un test que preguntaba por el selector de fichero lo daba por
+  abierto para siempre.
+
+**Lo que NO lleva:** «Nº de cliente nuestro», que sí está en la hoja de la
+clienta. No hay campo para él en la ficha y añadir uno pide una migración que
+esta carga no justifica, así que entra en las notas y **sólo al crear** — en
+una actualización no se toca, que es lo que mantiene la segunda pasada
+idéntica a la primera.
