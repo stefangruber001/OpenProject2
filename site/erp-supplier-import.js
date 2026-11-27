@@ -157,7 +157,15 @@
    */
   function toPartyType(name) {
     var f = fold(name).replace(/[.,]/g, "");
+    /* Las formas españolas y, detrás, las extranjeras que este cliente ya
+       recibe: una suscripción de software facturada desde fuera entra en el
+       mismo fichero que el almacén de la esquina, y archivarla como persona
+       física porque su sufijo no es «S.L.» es la clase de detalle que hace
+       dudar del resto. Se dejan fuera las siglas de dos letras que chocan con
+       palabras corrientes (AG, AB, OY, SPA): el coste de acertar una más no
+       compensa clasificar mal a «Spa Vallès». */
     if (/\b(sl|sa|slu|sau|slp|sccl|scp|sl unipersonal)\b/.test(f)) return "company";
+    if (/\b(pbc|inc|ltd|llc|gmbh|plc|sarl|srl|bv|nv)\b/.test(f)) return "company";
     if (/\b(cb|comunidad de bienes|comunitat de bens)\b/.test(f)) return "community";
     if (/\b(ayuntamiento|ajuntament|generalitat|diputacion|consorcio)\b/.test(f))
       return "publicBody";

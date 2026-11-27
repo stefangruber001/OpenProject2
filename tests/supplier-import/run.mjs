@@ -85,6 +85,12 @@ function plantillaRows() {
   is(S.toPartyType("Saltoki Cornellà, S.A.") === "company", "«S.A.» es una sociedad");
   is(S.toPartyType("Luengo Sanchez C.B.") === "community", "«C.B.» es una comunidad de bienes");
   is(S.toPartyType("Júlia Garcia Gómez") === "individual", "sin sufijo, persona física");
+  is(S.toPartyType("Anthropic, PBC") === "company", "«PBC» es una sociedad extranjera");
+  is(S.toPartyType("Acme GmbH") === "company", "«GmbH» también");
+  is(
+    S.toPartyType("Spa Vallès") === "individual",
+    "«Spa» no es una sigla: no se confunde con S.p.A.",
+  );
 }
 
 /* ---------- 3 · EL ARCO DE LA RETENCIÓN, que es el motivo de todo esto ---------- */

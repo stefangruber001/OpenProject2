@@ -12415,3 +12415,48 @@ clienta. No hay campo para él en la ficha y añadir uno pide una migración que
 esta carga no justifica, así que entra en las notas y **sólo al crear** — en
 una actualización no se toca, que es lo que mantiene la segunda pasada
 idéntica a la primera.
+
+## S169 · Lo que el material real cambió, y dos ficheros que yo había descartado mal
+
+Once proveedores salidos de los PDF de la carpeta del cliente, no de supuestos.
+Tres cosas que sólo se ven mirando los documentos:
+
+**Dos ficheros que había dicho que se saltaran, y en los dos me equivoqué.**
+`30- CANEI SUBIRATS.xlsx - Sheet1.pdf` no es la impresión de una hoja de
+cálculo: es una factura de **Oleg Belenciuc** (NIE `X2647926M`), 2.585,36 € de
+base. Y el albarán —que efectivamente no es una factura— resultó ser el único
+papel con la dirección y el correo de Sinelec. El nombre de un fichero no dice
+lo que hay dentro, y descartarlo por el nombre es como se pierde un gasto.
+
+**Un fichero que NO puede entrar como compra.** `Factura 15 Júlia Garcia…` es
+una factura EMITIDA por Canei: dice «Factura **a:** Júlia Garcia Vergés» y va
+firmada al pie con el CIF de Canei y su cuenta del BBVA. Cargarla como factura
+recibida daría de alta a una clienta como proveedora y anotaría 11.921,00 € de
+ingreso como coste. Además es de mayo, no del T4. **La carga de facturas
+necesitará una comprobación explícita de que el emisor no somos nosotros** —
+el NIF de la empresa está en el documento y el lector ya sabe distinguirlo
+(ver S159), así que la regla es barata y la consecuencia de no tenerla no.
+
+**«JGG» no era Júlia Garcia.** Lo supuse por las iniciales del nombre del
+fichero y es **Jorge Garcia Garcia**, otra persona. Las iniciales de un nombre
+de fichero no son un dato.
+
+**Lo que los documentos sí dijeron:**
+
+- Las tres series de Obramat son **una sola empresa**: `028-0011` es Badalona,
+  `036-0010` y `F0018-036` son L'Hospitalet. Mismo CIF, dos tiendas.
+- «La Plataforma Sant Just» es BigMat: misma serie fiscal `00002-2026/A2nnn` y
+  mismo número de cliente, `56619894`.
+- **Ninguno de los tres autónomos retiene.** Los tres facturan al 21 % sin
+  IRPF, que es lo correcto para una actividad empresarial — la retención se
+  practica sobre actividades profesionales. El único que retiene es el
+  arrendador, porque el alquiler sí. Queda anotado para que la gestoría lo
+  confirme, pero las facturas son coherentes entre sí.
+- Anthropic factura con **NIF intracomunitario irlandés y sin IVA español**:
+  inversión del sujeto pasivo. No se decide aquí; se señala.
+
+**Formas jurídicas extranjeras.** `toPartyType` archivaba «Anthropic, PBC»
+como persona física porque su sufijo no era «S.L.». Se añaden PBC, Inc, Ltd,
+LLC, GmbH, PLC, SARL, SRL, BV y NV, y se dejan fuera a propósito las siglas de
+dos letras que chocan con palabras corrientes (AG, AB, OY, SPA): acertar una
+más no compensa clasificar mal a «Spa Vallès».
